@@ -142,7 +142,7 @@
 | UI-01 | Phase 8 | Pending |
 | UI-02 | Phase 8 | Pending |
 | UI-03 | Phase 8 | Pending |
-| UI-04 | Phase 9 | Pending |
+| UI-04 | Phase 9 | Complete |
 | UI-05 | Phase 10 | Pending |
 | UI-06 | Phase 10 | Pending |
 | PDF-01 | Phase 11 | Pending |
