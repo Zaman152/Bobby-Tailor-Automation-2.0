@@ -407,5 +407,38 @@ def download_report_legacy(filename):
     return send_file(str(path), as_attachment=True)
 
 
+@app.route("/settings")
+def settings_page():
+    """Settings management page."""
+    return render_template("settings.html")
+
+
+@app.route("/api/settings", methods=["GET"])
+def api_get_settings():
+    """Return current settings with secrets redacted."""
+    from settings import get_settings
+    return jsonify(get_settings())
+
+
+@app.route("/api/settings", methods=["PUT"])
+def api_update_settings():
+    """Update settings — partial updates supported."""
+    from settings import get_settings, update_settings
+    data = request.get_json() or {}
+    if not data:
+        return jsonify({"error": "No settings provided"}), 400
+
+    success, message, restart_required = update_settings(data)
+    if not success:
+        return jsonify({"error": message}), 400
+
+    return jsonify({
+        "success": True,
+        "message": message,
+        "restart_required": restart_required,
+        "settings": get_settings()
+    })
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5050, use_reloader=False)
