@@ -10,12 +10,12 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 ## Current Position
 
-Phase: 13 of 13 (StackCT Data & Persistence) — complete  
-Plan: 13-01 through 13-04 (4/4)  
-Status: Phase 13 complete; Phase 12 (auth) planned not executed
-Last activity: 2026-05-26 — Executed Phase 13 (`/gsd-execute-phase 13`)
+Phase: 12 of 13 (Application Authentication) — in progress  
+Plan: 12-01 of N (1 complete)  
+Status: Phase 12 in progress — 12-01 complete, remaining plans pending
+Last activity: 2026-05-26 — Completed 12-01-PLAN.md (auth deps + admin seeding)
 
-Progress: [██████████] 100% (v1 phases 1–11 + 13; Phase 12 auth pending)
+Progress: [██████████] 100% (v1 phases 1–11 + 13; Phase 12 plan 01 complete)
 
 ## Performance Metrics
 
@@ -61,6 +61,14 @@ From 03-03 (UI Cost Display):
 - Report cards show cost in green (#4ade80) with 4-decimal USD precision
 - list_reports() reads api_usage from takeoff.json; old runs without cost render gracefully
 
+### Decisions
+
+From 12-01 (Auth Dependencies & Admin Seeding):
+
+- bcrypt rounds=12 for admin password hash (strong work factor, ~1s seeding time)
+- RATE_LIMIT_STORAGE_URI defaults to memory://; Redis URI documented for multi-worker gunicorn
+- SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD_HASH added to REQUIRED_ENV_VARS (crash-fail on missing)
+
 ### Pending Todos
 
 None yet.
@@ -74,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-26  
-Stopped at: Phase 3 complete — ready for `/gsd-plan-phase 9` or `/gsd-execute-phase 9`  
+Last session: 2026-05-26 17:26 UTC  
+Stopped at: Completed 12-01-PLAN.md — ready for `/gsd-execute-phase 12` (plan 02)  
 Resume file: None
