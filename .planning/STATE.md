@@ -11,11 +11,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 14 of 14 (StackCT Plan Sets & Folders)  
-Plan: 1 of 4 complete  
-Status: In progress — 14-01 executed 2026-05-26  
-Last activity: 2026-05-26 — `/gsd-execute-phase 14` (plan-set discovery, dedupe)
+Plan: 2 of 4 complete  
+Status: In progress — 14-01, 14-02 executed 2026-05-26  
+Last activity: 2026-05-26 — `/gsd-execute-phase 14` (browser, schema v2, sync)
 
-Progress: [██████████░] 92% (phases 1–13 complete, 14 in progress 1/4)
+Progress: [██████████░] 94% (phases 1–13 complete, 14 in progress 2/4)
 
 ## Performance Metrics
 
@@ -84,6 +84,13 @@ From 14-01 (Plan-Set Discovery & Dedupe):
 - Dedupe rules based on 14-DISCOVERY audit: drop "Plans X" parent, drop aggregate folders with multiple version labels
 - Direct-grid fallback with folder_id=0 for projects without folder cards (ATL 081 pattern)
 - Deprecated get_all_page_ids to use folder-aware APIs (prevents mixing multiple sets)
+
+From 14-02 (Schema v2 & Folder-Aware Sync):
+
+- Schema v2: project_plan_sets table, project_plans PK changed to (stackct_id, folder_id, page_id)
+- v1→v2 migration drops project_plans table (re-sync required for all projects)
+- sync_project_plans and get_project_plans now require folder_id parameter
+- Background sync tracks (project_id, folder_id) tuples for parallel folder syncs
 
 ### Pending Todos
 
