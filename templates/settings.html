@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings — Bobby Tailor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: #0b0d11;
+      color: #f1f5f9;
+      min-height: 100vh;
+      padding: 40px 24px;
+    }
+
+    .page-header {
+      max-width: 720px;
+      margin: 0 auto 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .page-header h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+
+    .back-link {
+      color: #60a5fa;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .back-link:hover { text-decoration: underline; }
+
+    .settings-form {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .section {
+      background: #141720;
+      border: 1px solid #252a3a;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .section h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #252a3a;
+    }
+
+    .field {
+      margin-bottom: 18px;
+    }
+    .field:last-child { margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .field-set-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10b981;
+      font-weight: 500;
+    }
+
+    .field-unset-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(239, 68, 68, 0.15);
+      color: #ef4444;
+      font-weight: 500;
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    select {
+      width: 100%;
+      background: #0f1117;
+      border: 1px solid #252a3a;
+      color: #f1f5f9;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input:focus, select:focus {
+      border-color: #3b82f6;
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      accent-color: #3b82f6;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .help-text {
+      font-size: 12px;
+      color: #475569;
+      margin-top: 5px;
+    }
+
+    .model-option-hint {
+      font-size: 11px;
+      color: #475569;
+      margin-top: 4px;
+    }
+
+    .cron-examples {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #475569;
+    }
+    .cron-examples code {
+      font-family: 'JetBrains Mono', 'Menlo', monospace;
+      color: #94a3b8;
+      background: #1c1f2e;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .actions {
+      max-width: 720px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .save-btn {
+      padding: 12px 32px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .save-btn:hover { background: #2563eb; }
+    .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .msg-area {
+      flex: 1;
+      font-size: 14px;
+    }
+
+    .msg-success {
+      color: #10b981;
+      padding: 10px 16px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-radius: 8px;
+    }
+
+    .msg-error {
+      color: #ef4444;
+      padding: 10px 16px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: 8px;
+    }
+
+    .msg-warning {
+      color: #f59e0b;
+      padding: 10px 16px;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(96,165,250,0.3);
+      border-top-color: #60a5fa;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>⚙️ Settings</h1>
+  <a href="/" class="back-link">← Back to App</a>
+</div>
+
+<form class="settings-form" onsubmit="saveSettings(event)">
+
+  <!-- ── StackCT Credentials ── -->
+  <div class="section">
+    <h2>StackCT Credentials</h2>
+
+    <div class="field">
+      <div class="label-row">
+        <label for="STACKCT_EMAIL">Email</label>
+        <span id="STACKCT_EMAIL_badge"></span>
+      </div>
+      <input type="email" id="STACKCT_EMAIL" name="STACKCT_EMAIL" placeholder="your@email.com" autocomplete="username" />
+      <p class="help-text">Your StackCT login email address.</p>
+    </div>
+
+    <div class="field">
+      <div class="label-row">
+        <label for="STACKCT_PASSWORD">Password</label>
+        <span id="STACKCT_PASSWORD_badge"></span>
+      </div>
+      <input type="password" id="STACKCT_PASSWORD" name="STACKCT_PASSWORD"
+             data-sensitive="true" data-has-value="false"
+             placeholder="Enter new password to change"
+             autocomplete="current-password" />
+      <p class="help-text">Leave blank to keep existing password. Changing this requires a server restart.</p>
+    </div>
+  </div>
+
+  <!-- ── Anthropic API Configuration ── -->
+  <div class="section">
+    <h2>Anthropic API Configuration</h2>
+
+    <div class="field">
+      <div class="label-row">
+        <label for="ANTHROPIC_API_KEY">API Key</label>
+        <span id="ANTHROPIC_API_KEY_badge"></span>
+      </div>
+      <input type="password" id="ANTHROPIC_API_KEY" name="ANTHROPIC_API_KEY"
+             data-sensitive="true" data-has-value="false"
+             placeholder="sk-ant-... (leave blank to keep existing)"
+             autocomplete="off" />
+      <p class="help-text">Leave blank to keep existing key. Must start with <code style="font-family:monospace;color:#94a3b8;">sk-ant-</code>.</p>
+    </div>
+
+    <div class="field">
+      <label for="CLAUDE_MODEL">Default Model</label>
+      <select id="CLAUDE_MODEL" name="CLAUDE_MODEL">
+        <option value="claude-haiku-4-5">Claude Haiku 4.5 — Fast &amp; cheap ($1/$5 per 1M tokens)</option>
+        <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — Balanced ($3/$15 per 1M tokens)</option>
+        <option value="claude-opus-4-7">Claude Opus 4.7 — Most capable ($5/$25 per 1M tokens)</option>
+      </select>
+      <p class="help-text">Used for most drawing sheets. Haiku recommended for general takeoffs.</p>
+    </div>
+
+    <div class="field">
+      <label for="CLAUDE_MODEL_SCHEDULES">Schedule Sheet Model</label>
+      <select id="CLAUDE_MODEL_SCHEDULES" name="CLAUDE_MODEL_SCHEDULES">
+        <option value="claude-haiku-4-5">Claude Haiku 4.5 — Fast &amp; cheap</option>
+        <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — Better for complex tables</option>
+        <option value="claude-opus-4-7">Claude Opus 4.7 — Most capable</option>
+      </select>
+      <p class="help-text">Used for schedule and panel sheets with dense tabular text. Sonnet recommended.</p>
+    </div>
+  </div>
+
+  <!-- ── Browser Settings ── -->
+  <div class="section">
+    <h2>Browser Settings</h2>
+
+    <div class="field">
+      <div class="checkbox-row">
+        <input type="checkbox" id="HEADLESS" name="HEADLESS" />
+        <label for="HEADLESS" style="margin:0;cursor:pointer;">Run browser in headless mode</label>
+      </div>
+      <p class="help-text">Disable for debugging; enable for server/VPS deployment.</p>
+    </div>
+
+    <div class="field">
+      <label for="CANVAS_STABILITY_TIMEOUT">Canvas Stability Timeout (seconds)</label>
+      <input type="text" id="CANVAS_STABILITY_TIMEOUT" name="CANVAS_STABILITY_TIMEOUT" placeholder="15" />
+      <p class="help-text">Seconds to wait for canvas to stabilize before screenshot.</p>
+    </div>
+
+    <div class="field">
+      <label for="CANVAS_STABILITY_CHECKS">Canvas Stability Checks</label>
+      <input type="text" id="CANVAS_STABILITY_CHECKS" name="CANVAS_STABILITY_CHECKS" placeholder="2" />
+      <p class="help-text">Consecutive pixel-hash matches required before screenshot is taken.</p>
+    </div>
+  </div>
+
+  <!-- ── Output Configuration ── -->
+  <div class="section">
+    <h2>Output Configuration</h2>
+
+    <div class="field">
+      <label for="OUTPUT_DIR">Output Directory</label>
+      <input type="text" id="OUTPUT_DIR" name="OUTPUT_DIR" placeholder="./output" />
+      <p class="help-text">Where reports and screenshots are saved. Relative to project root.</p>
+    </div>
+  </div>
+
+  <!-- ── Schedule Configuration ── -->
+  <div class="section">
+    <h2>Schedule Configuration</h2>
+
+    <div class="field">
+      <label for="RUN_SCHEDULE">Automated Run Schedule (cron format)</label>
+      <input type="text" id="RUN_SCHEDULE" name="RUN_SCHEDULE" placeholder="0 8 * * *" />
+      <p class="help-text">Format: <code style="font-family:monospace;color:#94a3b8;">minute hour day month weekday</code></p>
+      <div class="cron-examples">
+        Examples: <code>0 8 * * *</code> daily at 8am &nbsp;·&nbsp;
+        <code>0 */6 * * *</code> every 6h &nbsp;·&nbsp;
+        <code>0 0 * * 1</code> every Monday
+      </div>
+    </div>
+  </div>
+
+</form>
+
+<div class="actions" style="margin-top:24px;">
+  <div class="msg-area" id="msgArea"></div>
+  <button class="save-btn" id="saveBtn" onclick="saveSettings(event)">Save Settings</button>
+</div>
+
+<script src="{{ url_for('static', filename='settings.js') }}"></script>
+</body>
+</html>
