@@ -2,6 +2,7 @@
 Flask web app — project selector UI + job runner.
 """
 import asyncio
+import json
 import threading
 import uuid
 import logging
@@ -10,7 +11,7 @@ from typing import Optional
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.exceptions import HTTPException
-from config import OUTPUT_DIR
+from config import OUTPUT_DIR, MAX_PREVIEW_ROWS
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO,
@@ -45,6 +46,80 @@ def handle_exception(e: Exception):
         "error": "Internal server error",
         "message": "An unexpected error occurred"
     }), 500
+
+
+# ── Preview Helpers ───────────────────────────────────────────────────────────
+
+ALLOWED_PREVIEW_EXTENSIONS = {'.csv', '.json', '.txt'}
+
+
+def _validate_preview_path(run_folder: str, filename: str) -> Optional[Path]:
+    """Validate and resolve preview file path.
+
+    Returns resolved Path if valid, None if path traversal or invalid.
+    Security: Uses Path.resolve() + relative_to() to prevent traversal attacks.
+    Logs security-relevant rejections for monitoring.
+    """
+    # Fast-fail obvious traversal attempts (defense in depth)
+    if ".." in run_folder or ".." in filename:
+        logger.warning(f"Preview path traversal attempt blocked: {run_folder}/{filename}")
+        return None
+    if "/" in run_folder or "/" in filename:
+        logger.warning(f"Preview path slash attempt blocked: {run_folder}/{filename}")
+        return None
+
+    # Check extension is previewable
+    ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_PREVIEW_EXTENSIONS:
+        logger.debug(f"Preview extension not allowed: {ext}")
+        return None
+
+    # Resolve and validate containment
+    output_root = Path(OUTPUT_DIR).resolve()
+    target = (output_root / run_folder / filename).resolve()
+
+    try:
+        target.relative_to(output_root)
+    except ValueError:
+        # Path escaped output directory (symlink attack, URL encoding, etc.)
+        logger.warning(f"Preview path escaped output directory: {run_folder}/{filename}")
+        return None
+
+    if not target.is_file():
+        return None
+
+    return target
+
+
+def _preview_csv(path: Path) -> dict:
+    """Read CSV with row cap and pagination metadata.
+
+    Returns dict with type, headers, rows, count, total, capped, cap_limit.
+    Memory-efficient: only loads MAX_PREVIEW_ROWS rows, counts rest without storing.
+    """
+    import csv as csv_module
+
+    total = 0
+    rows = []
+    headers = []
+
+    with open(path, newline='', encoding='utf-8', errors='replace') as f:
+        reader = csv_module.DictReader(f)
+        headers = list(reader.fieldnames or [])
+        for row in reader:
+            total += 1
+            if len(rows) < MAX_PREVIEW_ROWS:
+                rows.append(row)
+
+    return {
+        "type": "csv",
+        "headers": headers,
+        "rows": rows,
+        "count": len(rows),
+        "total": total,
+        "capped": total > MAX_PREVIEW_ROWS,
+        "cap_limit": MAX_PREVIEW_ROWS
+    }
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -284,6 +359,43 @@ def download_run_file(run_folder, filename):
     if not path.exists() or not path.is_file():
         return jsonify({"error": "Not found"}), 404
     return send_file(str(path), as_attachment=True)
+
+
+@app.route("/api/reports/<run_folder>/preview/<filename>")
+def preview_report(run_folder: str, filename: str):
+    """Preview report file content for in-browser rendering.
+
+    Returns type-appropriate JSON:
+    - .csv → {"type": "csv", "headers": [...], "rows": [...], "total": N, "capped": bool}
+    - .json → {"type": "json", "data": {...}}
+    - .txt → {"type": "text", "content": "..."}
+    """
+    path = _validate_preview_path(run_folder, filename)
+    if path is None:
+        return jsonify({"error": "Invalid path"}), 400
+
+    ext = path.suffix.lower()
+
+    try:
+        if ext == '.csv':
+            return jsonify(_preview_csv(path))
+        elif ext == '.json':
+            data = json.loads(path.read_text(encoding='utf-8'))
+            return jsonify({"type": "json", "data": data})
+        elif ext == '.txt':
+            content = path.read_text(encoding='utf-8', errors='replace')
+            return jsonify({"type": "text", "content": content})
+        else:
+            return jsonify({"error": "Unsupported format"}), 400
+    except json.JSONDecodeError as e:
+        logger.warning(f"Invalid JSON in preview: {path.name} - {e}")
+        return jsonify({"error": "Invalid JSON file"}), 400
+    except UnicodeDecodeError as e:
+        logger.warning(f"Encoding error in preview: {path.name} - {e}")
+        return jsonify({"error": "File encoding error"}), 400
+    except Exception as e:
+        logger.error(f"Preview failed for {path.name}", exc_info=True)
+        raise
 
 
 @app.route("/api/reports/<filename>")
