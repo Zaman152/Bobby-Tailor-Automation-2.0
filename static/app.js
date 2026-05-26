@@ -280,7 +280,7 @@ async function loadReports() {
       return '<div class="report-item">' +
         '<div>' +
           '<div class="report-name">' + escHtml(r.project_name) + '</div>' +
-          '<div class="report-meta">' + new Date(r.created * 1000).toLocaleString() + ' · <code style="font-size:11px;color:#888">' + escHtml(r.run_folder) + '/</code></div>' +
+          '<div class="report-meta">' + new Date(r.created * 1000).toLocaleString() + (r.sheets_processed ? ' · ' + r.sheets_processed + ' sheets' : '') + (r.total_cost_usd != null ? ' · <span style="color:#4ade80;font-weight:500">$' + r.total_cost_usd.toFixed(4) + '</span>' : '') + ' · <code style="font-size:11px;color:#888">' + escHtml(r.run_folder) + '/</code></div>' +
         '</div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
           fileLink('calculated_csv', '📐 Calculations', '#1958c4') +
