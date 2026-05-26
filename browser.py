@@ -162,29 +162,35 @@ class StackCTBrowser:
 
         url = f"https://go.stackct.com/app/#/Takeoff/{project_id}"
         await self.page.goto(url, wait_until="load")
-        # Wait for thumbnails to render
-        try:
-            await self.page.wait_for_selector('[data-page-id]', timeout=15000)
-        except Exception:
-            logger.error("No [data-page-id] elements found — plans grid may not have loaded")
-            return []
-
-        await asyncio.sleep(2)
-
-        # Read all page containers with their IDs and names in one JS call
-        pages_raw = await self.page.evaluate('''() => {
-            const result = [];
-            const seen = new Set();
-            document.querySelectorAll('[data-page-id]').forEach(el => {
-                const pid = el.getAttribute('data-page-id');
-                if (!pid || seen.has(pid)) return;
-                seen.add(pid);
-                const nameEl = el.querySelector('[data-id="thumbnail-page-name"]');
-                const name = nameEl ? nameEl.textContent.trim() : "";
-                result.push({page_id: parseInt(pid), sheet_name: name});
-            });
-            return result;
-        }''')
+        # Wait for thumbnails to render — grid can be slow on first load
+        pages_raw = []
+        for attempt in range(3):
+            try:
+                await self.page.wait_for_selector('[data-page-id]', timeout=30000)
+                await asyncio.sleep(2 + attempt)
+                pages_raw = await self.page.evaluate('''() => {
+                    const result = [];
+                    const seen = new Set();
+                    document.querySelectorAll('[data-page-id]').forEach(el => {
+                        const pid = el.getAttribute('data-page-id');
+                        if (!pid || seen.has(pid)) return;
+                        seen.add(pid);
+                        const nameEl = el.querySelector('[data-id="thumbnail-page-name"]');
+                        const name = nameEl ? nameEl.textContent.trim() : "";
+                        result.push({page_id: parseInt(pid), sheet_name: name});
+                    });
+                    return result;
+                }''')
+                if pages_raw:
+                    break
+            except Exception:
+                if attempt < 2:
+                    logger.warning(f"Page grid not ready (attempt {attempt + 1}/3), retrying...")
+                    await asyncio.sleep(3)
+                    await self.page.goto(url, wait_until="load")
+                else:
+                    logger.error("No [data-page-id] elements found — plans grid may not have loaded")
+                    return []
 
         pages = [p for p in pages_raw if p["page_id"]]
         for p in pages:

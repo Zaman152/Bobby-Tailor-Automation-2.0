@@ -3,7 +3,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Always load .env from the same directory as this file
-_env_path = Path("/Users/macbook/Desktop/Bobby Tailor/.env")
+_env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=_env_path, override=True)
 
 # StackCT Credentials (set in .env file)
