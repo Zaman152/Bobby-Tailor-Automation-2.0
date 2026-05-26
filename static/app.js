@@ -32,6 +32,7 @@ let openPreviewFolder = null;
 let openPreviewTab = {};
 let currentJobId = null;
 let monitorPollInterval = null;
+let currentPdfUpload = null;
 
 function navigateTo(pageName) {
   // Hide all sections
@@ -200,57 +201,161 @@ async function runStackCT() {
   }
 }
 
-// ── PDF File Handling ──────────────────────────────────────────────────────
-function onFileSelected(input) {
-  selectedFile = input.files[0];
-  if (selectedFile) {
-    document.getElementById('selectedFileName').textContent =
-      '✓ ' + selectedFile.name + ' (' + (selectedFile.size / 1024 / 1024).toFixed(1) + ' MB)';
-    if (!document.getElementById('pdfProjectName').value)
-      document.getElementById('pdfProjectName').value = selectedFile.name.replace('.pdf', '');
-    document.getElementById('runPdfBtn').disabled = false;
+// ── PDF Upload & Page Selection (Master §8.6) ───────────────────────────────
+function formatFileSize(bytes) {
+  if (bytes == null) return '—';
+  const mb = bytes / 1024 / 1024;
+  return mb >= 0.1 ? mb.toFixed(1) + ' MB' : (bytes / 1024).toFixed(0) + ' KB';
+}
+
+async function uploadPdfFile(file) {
+  selectedFile = file;
+  currentPdfUpload = null;
+
+  const metaEl = document.getElementById('pdfUploadMeta');
+  const pageSel = document.getElementById('pageSelection');
+  const runBtn = document.getElementById('runPdfBtn');
+
+  metaEl.style.display = 'block';
+  metaEl.textContent = 'Uploading…';
+  pageSel.style.display = 'none';
+  runBtn.disabled = true;
+
+  const form = new FormData();
+  form.append('file', file);
+
+  try {
+    const res = await fetch('/api/pdf/upload', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.error) {
+      metaEl.textContent = 'Error: ' + data.error;
+      return;
+    }
+
+    currentPdfUpload = data;
+    if (!document.getElementById('pdfProjectName').value) {
+      document.getElementById('pdfProjectName').value = file.name.replace(/\.pdf$/i, '');
+    }
+
+    metaEl.textContent = '✓ ' + data.filename + ' · ' + data.page_count + ' pages · ' + formatFileSize(data.file_size_bytes);
+    document.getElementById('totalPageCount').textContent = data.page_count;
+    renderPdfPageList(data.pages || []);
+    pageSel.style.display = 'block';
+    runBtn.disabled = false;
+  } catch (e) {
+    metaEl.textContent = 'Upload failed: ' + e.message;
   }
 }
 
-// Drag & drop
-const dz = document.getElementById('dropZone');
-if (dz) {
-  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
-  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-  dz.addEventListener('drop', e => {
-    e.preventDefault(); dz.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.pdf')) {
-      const dt = new DataTransfer(); dt.items.add(file);
-      const inp = document.getElementById('fileInput');
-      inp.files = dt.files;
-      onFileSelected(inp);
-    }
+function onFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('selectedFileName').textContent = file.name;
+  uploadPdfFile(file);
+}
+
+function renderPdfPageList(pages) {
+  const list = document.getElementById('pdfPageList');
+  list.innerHTML = pages.map(p =>
+    '<label class="page-checkbox-label">' +
+      '<input type="checkbox" value="' + p.page_num + '" checked> ' +
+      p.page_num + '. ' + escHtml(p.sheet_name) +
+    '</label>'
+  ).join('');
+}
+
+function togglePdfPageList() {
+  const mode = document.querySelector('input[name="pageMode"]:checked')?.value;
+  const wrap = document.getElementById('pdfPageListWrap');
+  if (wrap) wrap.style.display = mode === 'select' ? 'block' : 'none';
+}
+
+function selectAllPdfPages(checked) {
+  document.querySelectorAll('#pdfPageList input[type="checkbox"]').forEach(cb => {
+    cb.checked = checked;
   });
 }
 
-async function runPDF() {
-  if (!selectedFile) return;
-  const btn = document.getElementById('runPdfBtn');
-  const name = document.getElementById('pdfProjectName').value || selectedFile.name;
-  btn.disabled = true;
-  btn.textContent = '⏳ Uploading…';
+function getSelectedPdfPages() {
+  const mode = document.querySelector('input[name="pageMode"]:checked')?.value;
+  if (mode === 'all') return null;
+  const pages = Array.from(document.querySelectorAll('#pdfPageList input:checked'))
+    .map(cb => parseInt(cb.value, 10));
+  return pages.length ? pages : [];
+}
 
-  const form = new FormData();
-  form.append('file', selectedFile);
-  form.append('project_name', name);
+async function runPDF() {
+  if (!currentPdfUpload) {
+    alert('Please upload a PDF first.');
+    return;
+  }
+
+  const selectedPages = getSelectedPdfPages();
+  if (Array.isArray(selectedPages) && selectedPages.length === 0) {
+    alert('Please select at least one page.');
+    return;
+  }
+
+  const btn = document.getElementById('runPdfBtn');
+  const name = document.getElementById('pdfProjectName').value || currentPdfUpload.filename.replace(/\.pdf$/i, '');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
 
   try {
-    const res = await fetch('/api/run/pdf', { method: 'POST', body: form });
+    const res = await fetch('/api/pdf/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        upload_id: currentPdfUpload.upload_id,
+        project_name: name,
+        selected_pages: selectedPages,
+      }),
+    });
     const data = await res.json();
-    if (data.error) { alert(data.error); return; }
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
     startPolling(data.job_id, name);
   } catch (e) {
-    alert('Upload failed: ' + e);
+    alert('Failed to start analysis: ' + e.message);
   } finally {
     btn.disabled = false;
     btn.textContent = '▶ Analyze PDF';
   }
+}
+
+function bindPdfEvents() {
+  const inp = document.getElementById('fileInput');
+  const dz = document.getElementById('dropZone');
+  if (inp) inp.addEventListener('change', () => onFileSelected(inp));
+
+  if (dz) {
+    dz.addEventListener('click', () => inp?.click());
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+    dz.addEventListener('drop', e => {
+      e.preventDefault();
+      dz.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file && file.name.toLowerCase().endsWith('.pdf')) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        inp.files = dt.files;
+        onFileSelected(inp);
+      }
+    });
+  }
+
+  document.querySelectorAll('input[name="pageMode"]').forEach(r => {
+    r.addEventListener('change', togglePdfPageList);
+  });
+
+  const runBtn = document.getElementById('runPdfBtn');
+  if (runBtn) runBtn.addEventListener('click', runPDF);
+
+  document.getElementById('pdfSelectAllBtn')?.addEventListener('click', () => selectAllPdfPages(true));
+  document.getElementById('pdfSelectNoneBtn')?.addEventListener('click', () => selectAllPdfPages(false));
 }
 
 // ── Job polling & monitor (Master §8.4) ────────────────────────────────────
@@ -1020,4 +1125,5 @@ function bindReportsAndMonitorEvents() {
 loadProjects();
 bindPlanSelectionEvents();
 bindReportsAndMonitorEvents();
+bindPdfEvents();
 startActiveJobPolling();
