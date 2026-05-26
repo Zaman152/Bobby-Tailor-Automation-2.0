@@ -16,6 +16,8 @@ cp .env.example .env
 
 ## VPS Deployment (Ubuntu)
 
+Production deployment on Hostinger VPS or similar Ubuntu hosts.
+
 ### System requirements
 
 - Ubuntu 20.04+ or Debian 11+
@@ -40,6 +42,96 @@ playwright install-deps chromium
 
 cp .env.example .env
 # Edit .env with StackCT and Anthropic credentials
+mkdir -p uploads output output/screenshots
+```
+
+### Environment variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `STACKCT_EMAIL` | StackCT login email | (required) |
+| `STACKCT_PASSWORD` | StackCT login password | (required) |
+| `ANTHROPIC_API_KEY` | Anthropic API key (`sk-ant-...`) | (required) |
+| `CLAUDE_MODEL` | Model for general drawings | `claude-haiku-4-5` |
+| `CLAUDE_MODEL_SCHEDULES` | Model for schedule/panel sheets | `claude-sonnet-4-6` |
+| `HEADLESS` | Run browser headless | `true` |
+| `OUTPUT_DIR` | Report output directory | `./output` |
+| `CANVAS_STABILITY_TIMEOUT` | Max seconds waiting for canvas render | `15` |
+| `CANVAS_STABILITY_CHECKS` | Consecutive stable hashes before capture | `2` |
+| `MAX_PREVIEW_ROWS` | CSV preview row cap in web UI | `500` |
+| `RUN_SCHEDULE` | Cron expression for scheduled runs | `0 8 * * *` |
+
+See `.env.example` for the full list and comments.
+
+### Running with Gunicorn
+
+Bind to localhost when using nginx; bind to `0.0.0.0` only if exposing directly:
+
+```bash
+source .venv/bin/activate
+gunicorn -w 2 -b 127.0.0.1:5050 app:app --timeout 300
+```
+
+Use `--timeout 300` (or higher) — StackCT runs and PDF analysis can exceed default worker timeouts.
+
+### Systemd service (auto-start on boot)
+
+Create `/etc/systemd/system/bobby-tailor.service`:
+
+```ini
+[Unit]
+Description=Bobby Tailor Estimation Automation
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/bobby-tailor
+Environment="PATH=/home/ubuntu/bobby-tailor/.venv/bin"
+ExecStart=/home/ubuntu/bobby-tailor/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5050 app:app --timeout 300
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable bobby-tailor
+sudo systemctl start bobby-tailor
+sudo systemctl status bobby-tailor
+```
+
+### Nginx reverse proxy (optional)
+
+Serve on port 80/443 and proxy to Gunicorn:
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:5050;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 75s;
+    }
+
+    client_max_body_size 100M;
+}
+```
+
+HTTPS with Let's Encrypt:
+
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain.com
 ```
 
 ### Chromium launch flags
@@ -55,12 +147,6 @@ Optional `.env` tuning for slow VPS links:
 - `CANVAS_STABILITY_TIMEOUT=20` — max seconds to wait for drawing tiles to finish rendering
 - `CANVAS_STABILITY_CHECKS=2` — consecutive matching pixel hashes before capture
 
-### Running with Gunicorn
-
-```bash
-gunicorn -w 2 -b 0.0.0.0:5050 app:app --timeout 300
-```
-
 ### Docker (alternative)
 
 If you run in Docker, increase shared memory:
@@ -72,6 +158,27 @@ services:
     ipc: host
     # or: shm_size: 1gb
     mem_limit: 2g
+```
+
+### Security notes
+
+**Firewall:** Expose only 80/443 (and SSH). Keep Gunicorn on `127.0.0.1:5050`:
+
+```bash
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 22/tcp
+sudo ufw enable
+```
+
+**Credentials:** Never commit `.env` to git (already in `.gitignore`).
+
+**Updates:** Periodically refresh Playwright and Chromium:
+
+```bash
+source .venv/bin/activate
+pip install --upgrade playwright
+playwright install chromium
 ```
 
 ### Troubleshooting
@@ -87,6 +194,11 @@ services:
 - Verify `playwright install chromium` completed
 - Check logs for canvas stability timeout warnings
 - Increase `CANVAS_STABILITY_TIMEOUT` in `.env`
+
+**PDF upload fails:**
+
+- Ensure `client_max_body_size` is large enough in nginx (see above)
+- Confirm `uploads/` directory exists and is writable
 
 ## Run
 
