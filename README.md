@@ -74,6 +74,10 @@ gunicorn -w 2 -b 127.0.0.1:5050 app:app --timeout 300
 
 Use `--timeout 300` (or higher) — StackCT runs and PDF analysis can exceed default worker timeouts.
 
+### StackCT catalog database
+
+Project and plan lists are stored in `{OUTPUT_DIR}/stackct.db` (SQLite). The UI reads the database first; live StackCT browser sync runs only when data is missing or past `STACKCT_CACHE_TTL_HOURS` (default 24). **Only one StackCT browser login runs at a time** — concurrent Refresh and Preview requests are queued. Legacy `projects_cache.json` / `plans_cache/` are migrated once on first startup.
+
 ### Systemd service (auto-start on boot)
 
 Create `/etc/systemd/system/bobby-tailor.service`:

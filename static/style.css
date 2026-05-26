@@ -516,6 +516,14 @@ select:focus, input[type="text"]:focus {
   flex-shrink: 0;
 }
 
+.sheet-count-pending,
+.sheet-count-unknown {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-style: italic;
+  opacity: 0.6;
+}
+
 .action-row {
   display: flex;
   gap: 10px;

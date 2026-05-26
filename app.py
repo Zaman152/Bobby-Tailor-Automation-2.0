@@ -12,7 +12,7 @@ from typing import Optional
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.exceptions import HTTPException
-from config import OUTPUT_DIR, MAX_PREVIEW_ROWS
+from config import OUTPUT_DIR, MAX_PREVIEW_ROWS, STACKCT_CACHE_TTL_HOURS
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO,
@@ -23,9 +23,30 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs("output/screenshots", exist_ok=True)
 os.makedirs("uploads", exist_ok=True)
 
-# Kick off background project cache refresh on startup
+# SQLite catalog + background StackCT sync on startup
+import stackct_store
+stackct_store.init_db()
+
 from project_cache import prefetch_in_background
 prefetch_in_background()
+
+# Periodic stale catalog refresh (single browser lock — may queue with preview)
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from stackct_sync import sync_projects_if_stale
+
+    _catalog_scheduler = BackgroundScheduler(daemon=True)
+    _catalog_scheduler.add_job(
+        sync_projects_if_stale,
+        "interval",
+        hours=STACKCT_CACHE_TTL_HOURS,
+        id="stackct_projects_sync",
+        replace_existing=True,
+    )
+    _catalog_scheduler.start()
+    logger.info("StackCT catalog scheduler started (interval=%sh)", STACKCT_CACHE_TTL_HOURS)
+except Exception as e:
+    logger.warning("APScheduler catalog sync not started: %s", e)
 
 # In-memory job tracker
 jobs: dict = {}
@@ -263,7 +284,12 @@ def index():
 
 @app.route("/api/projects")
 def get_projects():
-    """Return project list from cache (instant). Browser only used if cache is missing/stale."""
+    """Return project list from SQLite (DB-first).
+
+    Query: ?refresh=1 forces live StackCT sync.
+    Response may include from_cache, stale, syncing.
+    Legacy projects_cache.json is no longer read on this path.
+    """
     from project_cache import get_projects as _get
     force = request.args.get("refresh") == "1"
     result = _get(force_refresh=force)
@@ -272,21 +298,40 @@ def get_projects():
 
 @app.route("/api/projects/refresh", methods=["POST"])
 def refresh_projects():
-    """Force a fresh browser fetch of projects and update cache."""
-    from project_cache import get_projects as _get
-    result = _get(force_refresh=True)
+    """Force StackCT project catalog sync into SQLite."""
+    from stackct_sync import sync_projects
+    result = sync_projects(force=True)
+    return jsonify(result)
+
+
+@app.route("/api/projects/sheet-counts")
+def get_sheet_counts():
+    """Return sheet counts per project_id from SQLite (no browser when DB warm)."""
+    from project_cache import get_all_sheet_counts as _counts
+    return jsonify(_counts())
+
+
+@app.route("/api/projects/<int:project_id>/sync-plans", methods=["POST"])
+def sync_plans(project_id):
+    """Warm plan list for a project into SQLite (serialized browser login)."""
+    from stackct_sync import sync_project_plans
+    force = request.args.get("force") == "1"
+    result = sync_project_plans(project_id, force=force)
     return jsonify(result)
 
 
 @app.route("/api/projects/<int:project_id>/plans")
 def get_plans(project_id):
-    """Return drawing page list for plan selection UI.
+    """Return drawing page list for plan selection (DB-first).
 
-    Returns list of {page_id, sheet_name} for each drawing sheet in the project.
-    Allows users to preview available sheets before starting analysis.
+    Query: ?refresh=1 force live sync; ?background=1 non-blocking empty response.
     """
     from project_cache import get_project_plans as _get_plans
-    result = _get_plans(project_id)
+    force = request.args.get("refresh") == "1"
+    background = request.args.get("background") == "1"
+    result = _get_plans(
+        project_id, force_refresh=force, background=background
+    )
     return jsonify(result)
 
 

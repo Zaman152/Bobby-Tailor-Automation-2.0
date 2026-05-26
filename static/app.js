@@ -93,11 +93,12 @@ async function loadProjects(force = false) {
 
     allProjects = data.projects || [];
     projectsLoaded = true;
+    await loadSheetCounts();
     renderProjectList(allProjects);
 
     if (status) {
       const when = data.fetched_at ? new Date(data.fetched_at).toLocaleString() : '';
-      const tag = data.from_cache ? 'Cached' + (data.stale ? ' (stale)' : '') : 'Live';
+      let tag = data.syncing ? 'Syncing…' : (data.from_cache ? 'Cached' + (data.stale ? ' · refreshing' : '') : 'Live');
       status.textContent = tag + ' · ' + allProjects.length + ' projects' + (when ? ' · ' + when : '');
     }
   } catch (e) {
@@ -105,6 +106,21 @@ async function loadProjects(force = false) {
     if (status) status.textContent = 'Network error';
   } finally {
     if (refreshBtn) refreshBtn.disabled = false;
+  }
+}
+
+async function loadSheetCounts() {
+  try {
+    const res = await fetch('/api/projects/sheet-counts');
+    if (!res.ok) return;
+    const data = await res.json();
+    const counts = data.counts || {};
+    Object.keys(counts).forEach(id => {
+      projectSheetCounts[parseInt(id, 10)] = counts[id];
+    });
+    if (allProjects.length) renderProjectList(allProjects);
+  } catch (_) {
+    /* non-fatal */
   }
 }
 
@@ -124,7 +140,9 @@ function renderProjectList(projects) {
   listEl.innerHTML = filtered.map(p => {
     const isSelected = selectedProject && selectedProject.id === p.id;
     const count = projectSheetCounts[p.id];
-    const countLabel = count != null ? count + ' sheet' + (count !== 1 ? 's' : '') : '— sheets';
+    const countLabel = count != null
+      ? count + ' sheet' + (count !== 1 ? 's' : '')
+      : '<span class="sheet-count-unknown" title="Sync plans to load count">—</span>';
     return '<div class="project-item' + (isSelected ? ' selected' : '') + '" data-id="' + p.id + '" data-name="' + escHtml(p.name) + '" role="button" tabindex="0" aria-label="Select project ' + escHtml(p.name) + '">' +
       '<input type="radio" name="projectPick" class="project-radio"' + (isSelected ? ' checked' : '') + ' tabindex="-1" aria-hidden="true">' +
       '<div class="project-info">' +
@@ -142,11 +160,25 @@ function onProjectSelect(projectId, projectName) {
   document.getElementById('projectMeta').textContent = 'Project ID: ' + projectId;
   renderProjectList(allProjects);
   updatePreviewButton();
+  if (projectSheetCounts[projectId] == null) {
+    fetch('/api/projects/' + projectId + '/sync-plans', { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if (data.plans && data.plans.length) {
+          projectSheetCounts[projectId] = data.plans.length;
+          renderProjectList(allProjects);
+        }
+      })
+      .catch(() => {});
+  }
 }
 
 function updatePreviewButton() {
   const btn = document.getElementById('previewPlansBtn');
-  if (btn) btn.disabled = !selectedProject;
+  const refreshPlansBtn = document.getElementById('refreshPlansBtn');
+  const on = !!selectedProject;
+  if (btn) btn.disabled = !on;
+  if (refreshPlansBtn) refreshPlansBtn.disabled = !on;
 }
 
 function filterProjects(query) {
@@ -919,22 +951,60 @@ function resetPlanSelection() {
   updateRunButtonCount();
 }
 
-async function fetchPlans(projectId) {
-  const planList = document.getElementById('planList');
-  planList.innerHTML = '<p class="loading"><span class="spinner"></span> Loading plans…</p>';
+let plansFetchAbort = null;
+let plansFetchProjectId = null;
 
-  try {
-    const res = await fetch('/api/projects/' + projectId + '/plans');
+async function fetchPlans(projectId, forceRefresh) {
+  const planList = document.getElementById('planList');
+  const previewBtn = document.getElementById('previewPlansBtn');
+  planList.innerHTML = '<p class="loading"><span class="spinner"></span> Loading plans…</p>';
+  if (previewBtn) previewBtn.disabled = true;
+
+  if (plansFetchAbort) plansFetchAbort.abort();
+  plansFetchAbort = new AbortController();
+  plansFetchProjectId = projectId;
+  const signal = plansFetchAbort.signal;
+
+  const url = '/api/projects/' + projectId + '/plans' + (forceRefresh ? '?refresh=1' : '');
+  const maxPolls = 40;
+  let polls = 0;
+
+  async function loadOnce() {
+    const res = await fetch(url, { signal });
     if (res.status === 404) {
-      planList.innerHTML = '<p class="error">Project not found</p>';
-      return;
+      return { error: 'Project not found', plans: [] };
     }
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
+    return res.json();
+  }
 
-    if (data.error) {
-      planList.innerHTML = '<p class="error">Error: ' + escHtml(data.error) + '</p>';
+  try {
+    let data = await loadOnce();
+    if (!data) return;
+
+    while (data.syncing && polls < maxPolls) {
+      planList.innerHTML = '<p class="loading"><span class="spinner"></span> Syncing with StackCT…</p>';
+      await new Promise(r => setTimeout(r, 3000));
+      polls++;
+      data = await loadOnce();
+    }
+
+    if (data.error && !(data.plans && data.plans.length)) {
+      let hint = '';
+      if (/login/i.test(data.error)) {
+        hint = '<p class="help-text" style="margin-top:8px;color:var(--text-tertiary)">StackCT login failed. Wait a few seconds and click Preview again — only one browser login runs at a time. Check STACKCT_EMAIL / STACKCT_PASSWORD in Settings.</p>';
+      }
+      if (selectedProject && selectedProject.id === projectId) {
+        planList.innerHTML = '<p class="error">Error: ' + escHtml(data.error) + '</p>' + hint;
+      }
       return;
+    }
+
+    if (selectedProject && selectedProject.id !== projectId) return;
+
+    if (data.warning) {
+      const meta = document.getElementById('projectMeta');
+      if (meta) meta.textContent = data.warning;
     }
 
     allPlans = (data.plans || []).map(p => ({
@@ -942,23 +1012,36 @@ async function fetchPlans(projectId) {
       sheet_type: inferSheetType(p.sheet_name, p.sheet_type)
     }));
 
-    projectSheetCounts[projectId] = allPlans.length;
-    renderProjectList(allProjects);
-
     if (!allPlans.length) {
       planList.innerHTML = '<p class="empty">No drawing pages found for this project.</p>';
       return;
     }
 
     renderPlans(allPlans);
+    if (data.from_cache && !data.stale) {
+      const meta = document.getElementById('projectMeta');
+      if (meta && selectedProject) {
+        meta.textContent = 'Project ID: ' + projectId + ' · loaded from cache';
+      }
+    }
+    projectSheetCounts[projectId] = allPlans.length;
+    renderProjectList(allProjects);
   } catch (e) {
-    planList.innerHTML = '<p class="error">Failed to load plans. Check connection and try Preview again.</p>';
+    if (e.name === 'AbortError') return;
+    planList.innerHTML = '<p class="error">Failed to load plans: ' + escHtml(e.message || 'network error') + '. Try Preview again in a few seconds.</p>';
+  } finally {
+    if (plansFetchProjectId === projectId) {
+      updatePreviewButton();
+      plansFetchAbort = null;
+    }
   }
 }
 
 function renderPlans(plans) {
   const planList = document.getElementById('planList');
-  const filterType = document.getElementById('planTypeFilter').value;
+  if (!planList) return;
+  const filterEl = document.getElementById('planTypeFilter');
+  const filterType = filterEl ? filterEl.value : '';
 
   const visible = filterType
     ? plans.filter(p => p.sheet_type === filterType)
@@ -970,12 +1053,13 @@ function renderPlans(plans) {
     return;
   }
 
-  planList.innerHTML = visible.map((plan, idx) => {
+  planList.innerHTML = visible.map(plan => {
     const badgeClass = getSheetTypeBadgeClass(plan.sheet_type);
     const typeName = formatSheetType(plan.sheet_type);
+    const inputId = 'plan-' + plan.page_id;
     return '<div class="plan-item" data-type="' + escAttr(plan.sheet_type) + '" data-page-id="' + plan.page_id + '">' +
-      '<input type="checkbox" id="plan-' + idx + '" checked>' +
-      '<label for="plan-' + idx + '" class="plan-label">' +
+      '<input type="checkbox" id="' + inputId + '" checked>' +
+      '<label for="' + inputId + '" class="plan-label">' +
         '<span class="sheet-name">' + escHtml(plan.sheet_name || 'Unnamed Sheet') + '</span>' +
       '</label>' +
       '<span class="sheet-type-badge ' + badgeClass + '">' + typeName + '</span>' +
@@ -1090,7 +1174,16 @@ function bindPlanSelectionEvents() {
     previewBtn.addEventListener('click', async () => {
       if (!selectedProject) return;
       document.getElementById('planSelectionPanel').style.display = 'block';
-      await fetchPlans(selectedProject.id);
+      await fetchPlans(selectedProject.id, false);
+    });
+  }
+
+  const refreshPlansBtn = document.getElementById('refreshPlansBtn');
+  if (refreshPlansBtn) {
+    refreshPlansBtn.addEventListener('click', async () => {
+      if (!selectedProject) return;
+      document.getElementById('planSelectionPanel').style.display = 'block';
+      await fetchPlans(selectedProject.id, true);
     });
   }
 

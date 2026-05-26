@@ -10,12 +10,12 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 ## Current Position
 
-Phase: 11 of 11 (PDF Selection & Production Docs) — complete  
-Plan: 11-01, 11-02, 11-03 (3/3)  
-Status: All phases complete
-Last activity: 2026-05-26 — Executed Phase 11 (`/gsd-execute-phase 11`)
+Phase: 13 of 13 (StackCT Data & Persistence) — complete  
+Plan: 13-01 through 13-04 (4/4)  
+Status: Phase 13 complete; Phase 12 (auth) planned not executed
+Last activity: 2026-05-26 — Executed Phase 13 (`/gsd-execute-phase 13`)
 
-Progress: [██████████] 100% (11/11 phases complete)
+Progress: [██████████] 100% (v1 phases 1–11 + 13; Phase 12 auth pending)
 
 ## Performance Metrics
 

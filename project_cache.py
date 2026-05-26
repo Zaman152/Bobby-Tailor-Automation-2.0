@@ -1,137 +1,163 @@
 """
-Cache the StackCT project list locally so the UI dropdown is instant.
-Projects are fetched via a single browser login and saved to disk.
-Re-fetch only happens when explicitly requested (Refresh button) or cache is stale.
+StackCT catalog facade — DB-first reads with stackct_sync for live refresh.
+
+Legacy JSON caches (projects_cache.json, plans_cache/) are migrated once into
+SQLite via stackct_store.init_db(). Normal API paths do not read JSON files.
 """
-import json
 import logging
-import asyncio
-from pathlib import Path
-from datetime import datetime, timedelta
-from config import OUTPUT_DIR
+import threading
+from datetime import datetime
+
+import stackct_store as store
+from stackct_sync import get_browser_lock, sync_project_plans, sync_projects
 
 logger = logging.getLogger(__name__)
 
-CACHE_FILE = Path(OUTPUT_DIR) / "projects_cache.json"
-CACHE_TTL_HOURS = 24   # consider cache stale after 24 hours
+# Re-export lock for documentation / tests
+_browser_lock = get_browser_lock()
+
+_plans_bg_lock = threading.Lock()
+_plans_syncing: set[int] = set()
+_projects_bg_started = False
 
 
-def load_cache() -> dict:
-    """Load cached project list from disk. Returns {projects, fetched_at} or None."""
-    try:
-        if CACHE_FILE.exists():
-            data = json.loads(CACHE_FILE.read_text())
-            return data
-    except Exception:
-        pass
-    return None
-
-
-def save_cache(projects: list):
-    CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    CACHE_FILE.write_text(json.dumps({
-        "projects": projects,
-        "fetched_at": datetime.now().isoformat(),
-    }, indent=2))
-    logger.info(f"Cached {len(projects)} projects to {CACHE_FILE}")
-
-
-def is_stale(cache: dict) -> bool:
-    try:
-        fetched = datetime.fromisoformat(cache["fetched_at"])
-        return datetime.now() - fetched > timedelta(hours=CACHE_TTL_HOURS)
-    except Exception:
-        return True
-
-
-async def _fetch_from_stackct() -> list:
-    from browser import StackCTBrowser
-    b = StackCTBrowser()
-    await b.start()
-    try:
-        if not await b.login():
-            raise RuntimeError("Login failed")
-        return await b.get_all_projects()
-    finally:
-        await b.close()
+def _ensure_db():
+    store.init_db()
 
 
 def get_projects(force_refresh: bool = False) -> dict:
     """
-    Return projects list. Uses cache if fresh, otherwise fetches live.
-    Returns: {"projects": [...], "fetched_at": "...", "from_cache": bool}
+    Return projects list (DB-first).
+    Shape: {projects, fetched_at, from_cache, stale?, syncing?, error?}
     """
-    cache = load_cache()
+    _ensure_db()
+    global _projects_bg_started
 
-    if not force_refresh and cache and not is_stale(cache):
-        logger.info(f"Returning {len(cache['projects'])} projects from cache")
-        return {**cache, "from_cache": True}
+    if force_refresh:
+        return sync_projects(force=True)
 
-    # Fetch live
-    logger.info("Fetching project list from StackCT...")
+    projects = store.list_projects()
+    if projects and store.is_projects_fresh():
+        return {
+            "projects": [{"id": p["id"], "name": p["name"]} for p in projects],
+            "fetched_at": store.get_metadata("projects_synced_at"),
+            "from_cache": True,
+        }
+
+    if projects and not store.is_projects_fresh():
+        if not _projects_bg_started:
+            _projects_bg_started = True
+            threading.Thread(
+                target=_background_sync_projects, daemon=True
+            ).start()
+        return {
+            "projects": [{"id": p["id"], "name": p["name"]} for p in projects],
+            "fetched_at": store.get_metadata("projects_synced_at"),
+            "from_cache": True,
+            "stale": True,
+            "syncing": True,
+        }
+
+    return sync_projects(force=False)
+
+
+def _background_sync_projects():
+    global _projects_bg_started
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        projects = loop.run_until_complete(_fetch_from_stackct())
-        loop.close()
-
-        save_cache(projects)
-        return {
-            "projects": projects,
-            "fetched_at": datetime.now().isoformat(),
-            "from_cache": False,
-        }
-    except Exception as e:
-        logger.error(f"Live fetch failed: {e}")
-        # Fall back to stale cache if available
-        if cache:
-            logger.warning("Using stale cache as fallback")
-            return {**cache, "from_cache": True, "stale": True}
-        return {
-            "projects": [],
-            "error": "Could not fetch projects from StackCT. Try again or check credentials.",
-            "from_cache": False
-        }
+        sync_projects(force=True)
+    finally:
+        _projects_bg_started = False
 
 
 def prefetch_in_background():
-    """Call this on app startup — fetches in a background thread if cache is missing/stale."""
-    import threading
-    cache = load_cache()
-    if cache and not is_stale(cache):
-        logger.info("Project cache is fresh, skipping prefetch")
+    """On app startup — refresh project catalog if DB empty or stale."""
+    _ensure_db()
+    if store.is_projects_fresh() and store.project_count() > 0:
+        logger.info("StackCT catalog is fresh, skipping prefetch")
         return
-    logger.info("Starting background project prefetch...")
-    t = threading.Thread(target=get_projects, kwargs={"force_refresh": True}, daemon=True)
-    t.start()
+    logger.info("Starting background StackCT project sync...")
+    threading.Thread(target=lambda: sync_projects(force=False), daemon=True).start()
 
 
-async def _fetch_pages_for_project(project_id: int) -> list:
-    """Fetch page list for a specific project. Requires browser login."""
-    from browser import StackCTBrowser
-    b = StackCTBrowser()
-    await b.start()
-    try:
-        if not await b.login():
-            raise RuntimeError("Login failed")
-        return await b.get_all_page_ids(project_id)
-    finally:
-        await b.close()
+def get_all_sheet_counts() -> dict:
+    """Sheet counts from SQLite (all projects with synced plans)."""
+    _ensure_db()
+    counts = store.get_sheet_counts()
+    synced_at = store.get_metadata("projects_synced_at")
+    return {"counts": counts, "synced_at": synced_at}
 
 
-def get_project_plans(project_id: int) -> dict:
-    """Return list of drawing pages for a specific project.
+def _start_plans_background_sync(project_id: int):
+    with _plans_bg_lock:
+        if project_id in _plans_syncing:
+            return
+        _plans_syncing.add(project_id)
 
-    Returns:
-        dict: {plans: [{page_id, sheet_name}], project_id} on success
-              {plans: [], error: str} on failure
+    def _run():
+        try:
+            sync_project_plans(project_id, force=True)
+        finally:
+            with _plans_bg_lock:
+                _plans_syncing.discard(project_id)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def get_project_plans(
+    project_id: int,
+    force_refresh: bool = False,
+    background: bool = False,
+) -> dict:
     """
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        pages = loop.run_until_complete(_fetch_pages_for_project(project_id))
-        loop.close()
-        return {"plans": pages, "project_id": project_id}
-    except Exception as e:
-        logger.error(f"Plan fetch failed for project {project_id}: {e}")
-        return {"plans": [], "error": str(e), "project_id": project_id}
+    Return drawing pages for a project (DB-first, stale-while-revalidate).
+    """
+    _ensure_db()
+
+    if force_refresh:
+        return sync_project_plans(project_id, force=True)
+
+    plans = store.get_plans(project_id)
+    fetched_at = store.get_plans_synced_at(project_id)
+
+    if plans and store.is_plans_fresh(project_id):
+        return {
+            "plans": plans,
+            "project_id": project_id,
+            "from_cache": True,
+            "fetched_at": fetched_at,
+        }
+
+    if plans and not store.is_plans_fresh(project_id):
+        _start_plans_background_sync(project_id)
+        return {
+            "plans": plans,
+            "project_id": project_id,
+            "from_cache": True,
+            "fetched_at": fetched_at,
+            "stale": True,
+            "syncing": True,
+        }
+
+    if background and not plans:
+        _start_plans_background_sync(project_id)
+        return {
+            "plans": [],
+            "project_id": project_id,
+            "from_cache": False,
+            "syncing": True,
+        }
+
+    return sync_project_plans(project_id, force=False)
+
+
+# Deprecated JSON helpers — migration only (stackct_store.migrate_from_json_caches)
+def load_cache():
+    return None
+
+
+def save_cache(projects: list):
+    logger.debug("save_cache deprecated — use stackct_sync.sync_projects")
+
+
+def save_plans_cache(project_id: int, plans: list) -> None:
+    logger.debug("save_plans_cache deprecated — use stackct_sync.sync_project_plans")

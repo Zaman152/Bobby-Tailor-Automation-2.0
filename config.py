@@ -41,6 +41,10 @@ CANVAS_STABILITY_CHECKS = int(os.getenv("CANVAS_STABILITY_CHECKS", "2"))  # cons
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./output")
 SCREENSHOTS_DIR = os.path.join(OUTPUT_DIR, "screenshots")
 
+# StackCT catalog database (no secrets — credentials stay in .env)
+STACKCT_DB_PATH = Path(OUTPUT_DIR) / "stackct.db"
+STACKCT_CACHE_TTL_HOURS = int(os.getenv("STACKCT_CACHE_TTL_HOURS", "24"))
+
 # Preview settings
 MAX_PREVIEW_ROWS = int(os.getenv("MAX_PREVIEW_ROWS", "500"))  # Cap for CSV preview
 

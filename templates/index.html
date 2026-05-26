@@ -103,7 +103,7 @@
               <label class="toolbar-label">Choose project</label>
               <div class="toolbar-actions">
                 <span id="cacheStatus" class="cache-status"></span>
-                <button type="button" class="btn-ghost" onclick="refreshProjects()" id="refreshBtn">↻ Refresh</button>
+                <button type="button" class="btn-ghost" onclick="refreshProjects()" id="refreshBtn" title="Updates project list from StackCT (one browser login at a time)">↻ Refresh</button>
               </div>
             </div>
             <input type="text" id="projectSearch" class="project-search" placeholder="Search projects…" autocomplete="off" />
@@ -116,6 +116,9 @@
           <div class="action-row">
             <button type="button" class="preview-btn" id="previewPlansBtn" disabled>
               Preview Plans →
+            </button>
+            <button type="button" class="btn-ghost btn-sm" id="refreshPlansBtn" disabled title="Force live sync from StackCT">
+              ↻ Refresh plans
             </button>
             <button type="button" class="run-btn run-btn-secondary" id="runStackctBtn" onclick="runStackCT()">
               ▶ Run All

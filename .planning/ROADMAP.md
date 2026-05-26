@@ -22,7 +22,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [ ] **Phase 10: Reports & Monitor UI** — Report cards with preview tabs; live monitor page
 - [ ] **Phase 11: PDF Selection & Production Docs** — PDF page picker; VPS README
 - [ ] **Phase 12: Application Authentication** — Login sessions, protected routes/APIs, seeded admin for production deploy
-- [ ] **Phase 13: StackCT Data & Persistence Layer** — SQLite catalog, sync service, DB-first APIs, sheet counts without per-preview scrape
+- [x] **Phase 13: StackCT Data & Persistence Layer** — SQLite catalog, sync service, DB-first APIs, sheet counts without per-preview scrape
 
 ## Phase Details
 
@@ -385,10 +385,10 @@ Plans:
 
 Plans:
 
-- [ ] 13-01-PLAN.md — SQLite schema, store module, migrate JSON caches
-- [ ] 13-02-PLAN.md — Sync service with locking, TTL, background refresh
-- [ ] 13-03-PLAN.md — Refactor `/api/projects`, sheet-counts, plans to DB-first
-- [ ] 13-04-PLAN.md — UI sheet counts on load; cached preview; sync controls
+- [x] 13-01-PLAN.md — SQLite schema, store module, migrate JSON caches
+- [x] 13-02-PLAN.md — Sync service with locking, TTL, background refresh
+- [x] 13-03-PLAN.md — Refactor `/api/projects`, sheet-counts, plans to DB-first
+- [x] 13-04-PLAN.md — UI sheet counts on load; cached preview; sync controls
 
 Research: `.planning/phases/13-stackct-data-persistence/13-RESEARCH.md`
 
@@ -420,7 +420,7 @@ Research: `.planning/phases/13-stackct-data-persistence/13-RESEARCH.md`
 | 10. Reports & Monitor UI | 0/TBD | Not started | — |
 | 11. PDF Selection & Production Docs | 0/TBD | Not started | — |
 | 12. Application Authentication | 0/3 | Planned | — |
-| 13. StackCT Data & Persistence | 0/4 | Planned | — |
+| 13. StackCT Data & Persistence | 4/4 | Complete | 2026-05-26 |
 
 ---
 *Roadmap created: 2026-05-26*  
