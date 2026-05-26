@@ -1,0 +1,328 @@
+# Roadmap: Bobby Tailor — StackCT Estimation Automation
+
+## Overview
+
+Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable estimator tool: fix deployment and browser reliability first, add cost transparency and Master Phase 1 critical UX (plan selection, report preview), then layer settings, live job monitoring, and the industrial UI shell. v1 extends Flask in place; FastAPI migration (ARCH-01) stays in v2.
+
+**Depth:** comprehensive (11 phases)  
+**Stack:** Python, Flask, Playwright, Anthropic Claude Vision — per PROJECT.md  
+**Source of truth:** `Master.md` v2.0 (implementation order §7, UI spec §8, agent steps §9)
+
+## Phases
+
+- [ ] **Phase 1: Config & Safe Operations** — Portable `.env`, sanitized API errors, dependency docs
+- [ ] **Phase 2: Browser Reliability** — Canvas stability, full project list, VPS Chromium
+- [ ] **Phase 3: API Cost Transparency** — Per-sheet and per-run token/USD tracking in reports
+- [ ] **Phase 4: StackCT Plan Selection** — Preview sheets, filter, run selected `page_ids` only
+- [ ] **Phase 5: Report Preview APIs** — In-browser summary, tables, JSON with safe paths
+- [ ] **Phase 6: Settings Management** — Credentials and preferences editable in UI
+- [ ] **Phase 7: Live Job Monitoring** — Per-sheet progress, logs, sidebar mini-card
+- [ ] **Phase 8: UI Shell Foundation** — Sidebar layout, dark theme, static JS/CSS
+- [ ] **Phase 9: Projects Workspace** — Scope toggle and plan-selection workflow in UI
+- [ ] **Phase 10: Reports & Monitor UI** — Report cards with preview tabs; live monitor page
+- [ ] **Phase 11: PDF Selection & Production Docs** — PDF page picker; VPS README
+
+## Phase Details
+
+### Phase 1: Config & Safe Operations
+
+**Goal:** Operators can install and run the app on any machine without editing source code; API failures never leak stack traces to the UI.
+
+**Depends on:** Nothing (first phase)
+
+**Requirements:** FOUND-01, FOUND-02, DEPLOY-01, DEPLOY-03
+
+**Success Criteria** (what must be TRUE):
+
+1. Starting the app on a fresh clone with only `.env` beside the project root loads StackCT and Anthropic credentials successfully
+2. A failed job or API error shows a short, human-readable message in the UI while full details appear only in server logs
+3. `.env.example` lists every required variable with brief descriptions
+4. `pip install -r requirements.txt` installs Pillow and all runtime deps without extra manual packages
+
+**Plans:** TBD (plan-phase)
+
+Plans:
+
+- [ ] 01-01: Relative `.env` resolution in `config.py` (Master Step 1)
+- [ ] 01-02: User-safe error responses on Flask JSON routes
+- [ ] 01-03: `.env.example` + `requirements.txt` Pillow pin (DEPLOY-01, DEPLOY-03)
+
+---
+
+### Phase 2: Browser Reliability
+
+**Goal:** StackCT automation reliably discovers all projects and captures sharp, complete drawing screenshots on VPS hardware.
+
+**Depends on:** Phase 1
+
+**Requirements:** FOUND-03, FOUND-04, FOUND-05
+
+**Success Criteria** (what must be TRUE):
+
+1. Screenshots are taken only after the drawing canvas pixels stop changing (not after a fixed sleep alone)
+2. Project dropdown includes projects that appear only after scrolling a long StackCT list (no silent truncation)
+3. A StackCT scrape completes on a Linux VPS with headless Chromium using documented launch flags (e.g. `--disable-dev-shm-usage`)
+4. Failed canvas capture retries or logs clearly instead of saving blank or partial images
+
+**Plans:** TBD
+
+Plans:
+
+- [ ] 02-01: Pixel-hash canvas stability in `browser.py` (Master Feature 2.2)
+- [ ] 02-02: Project list scroll / lazy-load in `get_all_projects()` (Master Feature 2.3)
+- [ ] 02-03: VPS Chromium launch args and Playwright deps notes
+
+---
+
+### Phase 3: API Cost Transparency
+
+**Goal:** Estimators see exactly what each run cost in tokens and USD before exporting take-offs.
+
+**Depends on:** Phase 1
+
+**Requirements:** COST-01, COST-02, COST-03, COST-04
+
+**Success Criteria** (what must be TRUE):
+
+1. Each analyzed sheet records input/output tokens and the Claude model used
+2. Completed runs show a single aggregated USD total for API usage
+3. Report list cards and `summary.txt` display cost for that run
+4. `takeoff.json` contains an `api_usage` block with token and cost totals
+
+**Plans:** TBD
+
+Plans:
+
+- [ ] 03-01: Per-sheet usage capture in `claude_analyzer.py` (Master Feature 2.1)
+- [ ] 03-02: Run-level aggregation in `reporter.py` / scraper
+- [ ] 03-03: Surface cost in UI report cards and summary output
+
+---
+
+### Phase 4: StackCT Plan Selection
+
+**Goal:** Users choose which drawing sheets to analyze before spending API credits — no forced full-project runs.
+
+**Depends on:** Phase 2 (reliable page discovery)
+
+**Requirements:** PLAN-01, PLAN-02, PLAN-03, PLAN-04, PLAN-05
+
+**Success Criteria** (what must be TRUE):
+
+1. User can load the drawing page list for a selected project without starting analysis
+2. User sees sheet names with checkboxes plus Select All / Select None
+3. User can filter the plan list by sheet type (architectural, electrical, mechanical, schedule)
+4. User can start a run that processes only checked sheets
+5. `/api/run/stackct` accepts optional `page_ids` and the scraper analyzes only those pages
+
+**Plans:** TBD
+
+Plans:
+
+- [ ] 04-01: `GET /api/projects/<id>/plans` + `project_cache` helper (Master Step 2)
+- [ ] 04-02: `page_ids` on run endpoint and `scraper.py` filter (Master Step 2)
+- [ ] 04-03: Plan-selection UI panel (checkboxes, filters) — may ship minimal HTML first, polished in Phase 9
+
+---
+
+### Phase 5: Report Preview APIs
+
+**Goal:** Users inspect take-off outputs in the browser without downloading files first.
+
+**Depends on:** Phase 1 (path sanitization patterns)
+
+**Requirements:** PREV-01, PREV-02, PREV-03, PREV-04, PREV-05, PREV-06
+
+**Success Criteria** (what must be TRUE):
+
+1. User can view `summary.txt` rendered as styled HTML in the app
+2. User can view `calculations.csv` and `raw_items.csv` as sortable, filterable tables
+3. User can browse `takeoff.json` as a collapsible tree
+4. Preview requests reject `../` and other path traversal attempts
+5. Large CSV previews show a clear “showing N of M rows” cap with pagination or row limit
+
+**Plans:** TBD
+
+Plans:
+
+- [ ] 05-01: `GET /api/reports/<run>/preview/<file>` (Master Step 3)
+- [ ] 05-02: CSV pagination / row cap (PREV-06)
+- [ ] 05-03: Path validation and error handling (PREV-05)
+
+---
+
+### Phase 6: Settings Management
+
+**Goal:** Operators manage StackCT credentials, API keys, and output preferences through the app — not by SSH-editing `.env` alone.
+
+**Depends on:** Phase 1
+
+**Requirements:** SET-01, SET-02, SET-03, SET-04
+
+**Success Criteria** (what must be TRUE):
+
+1. User can view and update StackCT email/password in Settings
+2. User can view and update Anthropic API key and default models
+3. User can set output directory and screenshot retention preference
+4. Saving settings persists to `.env` or config store; API never returns secret values in responses
+
+**Plans:** TBD
+
+Plans:
+
+- [ ] 06-01: Settings read/write API with secret redaction
+- [ ] 06-02: Settings page form (wired in Phase 8 shell)
+
+---
+
+### Phase 7: Live Job Monitoring
+
+**Goal:** Users see exactly which sheet is running and what was extracted, without reading server logs.
+
+**Depends on:** Phase 4 (selective runs); benefits from Phase 3 cost lines in log
+
+**Requirements:** JOB-01, JOB-02, JOB-03, JOB-04
+
+**Success Criteria** (what must be TRUE):
+
+1. During a run, progress shows overall percentage and sheet index (e.g. 8/12)
+2. Current sheet name updates while that sheet is processing
+3. Per-sheet log lines appear (measurements, rooms, components found)
+4. Sidebar shows an active-job mini-card whenever a job is running
+
+**Plans:** TBD
+
+Plans:
+
+- [ ] 07-01: Enrich scraper `progress_callback` / `log_callback` payloads
+- [ ] 07-02: Job status API fields for current sheet and structured log
+- [ ] 07-03: Sidebar mini-card component (Master §8.4)
+
+---
+
+### Phase 8: UI Shell Foundation
+
+**Goal:** The app feels like a precision industrial tool with consistent navigation and maintainable front-end assets.
+
+**Depends on:** Phase 1
+
+**Requirements:** UI-01, UI-02, UI-03
+
+**Success Criteria** (what must be TRUE):
+
+1. Fixed sidebar navigation lists Projects, PDF Upload, Reports, and Settings
+2. Visual design matches Master.md dark palette (DM Mono, Inter, JetBrains Mono)
+3. Inline scripts and styles from `index.html` live in `static/app.js` and `static/style.css`
+
+**Plans:** TBD
+
+Plans:
+
+- [ ] 08-01: Base layout template + sidebar (Master §8.2)
+- [ ] 08-02: Theme tokens and typography (Master §8.1)
+- [ ] 08-03: Extract and wire static assets (Master §10)
+
+---
+
+### Phase 9: Projects Workspace
+
+**Goal:** The Projects page delivers the full StackCT workflow: pick scope, preview plans, select sheets, run.
+
+**Depends on:** Phase 4, Phase 8
+
+**Requirements:** UI-04
+
+**Success Criteria** (what must be TRUE):
+
+1. User toggles between “All Projects” and “Specific Project” scope modes
+2. Specific-project mode shows searchable project list with sheet counts
+3. “Preview Plans” opens the plan-selection panel integrated with Phase 4 APIs
+4. “Run Selected” starts analysis only for checked `page_ids` from this page
+
+**Plans:** TBD
+
+Plans:
+
+- [ ] 09-01: Projects page layout (Master §8.3)
+- [ ] 09-02: Wire plan selection + run to Phase 4 backend
+
+---
+
+### Phase 10: Reports & Job Monitor UI
+
+**Goal:** Reports and active jobs match Master layouts with in-browser preview and live monitor.
+
+**Depends on:** Phase 5, Phase 7, Phase 8
+
+**Requirements:** UI-05, UI-06
+
+**Success Criteria** (what must be TRUE):
+
+1. Reports page lists runs as expandable cards with Summary / Calculations / Raw / JSON tabs
+2. Each preview tab uses Phase 5 APIs (sort, filter, search where specified in Master §7.1.2)
+3. Dedicated job monitor view shows progress bar, current sheet, and scrollable per-sheet log (Master §8.4)
+4. User can download CSV/JSON/TXT from report cards without losing preview context
+
+**Plans:** TBD
+
+Plans:
+
+- [ ] 10-01: Reports page + preview tabs (Master §8.5)
+- [ ] 10-02: Job monitor page/panel (Master §8.4)
+
+---
+
+### Phase 11: PDF Selection & Production Docs
+
+**Goal:** PDF mode matches StackCT selectivity; production deployment is documented end-to-end.
+
+**Depends on:** Phase 8 (PDF page in shell); Phase 4 pattern for page selection UX
+
+**Requirements:** PDF-01, PDF-02, PDF-03, DEPLOY-02
+
+**Success Criteria** (what must be TRUE):
+
+1. User can upload a construction PDF and start analysis from the PDF Upload page
+2. After upload, user selects specific pages before analysis starts (not all pages only)
+3. UI shows page count and file size immediately after upload
+4. README documents Hostinger VPS setup: gunicorn, Playwright system deps, `.env`, and headless Chrome flags
+
+**Plans:** TBD
+
+Plans:
+
+- [ ] 11-01: PDF upload metadata + page checkbox UI (Master §8.6)
+- [ ] 11-02: Pass selected pages to `pdf_analyzer` / run endpoint
+- [ ] 11-03: README VPS deployment section (Master §11)
+
+---
+
+## v2 (Out of Roadmap)
+
+| Item | Notes |
+|------|--------|
+| ARCH-01 FastAPI migration | Deferred; Flask extensions for v1 |
+| ARCH-02 Celery/Redis queue | Deferred |
+| EST-*, AUTO-*, EXP-01, AUTH-01 | See REQUIREMENTS.md v2 |
+
+## Progress
+
+**Execution order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 1. Config & Safe Operations | 0/TBD | Not started | — |
+| 2. Browser Reliability | 0/TBD | Not started | — |
+| 3. API Cost Transparency | 0/TBD | Not started | — |
+| 4. StackCT Plan Selection | 0/TBD | Not started | — |
+| 5. Report Preview APIs | 0/TBD | Not started | — |
+| 6. Settings Management | 0/TBD | Not started | — |
+| 7. Live Job Monitoring | 0/TBD | Not started | — |
+| 8. UI Shell Foundation | 0/TBD | Not started | — |
+| 9. Projects Workspace | 0/TBD | Not started | — |
+| 10. Reports & Monitor UI | 0/TBD | Not started | — |
+| 11. PDF Selection & Production Docs | 0/TBD | Not started | — |
+
+---
+*Roadmap created: 2026-05-26*  
+*Aligned with Master.md Phase 1–3 ordering; Flask-in-place for v1*

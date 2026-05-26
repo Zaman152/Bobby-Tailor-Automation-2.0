@@ -111,13 +111,52 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmap) | | |
+| FOUND-01 | Phase 1 | Pending |
+| FOUND-02 | Phase 1 | Pending |
+| FOUND-03 | Phase 2 | Pending |
+| FOUND-04 | Phase 2 | Pending |
+| FOUND-05 | Phase 2 | Pending |
+| COST-01 | Phase 3 | Pending |
+| COST-02 | Phase 3 | Pending |
+| COST-03 | Phase 3 | Pending |
+| COST-04 | Phase 3 | Pending |
+| PLAN-01 | Phase 4 | Pending |
+| PLAN-02 | Phase 4 | Pending |
+| PLAN-03 | Phase 4 | Pending |
+| PLAN-04 | Phase 4 | Pending |
+| PLAN-05 | Phase 4 | Pending |
+| PREV-01 | Phase 5 | Pending |
+| PREV-02 | Phase 5 | Pending |
+| PREV-03 | Phase 5 | Pending |
+| PREV-04 | Phase 5 | Pending |
+| PREV-05 | Phase 5 | Pending |
+| PREV-06 | Phase 5 | Pending |
+| SET-01 | Phase 6 | Pending |
+| SET-02 | Phase 6 | Pending |
+| SET-03 | Phase 6 | Pending |
+| SET-04 | Phase 6 | Pending |
+| JOB-01 | Phase 7 | Pending |
+| JOB-02 | Phase 7 | Pending |
+| JOB-03 | Phase 7 | Pending |
+| JOB-04 | Phase 7 | Pending |
+| UI-01 | Phase 8 | Pending |
+| UI-02 | Phase 8 | Pending |
+| UI-03 | Phase 8 | Pending |
+| UI-04 | Phase 9 | Pending |
+| UI-05 | Phase 10 | Pending |
+| UI-06 | Phase 10 | Pending |
+| PDF-01 | Phase 11 | Pending |
+| PDF-02 | Phase 11 | Pending |
+| PDF-03 | Phase 11 | Pending |
+| DEPLOY-01 | Phase 1 | Pending |
+| DEPLOY-02 | Phase 11 | Pending |
+| DEPLOY-03 | Phase 1 | Pending |
 
 **Coverage:**
 - v1 requirements: 35 total
-- Mapped to phases: 0
-- Unmapped: 35 ⚠️
+- Mapped to phases: 35
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-26*
-*Last updated: 2026-05-26 after initial definition from Master.md + research*
+*Last updated: 2026-05-26 after roadmap traceability (11 phases, comprehensive depth)*
