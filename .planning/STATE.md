@@ -10,12 +10,12 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 ## Current Position
 
-Phase: 13 of 13 (all phases complete)  
-Plan: —  
-Status: Phase 12 (Application Authentication) verified — 3/3 plans executed 2026-05-26  
-Last activity: 2026-05-26 — `/gsd-execute-phase 12` (auth deps, Flask sessions, frontend CSRF)
+Phase: 14 of 14 (StackCT Plan Sets & Folders)  
+Plan: 1 of 4 complete  
+Status: In progress — 14-01 executed 2026-05-26  
+Last activity: 2026-05-26 — `/gsd-execute-phase 14` (plan-set discovery, dedupe)
 
-Progress: [██████████] 100% (phases 1–13 complete)
+Progress: [██████████░] 92% (phases 1–13 complete, 14 in progress 1/4)
 
 ## Performance Metrics
 
@@ -78,6 +78,12 @@ From 12-01 (Auth Dependencies & Admin Seeding):
 - bcrypt rounds=12 for admin password hash (strong work factor, ~1s seeding time)
 - RATE_LIMIT_STORAGE_URI defaults to memory://; Redis URI documented for multi-worker gunicorn
 - SECRET_KEY, ADMIN_EMAIL, ADMIN_PASSWORD_HASH added to REQUIRED_ENV_VARS (crash-fail on missing)
+
+From 14-01 (Plan-Set Discovery & Dedupe):
+
+- Dedupe rules based on 14-DISCOVERY audit: drop "Plans X" parent, drop aggregate folders with multiple version labels
+- Direct-grid fallback with folder_id=0 for projects without folder cards (ATL 081 pattern)
+- Deprecated get_all_page_ids to use folder-aware APIs (prevents mixing multiple sets)
 
 ### Pending Todos
 
