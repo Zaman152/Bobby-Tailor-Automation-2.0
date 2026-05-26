@@ -11,19 +11,19 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 3 of 11 (API Cost Transparency) — in progress  
-Plan: 03-01 (1/3 complete)  
+Plan: 03-02 (2/3 complete)  
 Status: In progress
-Last activity: 2026-05-26 — Completed 03-01-PLAN.md
+Last activity: 2026-05-26 — Completed 03-02-PLAN.md
 
-Progress: [███░░░░░░░] 33% (10/30 plans)
+Progress: [███░░░░░░░] 37% (11/30 plans)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 10
+- Total plans completed: 11
 - Average duration: ~1.5 min
-- Total execution time: ~12 min
+- Total execution time: ~13.5 min
 
 **By Phase:**
 
@@ -31,9 +31,9 @@ Progress: [███░░░░░░░] 33% (10/30 plans)
 |-------|-------|-------|----------|
 | 01-config-and-safe-operations | 3 | 5 min | 1.7 min |
 | 02-browser-reliability | 3 | ~5 min | ~1.7 min |
-| 03-api-cost-transparency | 1 | 2 min | 2 min |
+| 03-api-cost-transparency | 2 | 3.5 min | 1.75 min |
 
-**Recent Trend:** Fast execution, 2min for cost tracking foundation (03-01)
+**Recent Trend:** Consistent 1.5-2min execution, cost tracking progressing smoothly
 
 ## Accumulated Context
 
@@ -71,6 +71,13 @@ From 03-01 (API Cost Transparency Foundation):
 - Error paths return zero-value usage fields so reporter.py sum() never crashes
 - Combined both tasks in single commit due to tight coupling in same file
 
+From 03-02 (Reporter Cost Aggregation):
+
+- Use max(len(all_extracted), 1) for cost_per_sheet to prevent ZeroDivisionError on empty runs
+- models_used dict counts sheets per model (not tokens) for distribution visibility
+- Add cost to logger.info for at-a-glance run monitoring
+- Backward-compatible .get() with defaults in summary generation (old reports still render)
+
 ### Pending Todos
 
 None yet.
@@ -83,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-26T16:05:01Z  
-Stopped at: Completed 03-01-PLAN.md — ready for next plan (03-02)  
+Last session: 2026-05-26T16:09:05Z  
+Stopped at: Completed 03-02-PLAN.md — ready for next plan (03-03)  
 Resume file: None
