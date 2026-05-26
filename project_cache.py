@@ -104,3 +104,34 @@ def prefetch_in_background():
     logger.info("Starting background project prefetch...")
     t = threading.Thread(target=get_projects, kwargs={"force_refresh": True}, daemon=True)
     t.start()
+
+
+async def _fetch_pages_for_project(project_id: int) -> list:
+    """Fetch page list for a specific project. Requires browser login."""
+    from browser import StackCTBrowser
+    b = StackCTBrowser()
+    await b.start()
+    try:
+        if not await b.login():
+            raise RuntimeError("Login failed")
+        return await b.get_all_page_ids(project_id)
+    finally:
+        await b.close()
+
+
+def get_project_plans(project_id: int) -> dict:
+    """Return list of drawing pages for a specific project.
+
+    Returns:
+        dict: {plans: [{page_id, sheet_name}], project_id} on success
+              {plans: [], error: str} on failure
+    """
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        pages = loop.run_until_complete(_fetch_pages_for_project(project_id))
+        loop.close()
+        return {"plans": pages, "project_id": project_id}
+    except Exception as e:
+        logger.error(f"Plan fetch failed for project {project_id}: {e}")
+        return {"plans": [], "error": str(e), "project_id": project_id}
