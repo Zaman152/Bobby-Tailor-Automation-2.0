@@ -11,9 +11,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 12 of 13 (Application Authentication) — in progress  
-Plan: 12-01 of N (1 complete)  
-Status: Phase 12 in progress — 12-01 complete, remaining plans pending
-Last activity: 2026-05-26 — Completed 12-01-PLAN.md (auth deps + admin seeding)
+Plan: 12-02 of N (2 complete)  
+Status: Phase 12 in progress — 12-01 and 12-02 complete, remaining plans pending
+Last activity: 2026-05-26 — Completed 12-02-PLAN.md (auth.py, app.py auth integration, login.html)
 
 Progress: [██████████] 100% (v1 phases 1–11 + 13; Phase 12 plan 01 complete)
 
@@ -63,6 +63,12 @@ From 03-03 (UI Cost Display):
 
 ### Decisions
 
+From 12-02 (Core Flask Authentication):
+
+- Timing-safe dummy bcrypt check on unknown email (prevents user enumeration)
+- POST-only /logout to prevent CSRF via GET requests
+- SESSION_COOKIE_SECURE conditional on FLASK_ENV != "development"
+
 From 12-01 (Auth Dependencies & Admin Seeding):
 
 - bcrypt rounds=12 for admin password hash (strong work factor, ~1s seeding time)
@@ -82,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-26 17:26 UTC  
-Stopped at: Completed 12-01-PLAN.md — ready for `/gsd-execute-phase 12` (plan 02)  
+Last session: 2026-05-26 22:30 UTC  
+Stopped at: Completed 12-02-PLAN.md — ready for `/gsd-execute-phase 12` (plan 03)  
 Resume file: None
