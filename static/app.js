@@ -10,8 +10,11 @@ let currentMode = 'all';
 let selectedFile = null;
 let pollInterval = null;
 let projectsLoaded = false;
+let allProjects = [];
 let allPlans = [];
-let selectedProjectId = null;
+let selectedProject = null;
+let projectSheetCounts = {};
+let searchDebounceTimer = null;
 let activeJobPollInterval = null;
 
 // ── Navigation ─────────────────────────────────────────────────────────────
@@ -48,18 +51,23 @@ function setMode(mode) {
   currentMode = mode;
   document.getElementById('modeAll').classList.toggle('active', mode === 'all');
   document.getElementById('modeOne').classList.toggle('active', mode === 'specific');
-  document.getElementById('projectDropdownField').style.display = mode === 'specific' ? 'block' : 'none';
+  document.getElementById('projectListField').style.display = mode === 'specific' ? 'block' : 'none';
+  if (mode === 'all') {
+    resetPlanSelection();
+    selectedProject = null;
+    updatePreviewButton();
+  }
   if (mode === 'specific' && !projectsLoaded) loadProjects();
 }
 
-// ── Projects Dropdown ──────────────────────────────────────────────────────
+// ── Projects List (Master §8.3) ────────────────────────────────────────────
 async function loadProjects(force = false) {
-  const sel = document.getElementById('projectSelect');
+  const listEl = document.getElementById('projectList');
   const status = document.getElementById('cacheStatus');
   const refreshBtn = document.getElementById('refreshBtn');
 
-  sel.innerHTML = '<option>Loading…</option>';
-  if (status) status.textContent = force ? '🔄 Fetching live…' : '⏳ Loading…';
+  listEl.innerHTML = '<p class="empty">Loading…</p>';
+  if (status) status.textContent = force ? 'Fetching live…' : 'Loading…';
   if (refreshBtn) refreshBtn.disabled = true;
 
   try {
@@ -68,79 +76,116 @@ async function loadProjects(force = false) {
     const data = await res.json();
 
     if (data.error && !data.projects?.length) {
-      sel.innerHTML = '<option>Error loading projects</option>';
-      if (status) status.textContent = '⚠ Could not load';
+      listEl.innerHTML = '<p class="empty">Could not load projects</p>';
+      if (status) status.textContent = 'Could not load';
       return;
     }
 
-    sel.innerHTML = '<option value="">— Select a project —</option>';
-    (data.projects || []).forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name;
-      opt.dataset.name = p.name;
-      sel.appendChild(opt);
-    });
+    allProjects = data.projects || [];
     projectsLoaded = true;
+    renderProjectList(allProjects);
 
     if (status) {
       const when = data.fetched_at ? new Date(data.fetched_at).toLocaleString() : '';
-      const tag = data.from_cache ? '📦 Cached' + (data.stale ? ' (stale)' : '') : '✓ Live';
-      status.textContent = tag + ' · ' + (data.projects?.length || 0) + ' projects · ' + when;
-      status.style.color = data.stale ? '#f59e0b' : '#475569';
+      const tag = data.from_cache ? 'Cached' + (data.stale ? ' (stale)' : '') : 'Live';
+      status.textContent = tag + ' · ' + allProjects.length + ' projects' + (when ? ' · ' + when : '');
     }
-
-    sel.onchange = () => {
-      const opt = sel.options[sel.selectedIndex];
-      document.getElementById('projectMeta').textContent =
-        opt.value ? 'Project ID: ' + opt.value : '';
-      selectedProjectId = opt.value ? parseInt(opt.value) : null;
-      const previewBtn = document.getElementById('previewPlansBtn');
-      if (previewBtn) {
-        previewBtn.disabled = !selectedProjectId;
-        previewBtn.style.opacity = selectedProjectId ? '1' : '0.5';
-      }
-      document.getElementById('planSelectionPanel').style.display = 'none';
-      allPlans = [];
-    };
   } catch (e) {
-    sel.innerHTML = '<option>Could not load projects</option>';
-    if (status) status.textContent = '⚠ Network error';
+    listEl.innerHTML = '<p class="empty">Network error loading projects</p>';
+    if (status) status.textContent = 'Network error';
   } finally {
     if (refreshBtn) refreshBtn.disabled = false;
   }
 }
 
+function renderProjectList(projects) {
+  const listEl = document.getElementById('projectList');
+  const query = (document.getElementById('projectSearch')?.value || '').toLowerCase();
+
+  const filtered = projects.filter(p =>
+    !query || (p.name || '').toLowerCase().includes(query)
+  );
+
+  if (!filtered.length) {
+    listEl.innerHTML = '<p class="empty">' + (query ? 'No projects match your search' : 'No projects found') + '</p>';
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(p => {
+    const isSelected = selectedProject && selectedProject.id === p.id;
+    const count = projectSheetCounts[p.id];
+    const countLabel = count != null ? count + ' sheet' + (count !== 1 ? 's' : '') : '— sheets';
+    return '<div class="project-item' + (isSelected ? ' selected' : '') + '" data-id="' + p.id + '" data-name="' + escHtml(p.name) + '">' +
+      '<input type="radio" name="projectPick" class="project-radio"' + (isSelected ? ' checked' : '') + ' tabindex="-1">' +
+      '<div class="project-info">' +
+        '<div class="project-name">' + escHtml(p.name) + '</div>' +
+        '<div class="project-id">ID: ' + p.id + '</div>' +
+      '</div>' +
+      '<span class="sheet-count">' + countLabel + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function onProjectSelect(projectId, projectName) {
+  resetPlanSelection();
+  selectedProject = { id: projectId, name: projectName };
+  document.getElementById('projectMeta').textContent = 'Project ID: ' + projectId;
+  renderProjectList(allProjects);
+  updatePreviewButton();
+}
+
+function updatePreviewButton() {
+  const btn = document.getElementById('previewPlansBtn');
+  if (btn) btn.disabled = !selectedProject;
+}
+
+function filterProjects(query) {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => renderProjectList(allProjects), 200);
+}
+
 async function refreshProjects() {
   projectsLoaded = false;
+  resetPlanSelection();
+  selectedProject = null;
+  updatePreviewButton();
   await loadProjects(true);
 }
 
 // ── Run StackCT ────────────────────────────────────────────────────────────
 async function runStackCT() {
   const btn = document.getElementById('runStackctBtn');
-  let projectId = null, projectName = 'All Projects';
 
   if (currentMode === 'specific') {
-    const sel = document.getElementById('projectSelect');
-    if (!sel.value) { alert('Please select a project.'); return; }
-    projectId = parseInt(sel.value);
-    projectName = sel.options[sel.selectedIndex].dataset.name || 'Project';
+    const panel = document.getElementById('planSelectionPanel');
+    if (panel && panel.style.display !== 'none') {
+      return runSelectedPlans();
+    }
+    if (!selectedProject) {
+      alert('Please select a project first.');
+      return;
+    }
+    document.getElementById('previewPlansBtn').click();
+    return;
   }
 
   btn.disabled = true;
-  btn.textContent = '⏳ Starting…';
+  btn.textContent = 'Starting…';
 
   try {
     const res = await fetch('/api/run/stackct', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: currentMode, project_id: projectId, project_name: projectName })
+      body: JSON.stringify({ mode: 'all', project_name: 'All Projects' })
     });
     const data = await res.json();
-    startPolling(data.job_id, projectName);
+    if (data.error) {
+      alert('Error: ' + data.error);
+      return;
+    }
+    startPolling(data.job_id, 'All Projects');
   } catch (e) {
-    alert('Failed to start job: ' + e);
+    alert('Failed to start job: ' + e.message);
   } finally {
     btn.disabled = false;
     btn.textContent = '▶ Run All';
@@ -344,124 +389,252 @@ document.addEventListener('visibilitychange', () => {
   else startActiveJobPolling();
 });
 
-// ── Plan Selection ─────────────────────────────────────────────────────────
-function getSheetType(sheetName) {
+// ── Plan Selection (Master §8.3 + Phase 4 APIs) ────────────────────────────
+function inferSheetType(sheetName, apiType) {
+  if (apiType) return apiType;
   const upper = (sheetName || '').toUpperCase();
-  if (upper.match(/^A\d/) || upper.includes('FLOOR') || upper.includes('ELEVATION') || upper.includes('CEILING')) return 'architectural';
+  if (upper.match(/^A\d/) || upper.includes('FLOOR') || upper.includes('ELEVATION') || upper.includes('CEILING')) {
+    return upper.includes('FLOOR') ? 'floor_plan' : 'architectural';
+  }
   if (upper.match(/^E\d/) || upper.includes('ELECTRICAL') || upper.includes('PANEL') || upper.includes('LIGHTING')) return 'electrical';
   if (upper.match(/^M\d/) || upper.includes('MECHANICAL') || upper.includes('HVAC') || upper.includes('PLUMBING')) return 'mechanical';
   if (upper.includes('SCHEDULE') || upper.includes('ROOM FINISH') || upper.includes('DOOR SCHED')) return 'schedule';
   return 'other';
 }
 
-function getTypeBadgeStyle(type) {
-  const colors = {
-    architectural: '#3b82f6',
-    electrical: '#f59e0b',
-    mechanical: '#f97316',
-    schedule: '#8b5cf6',
-    other: '#6b7280'
+function getSheetTypeBadgeClass(sheetType) {
+  const types = {
+    floor_plan: 'badge-floor_plan',
+    architectural: 'badge-architectural',
+    electrical: 'badge-electrical',
+    mechanical: 'badge-mechanical',
+    schedule: 'badge-schedule'
   };
-  return 'background:' + (colors[type] || colors.other) + ';padding:2px 8px;border-radius:4px;font-size:11px;color:white;flex-shrink:0;';
+  return types[sheetType] || 'badge-other';
 }
 
-async function loadProjectPlans() {
-  if (!selectedProjectId) { alert('Please select a project first'); return; }
+function formatSheetType(type) {
+  const names = {
+    floor_plan: 'Floor Plan',
+    architectural: 'Architectural',
+    electrical: 'Electrical',
+    mechanical: 'Mechanical',
+    schedule: 'Schedule',
+    structural: 'Structural'
+  };
+  return names[type] || 'Other';
+}
+
+function resetPlanSelection() {
   const panel = document.getElementById('planSelectionPanel');
-  const plansList = document.getElementById('plansList');
-  panel.style.display = 'block';
-  plansList.innerHTML = '<div style="color:#94a3b8;padding:20px;text-align:center;">Loading plans…</div>';
+  if (panel) panel.style.display = 'none';
+  const planList = document.getElementById('planList');
+  if (planList) planList.innerHTML = '';
+  const selectAll = document.getElementById('selectAllPlans');
+  if (selectAll) selectAll.checked = false;
+  const filter = document.getElementById('planTypeFilter');
+  if (filter) filter.value = '';
+  allPlans = [];
+  updateRunButtonCount();
+}
+
+async function fetchPlans(projectId) {
+  const planList = document.getElementById('planList');
+  planList.innerHTML = '<p class="loading"><span class="spinner"></span> Loading plans…</p>';
+
   try {
-    const res = await fetch('/api/projects/' + selectedProjectId + '/plans');
+    const res = await fetch('/api/projects/' + projectId + '/plans');
+    if (res.status === 404) {
+      planList.innerHTML = '<p class="error">Project not found</p>';
+      return;
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
+
     if (data.error) {
-      plansList.innerHTML = '<div style="color:#ef4444;padding:20px;">Error: ' + escHtml(data.error) + '</div>';
+      planList.innerHTML = '<p class="error">Error: ' + escHtml(data.error) + '</p>';
       return;
     }
-    allPlans = data.plans || [];
+
+    allPlans = (data.plans || []).map(p => ({
+      ...p,
+      sheet_type: inferSheetType(p.sheet_name, p.sheet_type)
+    }));
+
+    projectSheetCounts[projectId] = allPlans.length;
+    renderProjectList(allProjects);
+
     if (!allPlans.length) {
-      plansList.innerHTML = '<div style="color:#94a3b8;padding:20px;">No plans found for this project</div>';
+      planList.innerHTML = '<p class="empty">No drawing pages found for this project.</p>';
       return;
     }
-    renderPlansList(allPlans);
-    updateSelectedCount();
-  } catch (err) {
-    plansList.innerHTML = '<div style="color:#ef4444;padding:20px;">Failed to load plans: ' + escHtml(err.message) + '</div>';
+
+    renderPlans(allPlans);
+  } catch (e) {
+    planList.innerHTML = '<p class="error">Failed to load plans. Check connection and try Preview again.</p>';
   }
 }
 
-function renderPlansList(plans) {
-  const filter = document.getElementById('sheetTypeFilter').value;
-  const filtered = filter === 'all' ? plans : plans.filter(p => getSheetType(p.sheet_name) === filter);
-  if (!filtered.length) {
-    document.getElementById('plansList').innerHTML = '<div style="color:#94a3b8;padding:20px;">No plans match the selected filter</div>';
+function renderPlans(plans) {
+  const planList = document.getElementById('planList');
+  const filterType = document.getElementById('planTypeFilter').value;
+
+  const visible = filterType
+    ? plans.filter(p => p.sheet_type === filterType)
+    : plans;
+
+  if (!visible.length) {
+    planList.innerHTML = '<p class="empty">No plans match the selected filter</p>';
+    updateRunButtonCount();
     return;
   }
-  document.getElementById('plansList').innerHTML = filtered.map(plan => {
-    const type = getSheetType(plan.sheet_name);
-    return '<label style="display:flex;align-items:center;padding:10px 12px;border-bottom:1px solid #252a3a;cursor:pointer;gap:12px;" data-type="' + type + '">' +
-      '<input type="checkbox" class="plan-checkbox" value="' + plan.page_id + '" onchange="updateSelectedCount()" style="width:16px;height:16px;flex-shrink:0;">' +
-      '<span style="flex:1;color:#f1f5f9;font-size:13px;">' + escHtml(plan.sheet_name || 'Unnamed Sheet') + '</span>' +
-      '<span style="' + getTypeBadgeStyle(type) + '">' + type + '</span>' +
-    '</label>';
+
+  planList.innerHTML = visible.map((plan, idx) => {
+    const badgeClass = getSheetTypeBadgeClass(plan.sheet_type);
+    const typeName = formatSheetType(plan.sheet_type);
+    return '<div class="plan-item" data-type="' + escAttr(plan.sheet_type) + '" data-page-id="' + plan.page_id + '">' +
+      '<input type="checkbox" id="plan-' + idx + '" checked>' +
+      '<label for="plan-' + idx + '" class="plan-label">' +
+        '<span class="sheet-name">' + escHtml(plan.sheet_name || 'Unnamed Sheet') + '</span>' +
+      '</label>' +
+      '<span class="sheet-type-badge ' + badgeClass + '">' + typeName + '</span>' +
+    '</div>';
   }).join('');
+
+  planList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', updateRunButtonCount);
+  });
+
+  document.getElementById('selectAllPlans').checked = true;
+  updateRunButtonCount();
+}
+
+function applyPlanTypeFilter() {
+  renderPlans(allPlans);
+  document.getElementById('selectAllPlans').checked = false;
 }
 
 function toggleAllPlans(checked) {
-  document.querySelectorAll('.plan-checkbox').forEach(cb => { cb.checked = checked; });
-  updateSelectedCount();
+  document.querySelectorAll('.plan-item:not([style*="display: none"]) input[type="checkbox"]').forEach(cb => {
+    cb.checked = checked;
+  });
+  updateRunButtonCount();
 }
 
-function selectNone() {
+function selectNonePlans() {
   document.getElementById('selectAllPlans').checked = false;
   toggleAllPlans(false);
 }
 
-function filterPlansByType(type) {
-  renderPlansList(allPlans);
-  updateSelectedCount();
+function updateRunButtonCount() {
+  const checked = document.querySelectorAll('.plan-item input[type="checkbox"]:checked').length;
+  const btn = document.getElementById('runSelectedBtn');
+  if (!btn) return;
+  btn.textContent = 'Run Selected Plans (' + checked + ') →';
+  btn.disabled = checked === 0;
 }
 
-function updateSelectedCount() {
-  const checked = document.querySelectorAll('.plan-checkbox:checked');
-  const total = document.querySelectorAll('.plan-checkbox').length;
-  const count = checked.length;
-  document.getElementById('selectedCount').textContent = count + ' sheet' + (count !== 1 ? 's' : '') + ' selected';
-  const btn = document.getElementById('runSelectedBtn');
-  btn.disabled = count === 0;
-  btn.style.opacity = count > 0 ? '1' : '0.5';
-  document.getElementById('selectAllPlans').checked = count === total && total > 0;
+function getSelectedPageIds() {
+  return Array.from(document.querySelectorAll('.plan-item input[type="checkbox"]:checked')).map(cb => {
+    return parseInt(cb.closest('.plan-item').dataset.pageId, 10);
+  });
+}
+
+function allPlansSelected() {
+  const total = document.querySelectorAll('.plan-item input[type="checkbox"]').length;
+  const checked = document.querySelectorAll('.plan-item input[type="checkbox"]:checked').length;
+  return total > 0 && total === checked;
 }
 
 async function runSelectedPlans() {
-  const checked = document.querySelectorAll('.plan-checkbox:checked');
-  const pageIds = Array.from(checked).map(cb => parseInt(cb.value));
-  if (!pageIds.length) { alert('Please select at least one plan'); return; }
-  const sel = document.getElementById('projectSelect');
-  const projectName = sel.options[sel.selectedIndex]?.textContent || 'Project';
+  if (!selectedProject) {
+    alert('Please select a project first.');
+    return;
+  }
+
+  const pageIds = getSelectedPageIds();
+  if (!pageIds.length) {
+    alert('Please select at least one plan to run.');
+    return;
+  }
+
+  const btn = document.getElementById('runSelectedBtn');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+
+  const body = {
+    mode: 'specific',
+    project_id: selectedProject.id,
+    project_name: selectedProject.name
+  };
+
+  if (!allPlansSelected()) {
+    body.page_ids = pageIds;
+  }
+
   try {
     const res = await fetch('/api/run/stackct', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'specific', project_id: selectedProjectId, project_name: projectName, page_ids: pageIds })
+      body: JSON.stringify(body)
     });
     const data = await res.json();
-    if (data.job_id) {
-      document.getElementById('planSelectionPanel').style.display = 'none';
-      startPolling(data.job_id, projectName);
-    } else {
-      alert('Failed to start job: ' + (data.error || 'Unknown error'));
+
+    if (data.error) {
+      alert('Error: ' + data.error);
+      return;
     }
-  } catch (err) {
-    alert('Failed to start job: ' + err.message);
+
+    document.getElementById('planSelectionPanel').style.display = 'none';
+    startPolling(data.job_id, selectedProject.name);
+  } catch (e) {
+    alert('Failed to start job: ' + e.message);
+  } finally {
+    updateRunButtonCount();
   }
+}
+
+function bindPlanSelectionEvents() {
+  const projectList = document.getElementById('projectList');
+  if (projectList) {
+    projectList.addEventListener('click', e => {
+      const item = e.target.closest('.project-item');
+      if (!item) return;
+      onProjectSelect(parseInt(item.dataset.id, 10), item.dataset.name);
+    });
+  }
+
+  const previewBtn = document.getElementById('previewPlansBtn');
+  if (previewBtn) {
+    previewBtn.addEventListener('click', async () => {
+      if (!selectedProject) return;
+      document.getElementById('planSelectionPanel').style.display = 'block';
+      await fetchPlans(selectedProject.id);
+    });
+  }
+
+  const selectAll = document.getElementById('selectAllPlans');
+  if (selectAll) selectAll.addEventListener('change', e => toggleAllPlans(e.target.checked));
+
+  const selectNoneBtn = document.getElementById('selectNoneBtn');
+  if (selectNoneBtn) selectNoneBtn.addEventListener('click', selectNonePlans);
+
+  const typeFilter = document.getElementById('planTypeFilter');
+  if (typeFilter) typeFilter.addEventListener('change', applyPlanTypeFilter);
+
+  const runBtn = document.getElementById('runSelectedBtn');
+  if (runBtn) runBtn.addEventListener('click', runSelectedPlans);
+
+  const search = document.getElementById('projectSearch');
+  if (search) search.addEventListener('input', e => filterProjects(e.target.value));
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────
 function escHtml(s) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────
 loadProjects();
+bindPlanSelectionEvents();
 startActiveJobPolling();
