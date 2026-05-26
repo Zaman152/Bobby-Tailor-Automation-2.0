@@ -21,7 +21,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [ ] **Phase 9: Projects Workspace** — Scope toggle and plan-selection workflow in UI
 - [ ] **Phase 10: Reports & Monitor UI** — Report cards with preview tabs; live monitor page
 - [ ] **Phase 11: PDF Selection & Production Docs** — PDF page picker; VPS README
-- [ ] **Phase 12: Application Authentication** — Login sessions, protected routes/APIs, seeded admin for production deploy
+- [x] **Phase 12: Application Authentication** — Login sessions, protected routes/APIs, seeded admin for production deploy
 - [x] **Phase 13: StackCT Data & Persistence Layer** — SQLite catalog, sync service, DB-first APIs, sheet counts without per-preview scrape
 
 ## Phase Details
@@ -334,13 +334,13 @@ Plans:
 |------|-------|----------|-------------|
 | 1 | 12-01 | — | Auth dependencies + seed_admin.py + env docs |
 | 2 | 12-02 | — | Core auth module + app.py integration + login.html |
-| 3 | 12-03 | — | Frontend CSRF headers on all fetch calls |
+| 3 | 12-03 | — | Frontend CSRF, POST logout form, README auth section |
 
 Plans:
 
-- [ ] 12-01-PLAN.md — Auth dependencies, seed_admin.py, .env.example, config.py validation
-- [ ] 12-02-PLAN.md — auth.py module, before_request guard, login/logout routes, login.html
-- [ ] 12-03-PLAN.md — CSRF meta tags in templates, apiFetch helper, CSRF headers on POST/PUT
+- [x] 12-01-PLAN.md — Auth dependencies, seed_admin.py, .env.example, config.py validation
+- [x] 12-02-PLAN.md — auth.py module, before_request guard, login/logout (POST), login.html
+- [x] 12-03-PLAN.md — CSRF meta tags, apiFetch helper, sidebar logout, README auth docs
 
 ---
 
@@ -419,7 +419,7 @@ Research: `.planning/phases/13-stackct-data-persistence/13-RESEARCH.md`
 | 9. Projects Workspace | 0/TBD | Not started | — |
 | 10. Reports & Monitor UI | 0/TBD | Not started | — |
 | 11. PDF Selection & Production Docs | 0/TBD | Not started | — |
-| 12. Application Authentication | 0/3 | Planned | — |
+| 12. Application Authentication | 3/3 | Complete | 2026-05-26 |
 | 13. StackCT Data & Persistence | 4/4 | Complete | 2026-05-26 |
 
 ---
