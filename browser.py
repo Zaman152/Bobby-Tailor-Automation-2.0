@@ -14,6 +14,81 @@ from config import (
 
 logger = logging.getLogger(__name__)
 
+# System folders to skip when discovering plan sets
+SKIP_PLAN_SET_NAMES = frozenset({
+    "plans", "bookmarks", "supporting documents", "supporting docs",
+})
+
+
+def normalize_plan_sets(raw: list[dict]) -> list[dict]:
+    """
+    Deduplicate and filter raw plan set folder list per discovery audit rules.
+    
+    Rules:
+    1. Skip system folders (Plans, Bookmarks, Supporting Documents)
+    2. Drop "Plans X" parent when child "X" exists with same sheet_count
+    3. Drop aggregate names containing multiple issue labels (e.g. both "v1" and "v2")
+    4. Prefer shorter names when same sheet_count
+    """
+    # Rule 1: Filter out system folders
+    candidates = []
+    for entry in raw:
+        name_lower = entry["name"].lower()
+        if name_lower in SKIP_PLAN_SET_NAMES:
+            continue
+        # Skip generic "Plans" or "Plans >" breadcrumb entries
+        if name_lower == "plans" or name_lower.startswith("plans >"):
+            continue
+        candidates.append(entry)
+    
+    # Rule 3: Drop aggregate names with multiple version labels
+    # Heuristic: if name contains multiple issue labels like "v1" and "v2"
+    filtered = []
+    for entry in candidates:
+        name = entry["name"]
+        # Check for common version patterns appearing together
+        version_indicators = ["v1", "v2", "v3", "issue", "rev", "addendum"]
+        found_indicators = [ind for ind in version_indicators if ind.lower() in name.lower()]
+        # If we find multiple distinct version numbers in one name, likely an aggregate
+        if "v1" in name.lower() and "v2" in name.lower():
+            logger.debug(f"Dropping aggregate plan set: {name}")
+            continue
+        filtered.append(entry)
+    
+    # Rule 2: Drop "Plans X" when child "X" exists with same sheet_count
+    # Build map by sheet_count for comparison
+    by_count = {}
+    for entry in filtered:
+        count = entry.get("sheet_count", 0)
+        if count not in by_count:
+            by_count[count] = []
+        by_count[count].append(entry)
+    
+    result = []
+    for entry in filtered:
+        name = entry["name"]
+        count = entry.get("sheet_count", 0)
+        
+        # Check if this is a "Plans X" parent
+        if name.lower().startswith("plans "):
+            child_name = name[6:].strip()  # Remove "Plans " prefix
+            # Look for matching child in same sheet_count group
+            siblings = by_count.get(count, [])
+            has_child = any(
+                s["name"].strip() == child_name and s["folder_id"] != entry["folder_id"]
+                for s in siblings
+            )
+            if has_child:
+                logger.debug(f"Dropping parent plan set: {name} (child exists)")
+                continue
+        
+        result.append(entry)
+    
+    # Rule 4: If multiple entries with same sheet_count, prefer shorter name
+    # (already handled by audit script's preference for short labels)
+    
+    return result
+
 
 class StackCTBrowser:
     def __init__(self):
@@ -243,50 +318,187 @@ class StackCTBrowser:
 
     async def get_all_page_ids(self, project_id: int) -> List[dict]:
         """
-        Discover all drawing page IDs from the thumbnail grid.
-        StackCT embeds data-page-id attributes directly in the DOM —
-        no need to click through each page.
+        Deprecated: Use get_plan_sets() + get_page_ids_in_folder() instead.
+        
+        Thin wrapper for backward compatibility:
+        - If one plan set exists, return its pages
+        - If multiple sets exist, log warning and return empty list
+        - If folder_id==0 (direct-grid), scrape landing page
+        
         Returns list of {page_id, sheet_name}.
         """
-        logger.info(f"Discovering all pages for project {project_id}")
+        logger.warning(
+            "get_all_page_ids is deprecated — use get_plan_sets + "
+            "get_page_ids_in_folder for folder-scoped access"
+        )
+        
+        plan_sets = await self.get_plan_sets(project_id)
+        
+        if len(plan_sets) == 0:
+            logger.error(f"No plan sets found for project {project_id}")
+            return []
+        
+        if len(plan_sets) == 1:
+            # Single set — return its pages
+            folder_id = plan_sets[0]["folder_id"]
+            return await self.get_page_ids_in_folder(project_id, folder_id)
+        
+        # Multiple sets — caller must use folder API
+        logger.warning(
+            f"Project {project_id} has {len(plan_sets)} plan sets. "
+            f"Callers must use get_plan_sets + get_page_ids_in_folder with "
+            f"explicit folder_id. Returning empty list."
+        )
+        return []
 
+    async def get_plan_sets(self, project_id: int) -> list[dict]:
+        """
+        Discover all plan sets (folders) for a project, with deduplication.
+        Returns list of {folder_id, name, sheet_count}.
+        
+        For projects with no folder cards (direct grid), returns a single
+        synthetic set with folder_id=0.
+        """
+        logger.info(f"Discovering plan sets for project {project_id}")
         url = f"https://go.stackct.com/app/#/Takeoff/{project_id}"
         await self.page.goto(url, wait_until="load", timeout=60000)
-        # Wait for thumbnails to render — grid can be slow on large projects
-        pages_raw = []
-        for attempt in range(3):
+        
+        # Wait for plan set cards to render
+        await asyncio.sleep(2.5)
+        
+        # Extract all folder cards
+        raw_sets = await self.page.evaluate('''() => {
+            const sets = [];
+            const seen = new Set();
+            document.querySelectorAll('[data-folder-id]').forEach(el => {
+                const id = parseInt(el.getAttribute('data-folder-id'), 10);
+                if (!id || seen.has(id)) return;
+                const name = (el.textContent || '').trim().replace(/\\s+/g, ' ');
+                if (!name || name.length < 4) return;
+                // Prefer short labels (folder card / tree row)
+                const short = name.split('>').pop().trim();
+                if (short.length > 150) return;
+                seen.add(id);
+                sets.push({ folder_id: id, name: short });
+            });
+            return sets;
+        }''')
+        
+        # Apply dedupe rules
+        candidates = normalize_plan_sets(raw_sets)
+        
+        # For each candidate, click folder and count sheets
+        plan_sets = []
+        for ps in candidates:
+            fid = ps["folder_id"]
             try:
-                await self.page.wait_for_selector('[data-page-id]', timeout=30000)
-                await asyncio.sleep(2 + attempt)
-                pages_raw = await self.page.evaluate('''() => {
-                    const result = [];
-                    const seen = new Set();
+                await self.page.click(f'[data-folder-id="{fid}"]', timeout=8000)
+                await asyncio.sleep(1.5)
+                sheet_count = await self.page.evaluate('''() => {
+                    const ids = new Set();
                     document.querySelectorAll('[data-page-id]').forEach(el => {
                         const pid = el.getAttribute('data-page-id');
-                        if (!pid || seen.has(pid)) return;
-                        seen.add(pid);
-                        const nameEl = el.querySelector('[data-id="thumbnail-page-name"]');
-                        const name = nameEl ? nameEl.textContent.trim() : "";
-                        result.push({page_id: parseInt(pid), sheet_name: name});
+                        if (pid) ids.add(pid);
                     });
-                    return result;
+                    return ids.size;
                 }''')
-                if pages_raw:
-                    break
-            except Exception:
-                if attempt < 2:
-                    logger.warning(f"Page grid not ready (attempt {attempt + 1}/3), retrying...")
-                    await asyncio.sleep(3)
-                    await self.page.goto(url, wait_until="load")
-                else:
-                    logger.error("No [data-page-id] elements found — plans grid may not have loaded")
-                    return []
+                plan_sets.append({
+                    "folder_id": fid,
+                    "name": ps["name"],
+                    "sheet_count": sheet_count,
+                })
+                logger.info(f"  Plan set: {ps['name']} ({sheet_count} sheets)")
+            except Exception as e:
+                logger.warning(f"Failed to query plan set {fid}: {e}")
+        
+        # Direct-grid fallback: if zero sets after dedupe but pages exist on landing
+        if len(plan_sets) == 0:
+            logger.info("No plan set folders found — checking for direct grid...")
+            # Re-navigate to ensure clean state
+            await self.page.goto(url, wait_until="load", timeout=60000)
+            # Wait up to 30s for page grid to appear
+            for attempt in range(6):
+                await asyncio.sleep(5)
+                landing_count = await self.page.evaluate('''() => {
+                    const ids = new Set();
+                    document.querySelectorAll('[data-page-id]').forEach(el => {
+                        const pid = el.getAttribute('data-page-id');
+                        if (pid) ids.add(pid);
+                    });
+                    return ids.size;
+                }''')
+                if landing_count > 0:
+                    logger.info(
+                        f"Direct-grid fallback: {landing_count} sheets "
+                        f"(no folder cards)"
+                    )
+                    return [{
+                        "folder_id": 0,
+                        "name": "All drawing sheets",
+                        "sheet_count": landing_count,
+                    }]
+            logger.warning("No plan sets and no landing grid pages found")
+        
+        logger.info(f"Discovered {len(plan_sets)} plan sets")
+        return plan_sets
 
+    async def get_page_ids_in_folder(
+        self, project_id: int, folder_id: int
+    ) -> list[dict]:
+        """
+        Get all drawing pages for a specific folder (plan set).
+        
+        If folder_id == 0 (direct-grid fallback), scrape landing page.
+        Otherwise, navigate to project and click the folder before scraping.
+        
+        Returns list of {page_id, sheet_name}.
+        """
+        logger.info(
+            f"Getting pages for project {project_id}, folder {folder_id}"
+        )
+        url = f"https://go.stackct.com/app/#/Takeoff/{project_id}"
+        await self.page.goto(url, wait_until="load", timeout=60000)
+        
+        if folder_id == 0:
+            # Direct-grid fallback — scrape landing page
+            logger.info("Using direct-grid fallback (folder_id=0)")
+            await asyncio.sleep(3)
+        else:
+            # Click folder card to load its sheets
+            try:
+                await self.page.click(
+                    f'[data-folder-id="{folder_id}"]', timeout=10000
+                )
+                await asyncio.sleep(2)
+            except Exception as e:
+                logger.error(f"Failed to click folder {folder_id}: {e}")
+                return []
+        
+        # Wait for thumbnails
+        try:
+            await self.page.wait_for_selector('[data-page-id]', timeout=30000)
+            await asyncio.sleep(2)
+        except Exception:
+            logger.warning("No [data-page-id] elements found")
+            return []
+        
+        # Extract page IDs (reuse logic from get_all_page_ids)
+        pages_raw = await self.page.evaluate('''() => {
+            const result = [];
+            const seen = new Set();
+            document.querySelectorAll('[data-page-id]').forEach(el => {
+                const pid = el.getAttribute('data-page-id');
+                if (!pid || seen.has(pid)) return;
+                seen.add(pid);
+                const nameEl = el.querySelector('[data-id="thumbnail-page-name"]');
+                const name = nameEl ? nameEl.textContent.trim() : "";
+                result.push({page_id: parseInt(pid), sheet_name: name});
+            });
+            return result;
+        }''')
+        
         pages = [p for p in pages_raw if p["page_id"]]
-        for p in pages:
-            logger.info(f"  Found page: {p['sheet_name']} (ID: {p['page_id']})")
-
-        logger.info(f"Discovered {len(pages)} pages")
+        logger.info(f"Found {len(pages)} pages in folder {folder_id}")
         return pages
 
     async def navigate_to_page(self, project_id: int, page_id: int) -> bool:
