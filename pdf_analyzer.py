@@ -54,15 +54,29 @@ def run_pdf_analysis(pdf_path: str, project_name: str = "PDF Project",
     for i in range(total):
         sheet = _sheet_name(pdf_path, i)
         logger.info(f"[{i+1}/{total}] {sheet}")
+
         if progress_callback:
-            progress_callback(i + 1, total, sheet)
+            progress_callback(i + 1, total, sheet, phase="converting")
 
         img_path = _page_to_image(pdf_path, i, str(img_dir))
+
+        if progress_callback:
+            progress_callback(i + 1, total, sheet, phase="analyzing")
+
         extracted = analyze_drawing(img_path, sheet)
         extracted["_page_num"] = i + 1
         all_extracted.append(extracted)
 
         if "error" not in extracted:
+            extraction_counts = {
+                "measurements": len(extracted.get("measurements", [])),
+                "components": len(extracted.get("components", [])),
+                "rooms": len(extracted.get("rooms", [])),
+                "schedules": len(extracted.get("schedules", [])),
+            }
+            if progress_callback:
+                progress_callback(i + 1, total, sheet,
+                                  phase="complete", extraction=extraction_counts)
             all_estimates.extend(apply_estimation_tables(extracted))
 
     return generate_report(project_name, all_extracted, all_estimates)

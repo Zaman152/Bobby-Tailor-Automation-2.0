@@ -16,14 +16,33 @@ from reporter import generate_report
 logger = logging.getLogger(__name__)
 
 
+def _make_log_entry(msg: str, entry_type: str = "info",
+                    sheet_index: int = None, sheet_total: int = None,
+                    sheet_name: str = None, extraction: dict = None) -> dict:
+    """Create a structured log entry for the job log."""
+    from datetime import datetime as _dt
+    entry = {
+        "timestamp": _dt.now().isoformat(),
+        "type": entry_type,
+        "message": msg
+    }
+    if sheet_index is not None:
+        entry["sheet_index"] = sheet_index
+        entry["sheet_total"] = sheet_total
+        entry["sheet_name"] = sheet_name
+    if extraction:
+        entry["extraction"] = extraction
+    return entry
+
+
 async def run_project_scrape(project_id: int, project_name: str,
                              page_ids_filter: Optional[List[int]] = None,
                              log_callback: Optional[Callable] = None,
                              progress_callback: Optional[Callable] = None) -> dict:
-    def log(msg: str):
+    def log(msg: str, entry: dict = None):
         logger.info(msg)
         if log_callback:
-            log_callback(msg)
+            log_callback(entry if entry else msg)
 
     log(f"Starting: {project_name} (ID: {project_id})")
 
@@ -64,7 +83,12 @@ async def run_project_scrape(project_id: int, project_name: str,
         for idx, page_info in enumerate(pages, 1):
             page_id = page_info["page_id"]
             sheet_name = page_info["sheet_name"] or f"Page_{idx}"
-            log(f"[{idx}/{total}] Screenshotting {sheet_name}...")
+
+            if progress_callback:
+                progress_callback(idx, total, sheet_name, phase="screenshotting")
+            log(f"[{idx}/{total}] Screenshotting {sheet_name}...",
+                _make_log_entry(f"[{idx}/{total}] Screenshotting {sheet_name}",
+                                "sheet_progress", idx, total, sheet_name))
 
             screenshot_path = screenshots_dir / f"{idx:03d}_{sheet_name}.png"
             success = await browser.screenshot_full_drawing(project_id, page_id, str(screenshot_path))
@@ -82,9 +106,11 @@ async def run_project_scrape(project_id: int, project_name: str,
                     log(f"  Could not capture {sheet_name}, skipping")
                     continue
 
-            log(f"[{idx}/{total}] Analyzing {sheet_name} with Claude...")
             if progress_callback:
-                progress_callback(idx, total, sheet_name)
+                progress_callback(idx, total, sheet_name, phase="analyzing")
+            log(f"[{idx}/{total}] Analyzing {sheet_name} with Claude...",
+                _make_log_entry(f"[{idx}/{total}] Analyzing {sheet_name}",
+                                "sheet_progress", idx, total, sheet_name))
 
             extracted = analyze_drawing(str(screenshot_path), sheet_name)
             extracted["_page_id"] = page_id
@@ -94,7 +120,21 @@ async def run_project_scrape(project_id: int, project_name: str,
             else:
                 n_meas = len(extracted.get("measurements", []))
                 n_comp = len(extracted.get("components", []))
-                log(f"  {sheet_name}: {n_meas} measurements, {n_comp} components extracted")
+                n_rooms = len(extracted.get("rooms", []))
+                n_sched = len(extracted.get("schedules", []))
+                extraction_counts = {
+                    "measurements": n_meas,
+                    "components": n_comp,
+                    "rooms": n_rooms,
+                    "schedules": n_sched,
+                }
+                msg = f"  {sheet_name}: {n_meas} measurements, {n_comp} components extracted"
+                log(msg, _make_log_entry(msg, "sheet_complete",
+                                         idx, total, sheet_name, extraction_counts))
+
+                if progress_callback:
+                    progress_callback(idx, total, sheet_name,
+                                      phase="complete", extraction=extraction_counts)
 
                 # STEP 6: Apply estimation tables to compute final takeoff quantities
                 estimates = apply_estimation_tables(extracted)
