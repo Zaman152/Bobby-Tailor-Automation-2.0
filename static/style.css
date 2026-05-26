@@ -148,6 +148,38 @@ input, select, button { font-family: var(--font-body); }
   margin: 8px 0;
 }
 
+/* Logout — POST form styled like nav links */
+.logout-form {
+  margin: 0;
+  padding: 0;
+  display: block;
+}
+
+button.nav-item {
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  line-height: inherit;
+}
+
+.logout-form--header {
+  display: inline;
+  margin: 0;
+}
+
+.logout-form--header .back-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
 .sidebar-footer {
   padding: 16px;
   border-top: 1px solid var(--border-subtle);
@@ -564,6 +596,123 @@ select:focus, input[type="text"]:focus {
   background: var(--bg-base);
   color: var(--text-primary);
 }
+
+/* ── Plan set picker ── */
+.plan-set-panel {
+  border-color: rgba(99, 102, 241, 0.35);
+  background: linear-gradient(180deg, var(--bg-surface) 0%, rgba(28, 31, 46, 0.95) 100%);
+}
+
+.plan-set-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.plan-set-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.plan-set-count-badge {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  font-weight: 600;
+}
+
+.plan-set-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.plan-set-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+.plan-set-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-base);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.plan-set-card:hover {
+  border-color: var(--accent-secondary);
+  background: var(--bg-elevated);
+}
+
+.plan-set-card.selected {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.plan-set-card input[type="radio"] {
+  margin-top: 3px;
+  accent-color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.plan-set-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-set-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.plan-set-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  font-family: var(--font-data);
+}
+
+.plan-set-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cache-pill {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.cache-pill.fresh { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+.cache-pill.stale { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+.cache-pill.syncing { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
 
 /* ── Plan Selection Panel ── */
 .plan-panel {

@@ -46,7 +46,9 @@ let pollInterval = null;
 let projectsLoaded = false;
 let allProjects = [];
 let allPlans = [];
+let allPlanSets = [];
 let selectedProject = null;
+let selectedPlanSet = null;
 let projectSheetCounts = {};
 let searchDebounceTimer = null;
 let activeJobPollInterval = null;
@@ -173,10 +175,22 @@ function renderProjectList(projects) {
 
   listEl.innerHTML = filtered.map(p => {
     const isSelected = selectedProject && selectedProject.id === p.id;
-    const count = projectSheetCounts[p.id];
-    const countLabel = count != null
-      ? count + ' sheet' + (count !== 1 ? 's' : '')
-      : '<span class="sheet-count-unknown" title="Sync plans to load count">—</span>';
+    const meta = projectSheetCounts[p.id];
+    let countLabel = '<span class="sheet-count-unknown" title="Preview to load plan sets">—</span>';
+    if (meta != null) {
+      if (typeof meta === 'object') {
+        const sets = meta.plan_set_count;
+        const sheets = meta.sheet_count;
+        if (sets != null && sets > 0) {
+          countLabel = sets + ' set' + (sets !== 1 ? 's' : '');
+          if (sheets != null) countLabel += ' · ' + sheets + ' sheets';
+        } else if (sheets != null) {
+          countLabel = sheets + ' sheet' + (sheets !== 1 ? 's' : '');
+        }
+      } else if (typeof meta === 'number') {
+        countLabel = meta + ' sheet' + (meta !== 1 ? 's' : '');
+      }
+    }
     return '<div class="project-item' + (isSelected ? ' selected' : '') + '" data-id="' + p.id + '" data-name="' + escHtml(p.name) + '" role="button" tabindex="0" aria-label="Select project ' + escHtml(p.name) + '">' +
       '<input type="radio" name="projectPick" class="project-radio"' + (isSelected ? ' checked' : '') + ' tabindex="-1" aria-hidden="true">' +
       '<div class="project-info">' +
@@ -194,17 +208,21 @@ function onProjectSelect(projectId, projectName) {
   document.getElementById('projectMeta').textContent = 'Project ID: ' + projectId;
   renderProjectList(allProjects);
   updatePreviewButton();
-  if (projectSheetCounts[projectId] == null) {
-    apiFetch('/api/projects/' + projectId + '/sync-plans', { method: 'POST' })
-      .then(r => r.json())
-      .then(data => {
-        if (data.plans && data.plans.length) {
-          projectSheetCounts[projectId] = data.plans.length;
-          renderProjectList(allProjects);
-        }
-      })
-      .catch(() => {});
-  }
+  apiFetch('/api/projects/' + projectId + '/sync-plan-sets', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.plan_sets && data.plan_sets.length) {
+        const totalSheets = data.plan_sets.reduce(
+          (n, s) => n + (s.sheet_count || 0), 0
+        );
+        projectSheetCounts[projectId] = {
+          plan_set_count: data.plan_sets.length,
+          sheet_count: totalSheets || null,
+        };
+        renderProjectList(allProjects);
+      }
+    })
+    .catch(() => {});
 }
 
 function updatePreviewButton() {
@@ -973,25 +991,167 @@ function formatSheetType(type) {
 }
 
 function resetPlanSelection() {
+  const setPanel = document.getElementById('planSetPanel');
+  if (setPanel) setPanel.style.display = 'none';
   const panel = document.getElementById('planSelectionPanel');
   if (panel) panel.style.display = 'none';
   const planList = document.getElementById('planList');
   if (planList) planList.innerHTML = '';
+  const planSetList = document.getElementById('planSetList');
+  if (planSetList) planSetList.innerHTML = '';
   const selectAll = document.getElementById('selectAllPlans');
   if (selectAll) selectAll.checked = false;
   const filter = document.getElementById('planTypeFilter');
   if (filter) filter.value = '';
+  const loadBtn = document.getElementById('loadSheetsBtn');
+  if (loadBtn) loadBtn.disabled = true;
+  const backBtn = document.getElementById('backToPlanSetsBtn');
+  if (backBtn) backBtn.style.display = 'none';
   allPlans = [];
+  allPlanSets = [];
+  selectedPlanSet = null;
   updateRunButtonCount();
+}
+
+function formatCachePill(data) {
+  if (data.syncing) return '<span class="cache-pill syncing">syncing</span>';
+  if (data.stale) return '<span class="cache-pill stale">stale · refreshing</span>';
+  if (data.from_cache) return '<span class="cache-pill fresh">cached</span>';
+  return '<span class="cache-pill fresh">live</span>';
+}
+
+function renderPlanSets(planSets) {
+  const list = document.getElementById('planSetList');
+  const badge = document.getElementById('planSetCount');
+  if (!list) return;
+  if (badge) badge.textContent = planSets.length + ' available';
+
+  list.innerHTML = planSets.map(ps => {
+    const fid = ps.folder_id;
+    const selected = selectedPlanSet && selectedPlanSet.folder_id === fid;
+    const sheets = ps.sheet_count != null ? ps.sheet_count + ' sheets' : 'sheet count unknown';
+    return '<label class="plan-set-card' + (selected ? ' selected' : '') + '" data-folder-id="' + fid + '">' +
+      '<input type="radio" name="planSetPick" value="' + fid + '"' + (selected ? ' checked' : '') + '>' +
+      '<div class="plan-set-card-body">' +
+        '<div class="plan-set-name">' + escHtml(ps.name || 'Plan set ' + fid) + '</div>' +
+        '<div class="plan-set-meta">' + sheets + ' · folder ' + fid + '</div>' +
+      '</div>' +
+    '</label>';
+  }).join('');
+
+  list.querySelectorAll('.plan-set-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const fid = parseInt(card.dataset.folderId, 10);
+      const ps = allPlanSets.find(s => s.folder_id === fid);
+      if (ps) selectPlanSet(ps);
+    });
+  });
+}
+
+function selectPlanSet(ps) {
+  selectedPlanSet = { folder_id: ps.folder_id, name: ps.name || ('Folder ' + ps.folder_id) };
+  renderPlanSets(allPlanSets);
+  const loadBtn = document.getElementById('loadSheetsBtn');
+  if (loadBtn) loadBtn.disabled = false;
+  const meta = document.getElementById('projectMeta');
+  if (meta && selectedProject) {
+    meta.textContent = 'Project ID: ' + selectedProject.id + ' · Plan set: ' + selectedPlanSet.name;
+  }
+}
+
+async function fetchPlanSets(projectId, forceRefresh) {
+  const setPanel = document.getElementById('planSetPanel');
+  const planSetList = document.getElementById('planSetList');
+  const sheetPanel = document.getElementById('planSelectionPanel');
+  if (setPanel) setPanel.style.display = 'block';
+  if (sheetPanel) sheetPanel.style.display = 'none';
+  planSetList.innerHTML = '<p class="loading"><span class="spinner"></span> Loading plan sets…</p>';
+
+  const url = '/api/projects/' + projectId + '/plan-sets' + (forceRefresh ? '?refresh=1' : '');
+  const maxPolls = 40;
+  let polls = 0;
+
+  async function loadOnce() {
+    const res = await fetch(url, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+
+  try {
+    let data = await loadOnce();
+    while (data.syncing && polls < maxPolls) {
+      planSetList.innerHTML = '<p class="loading"><span class="spinner"></span> Syncing plan sets from StackCT…</p>';
+      await new Promise(r => setTimeout(r, 3000));
+      polls++;
+      data = await loadOnce();
+    }
+
+    if (data.error && !(data.plan_sets && data.plan_sets.length)) {
+      planSetList.innerHTML = '<p class="error">' + escHtml(data.error) + '</p>' +
+        planSyncErrorHint(data.error);
+      return;
+    }
+
+    allPlanSets = data.plan_sets || [];
+    if (!allPlanSets.length) {
+      planSetList.innerHTML = '<p class="empty">No plan sets found. Try ↻ Refresh plans.</p>';
+      return;
+    }
+
+    const hint = document.getElementById('planSetHint');
+    if (hint) {
+      hint.innerHTML = 'Select an issue package (plan set), then load sheets.' + formatCachePill(data);
+    }
+
+    projectSheetCounts[projectId] = {
+      plan_set_count: allPlanSets.length,
+      sheet_count: allPlanSets.reduce((n, s) => n + (s.sheet_count || 0), 0) || null,
+    };
+    renderProjectList(allProjects);
+
+    if (allPlanSets.length === 1) {
+      selectPlanSet(allPlanSets[0]);
+      await fetchPlans(projectId, allPlanSets[0].folder_id, false);
+      return;
+    }
+
+    renderPlanSets(allPlanSets);
+  } catch (e) {
+    planSetList.innerHTML = '<p class="error">Failed to load plan sets: ' + escHtml(e.message) + '</p>';
+  }
+}
+
+function planSyncErrorHint(err) {
+  const s = String(err || '');
+  if (/dns|network|reach stackct|internet|vpn/i.test(s)) {
+    return '<p class="help-text" style="margin-top:8px;color:var(--text-tertiary)">Could not reach StackCT — check internet or VPN.</p>';
+  }
+  if (/login|credential/i.test(s)) {
+    return '<p class="help-text" style="margin-top:8px;color:var(--text-tertiary)">StackCT login failed — check credentials in Settings.</p>';
+  }
+  return '';
 }
 
 let plansFetchAbort = null;
 let plansFetchProjectId = null;
 
-async function fetchPlans(projectId, forceRefresh) {
+async function fetchPlans(projectId, folderId, forceRefresh) {
+  if (folderId == null && selectedPlanSet) folderId = selectedPlanSet.folder_id;
+  if (folderId == null) {
+    alert('Select a plan set first.');
+    return;
+  }
+
   const planList = document.getElementById('planList');
+  const sheetPanel = document.getElementById('planSelectionPanel');
+  const setPanel = document.getElementById('planSetPanel');
   const previewBtn = document.getElementById('previewPlansBtn');
-  planList.innerHTML = '<p class="loading"><span class="spinner"></span> Loading plans…</p>';
+  if (sheetPanel) sheetPanel.style.display = 'block';
+  if (setPanel) setPanel.style.display = 'none';
+  const backBtn = document.getElementById('backToPlanSetsBtn');
+  if (backBtn) backBtn.style.display = allPlanSets.length > 1 ? 'inline-block' : 'none';
+
+  planList.innerHTML = '<p class="loading"><span class="spinner"></span> Loading sheets…</p>';
   if (previewBtn) previewBtn.disabled = true;
 
   if (plansFetchAbort) plansFetchAbort.abort();
@@ -999,7 +1159,8 @@ async function fetchPlans(projectId, forceRefresh) {
   plansFetchProjectId = projectId;
   const signal = plansFetchAbort.signal;
 
-  const url = '/api/projects/' + projectId + '/plans' + (forceRefresh ? '?refresh=1' : '');
+  const url = '/api/projects/' + projectId + '/plan-sets/' + folderId + '/plans' +
+    (forceRefresh ? '?refresh=1' : '');
   const maxPolls = 40;
   let polls = 0;
 
@@ -1017,7 +1178,7 @@ async function fetchPlans(projectId, forceRefresh) {
     if (!data) return;
 
     while (data.syncing && polls < maxPolls) {
-      planList.innerHTML = '<p class="loading"><span class="spinner"></span> Syncing with StackCT…</p>';
+      planList.innerHTML = '<p class="loading"><span class="spinner"></span> Syncing sheets from StackCT…</p>';
       await new Promise(r => setTimeout(r, 3000));
       polls++;
       data = await loadOnce();
@@ -1025,12 +1186,9 @@ async function fetchPlans(projectId, forceRefresh) {
 
     if (data.error && !(data.plans && data.plans.length)) {
       let hint = '';
-      if (/dns|network|reach stackct|internet|vpn/i.test(data.error)) {
-        hint = '<p class="help-text" style="margin-top:8px;color:var(--text-tertiary)">The app could not reach StackCT. Check your internet connection or VPN, then click Preview or ↻ Refresh plans again.</p>';
-      } else if (/login|credential|password|email/i.test(data.error)) {
-        hint = '<p class="help-text" style="margin-top:8px;color:var(--text-tertiary)">StackCT login failed. Wait a few seconds and click Preview again — only one browser login runs at a time. Check STACKCT_EMAIL / STACKCT_PASSWORD in Settings.</p>';
-      } else if (/syncing|in progress/i.test(data.error)) {
-        hint = '<p class="help-text" style="margin-top:8px;color:var(--text-tertiary)">Plans are still syncing from StackCT. Wait a moment and click Preview again.</p>';
+      hint = planSyncErrorHint(data.error);
+      if (/syncing|in progress/i.test(data.error)) {
+        hint += '<p class="help-text" style="margin-top:8px;color:var(--text-tertiary)">Sheets are still syncing — wait and try again.</p>';
       }
       if (selectedProject && selectedProject.id === projectId) {
         planList.innerHTML = '<p class="error">Error: ' + escHtml(data.error) + '</p>' + hint;
@@ -1056,13 +1214,17 @@ async function fetchPlans(projectId, forceRefresh) {
     }
 
     renderPlans(allPlans);
-    if (data.from_cache && !data.stale) {
-      const meta = document.getElementById('projectMeta');
-      if (meta && selectedProject) {
-        meta.textContent = 'Project ID: ' + projectId + ' · loaded from cache';
-      }
+    const meta = document.getElementById('projectMeta');
+    if (meta && selectedProject && selectedPlanSet) {
+      meta.textContent = 'Project ID: ' + projectId + ' · ' + selectedPlanSet.name +
+        ' · ' + allPlans.length + ' sheets' +
+        (data.from_cache ? (data.stale ? ' · cached (refreshing)' : ' · cached') : ' · live');
     }
-    projectSheetCounts[projectId] = allPlans.length;
+    const prev = projectSheetCounts[projectId];
+    projectSheetCounts[projectId] = {
+      plan_set_count: (prev && prev.plan_set_count) || allPlanSets.length || 1,
+      sheet_count: allPlans.length,
+    };
     renderProjectList(allProjects);
   } catch (e) {
     if (e.name === 'AbortError') return;
@@ -1171,6 +1333,10 @@ async function runSelectedPlans() {
     project_name: selectedProject.name
   };
 
+  if (selectedPlanSet) {
+    body.folder_id = selectedPlanSet.folder_id;
+  }
+
   if (!allPlansSelected()) {
     body.page_ids = pageIds;
   }
@@ -1211,8 +1377,7 @@ function bindPlanSelectionEvents() {
   if (previewBtn) {
     previewBtn.addEventListener('click', async () => {
       if (!selectedProject) return;
-      document.getElementById('planSelectionPanel').style.display = 'block';
-      await fetchPlans(selectedProject.id, false);
+      await fetchPlanSets(selectedProject.id, false);
     });
   }
 
@@ -1220,8 +1385,30 @@ function bindPlanSelectionEvents() {
   if (refreshPlansBtn) {
     refreshPlansBtn.addEventListener('click', async () => {
       if (!selectedProject) return;
-      document.getElementById('planSelectionPanel').style.display = 'block';
-      await fetchPlans(selectedProject.id, true);
+      const proj = selectedProject;
+      resetPlanSelection();
+      selectedProject = proj;
+      document.getElementById('projectMeta').textContent = 'Project ID: ' + proj.id;
+      await fetchPlanSets(proj.id, true);
+    });
+  }
+
+  const loadSheetsBtn = document.getElementById('loadSheetsBtn');
+  if (loadSheetsBtn) {
+    loadSheetsBtn.addEventListener('click', async () => {
+      if (!selectedProject || !selectedPlanSet) return;
+      await fetchPlans(selectedProject.id, selectedPlanSet.folder_id, false);
+    });
+  }
+
+  const backToPlanSetsBtn = document.getElementById('backToPlanSetsBtn');
+  if (backToPlanSetsBtn) {
+    backToPlanSetsBtn.addEventListener('click', () => {
+      if (!selectedProject) return;
+      document.getElementById('planSelectionPanel').style.display = 'none';
+      document.getElementById('planSetPanel').style.display = 'block';
+      backToPlanSetsBtn.style.display = 'none';
+      renderPlanSets(allPlanSets);
     });
   }
 
