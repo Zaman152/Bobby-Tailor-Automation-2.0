@@ -11,6 +11,12 @@ logger = logging.getLogger(__name__)
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
+PRICING = {
+    "claude-haiku-4-5":   {"in": 1.0,  "out": 5.0},
+    "claude-sonnet-4-6":  {"in": 3.0,  "out": 15.0},
+    "claude-opus-4-7":    {"in": 5.0,  "out": 25.0},
+}
+
 
 def _pick_model(sheet_name: str) -> str:
     """Choose smarter model for sheets whose name suggests heavy tabular content.
@@ -214,6 +220,13 @@ def analyze_drawing(screenshot_path: str, sheet_name: str = "") -> dict:
             ],
         )
 
+        # Capture usage and calculate cost
+        usage = response.usage
+        p = PRICING.get(model, {"in": 3.0, "out": 15.0})
+        input_tokens = usage.input_tokens
+        output_tokens = usage.output_tokens
+        cost_usd = (input_tokens * p["in"] + output_tokens * p["out"]) / 1_000_000
+
         raw_text = response.content[0].text.strip()
 
         # Strip markdown if present
@@ -223,18 +236,38 @@ def analyze_drawing(screenshot_path: str, sheet_name: str = "") -> dict:
                 raw_text = raw_text[4:]
 
         extracted = json.loads(raw_text)
+        extracted["_tokens_in"] = input_tokens
+        extracted["_tokens_out"] = output_tokens
+        extracted["_cost_usd"] = round(cost_usd, 6)
+        extracted["_model_used"] = model
         extracted["_source_sheet"] = sheet_name
         extracted["_screenshot"] = screenshot_path
         logger.info(f"  Extracted {len(extracted.get('measurements', []))} measurements, "
-                    f"{len(extracted.get('components', []))} components")
+                    f"{len(extracted.get('components', []))} components "
+                    f"[{input_tokens} in / {output_tokens} out tokens, ${cost_usd:.6f}]")
         return extracted
 
     except json.JSONDecodeError as e:
         logger.error(f"Claude returned invalid JSON: {e}")
-        return {"error": "invalid_json", "raw": raw_text, "_source_sheet": sheet_name}
+        return {
+            "error": "invalid_json",
+            "raw": raw_text,
+            "_source_sheet": sheet_name,
+            "_tokens_in": input_tokens,
+            "_tokens_out": output_tokens,
+            "_cost_usd": round(cost_usd, 6),
+            "_model_used": model,
+        }
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
-        return {"error": str(e), "_source_sheet": sheet_name}
+        return {
+            "error": str(e),
+            "_source_sheet": sheet_name,
+            "_tokens_in": 0,
+            "_tokens_out": 0,
+            "_cost_usd": 0,
+            "_model_used": "",
+        }
 
 
 def make_navigation_decision(screenshot_path: str, current_state: dict) -> dict:
