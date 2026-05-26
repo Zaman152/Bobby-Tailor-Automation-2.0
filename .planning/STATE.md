@@ -10,12 +10,12 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 ## Current Position
 
-Phase: 14 of 14 (StackCT Plan Sets & Folders)  
-Plan: 3 of 4 complete  
-Status: In progress — 14-01, 14-02, 14-03 executed 2026-05-26  
-Last activity: 2026-05-26 — `/gsd-execute-phase 14` (browser, schema, sync, API)
+Phase: 14 of 14 (StackCT Plan Sets & Folders) — COMPLETE  
+Plan: 4/4 complete  
+Status: Phase 14 complete — all 4 plans executed 2026-05-26  
+Last activity: 2026-05-26 — `/gsd-execute-phase 14` (browser, schema, sync, API, UI)
 
-Progress: [██████████░] 96% (phases 1–13 complete, 14 in progress 3/4)
+Progress: [██████████] 100% (all 14 phases complete)
 
 ## Performance Metrics
 
@@ -98,6 +98,13 @@ From 14-03 (Folder-First API Routes):
 - GET /api/projects/<id>/plans now requires ?folder_id= (backward compat with 400 error)
 - POST /api/run/stackct validates page_ids belong to folder
 - folder_id stored in takeoff.json report root
+
+From 14-04 (Two-Step Plan Selection UI):
+
+- Two-step flow: plan sets → sheets (auto-skip for single-set projects)
+- Project list shows "N sets · M sheets" instead of single sheet count
+- Radio card picker with folder metadata visible
+- Back button hidden for single-set projects
 
 ### Pending Todos
 
