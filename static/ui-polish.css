@@ -1,5 +1,9 @@
 /**
- * UI polish layer — motion, depth, industrial dashboard refinements
+ * Bobby Tailor — UI Polish Layer
+ * Glass surfaces, elevation, focus rings, skeletons
+ * 
+ * Extends: static/style.css
+ * Depends on: Phase 15 design tokens
  */
 
 :root {
@@ -7,6 +11,19 @@
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.35);
   --shadow-glow: 0 0 0 1px rgba(59, 130, 246, 0.08);
   --gradient-brand: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  
+  /* Phase 15 additions */
+  --surface-glass: rgba(26, 29, 36, 0.6);
+  --surface-glass-hover: rgba(26, 29, 36, 0.75);
+  --radius-xl: 24px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.3);
+  --shadow-lg: 0 10px 15px rgba(0,0,0,0.4);
+  --shadow-xl: 0 20px 25px rgba(0,0,0,0.5);
+  --motion-fast: 150ms;
+  --motion-normal: 250ms;
+  --motion-slow: 400ms;
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 body {
@@ -361,4 +378,225 @@ body.settings-page .back-link {
 
 body.settings-page .back-link:hover {
   text-decoration: underline;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Phase 15 Additions: Glass, Elevation, Focus, Skeletons
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Glass Cards ── */
+.card-glass {
+  background: var(--surface-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-lg);
+  transition: all var(--motion-normal) var(--ease-smooth);
+}
+
+.card-glass:hover {
+  background: var(--surface-glass-hover);
+  box-shadow: var(--shadow-xl);
+}
+
+/* ── Elevation System ── */
+.elevation-1 { box-shadow: var(--shadow-sm); }
+.elevation-2 { box-shadow: var(--shadow-md); }
+.elevation-3 { box-shadow: var(--shadow-lg); }
+.elevation-4 { box-shadow: var(--shadow-xl); }
+
+/* ── Enhanced Focus Rings (Accessibility) ── */
+*:focus-visible {
+  outline: 2px solid var(--border-active);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--border-active);
+  outline-offset: 2px;
+}
+
+.btn-primary:focus-visible {
+  outline-color: var(--accent-construction);
+  outline-width: 3px;
+}
+
+/* ── Skeleton Loaders ── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 25%,
+    var(--bg-elevated) 50%,
+    var(--bg-surface) 75%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-md);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton {
+    animation: skeleton-shimmer 1.5s infinite;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-card {
+  height: 120px;
+  margin-bottom: 12px;
+}
+
+.skeleton-text {
+  height: 14px;
+  margin-bottom: 8px;
+}
+
+.skeleton-text.large {
+  height: 24px;
+  width: 60%;
+}
+
+.skeleton-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+
+/* ── Glass Overlays ── */
+.overlay-dark {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.overlay-light {
+  background: rgba(11, 13, 17, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── Surface Variants ── */
+.surface-primary {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+
+.surface-elevated {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+}
+
+.surface-glass-subtle {
+  background: rgba(26, 29, 36, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* ── Status Pills ── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.pill-success {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-success);
+}
+
+.pill-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-warning);
+}
+
+.pill-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-danger);
+}
+
+.pill-info {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent-primary);
+}
+
+.pill-neutral {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-secondary);
+}
+
+/* ── Dividers ── */
+.divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 24px 0;
+}
+
+.divider-vertical {
+  width: 1px;
+  background: var(--border-subtle);
+  height: 100%;
+}
+
+/* ── Smooth Transitions ── */
+.transition-smooth {
+  transition: all var(--motion-normal) var(--ease-smooth);
+}
+
+.transition-fast {
+  transition: all var(--motion-fast) ease-out;
+}
+
+.transition-slow {
+  transition: all var(--motion-slow) var(--ease-smooth);
+}
+
+/* ── Hover Lift Effect ── */
+.hover-lift {
+  transition: transform var(--motion-fast) ease-out, box-shadow var(--motion-fast) ease-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* ── Glass Modal/Drawer Base ── */
+.glass-panel {
+  background: var(--surface-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-xl);
+}
+
+/* ── Accessibility: Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  .skeleton {
+    background: var(--bg-elevated);
+  }
 }
