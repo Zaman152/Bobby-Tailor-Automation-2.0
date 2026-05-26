@@ -30,7 +30,13 @@
 
 <div class="page-header">
   <h1>Settings</h1>
-  <a href="/" class="back-link">← Back to App</a>
+  <div style="display:flex;align-items:center;gap:16px;">
+    <a href="/" class="back-link">← Back to App</a>
+    <form action="{{ url_for('logout') }}" method="post" class="logout-form" style="margin:0;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+      <button type="submit" class="logout-btn">Log out</button>
+    </form>
+  </div>
 </div>
 
 <form class="settings-form" onsubmit="saveSettings(event)">

@@ -185,6 +185,60 @@ pip install --upgrade playwright
 playwright install chromium
 ```
 
+## Application Authentication
+
+Bobby Tailor uses session-based authentication with bcrypt password hashing and CSRF protection.
+
+### Setup
+
+**1. Generate a secret key:**
+
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+Add the output as `SECRET_KEY=<value>` in your `.env` file.
+
+**2. Seed the admin account (once):**
+
+```bash
+python seed_admin.py
+```
+
+This writes `ADMIN_EMAIL` and `ADMIN_PASSWORD_HASH` to `.env`. Never commit `.env`.
+
+Default admin email: `admin@bobbytailor.com`. To change the password, re-run with env overrides or manually update `ADMIN_PASSWORD_HASH` using:
+
+```bash
+python -c "import bcrypt; print(bcrypt.hashpw(b'newpassword', bcrypt.gensalt(rounds=12)).decode())"
+```
+
+**3. Local development:**
+
+Set `FLASK_ENV=development` so `SESSION_COOKIE_SECURE` is `False` over plain HTTP:
+
+```env
+FLASK_ENV=development
+```
+
+**4. Production (HTTPS required):**
+
+Unset `FLASK_ENV` (or set to `production`). Session cookies are `Secure`-only; app will not work over plain HTTP.
+
+For multi-worker gunicorn, use a Redis-backed rate limiter to share state:
+
+```env
+RATE_LIMIT_STORAGE_URI=redis://127.0.0.1:6379
+```
+
+### Security checklist
+
+- Rotate `SECRET_KEY` immediately if leaked (invalidates all active sessions)
+- Store only the bcrypt hash in `.env`; never store the plaintext password
+- All state-changing endpoints require a valid session (no anonymous API access)
+- All POST/PUT/DELETE requests require a valid CSRF token (`X-CSRFToken` header or `csrf_token` form field)
+- Logout is POST-only to prevent logout CSRF via embedded images or links
+
 ### Troubleshooting
 
 **Browser crashes with "Target closed":**
