@@ -12,7 +12,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 
 - [x] **Phase 1: Config & Safe Operations** — Portable `.env`, sanitized API errors, dependency docs
 - [x] **Phase 2: Browser Reliability** — Canvas stability, full project list, VPS Chromium
-- [ ] **Phase 3: API Cost Transparency** — Per-sheet and per-run token/USD tracking in reports
+- [x] **Phase 3: API Cost Transparency** — Per-sheet and per-run token/USD tracking in reports
 - [x] **Phase 4: StackCT Plan Selection** — Preview sheets, filter, run selected `page_ids` only
 - [x] **Phase 5: Report Preview APIs** — In-browser summary, tables, JSON with safe paths
 - [x] **Phase 6: Settings Management** — Credentials and preferences editable in UI
@@ -104,9 +104,9 @@ Plans:
 
 Plans:
 
-- [ ] 03-01-PLAN.md — Per-sheet token/cost capture in analyze_drawing()
-- [ ] 03-02-PLAN.md — Run-level aggregation + api_usage in takeoff.json + summary.txt cost section
-- [ ] 03-03-PLAN.md — Display cost in report list cards via list_reports() API
+- [x] 03-01-PLAN.md — Per-sheet token/cost capture in analyze_drawing()
+- [x] 03-02-PLAN.md — Run-level aggregation + api_usage in takeoff.json + summary.txt cost section
+- [x] 03-03-PLAN.md — Display cost in report list cards via list_reports() API
 
 ---
 
@@ -250,12 +250,12 @@ Plans:
 3. “Preview Plans” opens the plan-selection panel integrated with Phase 4 APIs
 4. “Run Selected” starts analysis only for checked `page_ids` from this page
 
-**Plans:** Defined (2 plans)
+**Plans:** Complete (2/2)
 
 Plans:
 
-- [ ] 09-01: Projects page layout (Master §8.3) — depends on 08-01, 08-02, 08-03, 04-01
-- [ ] 09-02: Wire plan selection + run to Phase 4 backend — depends on 09-01, 04-01, 04-02
+- [x] 09-01: Projects page layout (Master §8.3) — depends on 08-01, 08-02, 08-03, 04-01
+- [x] 09-02: Wire plan selection + run to Phase 4 backend — depends on 09-01, 04-01, 04-02
 
 ---
 

@@ -39,10 +39,10 @@
 
 ### Cost & Usage Tracking
 
-- [ ] **COST-01**: Each sheet analysis records input/output tokens and model used
-- [ ] **COST-02**: Each run aggregates total API cost in USD
-- [ ] **COST-03**: Report cards and summary show cost per run
-- [ ] **COST-04**: `takeoff.json` includes `api_usage` block with token and cost totals
+- [x] **COST-01**: Each sheet analysis records input/output tokens and model used
+- [x] **COST-02**: Each run aggregates total API cost in USD
+- [x] **COST-03**: Report cards and summary show cost per run
+- [x] **COST-04**: `takeoff.json` includes `api_usage` block with token and cost totals
 
 ### PDF Mode
 
@@ -55,7 +55,7 @@
 - [ ] **UI-01**: App uses fixed sidebar navigation (Projects, PDF Upload, Reports, Settings)
 - [ ] **UI-02**: Industrial dark theme per Master.md palette (DM Mono, Inter, JetBrains Mono)
 - [ ] **UI-03**: Static assets extracted to `static/app.js` and `static/style.css`
-- [ ] **UI-04**: Projects page implements scope toggle (All Projects vs Specific Project)
+- [x] **UI-04**: Projects page implements scope toggle (All Projects vs Specific Project)
 - [ ] **UI-05**: Reports page shows expandable report cards with preview tabs
 - [ ] **UI-06**: Job monitor page/panel matches Master.md live monitor layout
 
@@ -116,10 +116,10 @@
 | FOUND-03 | Phase 2 | Complete |
 | FOUND-04 | Phase 2 | Complete |
 | FOUND-05 | Phase 2 | Complete |
-| COST-01 | Phase 3 | Pending |
-| COST-02 | Phase 3 | Pending |
-| COST-03 | Phase 3 | Pending |
-| COST-04 | Phase 3 | Pending |
+| COST-01 | Phase 3 | Complete |
+| COST-02 | Phase 3 | Complete |
+| COST-03 | Phase 3 | Complete |
+| COST-04 | Phase 3 | Complete |
 | PLAN-01 | Phase 4 | Pending |
 | PLAN-02 | Phase 4 | Pending |
 | PLAN-03 | Phase 4 | Pending |
