@@ -41,6 +41,9 @@ CANVAS_STABILITY_CHECKS = int(os.getenv("CANVAS_STABILITY_CHECKS", "2"))  # cons
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./output")
 SCREENSHOTS_DIR = os.path.join(OUTPUT_DIR, "screenshots")
 
+# Preview settings
+MAX_PREVIEW_ROWS = int(os.getenv("MAX_PREVIEW_ROWS", "500"))  # Cap for CSV preview
+
 # Schedule (cron expression)
 RUN_SCHEDULE = os.getenv("RUN_SCHEDULE", "0 8 * * *")  # daily at 8am
 
