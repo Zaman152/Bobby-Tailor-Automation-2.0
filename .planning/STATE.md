@@ -10,10 +10,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 ## Current Position
 
-Phase: 12 of 13 (Application Authentication) — in progress  
-Plan: 12-02 of N (2 complete)  
-Status: Phase 12 in progress — 12-01 and 12-02 complete, remaining plans pending
-Last activity: 2026-05-26 — Completed 12-02-PLAN.md (auth.py, app.py auth integration, login.html)
+Phase: 12 of 13 (Application Authentication) — complete  
+Plan: 12-03 of 3 (3 complete)  
+Status: Phase 12 complete — 12-01, 12-02, and 12-03 all complete
+Last activity: 2026-05-26 — Completed 12-03-PLAN.md (CSRF meta tags, apiFetch wrapper, logout form, README auth)
 
 Progress: [██████████] 100% (v1 phases 1–11 + 13; Phase 12 plan 01 complete)
 
@@ -63,6 +63,12 @@ From 03-03 (UI Cost Display):
 
 ### Decisions
 
+From 12-03 (Frontend CSRF Protection):
+
+- apiFetch wrapper in app.js handles X-CSRFToken automatically for all state-changing calls
+- settings.js keeps its own getCsrfToken() copy (self-contained page, no shared module)
+- Logout form added to both templates as POST with csrf_token hidden field
+
 From 12-02 (Core Flask Authentication):
 
 - Timing-safe dummy bcrypt check on unknown email (prevents user enumeration)
@@ -88,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-26 22:30 UTC  
-Stopped at: Completed 12-02-PLAN.md — ready for `/gsd-execute-phase 12` (plan 03)  
+Last session: 2026-05-26 22:32 UTC  
+Stopped at: Completed 12-03-PLAN.md — Phase 12 complete; ready for Phase 13  
 Resume file: None
