@@ -39,13 +39,13 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 3. `.env.example` lists every required variable with brief descriptions
 4. `pip install -r requirements.txt` installs Pillow and all runtime deps without extra manual packages
 
-**Plans:** TBD (plan-phase)
+**Plans:** 3 plans in 2 waves
 
 Plans:
 
-- [ ] 01-01: Relative `.env` resolution in `config.py` (Master Step 1)
-- [ ] 01-02: User-safe error responses on Flask JSON routes
-- [ ] 01-03: `.env.example` + `requirements.txt` Pillow pin (DEPLOY-01, DEPLOY-03)
+- [ ] 01-01-PLAN.md — Config validation & fail-fast env (wave 1)
+- [ ] 01-02-PLAN.md — Flask error sanitization & safe job errors (wave 2)
+- [ ] 01-03-PLAN.md — `.env.example` audit & requirements verify (wave 1)
 
 ---
 
