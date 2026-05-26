@@ -600,3 +600,197 @@ textarea:focus-visible {
     background: var(--bg-elevated);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Phase 15 UI Primitives: Modal, Drawer, Toast
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Modal ── */
+.ui-modal {
+  background: transparent;
+  border: none;
+  padding: 0;
+  max-width: none;
+  max-height: none;
+}
+
+.ui-modal::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.ui-modal .modal-content {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-modal-sm .modal-content { max-width: 400px; }
+.ui-modal-md .modal-content { max-width: 600px; }
+.ui-modal-lg .modal-content { max-width: 800px; }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.modal-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--motion-fast) ease;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Drawer ── */
+.ui-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+}
+
+.ui-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-xl);
+  overflow-y: auto;
+  z-index: 1001;
+}
+
+.ui-drawer-right {
+  right: 0;
+  border-left-width: 2px;
+}
+
+.ui-drawer-left {
+  left: 0;
+  border-right-width: 2px;
+}
+
+.drawer-content {
+  min-height: 100%;
+  padding: 24px;
+}
+
+/* ── Toast Container ── */
+.toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 320px;
+  max-width: 480px;
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toast-success { border-left: 3px solid var(--accent-success); }
+.toast-success .toast-icon { color: var(--accent-success); }
+
+.toast-error { border-left: 3px solid var(--accent-danger); }
+.toast-error .toast-icon { color: var(--accent-danger); }
+
+.toast-warning { border-left: 3px solid var(--accent-warning); }
+.toast-warning .toast-icon { color: var(--accent-warning); }
+
+.toast-info { border-left: 3px solid var(--accent-primary); }
+.toast-info .toast-icon { color: var(--accent-primary); }
+
+.toast-message {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--motion-fast) ease;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+/* ── Toast Responsive ── */
+@media (max-width: 768px) {
+  .toast-container {
+    top: 12px;
+    right: 12px;
+    left: 12px;
+  }
+  
+  .toast {
+    min-width: 0;
+    max-width: none;
+  }
+}
