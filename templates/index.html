@@ -222,6 +222,69 @@
     }
 
     .project-meta { font-size: 12px; color: #475569; margin-top: 4px; }
+
+    /* ── Active Job Mini-Card ── */
+    .active-job-mini {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 260px;
+      padding: 14px;
+      background: #1a1d27;
+      border: 1px solid #252a3a;
+      border-left: 3px solid #f97316;
+      border-radius: 10px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+      z-index: 100;
+    }
+    .mini-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px;
+      font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.05em; color: #94a3b8;
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      animation: pulse-dot 1.5s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .mini-project {
+      font-weight: 600; font-size: 13px;
+      margin-bottom: 8px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      color: #f1f5f9;
+    }
+    .mini-progress-row {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    }
+    .mini-progress-track {
+      flex: 1; height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px; overflow: hidden;
+    }
+    .mini-progress-bar {
+      height: 100%; width: 0%;
+      background: #10b981;
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+    .mini-pct { font-size: 12px; font-weight: 500; min-width: 34px; text-align: right; }
+    .mini-count { font-size: 12px; color: #94a3b8; }
+    .mini-current-sheet {
+      font-size: 12px; color: #94a3b8;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 6px;
+    }
+    .mini-link {
+      font-size: 12px; color: #60a5fa; text-decoration: none; display: block;
+    }
+    .mini-link:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -366,6 +429,24 @@
     <div class="log-box" id="logBox"></div>
   </div>
 
+</div>
+
+<!-- ── Active Job Mini-Card ── -->
+<div class="active-job-mini" id="activeJobMini" style="display:none;">
+  <div class="mini-header">
+    <span class="status-dot"></span>
+    <span>Active Job</span>
+  </div>
+  <div class="mini-project" id="miniProjectName">—</div>
+  <div class="mini-progress-row">
+    <div class="mini-progress-track">
+      <div class="mini-progress-bar" id="miniProgressBar"></div>
+    </div>
+    <span class="mini-pct" id="miniProgressPct">0%</span>
+    <span class="mini-count" id="miniSheetCount"></span>
+  </div>
+  <div class="mini-current-sheet" id="miniCurrentSheet">—</div>
+  <a href="#" class="mini-link" onclick="scrollToJobStatus(); return false;">View Details →</a>
 </div>
 
 <script>
@@ -574,9 +655,21 @@ async function pollStatus(jobId) {
     // Progress bar
     document.getElementById('progressFill').style.width = (job.progress || 0) + '%';
 
-    // Log
+    // Job info (current sheet)
+    if (job.current_sheet && job.current_sheet.name) {
+      const cs = job.current_sheet;
+      const countStr = cs.total ? ` (${cs.index}/${cs.total})` : '';
+      document.getElementById('jobInfo').textContent =
+        `Project: ${job.project}  ·  Job: ${job.id}  ·  ${cs.name}${countStr}`;
+    }
+
+    // Log — handle both plain strings and structured entries
     const logBox = document.getElementById('logBox');
-    logBox.innerHTML = (job.log || []).map(l => `<div class="log-line">${escHtml(l)}</div>`).join('');
+    logBox.innerHTML = (job.log || []).map(l => {
+      const msg = typeof l === 'object' ? l.message : l;
+      const cls = typeof l === 'object' && l.type === 'sheet_complete' ? 'color:#4ade80' : '';
+      return `<div class="log-line" style="${cls}">${escHtml(String(msg))}</div>`;
+    }).join('');
     logBox.scrollTop = logBox.scrollHeight;
 
     if (job.status === 'done' || job.status === 'error') {
@@ -631,6 +724,58 @@ async function loadReports() {
     el.innerHTML = '<p class="empty">Failed to load reports.</p>';
   }
 }
+
+// ── Active Job Mini-Card Polling ───────────────────────────────────────────
+let activeJobPollInterval = null;
+
+async function pollActiveJob() {
+  try {
+    const resp = await fetch('/api/jobs/active');
+    const data = await resp.json();
+    const el = document.getElementById('activeJobMini');
+    if (!el) return;
+    if (data.active && data.job) {
+      el.style.display = 'block';
+      document.getElementById('miniProjectName').textContent = data.job.project || '—';
+      document.getElementById('miniProgressBar').style.width = (data.job.progress || 0) + '%';
+      document.getElementById('miniProgressPct').textContent = (data.job.progress || 0) + '%';
+      const cs = data.job.current_sheet || {};
+      document.getElementById('miniSheetCount').textContent =
+        cs.total ? `${cs.index || 0}/${cs.total}` : '';
+      const phaseLbl = cs.phase ? ` (${cs.phase})` : '';
+      document.getElementById('miniCurrentSheet').textContent = cs.name ? cs.name + phaseLbl : '—';
+    } else {
+      el.style.display = 'none';
+    }
+  } catch(e) { /* ignore polling errors */ }
+}
+
+function startActiveJobPolling() {
+  if (!activeJobPollInterval) {
+    pollActiveJob();
+    activeJobPollInterval = setInterval(pollActiveJob, 1500);
+  }
+}
+
+function stopActiveJobPolling() {
+  if (activeJobPollInterval) {
+    clearInterval(activeJobPollInterval);
+    activeJobPollInterval = null;
+  }
+}
+
+function scrollToJobStatus() {
+  const card = document.getElementById('progressCard');
+  if (card && card.classList.contains('visible')) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+// Pause polling when tab hidden, resume on visibility
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopActiveJobPolling();
+  else startActiveJobPolling();
+});
 
 // ── Plan Selection ─────────────────────────────────────────────────────────
 function getSheetType(sheetName) {
@@ -745,6 +890,7 @@ function escHtml(s) {
 
 // ── Init ───────────────────────────────────────────────────────────────────
 loadProjects();
+startActiveJobPolling();
 </script>
 </body>
 </html>
