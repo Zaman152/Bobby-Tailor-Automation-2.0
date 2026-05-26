@@ -7,6 +7,7 @@ import threading
 import uuid
 import logging
 import os
+from datetime import datetime
 from typing import Optional
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file
@@ -139,16 +140,40 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
     """Background thread for StackCT scraping."""
     from scraper import run_all_projects, run_project_scrape
 
-    def log(msg: str):
-        jobs[job_id]["log"].append(msg)
-        logger.info(f"[job {job_id}] {msg}")
+    def log(msg_or_entry):
+        """Accept either plain string or structured entry dict."""
+        if isinstance(msg_or_entry, dict):
+            jobs[job_id]["log"].append(msg_or_entry)
+            logger.info(f"[job {job_id}] {msg_or_entry.get('message', str(msg_or_entry))}")
+        else:
+            jobs[job_id]["log"].append({
+                "timestamp": datetime.now().isoformat(),
+                "type": "info",
+                "message": msg_or_entry
+            })
+            logger.info(f"[job {job_id}] {msg_or_entry}")
+        # Cap log size to prevent unbounded memory growth
+        if len(jobs[job_id]["log"]) > 200:
+            jobs[job_id]["log"] = jobs[job_id]["log"][-150:]
 
-    def progress(current: int, total: int, sheet: str, **kwargs):
+    def progress(current: int, total: int, sheet: str,
+                 phase: str = "analyzing", extraction: dict = None):
         pct = int(current / total * 100) if total else 0
         jobs[job_id]["progress"] = pct
-        log(f"[{current}/{total}] Analyzing {sheet}...")
+        jobs[job_id]["current_sheet"] = {
+            "index": current,
+            "total": total,
+            "name": sheet,
+            "phase": phase
+        }
+        if phase == "complete" and extraction:
+            jobs[job_id]["sheets_completed"].append({
+                "name": sheet,
+                "extraction": extraction
+            })
 
     jobs[job_id]["status"] = "running"
+    jobs[job_id]["started_at"] = datetime.now().isoformat()
     log("Logging into StackCT...")
     try:
         if mode == "all":
@@ -173,13 +198,40 @@ def _pdf_job(job_id: str, pdf_path: str, project_name: str):
     """Background thread for PDF analysis."""
     from pdf_analyzer import run_pdf_analysis
 
-    def progress(current, total, sheet):
-        pct = int(current / total * 100)
+    def log(msg_or_entry):
+        if isinstance(msg_or_entry, dict):
+            jobs[job_id]["log"].append(msg_or_entry)
+        else:
+            jobs[job_id]["log"].append({
+                "timestamp": datetime.now().isoformat(),
+                "type": "info",
+                "message": msg_or_entry
+            })
+        if len(jobs[job_id]["log"]) > 200:
+            jobs[job_id]["log"] = jobs[job_id]["log"][-150:]
+
+    def progress(current, total, sheet, phase: str = "analyzing", extraction: dict = None):
+        pct = int(current / total * 100) if total else 0
         jobs[job_id]["progress"] = pct
-        jobs[job_id]["log"].append(f"[{current}/{total}] Analyzing {sheet}...")
+        jobs[job_id]["current_sheet"] = {
+            "index": current,
+            "total": total,
+            "name": sheet,
+            "phase": phase
+        }
+        if phase == "complete" and extraction:
+            jobs[job_id]["sheets_completed"].append({
+                "name": sheet,
+                "extraction": extraction
+            })
 
     jobs[job_id]["status"] = "running"
-    jobs[job_id]["log"].append(f"Starting PDF analysis: {project_name}")
+    jobs[job_id]["started_at"] = datetime.now().isoformat()
+    jobs[job_id]["log"].append({
+        "timestamp": datetime.now().isoformat(),
+        "type": "info",
+        "message": f"Starting PDF analysis: {project_name}"
+    })
     try:
         result = run_pdf_analysis(pdf_path, project_name, progress_callback=progress)
         jobs[job_id]["status"] = "done"
@@ -242,7 +294,10 @@ def run_stackct():
     jobs[job_id] = {
         "id": job_id, "type": "stackct", "status": "queued",
         "progress": 0, "log": [], "result": None, "error": None,
-        "project": project_name, "mode": mode
+        "project": project_name, "mode": mode,
+        "started_at": None,
+        "current_sheet": {"index": 0, "total": 0, "name": None, "phase": None},
+        "sheets_completed": []
     }
 
     t = threading.Thread(
@@ -272,7 +327,10 @@ def run_pdf():
     jobs[job_id] = {
         "id": job_id, "type": "pdf", "status": "queued",
         "progress": 0, "log": [], "result": None, "error": None,
-        "project": project_name, "file": f.filename
+        "project": project_name, "file": f.filename,
+        "started_at": None,
+        "current_sheet": {"index": 0, "total": 0, "name": None, "phase": None},
+        "sheets_completed": []
     }
 
     t = threading.Thread(
@@ -293,11 +351,35 @@ def job_status(job_id):
         "type": job["type"],
         "status": job["status"],
         "progress": job["progress"],
-        "log": job["log"][-10:],  # last 10 log lines
+        "started_at": job.get("started_at"),
+        "current_sheet": job.get("current_sheet", {}),
+        "sheets_completed": len(job.get("sheets_completed", [])),
+        "sheet_log": job.get("sheets_completed", [])[-5:],  # last 5 completed sheets
+        "log": job["log"][-15:],   # last 15 structured log entries
         "project": job["project"],
         "error": job["error"],
         "has_result": job["result"] is not None,
     })
+
+
+@app.route("/api/jobs/active")
+def get_active_job():
+    """Return the currently running job, if any. Used by sidebar mini-card (JOB-04)."""
+    for job in jobs.values():
+        if job["status"] == "running":
+            return jsonify({
+                "active": True,
+                "job": {
+                    "id": job["id"],
+                    "type": job["type"],
+                    "project": job["project"],
+                    "progress": job["progress"],
+                    "started_at": job.get("started_at"),
+                    "current_sheet": job.get("current_sheet", {}),
+                    "sheets_completed": len(job.get("sheets_completed", []))
+                }
+            })
+    return jsonify({"active": False, "job": None})
 
 
 @app.route("/api/reports")
