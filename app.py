@@ -405,6 +405,19 @@ def list_reports():
             if f.exists():
                 files[key] = {"filename": filename, "size": f.stat().st_size}
 
+        cost_usd = None
+        sheets_processed = None
+        json_file = sub / "takeoff.json"
+        if json_file.exists():
+            try:
+                with open(json_file) as jf:
+                    takeoff_data = json.load(jf)
+                api_usage = takeoff_data.get("api_usage", {})
+                cost_usd = api_usage.get("total_cost_usd")
+                sheets_processed = takeoff_data.get("sheets_processed")
+            except (json.JSONDecodeError, OSError):
+                pass
+
         if not files:
             continue
 
@@ -424,6 +437,8 @@ def list_reports():
             "timestamp": timestamp,
             "created": sub.stat().st_ctime,
             "files": files,
+            "total_cost_usd": cost_usd,
+            "sheets_processed": sheets_processed,
         })
 
     # Newest first by created time
