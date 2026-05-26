@@ -259,17 +259,34 @@ async function loadCalculationsTab(container) {
   
   const data = await response.json();
   
-  // Simple table for now (Grid.js integration in next iteration)
+  // Cap banner if needed
   if (data.capped) {
-    container.innerHTML = `
-      <div class="cap-banner">
-        Showing ${data.rows.length} of ${data.total || 'many'} rows. 
-        <a href="#" class="download-full-link">Download full CSV</a> to analyze all rows.
-      </div>
+    const banner = document.createElement('div');
+    banner.className = 'cap-banner';
+    banner.innerHTML = `
+      Showing ${data.rows.length} of ${data.total || 'many'} rows. 
+      <a href="/api/reports/${currentRun}/download/calculations.csv" class="download-full-link">Download full CSV</a> to analyze all rows.
     `;
+    container.appendChild(banner);
   }
   
-  container.innerHTML += renderDataTable(data.headers, data.rows);
+  // Enhanced grid with sort/filter/export
+  const gridContainer = document.createElement('div');
+  container.appendChild(gridContainer);
+  
+  if (window.dataGrid) {
+    window.dataGrid.mountGrid(gridContainer, {
+      headers: data.headers,
+      rows: data.rows,
+      sortable: true,
+      onExport: (filtered) => {
+        window.ui.toast.success(`Exported ${filtered.length} filtered rows`);
+      }
+    });
+  } else {
+    // Fallback: basic table
+    gridContainer.innerHTML = renderDataTable(data.headers, data.rows);
+  }
 }
 
 async function loadRawTab(container) {
