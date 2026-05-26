@@ -11,11 +11,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 14 of 14 (StackCT Plan Sets & Folders)  
-Plan: 2 of 4 complete  
-Status: In progress — 14-01, 14-02 executed 2026-05-26  
-Last activity: 2026-05-26 — `/gsd-execute-phase 14` (browser, schema v2, sync)
+Plan: 3 of 4 complete  
+Status: In progress — 14-01, 14-02, 14-03 executed 2026-05-26  
+Last activity: 2026-05-26 — `/gsd-execute-phase 14` (browser, schema, sync, API)
 
-Progress: [██████████░] 94% (phases 1–13 complete, 14 in progress 2/4)
+Progress: [██████████░] 96% (phases 1–13 complete, 14 in progress 3/4)
 
 ## Performance Metrics
 
@@ -91,6 +91,13 @@ From 14-02 (Schema v2 & Folder-Aware Sync):
 - v1→v2 migration drops project_plans table (re-sync required for all projects)
 - sync_project_plans and get_project_plans now require folder_id parameter
 - Background sync tracks (project_id, folder_id) tuples for parallel folder syncs
+
+From 14-03 (Folder-First API Routes):
+
+- GET /api/projects/<id>/plan-sets returns folder list
+- GET /api/projects/<id>/plans now requires ?folder_id= (backward compat with 400 error)
+- POST /api/run/stackct validates page_ids belong to folder
+- folder_id stored in takeoff.json report root
 
 ### Pending Todos
 
