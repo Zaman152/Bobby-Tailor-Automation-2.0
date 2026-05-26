@@ -4,893 +4,210 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bobby Tailor — Estimation Automation</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f1117;
-      color: #e2e8f0;
-      min-height: 100vh;
-    }
-
-    /* ── Header ── */
-    header {
-      background: #1a1d27;
-      border-bottom: 1px solid #2d3148;
-      padding: 18px 32px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    .logo {
-      width: 38px; height: 38px;
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; font-weight: 700; color: #fff;
-    }
-    header h1 { font-size: 18px; font-weight: 600; color: #f1f5f9; }
-    header span { font-size: 13px; color: #64748b; margin-left: 4px; }
-
-    /* ── Layout ── */
-    .container { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
-
-    /* ── Tabs ── */
-    .tabs {
-      display: flex; gap: 4px;
-      background: #1a1d27;
-      border: 1px solid #2d3148;
-      border-radius: 12px;
-      padding: 4px;
-      margin-bottom: 32px;
-    }
-    .tab {
-      flex: 1; padding: 10px;
-      text-align: center; font-size: 14px; font-weight: 500;
-      border-radius: 8px; cursor: pointer;
-      color: #64748b; border: none; background: transparent;
-      transition: all 0.15s;
-    }
-    .tab.active {
-      background: #2563eb;
-      color: #fff;
-    }
-    .tab:hover:not(.active) { background: #1e2235; color: #94a3b8; }
-
-    /* ── Card ── */
-    .card {
-      background: #1a1d27;
-      border: 1px solid #2d3148;
-      border-radius: 16px;
-      padding: 28px;
-      margin-bottom: 24px;
-    }
-    .card h2 { font-size: 15px; font-weight: 600; color: #94a3b8; margin-bottom: 20px; letter-spacing: 0.04em; text-transform: uppercase; }
-
-    /* ── Form elements ── */
-    label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
-    .field { margin-bottom: 20px; }
-
-    select, input[type="text"] {
-      width: 100%;
-      background: #0f1117;
-      border: 1px solid #2d3148;
-      color: #e2e8f0;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 14px;
-      outline: none;
-      transition: border-color 0.15s;
-      appearance: none;
-    }
-    select:focus, input[type="text"]:focus { border-color: #3b82f6; }
-
-    /* ── Mode toggle ── */
-    .mode-toggle {
-      display: flex; gap: 10px; margin-bottom: 20px;
-    }
-    .mode-btn {
-      flex: 1; padding: 12px;
-      border: 1px solid #2d3148;
-      border-radius: 10px;
-      cursor: pointer;
-      text-align: center;
-      font-size: 14px;
-      font-weight: 500;
-      background: transparent;
-      color: #64748b;
-      transition: all 0.15s;
-    }
-    .mode-btn.active {
-      border-color: #3b82f6;
-      background: rgba(59,130,246,0.1);
-      color: #60a5fa;
-    }
-    .mode-btn .icon { font-size: 22px; display: block; margin-bottom: 4px; }
-
-    /* ── Run button ── */
-    .run-btn {
-      width: 100%;
-      padding: 14px;
-      background: linear-gradient(135deg, #2563eb, #7c3aed);
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.15s;
-      margin-top: 8px;
-    }
-    .run-btn:hover { opacity: 0.9; }
-    .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-    /* ── Drop zone ── */
-    .drop-zone {
-      border: 2px dashed #2d3148;
-      border-radius: 12px;
-      padding: 40px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.15s;
-      background: #0f1117;
-    }
-    .drop-zone:hover, .drop-zone.drag-over {
-      border-color: #3b82f6;
-      background: rgba(59,130,246,0.05);
-    }
-    .drop-zone .dz-icon { font-size: 40px; margin-bottom: 10px; }
-    .drop-zone p { color: #64748b; font-size: 14px; }
-    .drop-zone .file-name { color: #60a5fa; margin-top: 8px; font-size: 13px; }
-    #fileInput { display: none; }
-
-    /* ── Progress ── */
-    .progress-card { display: none; }
-    .progress-card.visible { display: block; }
-    .progress-bar-bg {
-      height: 6px; background: #2d3148; border-radius: 3px; overflow: hidden;
-      margin: 12px 0;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #2563eb, #7c3aed);
-      border-radius: 3px;
-      width: 0%;
-      transition: width 0.4s ease;
-    }
-    .status-badge {
-      display: inline-flex; align-items: center; gap: 6px;
-      font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600;
-    }
-    .badge-queued  { background: rgba(100,116,139,0.2); color: #94a3b8; }
-    .badge-running { background: rgba(59,130,246,0.2); color: #60a5fa; }
-    .badge-done    { background: rgba(34,197,94,0.2); color: #4ade80; }
-    .badge-error   { background: rgba(239,68,68,0.2); color: #f87171; }
-
-    .log-box {
-      background: #0a0c12;
-      border: 1px solid #1e2235;
-      border-radius: 8px;
-      padding: 12px 16px;
-      font-family: 'Menlo', 'Monaco', monospace;
-      font-size: 12px;
-      color: #4ade80;
-      max-height: 160px;
-      overflow-y: auto;
-      margin-top: 12px;
-    }
-    .log-line { margin-bottom: 2px; }
-
-    /* ── Reports ── */
-    .report-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 0; border-bottom: 1px solid #1e2235;
-    }
-    .report-item:last-child { border-bottom: none; }
-    .report-name { font-size: 13px; color: #e2e8f0; }
-    .report-meta { font-size: 11px; color: #475569; margin-top: 2px; }
-    .dl-btn {
-      padding: 6px 14px; border-radius: 6px;
-      background: rgba(59,130,246,0.15); color: #60a5fa;
-      border: 1px solid rgba(59,130,246,0.3);
-      font-size: 12px; font-weight: 600; cursor: pointer;
-      text-decoration: none;
-    }
-    .dl-btn:hover { background: rgba(59,130,246,0.25); }
-
-    .empty { color: #475569; font-size: 14px; text-align: center; padding: 24px 0; }
-
-    /* ── Spinner ── */
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner {
-      display: inline-block; width: 14px; height: 14px;
-      border: 2px solid rgba(96,165,250,0.3);
-      border-top-color: #60a5fa;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    /* ── Divider / section label ── */
-    .section-divider {
-      display: flex; align-items: center; gap: 10px;
-      margin: 24px 0 16px;
-      color: #475569; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em;
-    }
-    .section-divider::before, .section-divider::after {
-      content: ""; flex: 1; height: 1px; background: #1e2235;
-    }
-
-    .project-meta { font-size: 12px; color: #475569; margin-top: 4px; }
-
-    /* ── Active Job Mini-Card ── */
-    .active-job-mini {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      width: 260px;
-      padding: 14px;
-      background: #1a1d27;
-      border: 1px solid #252a3a;
-      border-left: 3px solid #f97316;
-      border-radius: 10px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
-      z-index: 100;
-    }
-    .mini-header {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 8px;
-      font-size: 11px; text-transform: uppercase;
-      letter-spacing: 0.05em; color: #94a3b8;
-    }
-    .status-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #10b981;
-      animation: pulse-dot 1.5s ease-in-out infinite;
-      flex-shrink: 0;
-    }
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-    .mini-project {
-      font-weight: 600; font-size: 13px;
-      margin-bottom: 8px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      color: #f1f5f9;
-    }
-    .mini-progress-row {
-      display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
-    }
-    .mini-progress-track {
-      flex: 1; height: 4px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 2px; overflow: hidden;
-    }
-    .mini-progress-bar {
-      height: 100%; width: 0%;
-      background: #10b981;
-      border-radius: 2px;
-      transition: width 0.3s ease;
-    }
-    .mini-pct { font-size: 12px; font-weight: 500; min-width: 34px; text-align: right; }
-    .mini-count { font-size: 12px; color: #94a3b8; }
-    .mini-current-sheet {
-      font-size: 12px; color: #94a3b8;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      margin-bottom: 6px;
-    }
-    .mini-link {
-      font-size: 12px; color: #60a5fa; text-decoration: none; display: block;
-    }
-    .mini-link:hover { text-decoration: underline; }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
-<header>
-  <div class="logo">BT</div>
-  <div>
-    <h1>Bobby Tailor <span>Estimation Automation</span></h1>
-  </div>
-</header>
+<div class="app-shell">
 
-<div class="container">
-
-  <!-- Tabs -->
-  <div class="tabs">
-    <button class="tab active" onclick="switchTab('stackct', this)">StackCT Projects</button>
-    <button class="tab" onclick="switchTab('pdf', this)">Upload PDF</button>
-    <button class="tab" onclick="switchTab('reports', this)">Reports</button>
-  </div>
-
-  <!-- ── StackCT Tab ── -->
-  <div id="tab-stackct">
-    <div class="card">
-      <h2>Run on StackCT Projects</h2>
-
-      <div class="field">
-        <label>Select scope</label>
-        <div class="mode-toggle">
-          <button class="mode-btn active" id="modeAll" onclick="setMode('all')">
-            <span class="icon">🗂️</span>All Projects
-          </button>
-          <button class="mode-btn" id="modeOne" onclick="setMode('specific')">
-            <span class="icon">📋</span>Specific Project
-          </button>
-        </div>
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo">BT</div>
+      <div>
+        <div class="brand-name">Bobby Tailor</div>
+        <div class="brand-sub">Estimation Automation</div>
       </div>
+    </div>
 
-      <div class="field" id="projectDropdownField" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <label style="margin:0">Choose project</label>
-          <div style="display:flex;align-items:center;gap:8px">
-            <span id="cacheStatus" style="font-size:11px;color:#475569"></span>
-            <button onclick="refreshProjects()" id="refreshBtn"
-              style="background:none;border:1px solid #2d3148;color:#64748b;padding:3px 10px;border-radius:6px;font-size:11px;cursor:pointer">
-              ↻ Refresh
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-page="projects" onclick="navigateTo('projects'); return false;" href="#">
+        <span class="nav-icon">📋</span> Projects
+      </a>
+      <a class="nav-item" data-page="pdf" onclick="navigateTo('pdf'); return false;" href="#">
+        <span class="nav-icon">📄</span> PDF Upload
+      </a>
+      <a class="nav-item" data-page="reports" onclick="navigateTo('reports'); return false;" href="#">
+        <span class="nav-icon">📊</span> Reports
+      </a>
+      <div class="nav-divider"></div>
+      <a class="nav-item" href="/settings">
+        <span class="nav-icon">⚙️</span> Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <!-- JOB-04: Active job mini-card slot -->
+      <div class="sidebar-job-card" id="sidebarJobCard" style="display:none;">
+        <div class="mini-header">
+          <span class="status-dot"></span>
+          <span>Active Job</span>
+        </div>
+        <div class="mini-project" id="miniProjectName">—</div>
+        <div class="mini-progress-row">
+          <div class="mini-progress-track">
+            <div class="mini-progress-bar" id="miniProgressBar"></div>
+          </div>
+          <span class="mini-pct" id="miniProgressPct">0%</span>
+        </div>
+        <div class="mini-sheet-row">
+          <span class="mini-count" id="miniSheetCount"></span>
+          <span class="mini-current-sheet" id="miniCurrentSheet">—</span>
+        </div>
+        <a href="#" class="mini-link" onclick="scrollToJobStatus(); return false;">View Details →</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ── -->
+  <main class="main-content">
+    <header class="page-header">
+      <h1 id="pageTitle">StackCT Projects</h1>
+    </header>
+
+    <div class="page-body">
+
+      <!-- ── Projects Page ── -->
+      <section id="page-projects" class="page-section active">
+        <div class="card">
+          <h2>Run on StackCT Projects</h2>
+
+          <div class="field">
+            <label>Select scope</label>
+            <div class="mode-toggle">
+              <button class="mode-btn active" id="modeAll" onclick="setMode('all')">
+                <span class="icon">🗂️</span>All Projects
+              </button>
+              <button class="mode-btn" id="modeOne" onclick="setMode('specific')">
+                <span class="icon">📋</span>Specific Project
+              </button>
+            </div>
+          </div>
+
+          <div class="field" id="projectDropdownField" style="display:none">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <label style="margin:0">Choose project</label>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span id="cacheStatus" style="font-size:11px;color:var(--text-tertiary)"></span>
+                <button onclick="refreshProjects()" id="refreshBtn"
+                  style="background:none;border:1px solid var(--border-subtle);color:var(--text-tertiary);padding:3px 10px;border-radius:6px;font-size:11px;cursor:pointer">
+                  ↻ Refresh
+                </button>
+              </div>
+            </div>
+            <select id="projectSelect">
+              <option value="">— Loading… —</option>
+            </select>
+            <p class="project-meta" id="projectMeta"></p>
+          </div>
+
+          <!-- Plan Selection Panel -->
+          <div id="planSelectionPanel" style="display:none;margin-top:20px;padding:15px;border:1px solid var(--border-subtle);border-radius:8px;background:var(--bg-surface);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+              <div>
+                <label style="margin-right:15px;cursor:pointer;">
+                  <input type="checkbox" id="selectAllPlans" onchange="toggleAllPlans(this.checked)"> Select All
+                </label>
+                <button onclick="selectNone()" style="padding:4px 12px;background:var(--bg-elevated);border:none;border-radius:4px;color:var(--text-secondary);cursor:pointer;">Select None</button>
+              </div>
+              <div>
+                <label style="color:var(--text-secondary);margin-right:8px;font-size:13px;">Filter:</label>
+                <select id="sheetTypeFilter" onchange="filterPlansByType(this.value)" style="padding:6px 12px;background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:4px;color:var(--text-primary);font-size:13px;">
+                  <option value="all">All Types</option>
+                  <option value="architectural">Architectural</option>
+                  <option value="electrical">Electrical</option>
+                  <option value="mechanical">Mechanical</option>
+                  <option value="schedule">Schedule</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+            <div id="plansList" style="max-height:300px;overflow-y:auto;border:1px solid var(--border-subtle);border-radius:6px;"></div>
+            <div style="margin-top:15px;display:flex;justify-content:space-between;align-items:center;">
+              <span id="selectedCount" style="color:var(--text-secondary);font-size:13px;">0 sheets selected</span>
+              <button id="runSelectedBtn" onclick="runSelectedPlans()" disabled style="padding:10px 20px;background:var(--accent-primary);border:none;border-radius:6px;color:white;font-weight:500;cursor:pointer;opacity:0.5;">
+                ▶ Run Selected Plans
+              </button>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:8px;">
+            <button id="previewPlansBtn" onclick="loadProjectPlans()" disabled
+              style="padding:14px;background:var(--bg-elevated);border:1px solid var(--accent-primary);border-radius:var(--radius-md);color:var(--accent-primary);cursor:pointer;font-size:14px;font-weight:600;flex:1;opacity:0.5;">
+              🔍 Preview Plans
+            </button>
+            <button class="run-btn" id="runStackctBtn" onclick="runStackCT()" style="flex:1;margin-top:0;">
+              ▶ Run All
             </button>
           </div>
         </div>
-        <select id="projectSelect">
-          <option value="">— Loading… —</option>
-        </select>
-        <p class="project-meta" id="projectMeta"></p>
-      </div>
+      </section>
 
-      <!-- Plan Selection Panel (appears after clicking Preview Plans) -->
-      <div id="planSelectionPanel" style="display:none;margin-top:20px;padding:15px;border:1px solid #252a3a;border-radius:8px;background:#141720;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-          <div>
-            <label style="margin-right:15px;cursor:pointer;">
-              <input type="checkbox" id="selectAllPlans" onchange="toggleAllPlans(this.checked)"> Select All
-            </label>
-            <button onclick="selectNone()" style="padding:4px 12px;background:#252a3a;border:none;border-radius:4px;color:#94a3b8;cursor:pointer;">Select None</button>
+      <!-- ── PDF Upload Page ── -->
+      <section id="page-pdf" class="page-section">
+        <div class="card">
+          <h2>Analyze a PDF Floor Plan</h2>
+
+          <div class="field">
+            <label>Project name</label>
+            <input type="text" id="pdfProjectName" placeholder="e.g. Building A – Floor Plans" />
           </div>
-          <div>
-            <label style="color:#94a3b8;margin-right:8px;font-size:13px;">Filter:</label>
-            <select id="sheetTypeFilter" onchange="filterPlansByType(this.value)" style="padding:6px 12px;background:#1c1f2e;border:1px solid #252a3a;border-radius:4px;color:#f1f5f9;font-size:13px;">
-              <option value="all">All Types</option>
-              <option value="architectural">Architectural</option>
-              <option value="electrical">Electrical</option>
-              <option value="mechanical">Mechanical</option>
-              <option value="schedule">Schedule</option>
-              <option value="other">Other</option>
-            </select>
+
+          <div class="field">
+            <label>PDF file</label>
+            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+              <div class="dz-icon">📄</div>
+              <p>Drop a PDF here or <strong>click to browse</strong></p>
+              <p class="file-name" id="selectedFileName"></p>
+            </div>
+            <input type="file" id="fileInput" accept=".pdf" onchange="onFileSelected(this)" />
           </div>
-        </div>
-        <div id="plansList" style="max-height:300px;overflow-y:auto;border:1px solid #1e2235;border-radius:6px;"></div>
-        <div style="margin-top:15px;display:flex;justify-content:space-between;align-items:center;">
-          <span id="selectedCount" style="color:#94a3b8;font-size:13px;">0 sheets selected</span>
-          <button id="runSelectedBtn" onclick="runSelectedPlans()" disabled style="padding:10px 20px;background:#3b82f6;border:none;border-radius:6px;color:white;font-weight:500;cursor:pointer;opacity:0.5;">
-            ▶ Run Selected Plans
+
+          <button class="run-btn" id="runPdfBtn" onclick="runPDF()" disabled>
+            ▶ Analyze PDF
           </button>
         </div>
-      </div>
+      </section>
 
-      <div style="display:flex;gap:10px;margin-top:8px;">
-        <button id="previewPlansBtn" onclick="loadProjectPlans()" disabled
-          style="padding:14px;background:#1e2235;border:1px solid #3b82f6;border-radius:10px;color:#3b82f6;cursor:pointer;font-size:14px;font-weight:600;flex:1;opacity:0.5;">
-          🔍 Preview Plans
-        </button>
-        <button class="run-btn" id="runStackctBtn" onclick="runStackCT()" style="flex:1;margin-top:0;">
-          ▶ Run All
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── PDF Tab ── -->
-  <div id="tab-pdf" style="display:none">
-    <div class="card">
-      <h2>Analyze a PDF Floor Plan</h2>
-
-      <div class="field">
-        <label>Project name</label>
-        <input type="text" id="pdfProjectName" placeholder="e.g. Building A – Floor Plans" />
-      </div>
-
-      <div class="field">
-        <label>PDF file</label>
-        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-          <div class="dz-icon">📄</div>
-          <p>Drop a PDF here or <strong>click to browse</strong></p>
-          <p class="file-name" id="selectedFileName"></p>
+      <!-- ── Reports Page ── -->
+      <section id="page-reports" class="page-section">
+        <div class="card">
+          <h2>Generated Reports</h2>
+          <div id="reportsList"><p class="empty">No reports yet.</p></div>
+          <button class="run-btn" style="margin-top:16px;background:var(--bg-elevated);color:var(--text-secondary)" onclick="loadReports()">↻ Refresh</button>
         </div>
-        <input type="file" id="fileInput" accept=".pdf" onchange="onFileSelected(this)" />
+      </section>
+
+      <!-- ── Settings Placeholder (actual settings at /settings) ── -->
+      <section id="page-settings" class="page-section">
+        <div class="card">
+          <h2>Settings</h2>
+          <p class="empty" style="padding:16px 0 8px;">Manage credentials, API keys, and output preferences.</p>
+          <a href="/settings" class="run-btn" style="display:block;text-align:center;text-decoration:none;margin-top:8px;">Open Settings →</a>
+        </div>
+      </section>
+
+      <!-- ── Progress Card (shared across pages) ── -->
+      <div class="card progress-card" id="progressCard">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <h2 style="margin:0">Job Status</h2>
+          <span class="status-badge badge-queued" id="statusBadge">Queued</span>
+        </div>
+        <div id="jobInfo" style="font-size:13px;color:var(--text-tertiary);margin-bottom:8px"></div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="log-box" id="logBox"></div>
       </div>
 
-      <button class="run-btn" id="runPdfBtn" onclick="runPDF()" disabled>
-        ▶ Analyze PDF
-      </button>
-    </div>
-  </div>
+    </div><!-- end page-body -->
+  </main>
 
-  <!-- ── Reports Tab ── -->
-  <div id="tab-reports" style="display:none">
-    <div class="card">
-      <h2>Generated Reports</h2>
-      <div id="reportsList"><p class="empty">No reports yet.</p></div>
-      <button class="run-btn" style="margin-top:16px;background:#1e2235;color:#94a3b8" onclick="loadReports()">↻ Refresh</button>
-    </div>
-  </div>
+</div><!-- end app-shell -->
 
-  <!-- ── Progress (shared) ── -->
-  <div class="card progress-card" id="progressCard">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <h2 style="margin:0">Job Status</h2>
-      <span class="status-badge badge-queued" id="statusBadge">Queued</span>
-    </div>
-    <div id="jobInfo" style="font-size:13px;color:#64748b;margin-bottom:8px"></div>
-    <div class="progress-bar-bg">
-      <div class="progress-bar-fill" id="progressFill"></div>
-    </div>
-    <div class="log-box" id="logBox"></div>
-  </div>
-
-</div>
-
-<!-- ── Active Job Mini-Card ── -->
-<div class="active-job-mini" id="activeJobMini" style="display:none;">
-  <div class="mini-header">
-    <span class="status-dot"></span>
-    <span>Active Job</span>
-  </div>
-  <div class="mini-project" id="miniProjectName">—</div>
-  <div class="mini-progress-row">
-    <div class="mini-progress-track">
-      <div class="mini-progress-bar" id="miniProgressBar"></div>
-    </div>
-    <span class="mini-pct" id="miniProgressPct">0%</span>
-    <span class="mini-count" id="miniSheetCount"></span>
-  </div>
-  <div class="mini-current-sheet" id="miniCurrentSheet">—</div>
-  <a href="#" class="mini-link" onclick="scrollToJobStatus(); return false;">View Details →</a>
-</div>
-
-<script>
-// ── State ──────────────────────────────────────────────────────────────────
-let currentMode = 'all';
-let selectedFile = null;
-let pollInterval = null;
-let projectsLoaded = false;
-let allPlans = [];
-let selectedProjectId = null;
-
-// ── Tabs ───────────────────────────────────────────────────────────────────
-function switchTab(name, el) {
-  ['stackct','pdf','reports'].forEach(t => {
-    document.getElementById('tab-'+t).style.display = 'none';
-  });
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-'+name).style.display = 'block';
-  el.classList.add('active');
-  if (name === 'reports') loadReports();
-  if (name === 'stackct' && !projectsLoaded) loadProjects();
-}
-
-// ── Mode ───────────────────────────────────────────────────────────────────
-function setMode(mode) {
-  currentMode = mode;
-  document.getElementById('modeAll').classList.toggle('active', mode === 'all');
-  document.getElementById('modeOne').classList.toggle('active', mode === 'specific');
-  document.getElementById('projectDropdownField').style.display = mode === 'specific' ? 'block' : 'none';
-  if (mode === 'specific' && !projectsLoaded) loadProjects();
-}
-
-// ── Projects dropdown ──────────────────────────────────────────────────────
-async function loadProjects(force = false) {
-  const sel = document.getElementById('projectSelect');
-  const status = document.getElementById('cacheStatus');
-  const refreshBtn = document.getElementById('refreshBtn');
-
-  sel.innerHTML = '<option>Loading…</option>';
-  if (status) status.textContent = force ? '🔄 Fetching live…' : '⏳ Loading…';
-  if (refreshBtn) refreshBtn.disabled = true;
-
-  try {
-    const url = force ? '/api/projects?refresh=1' : '/api/projects';
-    const res = await fetch(url);
-    const data = await res.json();
-
-    if (data.error && !data.projects?.length) {
-      sel.innerHTML = `<option>Error loading projects</option>`;
-      if (status) status.textContent = '⚠ Could not load';
-      return;
-    }
-
-    sel.innerHTML = '<option value="">— Select a project —</option>';
-    (data.projects || []).forEach(p => {
-      const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = p.name;
-      opt.dataset.name = p.name;
-      sel.appendChild(opt);
-    });
-    projectsLoaded = true;
-
-    // Show cache info
-    if (status) {
-      const when = data.fetched_at ? new Date(data.fetched_at).toLocaleString() : '';
-      const tag  = data.from_cache ? `📦 Cached${data.stale ? ' (stale)' : ''}` : '✓ Live';
-      status.textContent = `${tag} · ${data.projects?.length || 0} projects · ${when}`;
-      status.style.color = data.stale ? '#f59e0b' : '#475569';
-    }
-
-    sel.onchange = () => {
-      const opt = sel.options[sel.selectedIndex];
-      document.getElementById('projectMeta').textContent =
-        opt.value ? `Project ID: ${opt.value}` : '';
-      selectedProjectId = opt.value ? parseInt(opt.value) : null;
-      const previewBtn = document.getElementById('previewPlansBtn');
-      if (previewBtn) {
-        previewBtn.disabled = !selectedProjectId;
-        previewBtn.style.opacity = selectedProjectId ? '1' : '0.5';
-      }
-      // Reset plan panel when project changes
-      document.getElementById('planSelectionPanel').style.display = 'none';
-      allPlans = [];
-    };
-  } catch(e) {
-    sel.innerHTML = '<option>Could not load projects</option>';
-    if (status) status.textContent = '⚠ Network error';
-  } finally {
-    if (refreshBtn) refreshBtn.disabled = false;
-  }
-}
-
-async function refreshProjects() {
-  projectsLoaded = false;
-  await loadProjects(true);
-}
-
-// ── Run StackCT ────────────────────────────────────────────────────────────
-async function runStackCT() {
-  const btn = document.getElementById('runStackctBtn');
-  let projectId = null, projectName = 'All Projects';
-
-  if (currentMode === 'specific') {
-    const sel = document.getElementById('projectSelect');
-    if (!sel.value) { alert('Please select a project.'); return; }
-    projectId = parseInt(sel.value);
-    projectName = sel.options[sel.selectedIndex].dataset.name || 'Project';
-  }
-
-  btn.disabled = true;
-  btn.textContent = '⏳ Starting…';
-
-  try {
-    const res = await fetch('/api/run/stackct', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ mode: currentMode, project_id: projectId, project_name: projectName })
-    });
-    const data = await res.json();
-    startPolling(data.job_id, projectName);
-  } catch(e) {
-    alert('Failed to start job: ' + e);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '▶ Run Estimation';
-  }
-}
-
-// ── PDF file handling ──────────────────────────────────────────────────────
-function onFileSelected(input) {
-  selectedFile = input.files[0];
-  if (selectedFile) {
-    document.getElementById('selectedFileName').textContent = `✓ ${selectedFile.name} (${(selectedFile.size/1024/1024).toFixed(1)} MB)`;
-    if (!document.getElementById('pdfProjectName').value)
-      document.getElementById('pdfProjectName').value = selectedFile.name.replace('.pdf','');
-    document.getElementById('runPdfBtn').disabled = false;
-  }
-}
-
-// Drag & drop
-const dz = document.getElementById('dropZone');
-dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
-dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-dz.addEventListener('drop', e => {
-  e.preventDefault(); dz.classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (file && file.name.endsWith('.pdf')) {
-    const dt = new DataTransfer(); dt.items.add(file);
-    const inp = document.getElementById('fileInput');
-    inp.files = dt.files;
-    onFileSelected(inp);
-  }
-});
-
-async function runPDF() {
-  if (!selectedFile) return;
-  const btn = document.getElementById('runPdfBtn');
-  const name = document.getElementById('pdfProjectName').value || selectedFile.name;
-  btn.disabled = true;
-  btn.textContent = '⏳ Uploading…';
-
-  const form = new FormData();
-  form.append('file', selectedFile);
-  form.append('project_name', name);
-
-  try {
-    const res = await fetch('/api/run/pdf', { method: 'POST', body: form });
-    const data = await res.json();
-    if (data.error) { alert(data.error); return; }
-    startPolling(data.job_id, name);
-  } catch(e) {
-    alert('Upload failed: ' + e);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '▶ Analyze PDF';
-  }
-}
-
-// ── Polling ────────────────────────────────────────────────────────────────
-function startPolling(jobId, projectName) {
-  if (pollInterval) clearInterval(pollInterval);
-  const card = document.getElementById('progressCard');
-  card.classList.add('visible');
-  document.getElementById('jobInfo').textContent = `Project: ${projectName}  ·  Job: ${jobId}`;
-  document.getElementById('logBox').innerHTML = '';
-
-  pollInterval = setInterval(() => pollStatus(jobId), 2000);
-  pollStatus(jobId);
-
-  // Scroll to progress
-  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-async function pollStatus(jobId) {
-  try {
-    const res = await fetch(`/api/status/${jobId}`);
-    const job = await res.json();
-
-    // Badge
-    const badge = document.getElementById('statusBadge');
-    badge.className = `status-badge badge-${job.status}`;
-    const labels = { queued:'⏳ Queued', running:'⚙ Running', done:'✓ Done', error:'✕ Error' };
-    badge.innerHTML = (job.status === 'running' ? '<span class="spinner"></span> ' : '') + (labels[job.status] || job.status);
-
-    // Progress bar
-    document.getElementById('progressFill').style.width = (job.progress || 0) + '%';
-
-    // Job info (current sheet)
-    if (job.current_sheet && job.current_sheet.name) {
-      const cs = job.current_sheet;
-      const countStr = cs.total ? ` (${cs.index}/${cs.total})` : '';
-      document.getElementById('jobInfo').textContent =
-        `Project: ${job.project}  ·  Job: ${job.id}  ·  ${cs.name}${countStr}`;
-    }
-
-    // Log — handle both plain strings and structured entries
-    const logBox = document.getElementById('logBox');
-    logBox.innerHTML = (job.log || []).map(l => {
-      const msg = typeof l === 'object' ? l.message : l;
-      const cls = typeof l === 'object' && l.type === 'sheet_complete' ? 'color:#4ade80' : '';
-      return `<div class="log-line" style="${cls}">${escHtml(String(msg))}</div>`;
-    }).join('');
-    logBox.scrollTop = logBox.scrollHeight;
-
-    if (job.status === 'done' || job.status === 'error') {
-      clearInterval(pollInterval);
-      if (job.status === 'done') {
-        document.getElementById('progressFill').style.width = '100%';
-        loadReports(); // refresh reports list
-      }
-      if (job.error) {
-        document.getElementById('logBox').innerHTML +=
-          `<div class="log-line" style="color:#f87171">Error: ${escHtml(job.error)}</div>`;
-      }
-    }
-  } catch(e) { /* ignore polling errors */ }
-}
-
-// ── Reports ────────────────────────────────────────────────────────────────
-async function loadReports() {
-  const el = document.getElementById('reportsList');
-  el.innerHTML = '<p class="empty">Loading…</p>';
-  try {
-    const res = await fetch('/api/reports');
-    const data = await res.json();
-    if (!data.reports.length) {
-      el.innerHTML = '<p class="empty">No reports yet. Run an estimation to generate one.</p>';
-      return;
-    }
-    el.innerHTML = data.reports.map(r => {
-      const files = r.files || {};
-      const folder = encodeURIComponent(r.run_folder);
-      const fileLink = (key, label, color) => {
-        const f = files[key];
-        if (!f) return '';
-        const sizeKB = (f.size/1024).toFixed(1);
-        return `<a class="dl-btn" style="background:${color}" href="/api/reports/${folder}/${encodeURIComponent(f.filename)}" title="${escHtml(f.filename)} (${sizeKB} KB)">${label} <span style="opacity:.7;font-size:11px">${sizeKB}KB</span></a>`;
-      };
-      return `
-      <div class="report-item">
-        <div>
-          <div class="report-name">${escHtml(r.project_name)}</div>
-          <div class="report-meta">${new Date(r.created*1000).toLocaleString()} · <code style="font-size:11px;color:#888">${escHtml(r.run_folder)}/</code></div>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          ${fileLink('calculated_csv', '📐 Calculations',     '#1958c4')}
-          ${fileLink('raw_csv',        '📋 Raw items',        '#0a7d4d')}
-          ${fileLink('summary',        '📄 Summary',          '#7a4ad6')}
-          ${fileLink('json',           '{ } JSON',            '#777')}
-        </div>
-      </div>
-    `;}).join('');
-  } catch(e) {
-    el.innerHTML = '<p class="empty">Failed to load reports.</p>';
-  }
-}
-
-// ── Active Job Mini-Card Polling ───────────────────────────────────────────
-let activeJobPollInterval = null;
-
-async function pollActiveJob() {
-  try {
-    const resp = await fetch('/api/jobs/active');
-    const data = await resp.json();
-    const el = document.getElementById('activeJobMini');
-    if (!el) return;
-    if (data.active && data.job) {
-      el.style.display = 'block';
-      document.getElementById('miniProjectName').textContent = data.job.project || '—';
-      document.getElementById('miniProgressBar').style.width = (data.job.progress || 0) + '%';
-      document.getElementById('miniProgressPct').textContent = (data.job.progress || 0) + '%';
-      const cs = data.job.current_sheet || {};
-      document.getElementById('miniSheetCount').textContent =
-        cs.total ? `${cs.index || 0}/${cs.total}` : '';
-      const phaseLbl = cs.phase ? ` (${cs.phase})` : '';
-      document.getElementById('miniCurrentSheet').textContent = cs.name ? cs.name + phaseLbl : '—';
-    } else {
-      el.style.display = 'none';
-    }
-  } catch(e) { /* ignore polling errors */ }
-}
-
-function startActiveJobPolling() {
-  if (!activeJobPollInterval) {
-    pollActiveJob();
-    activeJobPollInterval = setInterval(pollActiveJob, 1500);
-  }
-}
-
-function stopActiveJobPolling() {
-  if (activeJobPollInterval) {
-    clearInterval(activeJobPollInterval);
-    activeJobPollInterval = null;
-  }
-}
-
-function scrollToJobStatus() {
-  const card = document.getElementById('progressCard');
-  if (card && card.classList.contains('visible')) {
-    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-}
-
-// Pause polling when tab hidden, resume on visibility
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) stopActiveJobPolling();
-  else startActiveJobPolling();
-});
-
-// ── Plan Selection ─────────────────────────────────────────────────────────
-function getSheetType(sheetName) {
-  const upper = (sheetName || '').toUpperCase();
-  if (upper.match(/^A\d/) || upper.includes('FLOOR') || upper.includes('ELEVATION') || upper.includes('CEILING')) return 'architectural';
-  if (upper.match(/^E\d/) || upper.includes('ELECTRICAL') || upper.includes('PANEL') || upper.includes('LIGHTING')) return 'electrical';
-  if (upper.match(/^M\d/) || upper.includes('MECHANICAL') || upper.includes('HVAC') || upper.includes('PLUMBING')) return 'mechanical';
-  if (upper.includes('SCHEDULE') || upper.includes('ROOM FINISH') || upper.includes('DOOR SCHED')) return 'schedule';
-  return 'other';
-}
-
-function getTypeBadgeStyle(type) {
-  const colors = { architectural:'#3b82f6', electrical:'#f59e0b', mechanical:'#f97316', schedule:'#8b5cf6', other:'#6b7280' };
-  return `background:${colors[type]||colors.other};padding:2px 8px;border-radius:4px;font-size:11px;color:white;flex-shrink:0;`;
-}
-
-async function loadProjectPlans() {
-  if (!selectedProjectId) { alert('Please select a project first'); return; }
-  const panel = document.getElementById('planSelectionPanel');
-  const plansList = document.getElementById('plansList');
-  panel.style.display = 'block';
-  plansList.innerHTML = '<div style="color:#94a3b8;padding:20px;text-align:center;">Loading plans…</div>';
-  try {
-    const res = await fetch(`/api/projects/${selectedProjectId}/plans`);
-    const data = await res.json();
-    if (data.error) {
-      plansList.innerHTML = `<div style="color:#ef4444;padding:20px;">Error: ${escHtml(data.error)}</div>`;
-      return;
-    }
-    allPlans = data.plans || [];
-    if (!allPlans.length) {
-      plansList.innerHTML = '<div style="color:#94a3b8;padding:20px;">No plans found for this project</div>';
-      return;
-    }
-    renderPlansList(allPlans);
-    updateSelectedCount();
-  } catch(err) {
-    plansList.innerHTML = `<div style="color:#ef4444;padding:20px;">Failed to load plans: ${escHtml(err.message)}</div>`;
-  }
-}
-
-function renderPlansList(plans) {
-  const filter = document.getElementById('sheetTypeFilter').value;
-  const filtered = filter === 'all' ? plans : plans.filter(p => getSheetType(p.sheet_name) === filter);
-  if (!filtered.length) {
-    document.getElementById('plansList').innerHTML = '<div style="color:#94a3b8;padding:20px;">No plans match the selected filter</div>';
-    return;
-  }
-  document.getElementById('plansList').innerHTML = filtered.map(plan => {
-    const type = getSheetType(plan.sheet_name);
-    return `<label style="display:flex;align-items:center;padding:10px 12px;border-bottom:1px solid #252a3a;cursor:pointer;gap:12px;" data-type="${type}">
-      <input type="checkbox" class="plan-checkbox" value="${plan.page_id}" onchange="updateSelectedCount()" style="width:16px;height:16px;flex-shrink:0;">
-      <span style="flex:1;color:#f1f5f9;font-size:13px;">${escHtml(plan.sheet_name || 'Unnamed Sheet')}</span>
-      <span style="${getTypeBadgeStyle(type)}">${type}</span>
-    </label>`;
-  }).join('');
-}
-
-function toggleAllPlans(checked) {
-  document.querySelectorAll('.plan-checkbox').forEach(cb => { cb.checked = checked; });
-  updateSelectedCount();
-}
-
-function selectNone() {
-  document.getElementById('selectAllPlans').checked = false;
-  toggleAllPlans(false);
-}
-
-function filterPlansByType(type) {
-  renderPlansList(allPlans);
-  updateSelectedCount();
-}
-
-function updateSelectedCount() {
-  const checked = document.querySelectorAll('.plan-checkbox:checked');
-  const total = document.querySelectorAll('.plan-checkbox').length;
-  const count = checked.length;
-  document.getElementById('selectedCount').textContent = `${count} sheet${count !== 1 ? 's' : ''} selected`;
-  const btn = document.getElementById('runSelectedBtn');
-  btn.disabled = count === 0;
-  btn.style.opacity = count > 0 ? '1' : '0.5';
-  document.getElementById('selectAllPlans').checked = count === total && total > 0;
-}
-
-async function runSelectedPlans() {
-  const checked = document.querySelectorAll('.plan-checkbox:checked');
-  const pageIds = Array.from(checked).map(cb => parseInt(cb.value));
-  if (!pageIds.length) { alert('Please select at least one plan'); return; }
-  const sel = document.getElementById('projectSelect');
-  const projectName = sel.options[sel.selectedIndex]?.textContent || 'Project';
-  try {
-    const res = await fetch('/api/run/stackct', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ mode:'specific', project_id:selectedProjectId, project_name:projectName, page_ids:pageIds })
-    });
-    const data = await res.json();
-    if (data.job_id) {
-      document.getElementById('planSelectionPanel').style.display = 'none';
-      startPolling(data.job_id, projectName);
-    } else {
-      alert('Failed to start job: ' + (data.error || 'Unknown error'));
-    }
-  } catch(err) {
-    alert('Failed to start job: ' + err.message);
-  }
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// ── Init ───────────────────────────────────────────────────────────────────
-loadProjects();
-startActiveJobPolling();
-</script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
