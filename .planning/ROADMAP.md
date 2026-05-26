@@ -94,13 +94,19 @@ Plans:
 3. Report list cards and `summary.txt` display cost for that run
 4. `takeoff.json` contains an `api_usage` block with token and cost totals
 
-**Plans:** TBD
+**Plans:** 3 plans in 3 waves
+
+| Wave | Plans | Parallel | Description |
+|------|-------|----------|-------------|
+| 1 | 03-01 | — | Per-sheet usage capture (claude_analyzer.py) |
+| 2 | 03-02 | — | Run-level aggregation + summary.txt (reporter.py) |
+| 3 | 03-03 | — | Cost display in UI report cards (app.py + index.html) |
 
 Plans:
 
-- [ ] 03-01: Per-sheet usage capture in `claude_analyzer.py` (Master Feature 2.1)
-- [ ] 03-02: Run-level aggregation in `reporter.py` / scraper
-- [ ] 03-03: Surface cost in UI report cards and summary output
+- [ ] 03-01-PLAN.md — Per-sheet token/cost capture in analyze_drawing()
+- [ ] 03-02-PLAN.md — Run-level aggregation + api_usage in takeoff.json + summary.txt cost section
+- [ ] 03-03-PLAN.md — Display cost in report list cards via list_reports() API
 
 ---
 
@@ -318,7 +324,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Config & Safe Operations | 3/3 | Complete | 2026-05-26 |
 | 2. Browser Reliability | 3/3 | Complete | 2026-05-26 |
-| 3. API Cost Transparency | 0/TBD | Not started | — |
+| 3. API Cost Transparency | 0/3 | Planned | — |
 | 4. StackCT Plan Selection | 0/TBD | Not started | — |
 | 5. Report Preview APIs | 0/TBD | Not started | — |
 | 6. Settings Management | 0/TBD | Not started | — |
