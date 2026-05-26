@@ -87,7 +87,11 @@ def get_projects(force_refresh: bool = False) -> dict:
         if cache:
             logger.warning("Using stale cache as fallback")
             return {**cache, "from_cache": True, "stale": True}
-        return {"projects": [], "error": str(e), "from_cache": False}
+        return {
+            "projects": [],
+            "error": "Could not fetch projects from StackCT. Try again or check credentials.",
+            "from_cache": False
+        }
 
 
 def prefetch_in_background():

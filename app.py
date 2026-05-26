@@ -88,8 +88,8 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
     except Exception as e:
         logger.exception("StackCT job failed")
         jobs[job_id]["status"] = "error"
-        jobs[job_id]["error"] = str(e)
-        log(f"Error: {e}")
+        jobs[job_id]["error"] = "The job failed. Check server logs for details."
+        log("Job failed — see server logs")
 
 
 def _pdf_job(job_id: str, pdf_path: str, project_name: str):
@@ -113,7 +113,7 @@ def _pdf_job(job_id: str, pdf_path: str, project_name: str):
     except Exception as e:
         logger.exception("PDF job failed")
         jobs[job_id]["status"] = "error"
-        jobs[job_id]["error"] = str(e)
+        jobs[job_id]["error"] = "The job failed. Check server logs for details."
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
