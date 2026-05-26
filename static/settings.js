@@ -5,9 +5,14 @@
 
 const MASKED_PLACEHOLDER = "••••••••";
 
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.content : '';
+}
+
 async function loadSettings() {
   try {
-    const res = await fetch("/api/settings");
+    const res = await fetch("/api/settings", { credentials: 'same-origin' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     populateForm(data);
@@ -114,7 +119,11 @@ async function saveSettings(event) {
   try {
     const res = await fetch("/api/settings", {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken(),
+      },
+      credentials: 'same-origin',
       body: JSON.stringify(data),
     });
     const result = await res.json();
