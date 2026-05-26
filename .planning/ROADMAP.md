@@ -328,7 +328,19 @@ Plans:
 6. Failed login attempts are rate-limited; generic error messages (no user enumeration)
 7. Logout invalidates the session; README documents auth env vars and production checklist
 
-**Plans:** TBD (this planning run)
+**Plans:** 3 plans in 3 waves
+
+| Wave | Plans | Parallel | Description |
+|------|-------|----------|-------------|
+| 1 | 12-01 | — | Auth dependencies + seed_admin.py + env docs |
+| 2 | 12-02 | — | Core auth module + app.py integration + login.html |
+| 3 | 12-03 | — | Frontend CSRF headers on all fetch calls |
+
+Plans:
+
+- [ ] 12-01-PLAN.md — Auth dependencies, seed_admin.py, .env.example, config.py validation
+- [ ] 12-02-PLAN.md — auth.py module, before_request guard, login/logout routes, login.html
+- [ ] 12-03-PLAN.md — CSRF meta tags in templates, apiFetch helper, CSRF headers on POST/PUT
 
 ---
 
@@ -407,7 +419,7 @@ Research: `.planning/phases/13-stackct-data-persistence/13-RESEARCH.md`
 | 9. Projects Workspace | 0/TBD | Not started | — |
 | 10. Reports & Monitor UI | 0/TBD | Not started | — |
 | 11. PDF Selection & Production Docs | 0/TBD | Not started | — |
-| 12. Application Authentication | 0/TBD | Not started | — |
+| 12. Application Authentication | 0/3 | Planned | — |
 | 13. StackCT Data & Persistence | 0/4 | Planned | — |
 
 ---
