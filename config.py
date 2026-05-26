@@ -3,7 +3,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Always load .env from the same directory as this file
+# Fallback to cwd if project-root .env is missing
 _env_path = Path(__file__).resolve().parent / ".env"
+if not _env_path.exists():
+    _env_path = Path.cwd() / ".env"
 load_dotenv(dotenv_path=_env_path, override=True)
 
 # StackCT Credentials (set in .env file)
