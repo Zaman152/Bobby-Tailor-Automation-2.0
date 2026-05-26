@@ -34,6 +34,8 @@ HEADLESS = os.getenv("HEADLESS", "true").lower() == "true"
 PAGE_LOAD_TIMEOUT = 30000   # ms
 DRAWING_LOAD_TIMEOUT = 20000  # ms - drawings can be slow to render
 SCREENSHOT_DELAY = 3000       # ms - wait after navigation before screenshot
+CANVAS_STABILITY_TIMEOUT = int(os.getenv("CANVAS_STABILITY_TIMEOUT", "15"))  # seconds
+CANVAS_STABILITY_CHECKS = int(os.getenv("CANVAS_STABILITY_CHECKS", "2"))  # consecutive matches
 
 # Output
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./output")

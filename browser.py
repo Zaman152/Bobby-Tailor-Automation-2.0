@@ -1,11 +1,15 @@
 import asyncio
+import hashlib
 import logging
+import os
+import time
 from typing import List
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
 from config import (
     STACKCT_EMAIL, STACKCT_PASSWORD,
     STACKCT_LOGIN_URL, STACKCT_PROJECTS_URL,
-    HEADLESS, PAGE_LOAD_TIMEOUT
+    HEADLESS, PAGE_LOAD_TIMEOUT,
+    CANVAS_STABILITY_TIMEOUT, CANVAS_STABILITY_CHECKS,
 )
 
 logger = logging.getLogger(__name__)
@@ -20,9 +24,17 @@ class StackCTBrowser:
 
     async def start(self):
         self._playwright = await async_playwright().start()
+        # VPS-safe Chromium launch args:
+        # --no-sandbox: Required in Docker/restricted environments
+        # --disable-dev-shm-usage: Use /tmp instead of /dev/shm (prevents OOM on small VPS)
+        # --disable-blink-features=AutomationControlled: Reduce detection fingerprint
         self._browser = await self._playwright.chromium.launch(
             headless=HEADLESS,
-            args=["--no-sandbox", "--disable-dev-shm-usage"]
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+            ],
         )
         # Large viewport + 2x device pixel ratio = high-DPI screenshots that
         # let Claude actually read small dimension annotations on drawings.
@@ -117,38 +129,86 @@ class StackCTBrowser:
             return False
 
     async def get_all_projects(self) -> List[dict]:
-        """Return list of {id, name} for all projects."""
-        logger.info("Getting project list")
+        """Return list of {id, name} for ALL projects (handles virtual scrolling)."""
+        logger.info("Getting project list with virtual scroll handling")
         await self.page.goto(STACKCT_PROJECTS_URL, wait_until="load")
-        await asyncio.sleep(3)  # Let Angular render the project list
         await self.page.wait_for_selector("text=PROJECT NAME", timeout=15000)
+        await asyncio.sleep(2)
 
-        projects = []
-        # Each project row has a link or clickable element
-        rows = await self.page.query_selector_all('[class*="project-row"], tbody tr, [class*="project-item"]')
+        seen_ids = set()
+        prev_count = 0
+        stalled_iterations = 0
+        max_stalls = 3
 
-        if not rows:
-            # Fallback: get project names from visible text
-            items = await self.page.query_selector_all('text=/[A-Z]/')
-            logger.warning("Using fallback project detection")
+        for scroll_iteration in range(20):
+            project_links = await self.page.query_selector_all('a[href*="Takeoff"]')
+            for link in project_links:
+                href = await link.get_attribute("href")
+                if href and "Takeoff" in href:
+                    try:
+                        project_id = int(href.split("Takeoff/")[1].split("/")[0])
+                        seen_ids.add(project_id)
+                    except (IndexError, ValueError):
+                        continue
 
-        # Extract project IDs from links — deduplicate by ID, keep the one with a name
-        project_links = await self.page.query_selector_all('a[href*="Takeoff"]')
-        seen_ids = {}
-        for link in project_links:
-            href = await link.get_attribute("href")
-            text = (await link.inner_text()).strip()
-            if href and "Takeoff" in href:
-                try:
-                    project_id = int(href.split("Takeoff/")[1].split("/")[0])
-                except (IndexError, ValueError):
-                    continue
-                # Prefer the entry that has a non-empty name
-                if project_id not in seen_ids or (text and not seen_ids[project_id]["name"]):
-                    seen_ids[project_id] = {"id": project_id, "name": text}
+            current_count = len(seen_ids)
+            logger.debug(
+                f"Scroll iteration {scroll_iteration + 1}: {current_count} projects found"
+            )
 
-        projects = [v for v in seen_ids.values() if v["name"]]
-        logger.info(f"Found {len(projects)} projects")
+            if current_count == prev_count:
+                stalled_iterations += 1
+                if stalled_iterations >= max_stalls:
+                    logger.info(
+                        f"No new projects after {max_stalls} scrolls — collection complete"
+                    )
+                    break
+            else:
+                stalled_iterations = 0
+
+            prev_count = current_count
+
+            await self.page.evaluate("""
+                const container = document.querySelector(
+                    '[class*="virtual-scroll"], [class*="cdk-virtual-scroll"]'
+                );
+                if (container) {
+                    container.scrollTo(0, container.scrollHeight);
+                } else {
+                    window.scrollTo(0, document.body.scrollHeight);
+                }
+            """)
+            await asyncio.sleep(1.5)
+
+        project_map = {}
+        await self.page.evaluate("window.scrollTo(0, 0)")
+        await asyncio.sleep(1)
+
+        for _ in range(10):
+            project_links = await self.page.query_selector_all('a[href*="Takeoff"]')
+            for link in project_links:
+                href = await link.get_attribute("href")
+                text = (await link.inner_text()).strip()
+                if href and "Takeoff" in href and text:
+                    try:
+                        project_id = int(href.split("Takeoff/")[1].split("/")[0])
+                        if project_id in seen_ids and project_id not in project_map:
+                            project_map[project_id] = text
+                    except (IndexError, ValueError):
+                        continue
+
+            if len(project_map) >= len(seen_ids):
+                break
+
+            await self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await asyncio.sleep(1)
+
+        projects = [
+            {"id": pid, "name": project_map.get(pid, f"Project_{pid}")}
+            for pid in seen_ids
+        ]
+        projects.sort(key=lambda p: p["name"].lower())
+        logger.info(f"Found {len(projects)} projects after virtual scroll handling")
         return projects
 
     async def get_all_page_ids(self, project_id: int) -> List[dict]:
@@ -308,75 +368,166 @@ class StackCTBrowser:
         except Exception:
             pass
 
-    async def screenshot_full_drawing(self, project_id: int, page_id: int, filepath: str) -> bool:
+    async def _wait_for_canvas_stable(
+        self,
+        selector: str,
+        timeout_s: int = None,
+        stable_checks: int = None,
+    ) -> bool:
+        """Wait until canvas pixels stop changing (drawing fully rendered)."""
+        if timeout_s is None:
+            timeout_s = CANVAS_STABILITY_TIMEOUT
+        if stable_checks is None:
+            stable_checks = CANVAS_STABILITY_CHECKS
+
+        prev_hash = None
+        stable_count = 0
+        start = time.time()
+        deadline = start + timeout_s
+
+        while time.time() < deadline:
+            try:
+                el = await self.page.query_selector(selector)
+                if not el:
+                    await asyncio.sleep(0.5)
+                    continue
+
+                buf = await el.screenshot()
+                if len(buf) < 5000:
+                    logger.warning("Canvas screenshot < 5KB, waiting...")
+                    await asyncio.sleep(0.8)
+                    continue
+
+                h = hashlib.md5(buf).hexdigest()
+                if h == prev_hash:
+                    stable_count += 1
+                    if stable_count >= stable_checks:
+                        elapsed = time.time() - start
+                        logger.info(f"Canvas stable after {elapsed:.1f}s")
+                        return True
+                else:
+                    stable_count = 0
+
+                prev_hash = h
+            except Exception as e:
+                logger.warning(f"Canvas polling error: {e}")
+
+            await asyncio.sleep(0.8)
+
+        elapsed = time.time() - start
+        logger.warning(
+            f"Canvas stability timeout after {elapsed:.1f}s — proceeding anyway"
+        )
+        return False
+
+    async def screenshot_full_drawing(
+        self, project_id: int, page_id: int, filepath: str, max_retries: int = 1
+    ) -> bool:
         """Navigate to a drawing page and screenshot the actual drawing canvas
         directly (StackCT renders it into #canvas-interaction at high resolution)."""
-        try:
-            if not await self.navigate_to_page(project_id, page_id):
-                return False
+        for attempt in range(max_retries + 1):
+            try:
+                if not await self.navigate_to_page(project_id, page_id):
+                    raise Exception("Navigation to page failed")
 
-            # Confirm we're on the per-page URL
-            current_url = self.page.url
-            if f"/Page/{page_id}" not in current_url:
-                logger.warning(f"Wrong URL after nav: {current_url[:100]}")
-                url = f"https://go.stackct.com/app/#/Takeoff/{project_id}/Page/{page_id}/@0,0,0z"
-                await self.page.goto(url, wait_until="load")
-                await asyncio.sleep(3)
+                current_url = self.page.url
+                if f"/Page/{page_id}" not in current_url:
+                    logger.warning(f"Wrong URL after nav: {current_url[:100]}")
+                    url = (
+                        f"https://go.stackct.com/app/#/Takeoff/{project_id}"
+                        f"/Page/{page_id}/@0,0,0z"
+                    )
+                    await self.page.goto(url, wait_until="load")
+                    await asyncio.sleep(3)
 
-            # Dismiss popups if present (best effort)
-            await self._dismiss_popups()
+                await self._dismiss_popups()
 
-            # Click "Fit to page" so the entire drawing is rendered into the canvas
-            for selector in ['[data-id="fit-to-screen"]', '[data-id="fit-page"]',
-                             '[title*="Fit" i]', '[aria-label*="fit" i]',
-                             'button[title*="fit" i]']:
+                for selector in [
+                    '[data-id="fit-to-screen"]', '[data-id="fit-page"]',
+                    '[title*="Fit" i]', '[aria-label*="fit" i]',
+                    'button[title*="fit" i]',
+                ]:
+                    try:
+                        btn = await self.page.query_selector(selector)
+                        if btn and await btn.is_visible():
+                            await btn.click()
+                            break
+                    except Exception:
+                        pass
+
+                canvas_selector = "#canvas-interaction"
+                timeout = (
+                    CANVAS_STABILITY_TIMEOUT
+                    if attempt == 0
+                    else CANVAS_STABILITY_TIMEOUT + 10
+                )
+                stable = await self._wait_for_canvas_stable(
+                    canvas_selector, timeout_s=timeout
+                )
+                if not stable:
+                    logger.warning(
+                        f"Canvas not stable after timeout (attempt {attempt + 1})"
+                    )
+
                 try:
-                    btn = await self.page.query_selector(selector)
-                    if btn and await btn.is_visible():
-                        await btn.click()
-                        break
+                    await self.page.wait_for_selector(
+                        "text=Loading", state="hidden", timeout=8000
+                    )
                 except Exception:
                     pass
 
-            # Wait for tiles to fully render
-            await asyncio.sleep(5)
-            try:
-                await self.page.wait_for_selector("text=Loading", state="hidden", timeout=8000)
-            except Exception:
-                pass
+                captured = False
+                for sel in [
+                    "#canvas-interaction",
+                    "canvas#canvas-interaction",
+                    '[id*="canvas-content"]',
+                    'canvas[id*="canvas"]',
+                ]:
+                    try:
+                        el = await self.page.query_selector(sel)
+                        if el:
+                            box = await el.bounding_box()
+                            if box and box["width"] > 400 and box["height"] > 300:
+                                await el.screenshot(path=filepath)
+                                logger.info(
+                                    f"Captured canvas '{sel}' at "
+                                    f"{box['width']}x{box['height']}"
+                                )
+                                captured = True
+                                break
+                    except Exception:
+                        continue
 
-            # StackCT renders the drawing into a high-res canvas (#canvas-interaction or sibling).
-            # Screenshot that element directly — no sidebar, no popup, just the drawing.
-            captured = False
-            for sel in ['#canvas-interaction',
-                        'canvas#canvas-interaction',
-                        '[id*="canvas-content"]',
-                        'canvas[id*="canvas"]']:
-                try:
-                    el = await self.page.query_selector(sel)
-                    if el:
-                        box = await el.bounding_box()
-                        if box and box["width"] > 400 and box["height"] > 300:
-                            await el.screenshot(path=filepath)
-                            logger.info(f"Captured canvas '{sel}' at {box['width']}x{box['height']}")
-                            captured = True
-                            break
-                except Exception:
+                if not captured:
+                    logger.info("No canvas element found — using viewport screenshot")
+                    await self.page.screenshot(path=filepath, full_page=False)
+
+                if not os.path.exists(filepath):
+                    raise Exception("Screenshot file not created")
+
+                size = os.path.getsize(filepath)
+                if size < 5000:
+                    raise Exception(
+                        f"Screenshot too small ({size} bytes) — likely blank or partial"
+                    )
+
+                logger.info(f"Screenshot saved: {filepath} ({size:,} bytes)")
+                return True
+
+            except Exception as e:
+                if attempt < max_retries:
+                    logger.warning(
+                        f"Screenshot failed (attempt {attempt + 1}/"
+                        f"{max_retries + 1}): {e}"
+                    )
+                    logger.info("Retrying with extended timeout...")
+                    await asyncio.sleep(2)
                     continue
-
-            if not captured:
-                # Fallback: full viewport screenshot
-                logger.info("No canvas element found — using viewport screenshot")
-                await self.page.screenshot(path=filepath, full_page=False)
-
-            import os
-            size = os.path.getsize(filepath) if os.path.exists(filepath) else 0
-            logger.info(f"Screenshot saved: {filepath} ({size:,} bytes)")
-            return size > 5000
-
-        except Exception as e:
-            logger.error(f"Screenshot failed for page {page_id}: {e}")
-            return False
+                logger.error(
+                    f"Screenshot failed after {max_retries + 1} attempts: {e}"
+                )
+                return False
+        return False
 
     async def close(self):
         if self._browser:

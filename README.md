@@ -14,6 +14,80 @@ cp .env.example .env
 # Edit .env and add your ANTHROPIC_API_KEY + StackCT login
 ```
 
+## VPS Deployment (Ubuntu)
+
+### System requirements
+
+- Ubuntu 20.04+ or Debian 11+
+- Python 3.10+
+- 2 GB RAM minimum (4 GB recommended for concurrent jobs)
+- Chromium system dependencies via Playwright
+
+### Installation
+
+```bash
+sudo apt update && sudo apt install -y python3-pip python3-venv
+
+cd /home/ubuntu
+git clone <repo-url> bobby-tailor
+cd bobby-tailor
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+playwright install chromium
+playwright install-deps chromium
+
+cp .env.example .env
+# Edit .env with StackCT and Anthropic credentials
+```
+
+### Chromium launch flags
+
+`browser.py` launches Chromium with VPS-safe flags:
+
+- `--no-sandbox` — required in Docker and many restricted environments
+- `--disable-dev-shm-usage` — routes shared memory to `/tmp` when `/dev/shm` is capped at 64 MB
+- `--disable-blink-features=AutomationControlled` — reduces automation fingerprinting
+
+Optional `.env` tuning for slow VPS links:
+
+- `CANVAS_STABILITY_TIMEOUT=20` — max seconds to wait for drawing tiles to finish rendering
+- `CANVAS_STABILITY_CHECKS=2` — consecutive matching pixel hashes before capture
+
+### Running with Gunicorn
+
+```bash
+gunicorn -w 2 -b 0.0.0.0:5050 app:app --timeout 300
+```
+
+### Docker (alternative)
+
+If you run in Docker, increase shared memory:
+
+```yaml
+services:
+  bobby-tailor:
+    build: .
+    ipc: host
+    # or: shm_size: 1gb
+    mem_limit: 2g
+```
+
+### Troubleshooting
+
+**Browser crashes with "Target closed":**
+
+- Check `/dev/shm`: `df -h /dev/shm`
+- Confirm `--disable-dev-shm-usage` is in `browser.py` launch args
+- Check memory: `free -h`
+
+**Screenshots are blank:**
+
+- Verify `playwright install chromium` completed
+- Check logs for canvas stability timeout warnings
+- Increase `CANVAS_STABILITY_TIMEOUT` in `.env`
+
 ## Run
 
 ```bash
