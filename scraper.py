@@ -1,6 +1,6 @@
 """
-Main orchestrator: scrapes all drawing pages, runs Claude vision, generates report.
-No estimation tables needed — Claude extracts quantities directly from drawings.
+Main orchestrator: scrapes all drawing pages, runs Claude vision, applies
+estimation tables, and generates a structured takeoff report with source tracing.
 """
 import asyncio
 import logging
@@ -10,6 +10,7 @@ from typing import Optional, Callable
 from config import SCREENSHOTS_DIR
 from browser import StackCTBrowser
 from claude_analyzer import analyze_drawing, make_navigation_decision
+from calculator import apply_estimation_tables
 from reporter import generate_report
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ async def run_project_scrape(project_id: int, project_name: str,
 
     browser = StackCTBrowser()
     all_extracted = []
+    all_estimates = []   # calculated takeoff items (from estimation tables)
 
     try:
         await browser.start()
@@ -84,12 +86,24 @@ async def run_project_scrape(project_id: int, project_name: str,
                 n_comp = len(extracted.get("components", []))
                 log(f"  {sheet_name}: {n_meas} measurements, {n_comp} components extracted")
 
+                # STEP 6: Apply estimation tables to compute final takeoff quantities
+                estimates = apply_estimation_tables(extracted)
+                if estimates:
+                    log(f"  {sheet_name}: {len(estimates)} calculated takeoff items")
+                all_estimates.extend(estimates)
+
             all_extracted.append(extracted)
 
-        log("Generating report...")
-        report = generate_report(project_name, all_extracted)
+        log("Generating report (raw CSV + calculated CSV + summary + JSON)...")
+        report = generate_report(project_name, all_extracted, all_estimates)
         log(f"Report saved — {report.get('sheets_processed', 0)} sheets, "
-            f"{report.get('total_line_items', 0)} takeoff items")
+            f"{report.get('total_line_items', 0)} raw items, "
+            f"{report.get('total_calculated_items', 0)} calculated takeoff items")
+        files = report.get("_files", {})
+        if files:
+            log(f"  Files: raw items → {Path(files.get('raw_csv','')).name}")
+            log(f"         calculations → {Path(files.get('calculated_csv','')).name}")
+            log(f"         summary → {Path(files.get('summary_txt','')).name}")
         return report
 
     finally:

@@ -1,5 +1,4 @@
 .env
-.env.example
 *.save
 *.bak
 .DS_Store
@@ -7,3 +6,10 @@ __pycache__/
 *.pyc
 .claude/
 output/
+uploads/
+screenshots/
+*.log
+.venv/
+venv/
+.idea/
+.vscode/

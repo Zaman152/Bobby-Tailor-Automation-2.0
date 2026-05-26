@@ -193,23 +193,70 @@ def job_status(job_id):
 
 @app.route("/api/reports")
 def list_reports():
-    """List all generated report files."""
+    """List all generated report runs. Each run is its own folder under output/.
+    Each folder contains: takeoff.json, raw_items.csv, calculations.csv, summary.txt."""
     output = Path(OUTPUT_DIR)
-    reports = []
-    for f in sorted(output.glob("*.json"), reverse=True):
-        stat = f.stat()
-        reports.append({
-            "filename": f.name,
-            "size": stat.st_size,
-            "created": stat.st_ctime,
+    runs = []
+
+    # Each subdirectory of output/ that contains takeoff.json is a run
+    for sub in sorted(output.iterdir(), reverse=True):
+        if not sub.is_dir() or sub.name in ("screenshots",):
+            continue
+
+        files = {}
+        for filename, key in [
+            ("takeoff.json",     "json"),
+            ("raw_items.csv",    "raw_csv"),
+            ("calculations.csv", "calculated_csv"),
+            ("summary.txt",      "summary"),
+        ]:
+            f = sub / filename
+            if f.exists():
+                files[key] = {"filename": filename, "size": f.stat().st_size}
+
+        if not files:
+            continue
+
+        # Pretty project name + timestamp from folder name "Project_Name_20260525_203144"
+        import re as _re
+        m = _re.match(r"^(.*)_(\d{8}_\d{6})$", sub.name)
+        if m:
+            project_name = m.group(1).replace("_", " ")
+            timestamp = m.group(2)
+        else:
+            project_name = sub.name
+            timestamp = ""
+
+        runs.append({
+            "run_folder": sub.name,
+            "project_name": project_name,
+            "timestamp": timestamp,
+            "created": sub.stat().st_ctime,
+            "files": files,
         })
-    return jsonify({"reports": reports})
+
+    # Newest first by created time
+    runs.sort(key=lambda r: r["created"], reverse=True)
+    return jsonify({"reports": runs})
+
+
+@app.route("/api/reports/<run_folder>/<filename>")
+def download_run_file(run_folder, filename):
+    """Download a specific file from a run folder."""
+    # Sanitize: only allow simple folder/file names
+    if "/" in run_folder or ".." in run_folder or "/" in filename or ".." in filename:
+        return jsonify({"error": "Invalid path"}), 400
+    path = Path(OUTPUT_DIR) / run_folder / filename
+    if not path.exists() or not path.is_file():
+        return jsonify({"error": "Not found"}), 404
+    return send_file(str(path), as_attachment=True)
 
 
 @app.route("/api/reports/<filename>")
-def download_report(filename):
+def download_report_legacy(filename):
+    """Legacy flat-output download — kept for old reports still in the root output dir."""
     path = Path(OUTPUT_DIR) / filename
-    if not path.exists():
+    if not path.exists() or not path.is_file():
         return jsonify({"error": "Not found"}), 404
     return send_file(str(path), as_attachment=True)
 

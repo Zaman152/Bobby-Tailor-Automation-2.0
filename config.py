@@ -12,7 +12,14 @@ STACKCT_PASSWORD = os.getenv("STACKCT_PASSWORD", "")
 
 # Claude API
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-CLAUDE_MODEL = "claude-opus-4-7"  # Best vision model for drawing analysis
+# Model options by cost (per 1M tokens input/output):
+#   claude-haiku-4-5    → $1 / $5     (fastest, cheapest — good for structured extraction)
+#   claude-sonnet-4-6   → $3 / $15    (balanced — better on complex drawings)
+#   claude-opus-4-7     → $5 / $25    (most capable — use only if Haiku misses details)
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5")
+# Smarter model auto-used for schedule/panel/specification sheets where small
+# tabular text matters. Falls back to CLAUDE_MODEL if unset.
+CLAUDE_MODEL_SCHEDULES = os.getenv("CLAUDE_MODEL_SCHEDULES", CLAUDE_MODEL)
 
 # StackCT URLs
 STACKCT_BASE_URL = "https://go.stackct.com"

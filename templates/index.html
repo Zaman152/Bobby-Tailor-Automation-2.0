@@ -557,15 +557,29 @@ async function loadReports() {
       el.innerHTML = '<p class="empty">No reports yet. Run an estimation to generate one.</p>';
       return;
     }
-    el.innerHTML = data.reports.map(r => `
+    el.innerHTML = data.reports.map(r => {
+      const files = r.files || {};
+      const folder = encodeURIComponent(r.run_folder);
+      const fileLink = (key, label, color) => {
+        const f = files[key];
+        if (!f) return '';
+        const sizeKB = (f.size/1024).toFixed(1);
+        return `<a class="dl-btn" style="background:${color}" href="/api/reports/${folder}/${encodeURIComponent(f.filename)}" title="${escHtml(f.filename)} (${sizeKB} KB)">${label} <span style="opacity:.7;font-size:11px">${sizeKB}KB</span></a>`;
+      };
+      return `
       <div class="report-item">
         <div>
-          <div class="report-name">${escHtml(r.filename)}</div>
-          <div class="report-meta">${(r.size/1024).toFixed(1)} KB · ${new Date(r.created*1000).toLocaleString()}</div>
+          <div class="report-name">${escHtml(r.project_name)}</div>
+          <div class="report-meta">${new Date(r.created*1000).toLocaleString()} · <code style="font-size:11px;color:#888">${escHtml(r.run_folder)}/</code></div>
         </div>
-        <a class="dl-btn" href="/api/reports/${encodeURIComponent(r.filename)}">Download</a>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${fileLink('calculated_csv', '📐 Calculations',     '#1958c4')}
+          ${fileLink('raw_csv',        '📋 Raw items',        '#0a7d4d')}
+          ${fileLink('summary',        '📄 Summary',          '#7a4ad6')}
+          ${fileLink('json',           '{ } JSON',            '#777')}
+        </div>
       </div>
-    `).join('');
+    `;}).join('');
   } catch(e) {
     el.innerHTML = '<p class="empty">Failed to load reports.</p>';
   }

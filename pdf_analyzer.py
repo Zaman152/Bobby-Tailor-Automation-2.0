@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 from claude_analyzer import analyze_drawing
+from calculator import apply_estimation_tables
 from reporter import generate_report
 from config import SCREENSHOTS_DIR
 
@@ -48,6 +49,7 @@ def run_pdf_analysis(pdf_path: str, project_name: str = "PDF Project",
     logger.info(f"Processing PDF ({total} pages): {pdf_path}")
 
     all_extracted = []
+    all_estimates = []
 
     for i in range(total):
         sheet = _sheet_name(pdf_path, i)
@@ -60,4 +62,7 @@ def run_pdf_analysis(pdf_path: str, project_name: str = "PDF Project",
         extracted["_page_num"] = i + 1
         all_extracted.append(extracted)
 
-    return generate_report(project_name, all_extracted)
+        if "error" not in extracted:
+            all_estimates.extend(apply_estimation_tables(extracted))
+
+    return generate_report(project_name, all_extracted, all_estimates)

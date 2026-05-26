@@ -24,8 +24,11 @@ class StackCTBrowser:
             headless=HEADLESS,
             args=["--no-sandbox", "--disable-dev-shm-usage"]
         )
+        # Large viewport + 2x device pixel ratio = high-DPI screenshots that
+        # let Claude actually read small dimension annotations on drawings.
         self._context = await self._browser.new_context(
-            viewport={"width": 1920, "height": 1080},
+            viewport={"width": 2560, "height": 1600},
+            device_scale_factor=2,
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
         )
         # Intercept and log all network requests to discover APIs
@@ -44,15 +47,34 @@ class StackCTBrowser:
         logger.info("Logging into StackCT...")
         try:
             # Use "load" — StackCT uses SignalR WebSockets that never reach networkidle
-            await self.page.goto("https://go.stackct.com/", wait_until="load", timeout=30000)
+            await self.page.goto("https://go.stackct.com/", wait_until="load", timeout=45000)
 
-            # Auth0 redirects the page — wait for the login URL to appear
-            await self.page.wait_for_url("**/id.stackct.com/**", timeout=15000)
+            current_url = self.page.url
+            logger.info(f"After goto, URL: {current_url[:80]}")
+
+            # If already on the app (e.g. session active), we're done
+            if "go.stackct.com/app" in current_url:
+                logger.info("Already authenticated — skipping login form")
+                return True
+
+            # Auth0 may redirect immediately or after a short pause — wait up to 25s
+            try:
+                await self.page.wait_for_url("**/id.stackct.com/**", timeout=25000)
+            except Exception:
+                # Maybe it went straight to the app via a different redirect
+                if "go.stackct.com/app" in self.page.url:
+                    logger.info("Redirected directly to app — login successful")
+                    return True
+                raise
 
             # Step 1: Enter email
-            await self.page.wait_for_selector('input[name="username"], input[type="email"], input[type="text"]',
-                                              timeout=10000)
-            email_input = await self.page.query_selector('input[name="username"], input[type="email"], input[type="text"]')
+            await self.page.wait_for_selector(
+                'input[name="username"], input[type="email"], input[type="text"]',
+                timeout=10000
+            )
+            email_input = await self.page.query_selector(
+                'input[name="username"], input[type="email"], input[type="text"]'
+            )
             await email_input.fill(STACKCT_EMAIL)
 
             # Click the Continue / Next button
@@ -64,7 +86,7 @@ class StackCTBrowser:
             await self.page.click('button[type="submit"], button[name="action"]')
 
             # Wait for redirect back to the StackCT app
-            await self.page.wait_for_url("**/go.stackct.com/app/**", timeout=20000)
+            await self.page.wait_for_url("**/go.stackct.com/app/**", timeout=25000)
             logger.info("Login successful")
             return True
 
@@ -172,45 +194,179 @@ class StackCTBrowser:
         return pages
 
     async def navigate_to_page(self, project_id: int, page_id: int) -> bool:
+        """Navigate to a specific drawing page and VERIFY the URL actually changed
+        to that page (StackCT sometimes caches the previous page if you navigate too fast)."""
         url = f"https://go.stackct.com/app/#/Takeoff/{project_id}/Page/{page_id}/@0,0,0z"
         try:
+            # First navigate away to clear any cached page state — prevents StackCT
+            # from keeping the previous drawing on screen when we hit the same hash route.
+            current = self.page.url
+            if f"/Page/" in current and f"/Page/{page_id}" not in current:
+                # Force-clear by going to the project root first
+                await self.page.goto(
+                    f"https://go.stackct.com/app/#/Takeoff/{project_id}",
+                    wait_until="load"
+                )
+                await asyncio.sleep(1)
+
             await self.page.goto(url, wait_until="load")
-            # Wait for drawing canvas to render
-            await self.page.wait_for_selector("canvas, svg, [class*='drawing'], img[src*='blob.core']",
-                                              timeout=20000)
-            await asyncio.sleep(3)  # Extra wait for tiles to load
+
+            # Verify the URL actually contains our target page ID
+            for _ in range(3):
+                if f"/Page/{page_id}" in self.page.url:
+                    break
+                await asyncio.sleep(1)
+            else:
+                logger.warning(f"URL didn't update to page {page_id} — current: {self.page.url[:120]}")
+                # One more forceful attempt
+                await self.page.goto(url, wait_until="load")
+
+            # Wait for drawing canvas to appear
+            try:
+                await self.page.wait_for_selector(
+                    "canvas, [class*='viewer'], [class*='drawing-area']",
+                    timeout=15000
+                )
+            except Exception:
+                pass
+
+            # Wait for the "Loading" overlay to disappear
+            try:
+                await self.page.wait_for_selector(
+                    "text=Loading",
+                    state="hidden",
+                    timeout=20000
+                )
+            except Exception:
+                pass
+
+            # Confirm DOM reflects this page (check the active tab text matches)
+            try:
+                await self.page.wait_for_function(
+                    f'window.location.href.includes("/Page/{page_id}")',
+                    timeout=5000
+                )
+            except Exception:
+                pass
+
+            await asyncio.sleep(3)  # buffer for tile rendering
             return True
         except Exception as e:
             logger.error(f"Failed to navigate to page {page_id}: {e}")
             return False
 
+    async def _dismiss_popups(self):
+        """Hide StackCT's HubSpot marketing overlays via CSS so they don't appear in screenshots."""
+        try:
+            await self.page.add_style_tag(content="""
+                /* StackCT uses HubSpot CTAs for promo popups (e.g. STACK LIVE webinar) */
+                [id^="hs-overlay-cta"],
+                [id^="hs-cta-"],
+                [class*="hs-cta-embed"],
+                iframe[src*="hs-sites.com"],
+                iframe[src*="hubspot"],
+                iframe[src*="hsforms"],
+                /* Generic fallbacks */
+                [class*="hs-cta-trigger"],
+                [class*="webinar-promo"],
+                div[class*="modal-backdrop"] {
+                    display: none !important;
+                    visibility: hidden !important;
+                    opacity: 0 !important;
+                    pointer-events: none !important;
+                    width: 0 !important;
+                    height: 0 !important;
+                }
+            """)
+        except Exception:
+            pass
+
+        # Also try clicking common close buttons as backup
+        for sel in [
+            '[aria-label*="close" i]', '[aria-label*="dismiss" i]',
+            'button[class*="close" i]', 'button:has-text("Close")',
+            'button:has-text("No Thanks")', 'button:has-text("Maybe Later")',
+        ]:
+            try:
+                for el in await self.page.query_selector_all(sel):
+                    try:
+                        if await el.is_visible():
+                            await el.click(timeout=500)
+                    except Exception:
+                        continue
+            except Exception:
+                continue
+
+        try:
+            await self.page.keyboard.press("Escape")
+        except Exception:
+            pass
+
     async def screenshot_full_drawing(self, project_id: int, page_id: int, filepath: str) -> bool:
-        """Navigate to page and capture a high-quality screenshot of the drawing."""
+        """Navigate to a drawing page and screenshot the actual drawing canvas
+        directly (StackCT renders it into #canvas-interaction at high resolution)."""
         try:
             if not await self.navigate_to_page(project_id, page_id):
                 return False
 
-            # Zoom to fit the full drawing on screen
+            # Confirm we're on the per-page URL
+            current_url = self.page.url
+            if f"/Page/{page_id}" not in current_url:
+                logger.warning(f"Wrong URL after nav: {current_url[:100]}")
+                url = f"https://go.stackct.com/app/#/Takeoff/{project_id}/Page/{page_id}/@0,0,0z"
+                await self.page.goto(url, wait_until="load")
+                await asyncio.sleep(3)
+
+            # Dismiss popups if present (best effort)
+            await self._dismiss_popups()
+
+            # Click "Fit to page" so the entire drawing is rendered into the canvas
+            for selector in ['[data-id="fit-to-screen"]', '[data-id="fit-page"]',
+                             '[title*="Fit" i]', '[aria-label*="fit" i]',
+                             'button[title*="fit" i]']:
+                try:
+                    btn = await self.page.query_selector(selector)
+                    if btn and await btn.is_visible():
+                        await btn.click()
+                        break
+                except Exception:
+                    pass
+
+            # Wait for tiles to fully render
+            await asyncio.sleep(5)
             try:
-                fit_btn = await self.page.query_selector('[title*="Fit"], [aria-label*="fit"], button[title*="fit"]')
-                if fit_btn:
-                    await fit_btn.click()
-                    await asyncio.sleep(1)
+                await self.page.wait_for_selector("text=Loading", state="hidden", timeout=8000)
             except Exception:
                 pass
 
-            # Take screenshot of the drawing area only (exclude toolbar/sidebar)
-            drawing_area = await self.page.query_selector(
-                '[class*="drawing-area"], [class*="canvas-container"], [class*="takeoff-canvas"], main canvas'
-            )
-            if drawing_area:
-                await drawing_area.screenshot(path=filepath)
-            else:
-                # Fallback: screenshot the full viewport
+            # StackCT renders the drawing into a high-res canvas (#canvas-interaction or sibling).
+            # Screenshot that element directly — no sidebar, no popup, just the drawing.
+            captured = False
+            for sel in ['#canvas-interaction',
+                        'canvas#canvas-interaction',
+                        '[id*="canvas-content"]',
+                        'canvas[id*="canvas"]']:
+                try:
+                    el = await self.page.query_selector(sel)
+                    if el:
+                        box = await el.bounding_box()
+                        if box and box["width"] > 400 and box["height"] > 300:
+                            await el.screenshot(path=filepath)
+                            logger.info(f"Captured canvas '{sel}' at {box['width']}x{box['height']}")
+                            captured = True
+                            break
+                except Exception:
+                    continue
+
+            if not captured:
+                # Fallback: full viewport screenshot
+                logger.info("No canvas element found — using viewport screenshot")
                 await self.page.screenshot(path=filepath, full_page=False)
 
-            logger.info(f"Screenshot saved: {filepath}")
-            return True
+            import os
+            size = os.path.getsize(filepath) if os.path.exists(filepath) else 0
+            logger.info(f"Screenshot saved: {filepath} ({size:,} bytes)")
+            return size > 5000
 
         except Exception as e:
             logger.error(f"Screenshot failed for page {page_id}: {e}")
