@@ -72,6 +72,18 @@
 - [x] **DEPLOY-02**: README includes VPS gunicorn + Playwright deps instructions
 - [x] **DEPLOY-03**: `requirements.txt` pins Pillow and all runtime dependencies
 
+### StackCT Data & Persistence (Phase 13)
+
+- [ ] **DATA-01**: Projects catalog persisted in SQLite under `OUTPUT_DIR` (`stackct.db`)
+- [ ] **DATA-02**: Per-project plans (`page_id`, `sheet_name`) persisted with configurable TTL
+- [ ] **DATA-03**: Sheet counts on project list without requiring per-project preview scrape
+- [ ] **DATA-04**: Sync operations audited in `sync_runs` table
+- [ ] **DATA-05**: Single global browser lock serializes all StackCT catalog sync
+- [ ] **DATA-06**: Background stale refresh (startup prefetch + scheduled interval)
+- [ ] **DATA-07**: One-time migration from `projects_cache.json` and `plans_cache/`
+- [ ] **DATA-08**: Project/plan APIs expose `from_cache`, `stale`, and `syncing` metadata
+- [ ] **DATA-09**: UI shows sheet counts on load; plan preview uses DB when fresh
+
 ## v2 Requirements
 
 ### Architecture & Scale

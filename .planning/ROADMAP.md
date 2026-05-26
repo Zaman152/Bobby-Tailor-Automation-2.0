@@ -21,6 +21,8 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [ ] **Phase 9: Projects Workspace** — Scope toggle and plan-selection workflow in UI
 - [ ] **Phase 10: Reports & Monitor UI** — Report cards with preview tabs; live monitor page
 - [ ] **Phase 11: PDF Selection & Production Docs** — PDF page picker; VPS README
+- [ ] **Phase 12: Application Authentication** — Login sessions, protected routes/APIs, seeded admin for production deploy
+- [ ] **Phase 13: StackCT Data & Persistence Layer** — SQLite catalog, sync service, DB-first APIs, sheet counts without per-preview scrape
 
 ## Phase Details
 
@@ -308,17 +310,89 @@ Plans:
 
 ---
 
+### Phase 12: Application Authentication
+
+**Goal:** Every page and API endpoint requires authentication before use on a public VPS; operators sign in with seeded admin credentials using industry-standard session security.
+
+**Depends on:** Phase 1 (config/env patterns), Phase 8 (UI shell for login page)
+
+**Requirements:** AUTH-01 (promoted from v2)
+
+**Success Criteria** (what must be TRUE):
+
+1. Unauthenticated requests to any app route or `/api/*` receive 401/redirect to login (no anonymous access)
+2. User can log in with seeded admin (`admin@bobbytailor.com`) and receive a secure server-side session
+3. Passwords are stored only as bcrypt hashes; plaintext passwords never appear in logs or API responses
+4. Session cookies use `HttpOnly`, `Secure` (when HTTPS), and `SameSite` protections; `SECRET_KEY` comes from environment
+5. CSRF protection on state-changing forms and API calls from the browser
+6. Failed login attempts are rate-limited; generic error messages (no user enumeration)
+7. Logout invalidates the session; README documents auth env vars and production checklist
+
+**Plans:** TBD (this planning run)
+
+---
+
+### Phase 13: StackCT Data & Persistence Layer
+
+**Goal:** StackCT project and plan metadata lives in a queryable SQLite database with TTL sync and a single browser lock — so the UI serves project lists, sheet counts, and plan previews from cache without launching Playwright on every interaction.
+
+**Depends on:** Phase 2 (reliable `get_all_projects` / `get_all_page_ids`), Phase 4 (plan selection APIs and UI patterns)
+
+**Requirements:** DATA-01, DATA-02, DATA-03, DATA-04, DATA-05, DATA-06, DATA-07, DATA-08, DATA-09
+
+| ID | Requirement |
+|----|-------------|
+| DATA-01 | Projects catalog persisted in SQLite (`output/stackct.db`) |
+| DATA-02 | Per-project plans (`page_id`, `sheet_name`) persisted with TTL |
+| DATA-03 | Sheet counts available on project list without per-project preview scrape |
+| DATA-04 | Sync operations recorded in `sync_runs` audit table |
+| DATA-05 | Single global browser lock for all catalog sync (documented) |
+| DATA-06 | Background stale refresh via startup prefetch + APScheduler interval |
+| DATA-07 | One-time migration from `projects_cache.json` and `plans_cache/` |
+| DATA-08 | APIs expose `from_cache`, `stale`, `syncing` metadata |
+| DATA-09 | UI loads counts on project list; preview uses DB when fresh |
+
+**Success Criteria** (what must be TRUE):
+
+1. `GET /api/projects` serves from SQLite when TTL fresh; browser runs only on refresh/stale sync
+2. `GET /api/projects/sheet-counts` returns counts from DB for all projects with synced plans (not only after UI preview)
+3. `GET /api/projects/<id>/plans` returns cached plans from DB when fresh; preview does not require a new login if data exists
+4. Manual refresh and background sync update `sync_runs` and `fetched_at` timestamps
+5. Concurrent catalog operations serialize through one browser lock (no parallel Auth0 sessions)
+6. JSON file caches migrated; normal code path does not read `output/projects_cache.json` for serving
+7. SQLite contains no StackCT or Anthropic credentials
+
+**Plans:** 4 plans in 4 waves
+
+| Wave | Plans | Parallel | Description |
+|------|-------|----------|-------------|
+| 1 | 13-01 | — | SQLite schema + `stackct_store.py` + JSON migration |
+| 2 | 13-02 | — | `stackct_sync.py` + browser lock + APScheduler |
+| 3 | 13-03 | — | DB-first API routes + stale-while-revalidate |
+| 4 | 13-04 | — | UI sheet counts + cached preview + human verify |
+
+Plans:
+
+- [ ] 13-01-PLAN.md — SQLite schema, store module, migrate JSON caches
+- [ ] 13-02-PLAN.md — Sync service with locking, TTL, background refresh
+- [ ] 13-03-PLAN.md — Refactor `/api/projects`, sheet-counts, plans to DB-first
+- [ ] 13-04-PLAN.md — UI sheet counts on load; cached preview; sync controls
+
+Research: `.planning/phases/13-stackct-data-persistence/13-RESEARCH.md`
+
+---
+
 ## v2 (Out of Roadmap)
 
 | Item | Notes |
 |------|--------|
 | ARCH-01 FastAPI migration | Deferred; Flask extensions for v1 |
 | ARCH-02 Celery/Redis queue | Deferred |
-| EST-*, AUTO-*, EXP-01, AUTH-01 | See REQUIREMENTS.md v2 |
+| EST-*, AUTO-*, EXP-01 | See REQUIREMENTS.md v2 |
 
 ## Progress
 
-**Execution order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11
+**Execution order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -333,6 +407,8 @@ Plans:
 | 9. Projects Workspace | 0/TBD | Not started | — |
 | 10. Reports & Monitor UI | 0/TBD | Not started | — |
 | 11. PDF Selection & Production Docs | 0/TBD | Not started | — |
+| 12. Application Authentication | 0/TBD | Not started | — |
+| 13. StackCT Data & Persistence | 0/4 | Planned | — |
 
 ---
 *Roadmap created: 2026-05-26*  
