@@ -6,16 +6,16 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 1 — Config & Safe Operations
+**Current focus:** Phase 2 — Browser Reliability
 
 ## Current Position
 
-Phase: 1 of 11 (Config & Safe Operations)  
-Plan: All 3 plans complete (01-01, 01-02, 01-03)  
-Status: Phase complete
-Last activity: 2026-05-26 — Completed 01-02-PLAN.md (Error Sanitization)
+Phase: 2 of 11 (Browser Reliability)  
+Plan: 02-01, 02-02, 02-03 (3 plans, 2 waves)  
+Status: Planned (ready to execute)
+Last activity: 2026-05-26 — Phase 1 executed and verified (human testing recommended)
 
-Progress: [██████████] 100%
+Progress: [█░░░░░░░░░] 9% (Phase 1 complete; Phase 2 next)
 
 ## Performance Metrics
 
@@ -74,6 +74,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-26 15:38 UTC  
-Stopped at: Completed 01-02-PLAN.md (Error Sanitization) — Phase 1 complete  
+Last session: 2026-05-26  
+Stopped at: Phase 2 planned — ready for `/gsd-execute-phase 2`  
 Resume file: None

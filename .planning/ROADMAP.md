@@ -10,7 +10,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 
 ## Phases
 
-- [ ] **Phase 1: Config & Safe Operations** — Portable `.env`, sanitized API errors, dependency docs
+- [x] **Phase 1: Config & Safe Operations** — Portable `.env`, sanitized API errors, dependency docs
 - [ ] **Phase 2: Browser Reliability** — Canvas stability, full project list, VPS Chromium
 - [ ] **Phase 3: API Cost Transparency** — Per-sheet and per-run token/USD tracking in reports
 - [ ] **Phase 4: StackCT Plan Selection** — Preview sheets, filter, run selected `page_ids` only
@@ -43,9 +43,9 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 
 Plans:
 
-- [ ] 01-01-PLAN.md — Config validation & fail-fast env (wave 1)
-- [ ] 01-02-PLAN.md — Flask error sanitization & safe job errors (wave 2)
-- [ ] 01-03-PLAN.md — `.env.example` audit & requirements verify (wave 1)
+- [x] 01-01-PLAN.md — Config validation & fail-fast env (wave 1)
+- [x] 01-02-PLAN.md — Flask error sanitization & safe job errors (wave 2)
+- [x] 01-03-PLAN.md — `.env.example` audit & requirements verify (wave 1)
 
 ---
 
@@ -64,13 +64,18 @@ Plans:
 3. A StackCT scrape completes on a Linux VPS with headless Chromium using documented launch flags (e.g. `--disable-dev-shm-usage`)
 4. Failed canvas capture retries or logs clearly instead of saving blank or partial images
 
-**Plans:** TBD
+**Plans:** 3 plans in 2 waves
+
+| Wave | Plans | Parallel | Description |
+|------|-------|----------|-------------|
+| 1 | 02-01 | — | Canvas stability + screenshot retry (browser.py core) |
+| 2 | 02-02, 02-03 | yes | Project scroll + VPS docs (after 02-01 lands) |
 
 Plans:
 
-- [ ] 02-01: Pixel-hash canvas stability in `browser.py` (Master Feature 2.2)
-- [ ] 02-02: Project list scroll / lazy-load in `get_all_projects()` (Master Feature 2.3)
-- [ ] 02-03: VPS Chromium launch args and Playwright deps notes
+- [ ] 02-01-PLAN.md — Pixel-hash canvas stability detection with retry (browser.py)
+- [ ] 02-02-PLAN.md — Virtual scroll handling in get_all_projects() (browser.py)
+- [ ] 02-03-PLAN.md — VPS Chromium docs and Pillow dependency (README, requirements.txt)
 
 ---
 
@@ -311,8 +316,8 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Config & Safe Operations | 0/TBD | Not started | — |
-| 2. Browser Reliability | 0/TBD | Not started | — |
+| 1. Config & Safe Operations | 3/3 | Complete | 2026-05-26 |
+| 2. Browser Reliability | 0/3 | Planned | — |
 | 3. API Cost Transparency | 0/TBD | Not started | — |
 | 4. StackCT Plan Selection | 0/TBD | Not started | — |
 | 5. Report Preview APIs | 0/TBD | Not started | — |

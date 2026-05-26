@@ -7,8 +7,8 @@
 
 ### Foundation & Reliability
 
-- [ ] **FOUND-01**: Application loads credentials from project-relative `.env` on any machine (no hardcoded paths)
-- [ ] **FOUND-02**: API job errors return user-safe messages; full stack traces logged server-side only
+- [x] **FOUND-01**: Application loads credentials from project-relative `.env` on any machine (no hardcoded paths)
+- [x] **FOUND-02**: API job errors return user-safe messages; full stack traces logged server-side only
 - [ ] **FOUND-03**: Browser waits for canvas pixel stability before screenshot (not fixed sleep only)
 - [ ] **FOUND-04**: StackCT project list fetch scrolls/lazy-loads until all projects are captured
 - [ ] **FOUND-05**: Headless Chromium runs reliably on VPS (`--disable-dev-shm-usage` or equivalent)
@@ -68,9 +68,9 @@
 
 ### Deployment Readiness
 
-- [ ] **DEPLOY-01**: `.env.example` documents all required variables
+- [x] **DEPLOY-01**: `.env.example` documents all required variables
 - [ ] **DEPLOY-02**: README includes VPS gunicorn + Playwright deps instructions
-- [ ] **DEPLOY-03**: `requirements.txt` pins Pillow and all runtime dependencies
+- [x] **DEPLOY-03**: `requirements.txt` pins Pillow and all runtime dependencies
 
 ## v2 Requirements
 
@@ -111,8 +111,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1 | Pending |
-| FOUND-02 | Phase 1 | Pending |
+| FOUND-01 | Phase 1 | Complete |
+| FOUND-02 | Phase 1 | Complete |
 | FOUND-03 | Phase 2 | Pending |
 | FOUND-04 | Phase 2 | Pending |
 | FOUND-05 | Phase 2 | Pending |
@@ -148,9 +148,9 @@
 | PDF-01 | Phase 11 | Pending |
 | PDF-02 | Phase 11 | Pending |
 | PDF-03 | Phase 11 | Pending |
-| DEPLOY-01 | Phase 1 | Pending |
+| DEPLOY-01 | Phase 1 | Complete |
 | DEPLOY-02 | Phase 11 | Pending |
-| DEPLOY-03 | Phase 1 | Pending |
+| DEPLOY-03 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 35 total
