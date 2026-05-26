@@ -10,14 +10,40 @@ import os
 from datetime import datetime
 from typing import Optional
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
+from flask_login import current_user, login_user, logout_user, login_required
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.exceptions import HTTPException
 from config import OUTPUT_DIR, MAX_PREVIEW_ROWS, STACKCT_CACHE_TTL_HOURS
+from auth import login_manager, bcrypt, limiter, init_admin, get_admin
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+# ── Security configuration ────────────────────────────────────────────────────
+
+app.config.update(
+    SECRET_KEY=os.environ["SECRET_KEY"],
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") != "development",
+    SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=43200,   # 12 hours
+    WTF_CSRF_TIME_LIMIT=3600,
+)
+
+csrf = CSRFProtect(app)
+login_manager.init_app(app)
+login_manager.login_view = "login"
+login_manager.session_protection = "strong"
+bcrypt.init_app(app)
+limiter.init_app(app)
+
+init_admin(
+    email=os.environ["ADMIN_EMAIL"],
+    password_hash=os.environ["ADMIN_PASSWORD_HASH"],
+)
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs("output/screenshots", exist_ok=True)
@@ -71,6 +97,71 @@ def handle_exception(e: Exception):
         "error": "Internal server error",
         "message": "An unexpected error occurred"
     }), 500
+
+
+# ── Auth Guard ───────────────────────────────────────────────────────────────
+
+PUBLIC_ENDPOINTS: frozenset = frozenset({"login", "logout", "static"})
+
+
+@app.before_request
+def require_login():
+    """Block unauthenticated access to all routes.
+
+    API routes (/api/*) return 401 JSON; browser routes redirect to /login.
+    """
+    if not request.endpoint or request.endpoint in PUBLIC_ENDPOINTS:
+        return None
+    if not current_user.is_authenticated:
+        if request.path.startswith("/api/"):
+            return jsonify({"error": "Authentication required"}), 401
+        return redirect(url_for("login", next=request.path))
+
+
+# ── Auth Routes ───────────────────────────────────────────────────────────────
+
+@app.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute;20 per hour")
+def login():
+    """Login page and credential verification endpoint."""
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+
+    error = None
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
+        admin = get_admin()
+
+        # Always run bcrypt to prevent timing-based user enumeration
+        _dummy = bcrypt.generate_password_hash("__dummy__").decode()
+        check_hash = admin.password_hash if (admin and email == admin.email) else _dummy
+        credentials_valid = (
+            admin is not None
+            and email == admin.email
+            and bcrypt.check_password_hash(check_hash, password)
+        )
+
+        if credentials_valid:
+            login_user(admin, remember=False)
+            nxt = request.args.get("next", "")
+            from urllib.parse import urlparse
+            parsed = urlparse(nxt)
+            if nxt and parsed.scheme == "" and parsed.netloc == "" and nxt.startswith("/"):
+                return redirect(nxt)
+            return redirect(url_for("index"))
+
+        error = "Invalid credentials"
+
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout", methods=["POST"])
+@login_required
+def logout():
+    """POST-only logout — prevents logout CSRF via GET requests or embedded images."""
+    logout_user()
+    return redirect(url_for("login"))
 
 
 # ── Preview Helpers ───────────────────────────────────────────────────────────
