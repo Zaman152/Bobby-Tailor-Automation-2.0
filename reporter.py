@@ -47,12 +47,30 @@ def generate_report(project_name: str,
     # Calculated takeoff = estimator output with full traceability
     calculated_items = _normalize_calculated(all_estimates)
 
+    # Aggregate API usage across all sheets
+    total_cost = sum(d.get("_cost_usd", 0) for d in all_extracted)
+    total_tokens_in = sum(d.get("_tokens_in", 0) for d in all_extracted)
+    total_tokens_out = sum(d.get("_tokens_out", 0) for d in all_extracted)
+
+    model_counts: dict[str, int] = {}
+    for d in all_extracted:
+        m = d.get("_model_used", "")
+        if m:
+            model_counts[m] = model_counts.get(m, 0) + 1
+
     report = {
         "project_name": project_name,
         "generated_at": datetime.now().isoformat(),
         "sheets_processed": len(all_extracted),
         "total_line_items": len(raw_line_items),
         "total_calculated_items": len(calculated_items),
+        "api_usage": {
+            "total_cost_usd": round(total_cost, 4),
+            "total_tokens_in": total_tokens_in,
+            "total_tokens_out": total_tokens_out,
+            "cost_per_sheet": round(total_cost / max(len(all_extracted), 1), 4),
+            "models_used": model_counts,
+        },
         "calculated_takeoff": calculated_items,         # Section 5 deliverable
         "raw_line_items": raw_line_items,               # Source-of-truth list
         "by_sheet": _group_by_sheet(raw_line_items + calculated_items),
@@ -72,6 +90,10 @@ def generate_report(project_name: str,
                 "schedules": len(d.get("schedules", [])),
                 "confidence": d.get("confidence"),
                 "notes": d.get("notes"),
+                "tokens_in": d.get("_tokens_in", 0),
+                "tokens_out": d.get("_tokens_out", 0),
+                "cost_usd": d.get("_cost_usd", 0),
+                "model_used": d.get("_model_used", ""),
             }
             for d in all_extracted
         ],
@@ -113,7 +135,9 @@ def generate_report(project_name: str,
         except Exception:
             pass
 
-    logger.info(f"Saved run to: {run_dir}")
+    logger.info(f"Saved run to: {run_dir} "
+                f"[Total cost: ${total_cost:.4f}, "
+                f"{total_tokens_in + total_tokens_out:,} tokens]")
     report["_files"] = {
         "run_folder":     str(run_dir),
         "json":           str(json_path),
