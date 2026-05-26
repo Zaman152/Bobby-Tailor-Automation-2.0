@@ -5,6 +5,40 @@
  * Layout: Master.md §8.2–8.7
  */
 
+// ── CSRF & Fetch Helpers ────────────────────────────────────────────────────
+
+/**
+ * Get CSRF token from meta tag.
+ * @returns {string} CSRF token or empty string if not found
+ */
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.content : '';
+}
+
+/**
+ * Fetch wrapper that automatically adds CSRF token and credentials.
+ * Use for all API calls instead of raw fetch().
+ * @param {string} url - API endpoint
+ * @param {object} options - fetch options
+ * @returns {Promise<Response>}
+ */
+function apiFetch(url, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+  const needsCsrf = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+
+  const headers = { ...(options.headers || {}) };
+  if (needsCsrf) {
+    headers['X-CSRFToken'] = getCsrfToken();
+  }
+
+  return fetch(url, {
+    ...options,
+    credentials: 'same-origin',
+    headers,
+  });
+}
+
 // ── State ──────────────────────────────────────────────────────────────────
 let currentMode = 'all';
 let selectedFile = null;
@@ -82,7 +116,7 @@ async function loadProjects(force = false) {
 
   try {
     const url = force ? '/api/projects?refresh=1' : '/api/projects';
-    const res = await fetch(url);
+    const res = await fetch(url, { credentials: 'same-origin' });
     const data = await res.json();
 
     if (data.error && !data.projects?.length) {
@@ -111,7 +145,7 @@ async function loadProjects(force = false) {
 
 async function loadSheetCounts() {
   try {
-    const res = await fetch('/api/projects/sheet-counts');
+    const res = await fetch('/api/projects/sheet-counts', { credentials: 'same-origin' });
     if (!res.ok) return;
     const data = await res.json();
     const counts = data.counts || {};
@@ -161,7 +195,7 @@ function onProjectSelect(projectId, projectName) {
   renderProjectList(allProjects);
   updatePreviewButton();
   if (projectSheetCounts[projectId] == null) {
-    fetch('/api/projects/' + projectId + '/sync-plans', { method: 'POST' })
+    apiFetch('/api/projects/' + projectId + '/sync-plans', { method: 'POST' })
       .then(r => r.json())
       .then(data => {
         if (data.plans && data.plans.length) {
@@ -215,7 +249,7 @@ async function runStackCT() {
   btn.textContent = 'Starting…';
 
   try {
-    const res = await fetch('/api/run/stackct', {
+    const res = await apiFetch('/api/run/stackct', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: 'all', project_name: 'All Projects' })
@@ -258,7 +292,7 @@ async function uploadPdfFile(file) {
   form.append('file', file);
 
   try {
-    const res = await fetch('/api/pdf/upload', { method: 'POST', body: form });
+    const res = await apiFetch('/api/pdf/upload', { method: 'POST', body: form });
     const data = await res.json();
     if (data.error) {
       metaEl.textContent = 'Error: ' + data.error;
@@ -335,7 +369,7 @@ async function runPDF() {
   btn.textContent = 'Starting…';
 
   try {
-    const res = await fetch('/api/pdf/run', {
+    const res = await apiFetch('/api/pdf/run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -425,7 +459,7 @@ function stopJobPolling() {
 
 async function pollJobMonitor(jobId) {
   try {
-    const res = await fetch('/api/status/' + jobId);
+    const res = await fetch('/api/status/' + jobId, { credentials: 'same-origin' });
     const job = await res.json();
     if (job.error) return;
 
@@ -544,7 +578,7 @@ async function cancelJob() {
   if (!confirm('Cancel this job?')) return;
 
   try {
-    const res = await fetch('/api/cancel/' + currentJobId, { method: 'POST' });
+    const res = await apiFetch('/api/cancel/' + currentJobId, { method: 'POST' });
     const data = await res.json();
     if (data.success) {
       stopJobPolling();
@@ -566,7 +600,7 @@ async function loadReports() {
   grid.innerHTML = '<p class="empty">Loading…</p>';
 
   try {
-    const res = await fetch('/api/reports');
+    const res = await fetch('/api/reports', { credentials: 'same-origin' });
     const data = await res.json();
     allReports = data.reports || [];
     renderReportsGrid();
@@ -695,7 +729,7 @@ async function loadPreviewTab(folder, tab) {
   const enc = encodeURIComponent(folder);
   try {
     if (tab === 'summary') {
-      const res = await fetch('/api/reports/' + enc + '/preview/summary.txt');
+      const res = await fetch('/api/reports/' + enc + '/preview/summary.txt', { credentials: 'same-origin' });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       content.innerHTML = formatSummaryHtml(data.content || '');
@@ -710,7 +744,7 @@ async function loadPreviewTab(folder, tab) {
         searchCols: ['description', 'source_location']
       });
     } else if (tab === 'json') {
-      const res = await fetch('/api/reports/' + enc + '/preview/takeoff.json');
+      const res = await fetch('/api/reports/' + enc + '/preview/takeoff.json', { credentials: 'same-origin' });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       content.innerHTML = '<div class="json-tree">' + renderJsonTree(data.data, 0, true) + '</div>';
@@ -722,7 +756,7 @@ async function loadPreviewTab(folder, tab) {
 }
 
 async function loadCsvPreview(container, encFolder, filename, opts) {
-  const res = await fetch('/api/reports/' + encFolder + '/preview/' + filename);
+  const res = await fetch('/api/reports/' + encFolder + '/preview/' + filename, { credentials: 'same-origin' });
   const data = await res.json();
   if (data.error) throw new Error(data.error);
 
@@ -859,7 +893,7 @@ function downloadReportFile(folder, filename) {
 // ── Active Job Mini-Card Polling ───────────────────────────────────────────
 async function pollActiveJob() {
   try {
-    const resp = await fetch('/api/jobs/active');
+    const resp = await fetch('/api/jobs/active', { credentials: 'same-origin' });
     const data = await resp.json();
     const el = document.getElementById('sidebarJobCard');
     if (!el) return;
@@ -970,7 +1004,7 @@ async function fetchPlans(projectId, forceRefresh) {
   let polls = 0;
 
   async function loadOnce() {
-    const res = await fetch(url, { signal });
+    const res = await fetch(url, { signal, credentials: 'same-origin' });
     if (res.status === 404) {
       return { error: 'Project not found', plans: [] };
     }
@@ -1142,7 +1176,7 @@ async function runSelectedPlans() {
   }
 
   try {
-    const res = await fetch('/api/run/stackct', {
+    const res = await apiFetch('/api/run/stackct', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
