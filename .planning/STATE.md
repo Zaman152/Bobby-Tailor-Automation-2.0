@@ -6,22 +6,22 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 2 — Browser Reliability
+**Current focus:** Phase 3 — API Cost Transparency
 
 ## Current Position
 
-Phase: 2 of 11 (Browser Reliability)  
-Plan: 02-01, 02-02, 02-03 (3 plans, 2 waves)  
-Status: Planned (ready to execute)
-Last activity: 2026-05-26 — Phase 1 executed and verified (human testing recommended)
+Phase: 2 of 11 (Browser Reliability) — complete  
+Plan: 02-01, 02-02, 02-03 (3/3)  
+Status: Phase complete (verified)
+Last activity: 2026-05-26 — Executed Phase 2 (`/gsd-execute-phase 2`)
 
-Progress: [█░░░░░░░░░] 9% (Phase 1 complete; Phase 2 next)
+Progress: [██░░░░░░░░] ~18% (2/11 phases)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 3
+- Total plans completed: 6
 - Average duration: 2 min
 - Total execution time: 5 min
 
@@ -75,5 +75,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-05-26  
-Stopped at: Phase 2 planned — ready for `/gsd-execute-phase 2`  
+Stopped at: Phase 2 complete — ready for `/gsd-plan-phase 3` or `/gsd-discuss-phase 3`  
 Resume file: None

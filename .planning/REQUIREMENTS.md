@@ -9,9 +9,9 @@
 
 - [x] **FOUND-01**: Application loads credentials from project-relative `.env` on any machine (no hardcoded paths)
 - [x] **FOUND-02**: API job errors return user-safe messages; full stack traces logged server-side only
-- [ ] **FOUND-03**: Browser waits for canvas pixel stability before screenshot (not fixed sleep only)
-- [ ] **FOUND-04**: StackCT project list fetch scrolls/lazy-loads until all projects are captured
-- [ ] **FOUND-05**: Headless Chromium runs reliably on VPS (`--disable-dev-shm-usage` or equivalent)
+- [x] **FOUND-03**: Browser waits for canvas pixel stability before screenshot (not fixed sleep only)
+- [x] **FOUND-04**: StackCT project list fetch scrolls/lazy-loads until all projects are captured
+- [x] **FOUND-05**: Headless Chromium runs reliably on VPS (`--disable-dev-shm-usage` or equivalent)
 
 ### StackCT Plan Selection
 
@@ -113,9 +113,9 @@
 |-------------|-------|--------|
 | FOUND-01 | Phase 1 | Complete |
 | FOUND-02 | Phase 1 | Complete |
-| FOUND-03 | Phase 2 | Pending |
-| FOUND-04 | Phase 2 | Pending |
-| FOUND-05 | Phase 2 | Pending |
+| FOUND-03 | Phase 2 | Complete |
+| FOUND-04 | Phase 2 | Complete |
+| FOUND-05 | Phase 2 | Complete |
 | COST-01 | Phase 3 | Pending |
 | COST-02 | Phase 3 | Pending |
 | COST-03 | Phase 3 | Pending |

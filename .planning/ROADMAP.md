@@ -11,7 +11,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 ## Phases
 
 - [x] **Phase 1: Config & Safe Operations** — Portable `.env`, sanitized API errors, dependency docs
-- [ ] **Phase 2: Browser Reliability** — Canvas stability, full project list, VPS Chromium
+- [x] **Phase 2: Browser Reliability** — Canvas stability, full project list, VPS Chromium
 - [ ] **Phase 3: API Cost Transparency** — Per-sheet and per-run token/USD tracking in reports
 - [ ] **Phase 4: StackCT Plan Selection** — Preview sheets, filter, run selected `page_ids` only
 - [ ] **Phase 5: Report Preview APIs** — In-browser summary, tables, JSON with safe paths
@@ -73,9 +73,9 @@ Plans:
 
 Plans:
 
-- [ ] 02-01-PLAN.md — Pixel-hash canvas stability detection with retry (browser.py)
-- [ ] 02-02-PLAN.md — Virtual scroll handling in get_all_projects() (browser.py)
-- [ ] 02-03-PLAN.md — VPS Chromium docs and Pillow dependency (README, requirements.txt)
+- [x] 02-01-PLAN.md — Pixel-hash canvas stability detection with retry (browser.py)
+- [x] 02-02-PLAN.md — Virtual scroll handling in get_all_projects() (browser.py)
+- [x] 02-03-PLAN.md — VPS Chromium docs and Pillow dependency (README, requirements.txt)
 
 ---
 
@@ -317,7 +317,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Config & Safe Operations | 3/3 | Complete | 2026-05-26 |
-| 2. Browser Reliability | 0/3 | Planned | — |
+| 2. Browser Reliability | 3/3 | Complete | 2026-05-26 |
 | 3. API Cost Transparency | 0/TBD | Not started | — |
 | 4. StackCT Plan Selection | 0/TBD | Not started | — |
 | 5. Report Preview APIs | 0/TBD | Not started | — |
