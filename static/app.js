@@ -22,8 +22,16 @@ const PAGE_TITLES = {
   projects: 'StackCT Projects',
   pdf: 'Upload PDF',
   reports: 'Reports',
+  'job-monitor': 'Job Monitor',
   settings: 'Settings'
 };
+
+let allReports = [];
+let reportsSearchQuery = '';
+let openPreviewFolder = null;
+let openPreviewTab = {};
+let currentJobId = null;
+let monitorPollInterval = null;
 
 function navigateTo(pageName) {
   // Hide all sections
@@ -245,99 +253,465 @@ async function runPDF() {
   }
 }
 
-// ── Polling ────────────────────────────────────────────────────────────────
+// ── Job polling & monitor (Master §8.4) ────────────────────────────────────
 function startPolling(jobId, projectName) {
+  currentJobId = jobId;
   if (pollInterval) clearInterval(pollInterval);
+  if (monitorPollInterval) clearInterval(monitorPollInterval);
+
+  const navMonitor = document.getElementById('navJobMonitor');
+  if (navMonitor) navMonitor.style.display = 'flex';
+
+  navigateTo('job-monitor');
+  document.getElementById('monitorProjectName').textContent = projectName;
+  document.getElementById('monitorJobId').textContent = 'Job: ' + jobId;
+  document.getElementById('cancelJobBtn').style.display = 'inline-block';
+
   const card = document.getElementById('progressCard');
-  card.classList.add('visible');
-  document.getElementById('jobInfo').textContent = 'Project: ' + projectName + '  ·  Job: ' + jobId;
-  document.getElementById('logBox').innerHTML = '';
+  if (card) card.classList.remove('visible');
 
-  pollInterval = setInterval(() => pollStatus(jobId), 2000);
-  pollStatus(jobId);
-
-  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  pollJobMonitor(jobId);
+  monitorPollInterval = setInterval(() => pollJobMonitor(jobId), 1500);
 }
 
-async function pollStatus(jobId) {
+function stopJobPolling() {
+  if (monitorPollInterval) {
+    clearInterval(monitorPollInterval);
+    monitorPollInterval = null;
+  }
+  if (pollInterval) {
+    clearInterval(pollInterval);
+    pollInterval = null;
+  }
+}
+
+async function pollJobMonitor(jobId) {
   try {
     const res = await fetch('/api/status/' + jobId);
     const job = await res.json();
+    if (job.error) return;
 
-    const badge = document.getElementById('statusBadge');
-    badge.className = 'status-badge badge-' + job.status;
-    const labels = { queued: '⏳ Queued', running: '⚙ Running', done: '✓ Done', error: '✕ Error' };
-    badge.innerHTML = (job.status === 'running' ? '<span class="spinner"></span> ' : '') + (labels[job.status] || job.status);
+    updateMonitorUI(job);
 
-    document.getElementById('progressFill').style.width = (job.progress || 0) + '%';
-
-    // Update job info with current sheet
-    if (job.current_sheet && job.current_sheet.name) {
-      const cs = job.current_sheet;
-      const countStr = cs.total ? ' (' + cs.index + '/' + cs.total + ')' : '';
-      document.getElementById('jobInfo').textContent =
-        'Project: ' + job.project + '  ·  Job: ' + job.id + '  ·  ' + cs.name + countStr;
+    if (['done', 'error', 'cancelled'].includes(job.status)) {
+      stopJobPolling();
+      handleJobCompletion(job);
     }
-
-    // Log — handle both plain strings and structured entries
-    const logBox = document.getElementById('logBox');
-    logBox.innerHTML = (job.log || []).map(l => {
-      const msg = typeof l === 'object' ? l.message : l;
-      const isComplete = typeof l === 'object' && l.type === 'sheet_complete';
-      const style = isComplete ? ' style="color:#4ade80"' : '';
-      return '<div class="log-line"' + style + '>' + escHtml(String(msg)) + '</div>';
-    }).join('');
-    logBox.scrollTop = logBox.scrollHeight;
-
-    if (job.status === 'done' || job.status === 'error') {
-      clearInterval(pollInterval);
-      if (job.status === 'done') {
-        document.getElementById('progressFill').style.width = '100%';
-        loadReports();
-      }
-      if (job.error) {
-        logBox.innerHTML += '<div class="log-line" style="color:#f87171">Error: ' + escHtml(job.error) + '</div>';
-      }
-    }
-  } catch (e) { /* ignore polling errors */ }
+  } catch (e) { /* ignore */ }
 }
 
-// ── Reports ────────────────────────────────────────────────────────────────
+function updateMonitorUI(job) {
+  const statusEl = document.getElementById('monitorStatus');
+  const statusLabels = {
+    queued: '● QUEUED',
+    running: '● RUNNING',
+    done: '✓ COMPLETED',
+    error: '✗ ERROR',
+    cancelled: '⊘ CANCELLED'
+  };
+  statusEl.textContent = statusLabels[job.status] || job.status;
+  statusEl.className = 'status-badge badge-' + (job.status === 'cancelled' ? 'cancelled' : job.status);
+
+  const pct = job.progress || 0;
+  document.getElementById('monitorProgressFill').style.width = pct + '%';
+  document.getElementById('monitorPercent').textContent = pct + '%';
+
+  const cs = job.current_sheet || {};
+  const total = cs.total || job.total_sheets || 0;
+  const completed = job.sheets_completed || 0;
+  document.getElementById('monitorSheetCount').textContent =
+    '[' + completed + ' / ' + (total || '?') + ' sheets]';
+
+  if (job.started_at) {
+    const t = new Date(job.started_at);
+    document.getElementById('monitorStarted').textContent =
+      'Started: ' + t.toLocaleTimeString();
+  }
+
+  if (cs.name) {
+    document.getElementById('monitorCurrentSheet').innerHTML =
+      'Currently analyzing: <strong>' + escHtml(cs.name) + '</strong>';
+  }
+
+  renderMonitorSheetLog(job);
+  renderMonitorLogConsole(job.log || []);
+}
+
+function renderMonitorSheetLog(job) {
+  const container = document.getElementById('monitorSheetLog');
+  if (!container) return;
+
+  const rows = [];
+  const completed = job.sheet_log_full || job.sheet_log || [];
+  completed.forEach(s => {
+    const ext = s.extraction || {};
+    rows.push({
+      status: 'done',
+      name: s.name || '—',
+      metrics: (ext.measurements || 0) + ' meas  ' + (ext.rooms || 0) + ' rooms  ' + (ext.components || 0) + ' comp'
+    });
+  });
+
+  const cs = job.current_sheet || {};
+  if (cs.name && cs.phase && cs.phase !== 'complete') {
+    rows.push({ status: 'analyzing', name: cs.name, metrics: 'analyzing…' });
+  }
+
+  if (!rows.length) {
+    container.innerHTML = '<div class="sheet-row"><span class="sheet-status">○</span><span>Waiting for sheets…</span></div>';
+    return;
+  }
+
+  const icons = { done: '✓', analyzing: '⟳', pending: '○' };
+  container.innerHTML = rows.map(r =>
+    '<div class="sheet-row ' + r.status + '">' +
+      '<span class="sheet-status">' + (icons[r.status] || '○') + '</span>' +
+      '<span class="sheet-name">' + escHtml(r.name) + '</span>' +
+      '<span class="sheet-metrics">' + escHtml(r.metrics) + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+function renderMonitorLogConsole(logs) {
+  const console = document.getElementById('monitorLogConsole');
+  if (!console) return;
+
+  console.innerHTML = logs.map(l => {
+    const msg = typeof l === 'object' ? (l.message || '') : String(l);
+    const ts = typeof l === 'object' && l.timestamp
+      ? new Date(l.timestamp).toLocaleTimeString()
+      : '';
+    return '<div class="log-entry">' +
+      (ts ? '<span class="log-time">[' + ts + ']</span> ' : '') +
+      escHtml(msg) + '</div>';
+  }).join('');
+  console.scrollTop = console.scrollHeight;
+}
+
+function handleJobCompletion(job) {
+  document.getElementById('cancelJobBtn').style.display = 'none';
+  const navMonitor = document.getElementById('navJobMonitor');
+  if (navMonitor) navMonitor.style.display = 'none';
+
+  if (job.status === 'done') {
+    setTimeout(() => {
+      navigateTo('reports');
+      loadReports();
+    }, 2000);
+  }
+}
+
+async function cancelJob() {
+  if (!currentJobId) return;
+  if (!confirm('Cancel this job?')) return;
+
+  try {
+    const res = await fetch('/api/cancel/' + currentJobId, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      stopJobPolling();
+      document.getElementById('monitorStatus').textContent = '⊘ CANCELLED';
+      document.getElementById('monitorStatus').className = 'status-badge badge-cancelled';
+      document.getElementById('cancelJobBtn').style.display = 'none';
+    } else if (data.error) {
+      alert(data.error);
+    }
+  } catch (e) {
+    alert('Cancel failed: ' + e.message);
+  }
+}
+
+// ── Reports (Master §8.5) ────────────────────────────────────────────────────
 async function loadReports() {
-  const el = document.getElementById('reportsList');
-  el.innerHTML = '<p class="empty">Loading…</p>';
+  const grid = document.getElementById('reportsGrid');
+  if (!grid) return;
+  grid.innerHTML = '<p class="empty">Loading…</p>';
+
   try {
     const res = await fetch('/api/reports');
     const data = await res.json();
-    if (!data.reports.length) {
-      el.innerHTML = '<p class="empty">No reports yet. Run an estimation to generate one.</p>';
-      return;
-    }
-    el.innerHTML = data.reports.map(r => {
-      const files = r.files || {};
-      const folder = encodeURIComponent(r.run_folder);
-      const fileLink = (key, label, color) => {
-        const f = files[key];
-        if (!f) return '';
-        const sizeKB = (f.size / 1024).toFixed(1);
-        return '<a class="dl-btn" style="background:' + color + '" href="/api/reports/' + folder + '/' + encodeURIComponent(f.filename) + '" title="' + escHtml(f.filename) + ' (' + sizeKB + ' KB)">' + label + ' <span style="opacity:.7;font-size:11px">' + sizeKB + 'KB</span></a>';
-      };
-      return '<div class="report-item">' +
-        '<div>' +
-          '<div class="report-name">' + escHtml(r.project_name) + '</div>' +
-          '<div class="report-meta">' + new Date(r.created * 1000).toLocaleString() + (r.sheets_processed ? ' · ' + r.sheets_processed + ' sheets' : '') + (r.total_cost_usd != null ? ' · <span style="color:#4ade80;font-weight:500">$' + r.total_cost_usd.toFixed(4) + '</span>' : '') + ' · <code style="font-size:11px;color:#888">' + escHtml(r.run_folder) + '/</code></div>' +
-        '</div>' +
-        '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-          fileLink('calculated_csv', '📐 Calculations', '#1958c4') +
-          fileLink('raw_csv', '📋 Raw items', '#0a7d4d') +
-          fileLink('summary', '📄 Summary', '#7a4ad6') +
-          fileLink('json', '{ } JSON', '#777') +
-        '</div>' +
-      '</div>';
-    }).join('');
+    allReports = data.reports || [];
+    renderReportsGrid();
   } catch (e) {
-    el.innerHTML = '<p class="empty">Failed to load reports.</p>';
+    grid.innerHTML = '<p class="empty">Failed to load reports.</p>';
   }
+}
+
+function filterReports(query) {
+  reportsSearchQuery = (query || '').toLowerCase();
+  renderReportsGrid();
+}
+
+function renderReportsGrid() {
+  const grid = document.getElementById('reportsGrid');
+  const filtered = allReports.filter(r =>
+    !reportsSearchQuery || (r.project_name || '').toLowerCase().includes(reportsSearchQuery)
+  );
+
+  if (!filtered.length) {
+    grid.innerHTML = '<p class="empty">' +
+      (reportsSearchQuery ? 'No reports match your search.' : 'No reports yet. Run an estimation to generate one.') +
+      '</p>';
+    return;
+  }
+
+  grid.innerHTML = filtered.map(r => renderReportCard(r)).join('');
+
+  grid.querySelectorAll('.btn-preview').forEach(btn => {
+    btn.addEventListener('click', () => togglePreview(btn.dataset.folder));
+  });
+  grid.querySelectorAll('.btn-download').forEach(btn => {
+    btn.addEventListener('click', () => downloadReportFile(btn.dataset.folder, btn.dataset.file));
+  });
+  grid.querySelectorAll('.preview-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => switchPreviewTab(tab.dataset.folder, tab.dataset.tab));
+  });
+}
+
+function renderReportCard(r) {
+  const folder = r.run_folder;
+  const enc = encodeURIComponent(folder);
+  const date = r.created ? new Date(r.created * 1000).toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric'
+  }) : '';
+  const sheets = r.sheets_processed != null ? r.sheets_processed + ' sheets' : '— sheets';
+  const raw = r.raw_items_count != null ? r.raw_items_count + ' raw items' : '';
+  const calc = r.calculated_count != null ? r.calculated_count + ' calculated' : '';
+  const cost = r.total_cost_usd != null ? '$' + r.total_cost_usd.toFixed(4) : '';
+  const isOpen = openPreviewFolder === folder;
+  const activeTab = openPreviewTab[folder] || 'summary';
+
+  const files = r.files || {};
+  const dl = (fileKey, label) => {
+    const f = files[fileKey];
+    if (!f) return '';
+    return '<button type="button" class="btn-download" data-folder="' + escHtml(folder) + '" data-file="' + escHtml(f.filename) + '">' + label + '</button>';
+  };
+
+  return '<div class="report-card' + (isOpen ? ' expanded' : '') + '" data-folder="' + escHtml(folder) + '">' +
+    '<div class="card-header">' +
+      '<span class="project-name">' + escHtml(r.project_name) + '</span>' +
+      '<span class="report-date">' + escHtml(date) + '</span>' +
+    '</div>' +
+    '<div class="card-meta">' +
+      '<span>' + sheets + '</span>' +
+      (raw ? '<span>·</span><span>' + raw + '</span>' : '') +
+      (calc ? '<span>·</span><span>' + calc + '</span>' : '') +
+      (cost ? '<span>·</span><span class="cost">' + cost + '</span>' : '') +
+    '</div>' +
+    '<div class="card-actions">' +
+      '<button type="button" class="btn-preview' + (isOpen ? ' active' : '') + '" data-folder="' + escHtml(folder) + '">Preview</button>' +
+      dl('calculated_csv', 'Calculations') +
+      dl('raw_csv', 'Raw CSV') +
+      dl('json', '{ } JSON') +
+      dl('summary', 'Summary TXT') +
+    '</div>' +
+    (isOpen ? renderPreviewPanel(folder, activeTab) : '') +
+  '</div>';
+}
+
+function renderPreviewPanel(folder, activeTab) {
+  return '<div class="preview-panel" id="preview-panel-' + escHtml(folder) + '">' +
+    '<div class="preview-tabs">' +
+      ['summary', 'calculations', 'raw', 'json'].map(t => {
+        const labels = { summary: 'Summary', calculations: 'Calculations', raw: 'Raw Items', json: 'JSON' };
+        return '<button type="button" class="tab' + (t === activeTab ? ' active' : '') + '" data-folder="' + escHtml(folder) + '" data-tab="' + t + '">' + labels[t] + '</button>';
+      }).join('') +
+    '</div>' +
+    '<div class="preview-content" data-folder="' + escHtml(folder) + '">' +
+      '<p class="loading"><span class="spinner"></span> Loading…</p>' +
+    '</div>' +
+  '</div>';
+}
+
+async function togglePreview(folder) {
+  if (openPreviewFolder === folder) {
+    openPreviewFolder = null;
+    renderReportsGrid();
+    return;
+  }
+  openPreviewFolder = folder;
+  if (!openPreviewTab[folder]) openPreviewTab[folder] = 'summary';
+  renderReportsGrid();
+  await loadPreviewTab(folder, openPreviewTab[folder]);
+}
+
+async function switchPreviewTab(folder, tab) {
+  openPreviewTab[folder] = tab;
+  const card = document.querySelector('.report-card[data-folder="' + CSS.escape(folder) + '"]');
+  card?.querySelectorAll('.preview-tabs .tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tab);
+  });
+  await loadPreviewTab(folder, tab);
+}
+
+async function loadPreviewTab(folder, tab) {
+  const content = document.querySelector('.preview-content[data-folder="' + CSS.escape(folder) + '"]');
+  if (!content) return;
+  content.innerHTML = '<p class="loading"><span class="spinner"></span> Loading…</p>';
+
+  const enc = encodeURIComponent(folder);
+  try {
+    if (tab === 'summary') {
+      const res = await fetch('/api/reports/' + enc + '/preview/summary.txt');
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      content.innerHTML = '<pre class="summary-text">' + escHtml(data.content || '') + '</pre>';
+    } else if (tab === 'calculations') {
+      await loadCsvPreview(content, enc, 'calculations.csv', {
+        filterCols: ['source_sheet', 'item_type'],
+        searchCols: ['description', 'formula_applied']
+      });
+    } else if (tab === 'raw') {
+      await loadCsvPreview(content, enc, 'raw_items.csv', {
+        filterCols: ['source_sheet', 'type'],
+        searchCols: ['description', 'source_location']
+      });
+    } else if (tab === 'json') {
+      const res = await fetch('/api/reports/' + enc + '/preview/takeoff.json');
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      content.innerHTML = '<div class="json-tree">' + renderJsonTree(data.data, 0, true) + '</div>';
+      bindJsonToggles(content);
+    }
+  } catch (e) {
+    content.innerHTML = '<p class="error">Failed to load preview: ' + escHtml(e.message) + '</p>';
+  }
+}
+
+async function loadCsvPreview(container, encFolder, filename, opts) {
+  const res = await fetch('/api/reports/' + encFolder + '/preview/' + filename);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+
+  const capNote = data.capped
+    ? '<p class="preview-cap-note">Showing ' + data.count + ' of ' + data.total + ' rows (cap: ' + data.cap_limit + ')</p>'
+    : '';
+
+  container.innerHTML = capNote + renderDataTable(data.headers, data.rows, opts);
+  bindDataTable(container.querySelector('.data-table'), data.headers, data.rows, opts);
+}
+
+function renderDataTable(headers, rows, opts) {
+  const filterCols = opts.filterCols || [];
+  const id = 'tbl-' + Math.random().toString(36).slice(2, 8);
+
+  let toolbar = '<div class="table-toolbar">';
+  toolbar += '<input type="text" placeholder="Search…" class="table-search" data-table="' + id + '">';
+  filterCols.forEach(col => {
+    const vals = [...new Set(rows.map(r => r[col]).filter(Boolean))].sort();
+    toolbar += '<select class="table-filter" data-table="' + id + '" data-col="' + col + '">' +
+      '<option value="">All ' + col.replace(/_/g, ' ') + '</option>' +
+      vals.map(v => '<option value="' + escHtml(String(v)) + '">' + escHtml(String(v)) + '</option>').join('') +
+    '</select>';
+  });
+  toolbar += '</div>';
+
+  const ths = headers.map(h =>
+    '<th data-col="' + escHtml(h) + '">' + escHtml(h) + '</th>'
+  ).join('');
+
+  const trs = rows.map((row, i) =>
+    '<tr data-idx="' + i + '">' + headers.map(h => '<td>' + escHtml(row[h] ?? '') + '</td>').join('') + '</tr>'
+  ).join('');
+
+  return toolbar +
+    '<div class="data-table-wrap"><table class="data-table" id="' + id + '" data-headers="' + escHtml(JSON.stringify(headers)) + '">' +
+    '<thead><tr>' + ths + '</tr></thead><tbody>' + trs + '</tbody></table></div>';
+}
+
+function bindDataTable(table, headers, allRows, opts) {
+  if (!table) return;
+  const wrap = table.closest('.preview-content') || table.parentElement;
+  const searchInput = wrap.querySelector('.table-search');
+  const filters = wrap.querySelectorAll('.table-filter');
+  let sortCol = null;
+  let sortDir = 1;
+
+  function applyFilters() {
+    let rows = [...allRows];
+    const q = (searchInput?.value || '').toLowerCase();
+    if (q) {
+      const cols = opts.searchCols || headers;
+      rows = rows.filter(r => cols.some(c => String(r[c] || '').toLowerCase().includes(q)));
+    }
+    filters.forEach(sel => {
+      const col = sel.dataset.col;
+      if (sel.value) rows = rows.filter(r => String(r[col]) === sel.value);
+    });
+    if (sortCol) {
+      rows.sort((a, b) => {
+        const av = String(a[sortCol] ?? '');
+        const bv = String(b[sortCol] ?? '');
+        return sortDir * av.localeCompare(bv, undefined, { numeric: true });
+      });
+    }
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = rows.map(row =>
+      '<tr>' + headers.map(h => '<td>' + escHtml(row[h] ?? '') + '</td>').join('') + '</tr>'
+    ).join('');
+  }
+
+  searchInput?.addEventListener('input', applyFilters);
+  filters.forEach(f => f.addEventListener('change', applyFilters));
+  table.querySelectorAll('th').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (sortCol === col) sortDir *= -1;
+      else { sortCol = col; sortDir = 1; }
+      table.querySelectorAll('th').forEach(h => h.classList.remove('sorted-asc', 'sorted-desc'));
+      th.classList.add(sortDir === 1 ? 'sorted-asc' : 'sorted-desc');
+      applyFilters();
+    });
+  });
+}
+
+function renderJsonTree(obj, depth, expanded) {
+  if (obj === null || typeof obj !== 'object') {
+    return '<span class="json-value">' + escHtml(JSON.stringify(obj)) + '</span>';
+  }
+  const isArr = Array.isArray(obj);
+  const entries = isArr ? obj.map((v, i) => [i, v]) : Object.entries(obj);
+  const id = 'jn-' + Math.random().toString(36).slice(2, 9);
+
+  let html = '<div class="json-node">';
+  if (entries.length) {
+    html += '<span class="json-toggle" data-target="' + id + '">' + (expanded ? '▼' : '▶') + '</span>';
+    html += '<span class="json-bracket">' + (isArr ? '[' : '{') + '</span>';
+    html += '<div class="json-children' + (expanded ? '' : ' collapsed') + '" id="' + id + '">';
+    entries.forEach(([key, val]) => {
+      html += '<div class="json-entry">';
+      if (!isArr) html += '<span class="json-key">"' + escHtml(String(key)) + '"</span>: ';
+      if (val !== null && typeof val === 'object') {
+        html += renderJsonTree(val, depth + 1, depth < 1);
+      } else {
+        html += '<span class="json-value">' + escHtml(JSON.stringify(val)) + '</span>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '<span class="json-bracket">' + (isArr ? ']' : '}') + '</span>';
+  } else {
+    html += '<span class="json-bracket">' + (isArr ? '[]' : '{}') + '</span>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function bindJsonToggles(container) {
+  container.querySelectorAll('.json-toggle').forEach(toggle => {
+    toggle.addEventListener('click', () => {
+      const target = document.getElementById(toggle.dataset.target);
+      if (!target) return;
+      target.classList.toggle('collapsed');
+      toggle.textContent = target.classList.contains('collapsed') ? '▶' : '▼';
+    });
+  });
+}
+
+function downloadReportFile(folder, filename) {
+  const url = '/api/reports/' + encodeURIComponent(folder) + '/' + encodeURIComponent(filename);
+  window.open(url, '_blank');
 }
 
 // ── Active Job Mini-Card Polling ───────────────────────────────────────────
@@ -378,10 +752,7 @@ function stopActiveJobPolling() {
 }
 
 function scrollToJobStatus() {
-  const card = document.getElementById('progressCard');
-  if (card && card.classList.contains('visible')) {
-    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  if (currentJobId) navigateTo('job-monitor');
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -634,7 +1005,19 @@ function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function bindReportsAndMonitorEvents() {
+  const search = document.getElementById('reportsSearch');
+  if (search) search.addEventListener('input', e => filterReports(e.target.value));
+
+  const refresh = document.getElementById('reportsRefreshBtn');
+  if (refresh) refresh.addEventListener('click', () => loadReports());
+
+  const cancelBtn = document.getElementById('cancelJobBtn');
+  if (cancelBtn) cancelBtn.addEventListener('click', cancelJob);
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
 loadProjects();
 bindPlanSelectionEvents();
+bindReportsAndMonitorEvents();
 startActiveJobPolling();

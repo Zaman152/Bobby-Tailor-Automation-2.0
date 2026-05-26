@@ -346,20 +346,42 @@ def job_status(job_id):
     if not job:
         return jsonify({"error": "Job not found"}), 404
     # Don't return full result in status poll — too large
+    cs = job.get("current_sheet", {})
+    completed = job.get("sheets_completed", [])
     return jsonify({
         "id": job["id"],
         "type": job["type"],
         "status": job["status"],
         "progress": job["progress"],
         "started_at": job.get("started_at"),
-        "current_sheet": job.get("current_sheet", {}),
-        "sheets_completed": len(job.get("sheets_completed", [])),
-        "sheet_log": job.get("sheets_completed", [])[-5:],  # last 5 completed sheets
-        "log": job["log"][-15:],   # last 15 structured log entries
+        "current_sheet": cs,
+        "sheets_completed": len(completed),
+        "total_sheets": cs.get("total", 0),
+        "sheet_log": completed[-10:],
+        "sheet_log_full": completed,
+        "log": job["log"][-50:],
         "project": job["project"],
         "error": job["error"],
         "has_result": job["result"] is not None,
     })
+
+
+@app.route("/api/cancel/<job_id>", methods=["POST"])
+def cancel_job(job_id):
+    """Request cancellation of a running or queued job."""
+    job = jobs.get(job_id)
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    if job["status"] not in ("running", "queued"):
+        return jsonify({"error": "Job is not running"}), 400
+    job["status"] = "cancelled"
+    job["_cancel"] = True
+    job["log"].append({
+        "timestamp": datetime.now().isoformat(),
+        "type": "info",
+        "message": "Job cancelled by user",
+    })
+    return jsonify({"success": True})
 
 
 @app.route("/api/jobs/active")
@@ -407,6 +429,8 @@ def list_reports():
 
         cost_usd = None
         sheets_processed = None
+        raw_items_count = None
+        calculated_count = None
         json_file = sub / "takeoff.json"
         if json_file.exists():
             try:
@@ -415,6 +439,8 @@ def list_reports():
                 api_usage = takeoff_data.get("api_usage", {})
                 cost_usd = api_usage.get("total_cost_usd")
                 sheets_processed = takeoff_data.get("sheets_processed")
+                raw_items_count = takeoff_data.get("total_line_items")
+                calculated_count = takeoff_data.get("total_calculated_items")
             except (json.JSONDecodeError, OSError):
                 pass
 
@@ -439,6 +465,8 @@ def list_reports():
             "files": files,
             "total_cost_usd": cost_usd,
             "sheets_processed": sheets_processed,
+            "raw_items_count": raw_items_count,
+            "calculated_count": calculated_count,
         })
 
     # Newest first by created time

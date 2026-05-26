@@ -33,6 +33,9 @@
       <a class="nav-item" data-page="reports" onclick="navigateTo('reports'); return false;" href="#">
         <span class="nav-icon">📊</span> Reports
       </a>
+      <a class="nav-item" data-page="job-monitor" onclick="navigateTo('job-monitor'); return false;" href="#" id="navJobMonitor" style="display:none">
+        <span class="nav-icon">⚙️</span> Job Monitor
+      </a>
       <div class="nav-divider"></div>
       <a class="nav-item" href="/settings">
         <span class="nav-icon">⚙️</span> Settings
@@ -164,12 +167,65 @@
         </div>
       </section>
 
-      <!-- ── Reports Page ── -->
+      <!-- ── Reports Page (Master §8.5) ── -->
       <section id="page-reports" class="page-section">
-        <div class="card">
-          <h2>Generated Reports</h2>
-          <div id="reportsList"><p class="empty">No reports yet.</p></div>
-          <button class="run-btn" style="margin-top:16px;background:var(--bg-elevated);color:var(--text-secondary)" onclick="loadReports()">↻ Refresh</button>
+        <div class="reports-page-header">
+          <div class="reports-header-row">
+            <h2 class="reports-title">Reports</h2>
+            <div class="reports-header-actions">
+              <input type="text" id="reportsSearch" class="reports-search" placeholder="Search reports…" autocomplete="off" />
+              <button type="button" class="btn-ghost" id="reportsRefreshBtn">↻ Refresh</button>
+            </div>
+          </div>
+        </div>
+        <div id="reportsGrid" class="reports-grid">
+          <p class="empty">Loading reports…</p>
+        </div>
+      </section>
+
+      <!-- ── Job Monitor (Master §8.4) ── -->
+      <section id="page-job-monitor" class="page-section">
+        <div class="monitor-container card">
+          <div class="monitor-header">
+            <div class="monitor-header-left">
+              <h2 class="monitor-project-name" id="monitorProjectName">—</h2>
+              <span class="monitor-job-id" id="monitorJobId">Job: —</span>
+            </div>
+            <div class="monitor-header-right">
+              <span class="monitor-started" id="monitorStarted">Started: —</span>
+              <span class="status-badge badge-running" id="monitorStatus">● RUNNING</span>
+            </div>
+          </div>
+
+          <div class="monitor-progress-section">
+            <div class="progress-bar-bg monitor-progress-track">
+              <div class="progress-bar-fill" id="monitorProgressFill"></div>
+            </div>
+            <div class="monitor-progress-text">
+              <span id="monitorPercent">0%</span>
+              <span id="monitorSheetCount">[0 / 0 sheets]</span>
+            </div>
+          </div>
+
+          <div class="monitor-current-sheet" id="monitorCurrentSheet">
+            Currently analyzing: <strong>—</strong>
+          </div>
+
+          <div class="monitor-content-grid">
+            <div class="monitor-panel">
+              <h3 class="monitor-panel-title">Sheet Log</h3>
+              <div class="sheet-log" id="monitorSheetLog"></div>
+            </div>
+            <div class="monitor-panel">
+              <h3 class="monitor-panel-title">Log Console</h3>
+              <div class="log-console" id="monitorLogConsole"></div>
+            </div>
+          </div>
+
+          <div class="monitor-actions">
+            <button type="button" class="btn-danger" id="cancelJobBtn">Cancel Job</button>
+            <button type="button" class="btn-ghost" onclick="navigateTo('projects')">← Back to Projects</button>
+          </div>
         </div>
       </section>
 
