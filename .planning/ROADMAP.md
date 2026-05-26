@@ -302,9 +302,9 @@ Plans:
 
 Plans:
 
-- [ ] 11-01: PDF upload metadata + page checkbox UI (Master §8.6)
-- [ ] 11-02: Pass selected pages to `pdf_analyzer` / run endpoint
-- [ ] 11-03: README VPS deployment section (Master §11)
+- [x] 11-01: PDF upload metadata + page checkbox UI (Master §8.6)
+- [x] 11-02: Pass selected pages to `pdf_analyzer` / run endpoint
+- [x] 11-03: README VPS deployment section (Master §11)
 
 ---
 

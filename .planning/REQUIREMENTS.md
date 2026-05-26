@@ -46,9 +46,9 @@
 
 ### PDF Mode
 
-- [ ] **PDF-01**: User can upload a construction PDF for analysis
-- [ ] **PDF-02**: User can select specific pages before starting PDF analysis (not all pages only)
-- [ ] **PDF-03**: PDF page selection shows page count and file size after upload
+- [x] **PDF-01**: User can upload a construction PDF for analysis
+- [x] **PDF-02**: User can select specific pages before starting PDF analysis (not all pages only)
+- [x] **PDF-03**: PDF page selection shows page count and file size after upload
 
 ### UI/UX Shell
 
@@ -69,7 +69,7 @@
 ### Deployment Readiness
 
 - [x] **DEPLOY-01**: `.env.example` documents all required variables
-- [ ] **DEPLOY-02**: README includes VPS gunicorn + Playwright deps instructions
+- [x] **DEPLOY-02**: README includes VPS gunicorn + Playwright deps instructions
 - [x] **DEPLOY-03**: `requirements.txt` pins Pillow and all runtime dependencies
 
 ## v2 Requirements
@@ -145,11 +145,11 @@
 | UI-04 | Phase 9 | Complete |
 | UI-05 | Phase 10 | Complete |
 | UI-06 | Phase 10 | Complete |
-| PDF-01 | Phase 11 | Pending |
-| PDF-02 | Phase 11 | Pending |
-| PDF-03 | Phase 11 | Pending |
+| PDF-01 | Phase 11 | Complete |
+| PDF-02 | Phase 11 | Complete |
+| PDF-03 | Phase 11 | Complete |
 | DEPLOY-01 | Phase 1 | Complete |
-| DEPLOY-02 | Phase 11 | Pending |
+| DEPLOY-02 | Phase 11 | Complete |
 | DEPLOY-03 | Phase 1 | Complete |
 
 **Coverage:**
