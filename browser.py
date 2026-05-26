@@ -55,6 +55,19 @@ class StackCTBrowser:
         if any(x in url for x in ["agent.stackct", "api/", "/takeoff/", "/pages/", "signalr"]):
             logger.debug(f"API call: {request.method} {url[:120]}")
 
+    def _login_error_message(self, exc: Exception) -> str:
+        msg = str(exc)
+        if "ERR_NAME_NOT_RESOLVED" in msg or "ENOTFOUND" in msg:
+            return (
+                "Cannot reach StackCT (DNS/network). "
+                "Check your internet connection or VPN, then try again."
+            )
+        if "ERR_INTERNET_DISCONNECTED" in msg or "ERR_NETWORK_CHANGED" in msg:
+            return "Network disconnected while connecting to StackCT. Try again."
+        if "Timeout" in msg or "timeout" in msg:
+            return "StackCT login timed out. Try again in a few seconds."
+        return f"StackCT login failed: {msg}"
+
     async def login(self) -> bool:
         logger.info("Logging into StackCT...")
         try:
@@ -97,14 +110,31 @@ class StackCTBrowser:
             await self.page.fill('input[type="password"]', STACKCT_PASSWORD)
             await self.page.click('button[type="submit"], button[name="action"]')
 
-            # Wait for redirect back to the StackCT app
-            await self.page.wait_for_url("**/go.stackct.com/app/**", timeout=25000)
-            logger.info("Login successful")
-            return True
+            # Auth0 may pass through several /authorize redirects before the SPA loads
+            if await self._wait_for_stackct_app(timeout_ms=60000):
+                logger.info("Login successful")
+                return True
+            raise RuntimeError(
+                "StackCT login timed out waiting for the app to load after Auth0."
+            )
 
         except Exception as e:
-            logger.error(f"Login failed: {e}")
-            return False
+            err = self._login_error_message(e)
+            logger.error(err)
+            raise RuntimeError(err) from e
+
+    async def _wait_for_stackct_app(self, timeout_ms: int = 60000) -> bool:
+        """Poll until the StackCT app shell is loaded (post-Auth0 redirect chain)."""
+        deadline = time.time() + timeout_ms / 1000
+        last_url = ""
+        while time.time() < deadline:
+            last_url = self.page.url
+            if "go.stackct.com/app" in last_url:
+                await asyncio.sleep(1.5)
+                return True
+            await asyncio.sleep(0.5)
+        logger.error(f"Timed out waiting for StackCT app; last URL: {last_url[:160]}")
+        return False
 
     async def navigate_to_project(self, project_id: int) -> bool:
         url = f"https://go.stackct.com/app/#/Takeoff/{project_id}/Home"
@@ -221,8 +251,8 @@ class StackCTBrowser:
         logger.info(f"Discovering all pages for project {project_id}")
 
         url = f"https://go.stackct.com/app/#/Takeoff/{project_id}"
-        await self.page.goto(url, wait_until="load")
-        # Wait for thumbnails to render — grid can be slow on first load
+        await self.page.goto(url, wait_until="load", timeout=60000)
+        # Wait for thumbnails to render — grid can be slow on large projects
         pages_raw = []
         for attempt in range(3):
             try:

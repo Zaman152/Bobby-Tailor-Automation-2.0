@@ -991,8 +991,12 @@ async function fetchPlans(projectId, forceRefresh) {
 
     if (data.error && !(data.plans && data.plans.length)) {
       let hint = '';
-      if (/login/i.test(data.error)) {
+      if (/dns|network|reach stackct|internet|vpn/i.test(data.error)) {
+        hint = '<p class="help-text" style="margin-top:8px;color:var(--text-tertiary)">The app could not reach StackCT. Check your internet connection or VPN, then click Preview or ↻ Refresh plans again.</p>';
+      } else if (/login|credential|password|email/i.test(data.error)) {
         hint = '<p class="help-text" style="margin-top:8px;color:var(--text-tertiary)">StackCT login failed. Wait a few seconds and click Preview again — only one browser login runs at a time. Check STACKCT_EMAIL / STACKCT_PASSWORD in Settings.</p>';
+      } else if (/syncing|in progress/i.test(data.error)) {
+        hint = '<p class="help-text" style="margin-top:8px;color:var(--text-tertiary)">Plans are still syncing from StackCT. Wait a moment and click Preview again.</p>';
       }
       if (selectedProject && selectedProject.id === projectId) {
         planList.innerHTML = '<p class="error">Error: ' + escHtml(data.error) + '</p>' + hint;

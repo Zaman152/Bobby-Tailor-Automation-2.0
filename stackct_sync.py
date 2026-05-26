@@ -26,8 +26,7 @@ async def _fetch_projects_from_browser() -> list[dict]:
     b = StackCTBrowser()
     await b.start()
     try:
-        if not await b.login():
-            raise RuntimeError("Login failed")
+        await b.login()
         return await b.get_all_projects()
     finally:
         await b.close()
@@ -39,8 +38,7 @@ async def _fetch_plans_from_browser(project_id: int) -> list[dict]:
     b = StackCTBrowser()
     await b.start()
     try:
-        if not await b.login():
-            raise RuntimeError("Login failed")
+        await b.login()
         return await b.get_all_page_ids(project_id)
     finally:
         await b.close()

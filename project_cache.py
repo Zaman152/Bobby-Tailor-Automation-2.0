@@ -138,16 +138,15 @@ def get_project_plans(
             "syncing": True,
         }
 
-    if background and not plans:
-        _start_plans_background_sync(project_id)
-        return {
-            "plans": [],
-            "project_id": project_id,
-            "from_cache": False,
-            "syncing": True,
-        }
-
-    return sync_project_plans(project_id, force=False)
+    # No cached plans — start background sync and let the UI poll (avoids blocking
+    # the request thread and races with POST /sync-plans on project select).
+    _start_plans_background_sync(project_id)
+    return {
+        "plans": [],
+        "project_id": project_id,
+        "from_cache": False,
+        "syncing": True,
+    }
 
 
 # Deprecated JSON helpers — migration only (stackct_store.migrate_from_json_caches)
