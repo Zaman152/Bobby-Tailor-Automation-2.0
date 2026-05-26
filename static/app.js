@@ -651,14 +651,26 @@ function renderReportsGrid() {
     window.uiMotion.staggerChildren(grid, '.report-card');
   }
 
-  grid.querySelectorAll('.btn-preview').forEach(btn => {
-    btn.addEventListener('click', () => togglePreview(btn.dataset.folder));
+  // Phase 15: Open report workspace instead of inline preview
+  grid.querySelectorAll('.btn-preview-workspace').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (window.reportWorkspace) {
+        window.reportWorkspace.openReportWorkspace(btn.dataset.folder);
+      }
+    });
   });
+  
   grid.querySelectorAll('.btn-download').forEach(btn => {
     btn.addEventListener('click', () => downloadReportFile(btn.dataset.folder, btn.dataset.file));
   });
-  grid.querySelectorAll('.preview-tabs .tab').forEach(tab => {
-    tab.addEventListener('click', () => switchPreviewTab(tab.dataset.folder, tab.dataset.tab));
+  
+  // Export dropdown toggle
+  grid.querySelectorAll('.btn-export-toggle').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dropdown = btn.closest('.export-dropdown');
+      dropdown.classList.toggle('open');
+    });
   });
 }
 
@@ -672,20 +684,24 @@ function renderReportCard(r) {
   const raw = r.raw_items_count != null ? r.raw_items_count + ' raw items' : '';
   const calc = r.calculated_count != null ? r.calculated_count + ' calculated' : '';
   const cost = r.total_cost_usd != null ? '$' + r.total_cost_usd.toFixed(4) : '';
-  const isOpen = openPreviewFolder === folder;
-  const activeTab = openPreviewTab[folder] || 'summary';
-
   const files = r.files || {};
+  
+  // Phase 15: Simple download links, workspace replaces inline preview
   const dl = (fileKey, label) => {
     const f = files[fileKey];
     if (!f) return '';
     return '<button type="button" class="btn-download" data-folder="' + escHtml(folder) + '" data-file="' + escHtml(f.filename) + '">' + label + '</button>';
   };
 
-  return '<div class="report-card' + (isOpen ? ' expanded' : '') + '" data-folder="' + escHtml(folder) + '">' +
+  const cachePill = r.from_cache ? '<span class="pill pill-success">Cached</span>' : '';
+
+  return '<div class="report-card" data-folder="' + escHtml(folder) + '">' +
     '<div class="card-header">' +
       '<span class="project-name">' + escHtml(r.project_name) + '</span>' +
-      '<span class="report-date">' + escHtml(date) + '</span>' +
+      '<div class="card-header-right">' +
+        cachePill +
+        '<span class="report-date">' + escHtml(date) + '</span>' +
+      '</div>' +
     '</div>' +
     '<div class="card-meta">' +
       '<span>' + sheets + '</span>' +
@@ -694,23 +710,42 @@ function renderReportCard(r) {
       (cost ? '<span>·</span><span class="cost">' + cost + '</span>' : '') +
     '</div>' +
     '<div class="card-actions">' +
-      '<button type="button" class="btn-preview' + (isOpen ? ' active' : '') + '" data-folder="' + escHtml(folder) + '">Preview</button>' +
-      dl('calculated_csv', 'Calculations') +
-      dl('raw_csv', 'Raw CSV') +
-      dl('json', '{ } JSON') +
-      dl('summary', 'Summary TXT') +
+      '<button type="button" class="btn-preview-workspace btn-primary-cta" data-folder="' + escHtml(folder) + '">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+          '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>' +
+        '</svg>' +
+        'Open Preview' +
+      '</button>' +
+      '<div class="export-dropdown">' +
+        '<button type="button" class="btn-export-toggle">Export ▾</button>' +
+        '<div class="export-menu">' +
+          dl('takeoff_summary_csv', 'Summary CSV') +
+          dl('calculated_csv', 'Calc CSV') +
+          dl('raw_csv', 'Raw CSV') +
+          dl('json', 'JSON') +
+          dl('summary', 'TXT') +
+        '</div>' +
+      '</div>' +
     '</div>' +
-    (isOpen ? renderPreviewPanel(folder, activeTab) : '') +
   '</div>';
 }
 
-function renderPreviewPanel(folder, activeTab) {
-  return '<div class="preview-panel" id="preview-panel-' + escHtml(folder) + '">' +
+function renderPreviewPanel(folder, activeTab, hasTakeoffSummary) {
+  const tabs = [];
+  if (hasTakeoffSummary) tabs.push('takeoff');
+  tabs.push('summary', 'calculations', 'raw', 'json');
+  const labels = {
+    takeoff: 'Takeoff Summary',
+    summary: 'Run Log',
+    calculations: 'Calculations',
+    raw: 'Raw Items',
+    json: 'JSON'
+  };
+  return '<div class="preview-panel glass-panel" id="preview-panel-' + escHtml(folder) + '">' +
     '<div class="preview-tabs">' +
-      ['summary', 'calculations', 'raw', 'json'].map(t => {
-        const labels = { summary: 'Summary', calculations: 'Calculations', raw: 'Raw Items', json: 'JSON' };
-        return '<button type="button" class="tab' + (t === activeTab ? ' active' : '') + '" data-folder="' + escHtml(folder) + '" data-tab="' + t + '">' + labels[t] + '</button>';
-      }).join('') +
+      tabs.map(t =>
+        '<button type="button" class="tab' + (t === activeTab ? ' active' : '') + '" data-folder="' + escHtml(folder) + '" data-tab="' + t + '">' + labels[t] + '</button>'
+      ).join('') +
     '</div>' +
     '<div class="preview-content" data-folder="' + escHtml(folder) + '">' +
       '<p class="loading"><span class="spinner"></span> Loading…</p>' +
@@ -725,7 +760,9 @@ async function togglePreview(folder) {
     return;
   }
   openPreviewFolder = folder;
-  if (!openPreviewTab[folder]) openPreviewTab[folder] = 'summary';
+  const report = allReports.find(r => r.run_folder === folder);
+  const hasTakeoff = report?.files?.takeoff_summary_csv;
+  if (!openPreviewTab[folder]) openPreviewTab[folder] = hasTakeoff ? 'takeoff' : 'summary';
   renderReportsGrid();
   await loadPreviewTab(folder, openPreviewTab[folder]);
 }
@@ -746,7 +783,12 @@ async function loadPreviewTab(folder, tab) {
 
   const enc = encodeURIComponent(folder);
   try {
-    if (tab === 'summary') {
+    if (tab === 'takeoff') {
+      const res = await fetch('/api/reports/' + enc + '/preview/takeoff_summary.csv', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      content.innerHTML = renderTakeoffSummaryTable(data.rows || []);
+    } else if (tab === 'summary') {
       const res = await fetch('/api/reports/' + enc + '/preview/summary.txt', { credentials: 'same-origin' });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -1435,6 +1477,28 @@ function escHtml(s) {
 
 function escAttr(s) {
   return escHtml(s);
+}
+
+function renderTakeoffSummaryTable(rows) {
+  if (!rows.length) {
+    return '<p class="empty">No consolidated takeoff summary for this run.</p>';
+  }
+  const headers = ['item', 'quantity', 'unit', 'source_sheets', 'line_count'];
+  const labels = { item: 'Item', quantity: 'Qty', unit: 'Unit', source_sheets: 'Sheets', line_count: 'Lines' };
+  let html = '<div class="takeoff-summary-wrap"><table class="data-table takeoff-summary-table"><thead><tr>';
+  headers.forEach(h => { html += '<th>' + escHtml(labels[h] || h) + '</th>'; });
+  html += '</tr></thead><tbody>';
+  rows.forEach(row => {
+    html += '<tr>';
+    headers.forEach(h => {
+      const cls = h === 'quantity' ? ' class="num"' : '';
+      html += '<td' + cls + '>' + escHtml(row[h] != null ? String(row[h]) : '') + '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  html += '<p class="preview-cap-note">Consolidated across all sheets — matches StackCT summary format. See Calculations tab for per-sheet audit.</p></div>';
+  return html;
 }
 
 function formatSummaryHtml(text) {
