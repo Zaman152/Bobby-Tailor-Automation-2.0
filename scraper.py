@@ -6,7 +6,7 @@ import asyncio
 import logging
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Callable
+from typing import Optional, Callable, List
 from config import SCREENSHOTS_DIR
 from browser import StackCTBrowser
 from claude_analyzer import analyze_drawing, make_navigation_decision
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 async def run_project_scrape(project_id: int, project_name: str,
+                             page_ids_filter: Optional[List[int]] = None,
                              log_callback: Optional[Callable] = None,
                              progress_callback: Optional[Callable] = None) -> dict:
     def log(msg: str):
@@ -49,6 +50,15 @@ async def run_project_scrape(project_id: int, project_name: str,
             return {"error": "no_pages_found"}
 
         log(f"Found {len(pages)} drawing pages — starting analysis...")
+
+        # Filter to specific pages if requested
+        if page_ids_filter:
+            pages = [p for p in pages if p["page_id"] in page_ids_filter]
+            log(f"Filtered to {len(pages)} selected pages (from {page_ids_filter})")
+            if not pages:
+                log("No matching pages found for the selected IDs")
+                return {"error": "no_matching_pages"}
+
         total = len(pages)
 
         for idx, page_info in enumerate(pages, 1):

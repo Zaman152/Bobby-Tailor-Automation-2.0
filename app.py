@@ -59,7 +59,8 @@ def _run_async(coro):
         loop.close()
 
 
-def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name: str):
+def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name: str,
+                 page_ids: Optional[list] = None):
     """Background thread for StackCT scraping."""
     from scraper import run_all_projects, run_project_scrape
 
@@ -67,7 +68,7 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
         jobs[job_id]["log"].append(msg)
         logger.info(f"[job {job_id}] {msg}")
 
-    def progress(current: int, total: int, sheet: str):
+    def progress(current: int, total: int, sheet: str, **kwargs):
         pct = int(current / total * 100) if total else 0
         jobs[job_id]["progress"] = pct
         log(f"[{current}/{total}] Analyzing {sheet}...")
@@ -79,6 +80,7 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
             result = _run_async(run_all_projects(log_callback=log, progress_callback=progress))
         else:
             result = _run_async(run_project_scrape(project_id, project_name,
+                                                   page_ids_filter=page_ids,
                                                    log_callback=log, progress_callback=progress))
         jobs[job_id]["status"] = "done"
         jobs[job_id]["result"] = result
@@ -140,6 +142,18 @@ def refresh_projects():
     return jsonify(result)
 
 
+@app.route("/api/projects/<int:project_id>/plans")
+def get_plans(project_id):
+    """Return drawing page list for plan selection UI.
+
+    Returns list of {page_id, sheet_name} for each drawing sheet in the project.
+    Allows users to preview available sheets before starting analysis.
+    """
+    from project_cache import get_project_plans as _get_plans
+    result = _get_plans(project_id)
+    return jsonify(result)
+
+
 @app.route("/api/run/stackct", methods=["POST"])
 def run_stackct():
     """Start a StackCT scraping job."""
@@ -147,6 +161,7 @@ def run_stackct():
     mode = data.get("mode", "all")           # "all" | "specific"
     project_id = data.get("project_id")
     project_name = data.get("project_name", "Project")
+    page_ids = data.get("page_ids")          # Optional list of specific page IDs to analyze
 
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
@@ -157,7 +172,7 @@ def run_stackct():
 
     t = threading.Thread(
         target=_stackct_job,
-        args=(job_id, mode, project_id, project_name),
+        args=(job_id, mode, project_id, project_name, page_ids),
         daemon=True
     )
     t.start()
