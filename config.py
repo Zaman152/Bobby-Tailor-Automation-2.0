@@ -51,8 +51,21 @@ MAX_PREVIEW_ROWS = int(os.getenv("MAX_PREVIEW_ROWS", "500"))  # Cap for CSV prev
 # Schedule (cron expression)
 RUN_SCHEDULE = os.getenv("RUN_SCHEDULE", "0 8 * * *")  # daily at 8am
 
+# Application Authentication (Phase 12)
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
+ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "")
+RATE_LIMIT_STORAGE_URI = os.getenv("RATE_LIMIT_STORAGE_URI", "memory://")
+
 # Environment validation
-REQUIRED_ENV_VARS = ["STACKCT_EMAIL", "STACKCT_PASSWORD", "ANTHROPIC_API_KEY"]
+REQUIRED_ENV_VARS = [
+    "STACKCT_EMAIL",
+    "STACKCT_PASSWORD",
+    "ANTHROPIC_API_KEY",
+    "SECRET_KEY",
+    "ADMIN_EMAIL",
+    "ADMIN_PASSWORD_HASH",
+]
 
 def validate_required_env() -> None:
     """Validate that all required environment variables are set.
