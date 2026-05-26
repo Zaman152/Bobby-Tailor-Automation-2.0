@@ -35,22 +35,23 @@ let monitorPollInterval = null;
 let currentPdfUpload = null;
 
 function navigateTo(pageName) {
-  // Hide all sections
-  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
-  // Show target section
   const target = document.getElementById('page-' + pageName);
-  if (target) target.classList.add('active');
+  if (!target) return;
 
-  // Update nav active state
+  document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+  target.classList.add('active');
+
+  if (window.uiMotion?.pageEnter) {
+    window.uiMotion.pageEnter(target);
+  }
+
   document.querySelectorAll('.nav-item[data-page]').forEach(n => n.classList.remove('active'));
   const navItem = document.querySelector('.nav-item[data-page="' + pageName + '"]');
   if (navItem) navItem.classList.add('active');
 
-  // Update page title
   const titleEl = document.getElementById('pageTitle');
   if (titleEl) titleEl.textContent = PAGE_TITLES[pageName] || pageName;
 
-  // Trigger data loads on navigation
   if (pageName === 'reports') loadReports();
   if (pageName === 'projects' && !projectsLoaded) loadProjects();
 }
@@ -124,8 +125,8 @@ function renderProjectList(projects) {
     const isSelected = selectedProject && selectedProject.id === p.id;
     const count = projectSheetCounts[p.id];
     const countLabel = count != null ? count + ' sheet' + (count !== 1 ? 's' : '') : '— sheets';
-    return '<div class="project-item' + (isSelected ? ' selected' : '') + '" data-id="' + p.id + '" data-name="' + escHtml(p.name) + '">' +
-      '<input type="radio" name="projectPick" class="project-radio"' + (isSelected ? ' checked' : '') + ' tabindex="-1">' +
+    return '<div class="project-item' + (isSelected ? ' selected' : '') + '" data-id="' + p.id + '" data-name="' + escHtml(p.name) + '" role="button" tabindex="0" aria-label="Select project ' + escHtml(p.name) + '">' +
+      '<input type="radio" name="projectPick" class="project-radio"' + (isSelected ? ' checked' : '') + ' tabindex="-1" aria-hidden="true">' +
       '<div class="project-info">' +
         '<div class="project-name">' + escHtml(p.name) + '</div>' +
         '<div class="project-id">ID: ' + p.id + '</div>' +
@@ -562,6 +563,10 @@ function renderReportsGrid() {
 
   grid.innerHTML = filtered.map(r => renderReportCard(r)).join('');
 
+  if (window.uiMotion?.staggerChildren) {
+    window.uiMotion.staggerChildren(grid, '.report-card');
+  }
+
   grid.querySelectorAll('.btn-preview').forEach(btn => {
     btn.addEventListener('click', () => togglePreview(btn.dataset.folder));
   });
@@ -661,7 +666,7 @@ async function loadPreviewTab(folder, tab) {
       const res = await fetch('/api/reports/' + enc + '/preview/summary.txt');
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      content.innerHTML = '<pre class="summary-text">' + escHtml(data.content || '') + '</pre>';
+      content.innerHTML = formatSummaryHtml(data.content || '');
     } else if (tab === 'calculations') {
       await loadCsvPreview(content, enc, 'calculations.csv', {
         filterCols: ['source_sheet', 'item_type'],
@@ -1108,6 +1113,24 @@ function bindPlanSelectionEvents() {
 // ── Utilities ──────────────────────────────────────────────────────────────
 function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatSummaryHtml(text) {
+  const lines = String(text).split('\n');
+  let html = '<div class="summary-view">';
+  lines.forEach(line => {
+    const t = line.trim();
+    if (!t) return;
+    if (t.endsWith(':') && t.length < 80 && !t.includes('=')) {
+      html += '<div class="summary-heading">' + escHtml(t) + '</div>';
+    } else if (t.startsWith('===') || t.startsWith('---')) {
+      html += '<div class="summary-heading">' + escHtml(t.replace(/[=|-]+/g, ' ').trim() || t) + '</div>';
+    } else {
+      html += '<div class="summary-line">' + escHtml(line) + '</div>';
+    }
+  });
+  html += '</div>';
+  return html;
 }
 
 function bindReportsAndMonitorEvents() {

@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='ui-polish.css') }}">
 </head>
 <body>
 
@@ -23,22 +24,27 @@
       </div>
     </div>
 
-    <nav class="sidebar-nav">
+    <nav class="sidebar-nav" aria-label="Main navigation">
       <a class="nav-item active" data-page="projects" onclick="navigateTo('projects'); return false;" href="#">
-        <span class="nav-icon">📋</span> Projects
+        <span class="nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/></svg></span>
+        <span>Projects</span>
       </a>
       <a class="nav-item" data-page="pdf" onclick="navigateTo('pdf'); return false;" href="#">
-        <span class="nav-icon">📄</span> PDF Upload
+        <span class="nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg></span>
+        <span>PDF Upload</span>
       </a>
       <a class="nav-item" data-page="reports" onclick="navigateTo('reports'); return false;" href="#">
-        <span class="nav-icon">📊</span> Reports
+        <span class="nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg></span>
+        <span>Reports</span>
       </a>
       <a class="nav-item" data-page="job-monitor" onclick="navigateTo('job-monitor'); return false;" href="#" id="navJobMonitor" style="display:none">
-        <span class="nav-icon">⚙️</span> Job Monitor
+        <span class="nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></span>
+        <span>Job Monitor</span>
       </a>
       <div class="nav-divider"></div>
       <a class="nav-item" href="/settings">
-        <span class="nav-icon">⚙️</span> Settings
+        <span class="nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+        <span>Settings</span>
       </a>
     </nav>
 
@@ -80,12 +86,14 @@
 
           <div class="field">
             <label>Select scope</label>
-            <div class="mode-toggle">
-              <button class="mode-btn active" id="modeAll" onclick="setMode('all')">
-                <span class="icon">🗂️</span>All Projects
+            <div class="mode-toggle" role="group" aria-label="Project scope">
+              <button type="button" class="mode-btn active" id="modeAll" onclick="setMode('all')">
+                <span class="mode-label">All Projects</span>
+                <span class="mode-hint">Run across every cached project</span>
               </button>
-              <button class="mode-btn" id="modeOne" onclick="setMode('specific')">
-                <span class="icon">📋</span>Specific Project
+              <button type="button" class="mode-btn" id="modeOne" onclick="setMode('specific')">
+                <span class="mode-label">Specific Project</span>
+                <span class="mode-hint">Pick one job, select sheets, then run</span>
               </button>
             </div>
           </div>
@@ -154,7 +162,9 @@
           <div class="field">
             <label>PDF file</label>
             <div class="drop-zone" id="dropZone">
-              <div class="dz-icon">📄</div>
+              <div class="dz-icon" aria-hidden="true">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+              </div>
               <p>Drop a PDF here or <strong>click to browse</strong></p>
               <p class="file-name" id="selectedFileName"></p>
             </div>
@@ -188,9 +198,9 @@
 
       <!-- ── Reports Page (Master §8.5) ── -->
       <section id="page-reports" class="page-section">
-        <div class="reports-page-header">
+        <div class="reports-toolbar card">
           <div class="reports-header-row">
-            <h2 class="reports-title">Reports</h2>
+            <p class="card-eyebrow">Generated takeoffs</p>
             <div class="reports-header-actions">
               <input type="text" id="reportsSearch" class="reports-search" placeholder="Search reports…" autocomplete="off" />
               <button type="button" class="btn-ghost" id="reportsRefreshBtn">↻ Refresh</button>
@@ -275,6 +285,7 @@
 
 </div><!-- end app-shell -->
 
+<script type="module" src="{{ url_for('static', filename='ui-motion.js') }}"></script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
