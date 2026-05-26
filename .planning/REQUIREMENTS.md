@@ -56,8 +56,8 @@
 - [ ] **UI-02**: Industrial dark theme per Master.md palette (DM Mono, Inter, JetBrains Mono)
 - [ ] **UI-03**: Static assets extracted to `static/app.js` and `static/style.css`
 - [x] **UI-04**: Projects page implements scope toggle (All Projects vs Specific Project)
-- [ ] **UI-05**: Reports page shows expandable report cards with preview tabs
-- [ ] **UI-06**: Job monitor page/panel matches Master.md live monitor layout
+- [x] **UI-05**: Reports page shows expandable report cards with preview tabs
+- [x] **UI-06**: Job monitor page/panel matches Master.md live monitor layout
 
 ### Settings
 
@@ -143,8 +143,8 @@
 | UI-02 | Phase 8 | Pending |
 | UI-03 | Phase 8 | Pending |
 | UI-04 | Phase 9 | Complete |
-| UI-05 | Phase 10 | Pending |
-| UI-06 | Phase 10 | Pending |
+| UI-05 | Phase 10 | Complete |
+| UI-06 | Phase 10 | Complete |
 | PDF-01 | Phase 11 | Pending |
 | PDF-02 | Phase 11 | Pending |
 | PDF-03 | Phase 11 | Pending |

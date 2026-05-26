@@ -6,16 +6,16 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 10 — Reports & Job Monitor UI
+**Current focus:** Phase 11 — PDF Selection & Production Docs
 
 ## Current Position
 
-Phase: 9 of 11 (Projects Workspace) — complete  
-Plan: 09-01, 09-02 (2/2)  
+Phase: 10 of 11 (Reports & Job Monitor UI) — complete  
+Plan: 10-01, 10-02 (2/2)  
 Status: Phase complete (verified)
-Last activity: 2026-05-26 — Executed Phase 9 (`/gsd-execute-phase 9`)
+Last activity: 2026-05-26 — Executed Phase 10 (`/gsd-execute-phase 10`)
 
-Progress: [█████████░] ~82% (9/11 phases complete)
+Progress: [██████████░] ~91% (10/11 phases complete)
 
 ## Performance Metrics
 
