@@ -10,20 +10,20 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 ## Current Position
 
-Phase: 8 of 11 (UI Shell Foundation) — complete  
-Plans: 04-01 through 08-03 (14 plans executed in this session)  
-Status: Phases 4–8 complete; Phase 3 (API Cost Transparency) still pending
-Last activity: 2026-05-26 — Executed Phases 4–8 (`/gsd-execute-phase 4-8`)
+Phase: 3 of 11 (API Cost Transparency) — complete  
+Plan: 03-03 of 03 (all complete)  
+Status: Phase 3 complete; Phases 1–8 all complete
+Last activity: 2026-05-26 — Completed 03-03-PLAN.md
 
-Progress: [███████░░░] ~64% (7/11 phases complete — phases 1,2,4,5,6,7,8)
+Progress: [████████░░] 73% (8/11 phases complete — phases 1,2,3,4,5,6,7,8)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 11
+- Total plans completed: 12
 - Average duration: ~1.5 min
-- Total execution time: ~13.5 min
+- Total execution time: ~17.5 min
 
 **By Phase:**
 
@@ -31,9 +31,9 @@ Progress: [███████░░░] ~64% (7/11 phases complete — phases
 |-------|-------|-------|----------|
 | 01-config-and-safe-operations | 3 | 5 min | 1.7 min |
 | 02-browser-reliability | 3 | ~5 min | ~1.7 min |
-| 03-api-cost-transparency | 2 | 3.5 min | 1.75 min |
+| 03-api-cost-transparency | 3 | 7.5 min | 2.5 min |
 
-**Recent Trend:** Consistent 1.5-2min execution, cost tracking progressing smoothly
+**Recent Trend:** Consistent 1.5-2min execution, Phase 3 (API cost transparency) now complete
 
 ## Accumulated Context
 
@@ -78,6 +78,12 @@ From 03-02 (Reporter Cost Aggregation):
 - Add cost to logger.info for at-a-glance run monitoring
 - Backward-compatible .get() with defaults in summary generation (old reports still render)
 
+From 03-03 (API Cost UI Display):
+
+- Display cost with .toFixed(4) for consistent 4-decimal USD precision
+- Use green color (#4ade80) for cost to make it visually distinct
+- Null check (r.total_cost_usd != null) prevents crash on old runs
+
 ### Pending Todos
 
 None yet.
@@ -90,13 +96,18 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-26T21:00:00Z (Phases 4–8 execution)  
-Stopped at: Phase 8 complete — all 14 plans from phases 4–8 executed  
+Last session: 2026-05-26T16:16:51Z  
+Stopped at: Completed 03-03-PLAN.md — Phase 3 (API Cost Transparency) complete  
 Resume file: None
 
-### Session Notes (Phases 4–8)
+### Session Notes
 
-- Phase 3 (API Cost Transparency) was skipped — plans exist but not executed in this run
+**Phase 3 Complete (2026-05-26):**
+- All 3 plans executed (03-01, 03-02, 03-03)
+- Cost transparency pipeline complete: capture → aggregate → display
+- Estimators can now see per-run API cost in web UI before downloading files
+
+**Previous Session (Phases 4–8):**
 - Phases 4–8 executed with 14 commits total (11 feat + 5 docs)
 - New files: settings.py, static/settings.js, static/style.css, static/app.js, templates/settings.html
 - Modified: app.py, scraper.py, pdf_analyzer.py, project_cache.py, config.py, templates/index.html
