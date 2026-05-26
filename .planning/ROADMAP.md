@@ -13,11 +13,11 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [x] **Phase 1: Config & Safe Operations** — Portable `.env`, sanitized API errors, dependency docs
 - [x] **Phase 2: Browser Reliability** — Canvas stability, full project list, VPS Chromium
 - [ ] **Phase 3: API Cost Transparency** — Per-sheet and per-run token/USD tracking in reports
-- [ ] **Phase 4: StackCT Plan Selection** — Preview sheets, filter, run selected `page_ids` only
-- [ ] **Phase 5: Report Preview APIs** — In-browser summary, tables, JSON with safe paths
-- [ ] **Phase 6: Settings Management** — Credentials and preferences editable in UI
-- [ ] **Phase 7: Live Job Monitoring** — Per-sheet progress, logs, sidebar mini-card
-- [ ] **Phase 8: UI Shell Foundation** — Sidebar layout, dark theme, static JS/CSS
+- [x] **Phase 4: StackCT Plan Selection** — Preview sheets, filter, run selected `page_ids` only
+- [x] **Phase 5: Report Preview APIs** — In-browser summary, tables, JSON with safe paths
+- [x] **Phase 6: Settings Management** — Credentials and preferences editable in UI
+- [x] **Phase 7: Live Job Monitoring** — Per-sheet progress, logs, sidebar mini-card
+- [x] **Phase 8: UI Shell Foundation** — Sidebar layout, dark theme, static JS/CSS
 - [ ] **Phase 9: Projects Workspace** — Scope toggle and plan-selection workflow in UI
 - [ ] **Phase 10: Reports & Monitor UI** — Report cards with preview tabs; live monitor page
 - [ ] **Phase 11: PDF Selection & Production Docs** — PDF page picker; VPS README
@@ -325,11 +325,11 @@ Plans:
 | 1. Config & Safe Operations | 3/3 | Complete | 2026-05-26 |
 | 2. Browser Reliability | 3/3 | Complete | 2026-05-26 |
 | 3. API Cost Transparency | 0/3 | Planned | — |
-| 4. StackCT Plan Selection | 0/TBD | Not started | — |
-| 5. Report Preview APIs | 0/TBD | Not started | — |
-| 6. Settings Management | 0/TBD | Not started | — |
-| 7. Live Job Monitoring | 0/TBD | Not started | — |
-| 8. UI Shell Foundation | 0/TBD | Not started | — |
+| 4. StackCT Plan Selection | 3/3 | Complete | 2026-05-26 |
+| 5. Report Preview APIs | 3/3 | Complete | 2026-05-26 |
+| 6. Settings Management | 2/2 | Complete | 2026-05-26 |
+| 7. Live Job Monitoring | 3/3 | Complete | 2026-05-26 |
+| 8. UI Shell Foundation | 3/3 | Complete | 2026-05-26 |
 | 9. Projects Workspace | 0/TBD | Not started | — |
 | 10. Reports & Monitor UI | 0/TBD | Not started | — |
 | 11. PDF Selection & Production Docs | 0/TBD | Not started | — |
