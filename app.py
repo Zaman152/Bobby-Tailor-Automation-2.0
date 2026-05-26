@@ -9,6 +9,7 @@ import os
 from typing import Optional
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file
+from werkzeug.exceptions import HTTPException
 from config import OUTPUT_DIR
 
 app = Flask(__name__)
@@ -26,6 +27,24 @@ prefetch_in_background()
 
 # In-memory job tracker
 jobs: dict = {}
+
+
+# ── Error Handlers ───────────────────────────────────────────────────────────
+
+@app.errorhandler(HTTPException)
+def handle_http_exception(e: HTTPException):
+    """Handle all HTTP exceptions (404, etc.) with JSON response."""
+    return jsonify({"error": e.name, "message": e.description}), e.code
+
+
+@app.errorhandler(Exception)
+def handle_exception(e: Exception):
+    """Catch-all handler for unhandled exceptions — returns generic 500."""
+    logger.error("Unhandled exception in route", exc_info=True)
+    return jsonify({
+        "error": "Internal server error",
+        "message": "An unexpected error occurred"
+    }), 500
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
