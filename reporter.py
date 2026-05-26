@@ -379,6 +379,19 @@ def _write_summary(report: dict, path: Path):
         f"Calculated items: {report['total_calculated_items']}",
         "",
         "─" * 70,
+        "API USAGE & COST",
+        "─" * 70,
+    ]
+
+    usage = report.get("api_usage", {})
+    lines.append(f"Total cost:       ${usage.get('total_cost_usd', 0):.4f} USD")
+    lines.append(f"Input tokens:     {usage.get('total_tokens_in', 0):,}")
+    lines.append(f"Output tokens:    {usage.get('total_tokens_out', 0):,}")
+    lines.append(f"Cost per sheet:   ${usage.get('cost_per_sheet', 0):.4f} USD")
+    lines.append("")
+
+    lines += [
+        "─" * 70,
         "SHEET-BY-SHEET LOG (source traceability)",
         "─" * 70,
     ]
