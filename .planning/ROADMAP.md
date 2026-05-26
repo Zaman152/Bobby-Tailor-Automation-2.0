@@ -120,13 +120,13 @@ Plans:
 4. User can start a run that processes only checked sheets
 5. `/api/run/stackct` accepts optional `page_ids` and the scraper analyzes only those pages
 
-**Plans:** TBD
+**Plans:** 3 plans (2 waves)
 
 Plans:
 
-- [ ] 04-01: `GET /api/projects/<id>/plans` + `project_cache` helper (Master Step 2)
-- [ ] 04-02: `page_ids` on run endpoint and `scraper.py` filter (Master Step 2)
-- [ ] 04-03: Plan-selection UI panel (checkboxes, filters) — may ship minimal HTML first, polished in Phase 9
+- [ ] 04-01-PLAN.md — Plans fetching API endpoint (Wave 1)
+- [ ] 04-02-PLAN.md — page_ids filter on run endpoint and scraper (Wave 1)
+- [ ] 04-03-PLAN.md — Plan-selection UI panel with checkboxes and type filter (Wave 2)
 
 ---
 
@@ -146,13 +146,13 @@ Plans:
 4. Preview requests reject `../` and other path traversal attempts
 5. Large CSV previews show a clear “showing N of M rows” cap with pagination or row limit
 
-**Plans:** TBD
+**Plans:** 3 plans (2 waves)
 
 Plans:
 
-- [ ] 05-01: `GET /api/reports/<run>/preview/<file>` (Master Step 3)
-- [ ] 05-02: CSV pagination / row cap (PREV-06)
-- [ ] 05-03: Path validation and error handling (PREV-05)
+- [ ] 05-01-PLAN.md — Preview endpoint with path validation (Wave 1)
+- [ ] 05-02-PLAN.md — CSV pagination with row cap and total count (Wave 2)
+- [ ] 05-03-PLAN.md — Security logging and error handling polish (Wave 2)
 
 ---
 
@@ -171,12 +171,12 @@ Plans:
 3. User can set output directory and screenshot retention preference
 4. Saving settings persists to `.env` or config store; API never returns secret values in responses
 
-**Plans:** TBD
+**Plans:** Defined
 
 Plans:
 
-- [ ] 06-01: Settings read/write API with secret redaction
-- [ ] 06-02: Settings page form (wired in Phase 8 shell)
+- [ ] 06-01: Settings read/write API with secret redaction (`settings.py` module + API routes)
+- [ ] 06-02: Settings page form (`templates/settings.html` + `static/settings.js`, wired in Phase 8 shell)
 
 ---
 
@@ -195,13 +195,13 @@ Plans:
 3. Per-sheet log lines appear (measurements, rooms, components found)
 4. Sidebar shows an active-job mini-card whenever a job is running
 
-**Plans:** TBD
+**Plans:** Planned 2026-05-26
 
 Plans:
 
 - [ ] 07-01: Enrich scraper `progress_callback` / `log_callback` payloads
 - [ ] 07-02: Job status API fields for current sheet and structured log
-- [ ] 07-03: Sidebar mini-card component (Master §8.4)
+- [ ] 07-03: Sidebar mini-card component (Master §8.7)
 
 ---
 
@@ -244,12 +244,12 @@ Plans:
 3. “Preview Plans” opens the plan-selection panel integrated with Phase 4 APIs
 4. “Run Selected” starts analysis only for checked `page_ids` from this page
 
-**Plans:** TBD
+**Plans:** Defined (2 plans)
 
 Plans:
 
-- [ ] 09-01: Projects page layout (Master §8.3)
-- [ ] 09-02: Wire plan selection + run to Phase 4 backend
+- [ ] 09-01: Projects page layout (Master §8.3) — depends on 08-01, 08-02, 08-03, 04-01
+- [ ] 09-02: Wire plan selection + run to Phase 4 backend — depends on 09-01, 04-01, 04-02
 
 ---
 
@@ -268,12 +268,12 @@ Plans:
 3. Dedicated job monitor view shows progress bar, current sheet, and scrollable per-sheet log (Master §8.4)
 4. User can download CSV/JSON/TXT from report cards without losing preview context
 
-**Plans:** TBD
+**Plans:** DEFINED
 
 Plans:
 
-- [ ] 10-01: Reports page + preview tabs (Master §8.5)
-- [ ] 10-02: Job monitor page/panel (Master §8.4)
+- [x] 10-01: Reports page + preview tabs (Master §8.5) → `.planning/phases/10-reports-job-monitor-ui/10-01-PLAN.md`
+- [x] 10-02: Job monitor page/panel (Master §8.4) → `.planning/phases/10-reports-job-monitor-ui/10-02-PLAN.md`
 
 ---
 
@@ -292,7 +292,7 @@ Plans:
 3. UI shows page count and file size immediately after upload
 4. README documents Hostinger VPS setup: gunicorn, Playwright system deps, `.env`, and headless Chrome flags
 
-**Plans:** TBD
+**Plans:** 11-01, 11-02, 11-03
 
 Plans:
 
