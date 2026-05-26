@@ -9,15 +9,22 @@ import threading
 from datetime import datetime
 
 import stackct_store as store
-from stackct_sync import get_browser_lock, sync_project_plans, sync_projects
+from stackct_sync import (
+    get_browser_lock,
+    sync_project_plan_sets,
+    sync_project_plans,
+    sync_projects,
+)
 
 logger = logging.getLogger(__name__)
 
 # Re-export lock for documentation / tests
 _browser_lock = get_browser_lock()
 
+_plan_sets_bg_lock = threading.Lock()
+_plan_sets_syncing: set[int] = set()
 _plans_bg_lock = threading.Lock()
-_plans_syncing: set[int] = set()
+_plans_syncing: set[tuple[int, int]] = set()
 _projects_bg_started = False
 
 
@@ -80,57 +87,62 @@ def prefetch_in_background():
 
 
 def get_all_sheet_counts() -> dict:
-    """Sheet counts from SQLite (all projects with synced plans)."""
+    """Plan-set and sheet counts from SQLite."""
     _ensure_db()
     counts = store.get_sheet_counts()
     synced_at = store.get_metadata("projects_synced_at")
-    return {"counts": counts, "synced_at": synced_at}
+    return {
+        "counts": counts,
+        "plan_set_counts": {
+            int(pid): meta.get("plan_set_count")
+            for pid, meta in counts.items()
+            if meta.get("plan_set_count") is not None
+        },
+        "synced_at": synced_at,
+    }
 
 
-def _start_plans_background_sync(project_id: int):
-    with _plans_bg_lock:
-        if project_id in _plans_syncing:
+def _start_plan_sets_background_sync(project_id: int):
+    with _plan_sets_bg_lock:
+        if project_id in _plan_sets_syncing:
             return
-        _plans_syncing.add(project_id)
+        _plan_sets_syncing.add(project_id)
 
     def _run():
         try:
-            sync_project_plans(project_id, force=True)
+            sync_project_plan_sets(project_id, force=True)
         finally:
-            with _plans_bg_lock:
-                _plans_syncing.discard(project_id)
+            with _plan_sets_bg_lock:
+                _plan_sets_syncing.discard(project_id)
 
     threading.Thread(target=_run, daemon=True).start()
 
 
-def get_project_plans(
+def get_project_plan_sets(
     project_id: int,
     force_refresh: bool = False,
-    background: bool = False,
 ) -> dict:
-    """
-    Return drawing pages for a project (DB-first, stale-while-revalidate).
-    """
+    """Return plan sets for a project (DB-first, stale-while-revalidate)."""
     _ensure_db()
 
     if force_refresh:
-        return sync_project_plans(project_id, force=True)
+        return sync_project_plan_sets(project_id, force=True)
 
-    plans = store.get_plans(project_id)
-    fetched_at = store.get_plans_synced_at(project_id)
+    plan_sets = store.get_plan_sets(project_id)
+    fetched_at = store.get_plan_sets_synced_at(project_id)
 
-    if plans and store.is_plans_fresh(project_id):
+    if plan_sets and store.is_plan_sets_fresh(project_id):
         return {
-            "plans": plans,
+            "plan_sets": plan_sets,
             "project_id": project_id,
             "from_cache": True,
             "fetched_at": fetched_at,
         }
 
-    if plans and not store.is_plans_fresh(project_id):
-        _start_plans_background_sync(project_id)
+    if plan_sets and not store.is_plan_sets_fresh(project_id):
+        _start_plan_sets_background_sync(project_id)
         return {
-            "plans": plans,
+            "plan_sets": plan_sets,
             "project_id": project_id,
             "from_cache": True,
             "fetched_at": fetched_at,
@@ -138,12 +150,86 @@ def get_project_plans(
             "syncing": True,
         }
 
-    # No cached plans — start background sync and let the UI poll (avoids blocking
-    # the request thread and races with POST /sync-plans on project select).
-    _start_plans_background_sync(project_id)
+    _start_plan_sets_background_sync(project_id)
+    return {
+        "plan_sets": [],
+        "project_id": project_id,
+        "from_cache": False,
+        "syncing": True,
+    }
+
+
+def _start_plans_background_sync(project_id: int, folder_id: int):
+    key = (project_id, folder_id)
+    with _plans_bg_lock:
+        if key in _plans_syncing:
+            return
+        _plans_syncing.add(key)
+
+    def _run():
+        try:
+            sync_project_plans(project_id, folder_id, force=True)
+        finally:
+            with _plans_bg_lock:
+                _plans_syncing.discard(key)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def get_project_plans(
+    project_id: int,
+    folder_id: int,
+    force_refresh: bool = False,
+    background: bool = False,
+) -> dict:
+    """
+    Return drawing pages for one plan set (DB-first, stale-while-revalidate).
+    """
+    _ensure_db()
+
+    if force_refresh:
+        return sync_project_plans(project_id, folder_id, force=True)
+
+    if background:
+        _start_plans_background_sync(project_id, folder_id)
+        plans = store.get_plans(project_id, folder_id)
+        return {
+            "plans": plans or [],
+            "project_id": project_id,
+            "folder_id": folder_id,
+            "from_cache": True,
+            "syncing": True,
+        }
+
+    plans = store.get_plans(project_id, folder_id)
+    fetched_at = store.get_plans_synced_at(project_id, folder_id)
+
+    if plans and store.is_plans_fresh(project_id, folder_id):
+        return {
+            "plans": plans,
+            "project_id": project_id,
+            "folder_id": folder_id,
+            "from_cache": True,
+            "fetched_at": fetched_at,
+        }
+
+    if plans and not store.is_plans_fresh(project_id, folder_id):
+        _start_plans_background_sync(project_id, folder_id)
+        return {
+            "plans": plans,
+            "project_id": project_id,
+            "folder_id": folder_id,
+            "from_cache": True,
+            "fetched_at": fetched_at,
+            "stale": True,
+            "syncing": True,
+        }
+
+    _start_plans_background_sync(project_id, folder_id)
     return {
         "plans": [],
         "project_id": project_id,
+        "folder_id": folder_id,
         "from_cache": False,
         "syncing": True,
     }

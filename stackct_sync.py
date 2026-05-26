@@ -32,14 +32,28 @@ async def _fetch_projects_from_browser() -> list[dict]:
         await b.close()
 
 
-async def _fetch_plans_from_browser(project_id: int) -> list[dict]:
+async def _fetch_plan_sets_from_browser(project_id: int) -> list[dict]:
     from browser import StackCTBrowser
 
     b = StackCTBrowser()
     await b.start()
     try:
         await b.login()
-        return await b.get_all_page_ids(project_id)
+        return await b.get_plan_sets(project_id)
+    finally:
+        await b.close()
+
+
+async def _fetch_plans_in_folder_from_browser(
+    project_id: int, folder_id: int
+) -> list[dict]:
+    from browser import StackCTBrowser
+
+    b = StackCTBrowser()
+    await b.start()
+    try:
+        await b.login()
+        return await b.get_page_ids_in_folder(project_id, folder_id)
     finally:
         await b.close()
 
@@ -111,65 +125,149 @@ def sync_projects(force: bool = False) -> dict:
         }
 
 
-def sync_project_plans(project_id: int, force: bool = False) -> dict:
+def sync_project_plan_sets(project_id: int, force: bool = False) -> dict:
     """
-    Sync plan list for one project into SQLite.
-    Returns: {plans, project_id, fetched_at, from_cache, stale?, warning?, error?}
+    Sync plan-set (folder) index for one project into SQLite.
+    Returns: {plan_sets, project_id, fetched_at, from_cache, stale?, error?}
     """
     store.init_db()
 
-    if not force and store.is_plans_fresh(project_id):
-        plans = store.get_plans(project_id)
-        if plans is not None:
+    if not force and store.is_plan_sets_fresh(project_id):
+        plan_sets = store.get_plan_sets(project_id)
+        if plan_sets:
             logger.info(
-                f"Returning {len(plans)} plans from DB for project {project_id}"
+                f"Returning {len(plan_sets)} plan sets from DB for project {project_id}"
             )
             return {
-                "plans": plans,
+                "plan_sets": plan_sets,
                 "project_id": project_id,
                 "from_cache": True,
-                "fetched_at": store.get_plans_synced_at(project_id),
+                "fetched_at": store.get_plan_sets_synced_at(project_id),
             }
 
-    run_id = store.record_sync_run("plans", project_id=project_id)
+    run_id = store.record_sync_run("plan_sets", project_id=project_id)
     try:
         with _browser_lock:
-            if not force and store.is_plans_fresh(project_id):
-                plans = store.get_plans(project_id)
-                store.finish_sync_run(run_id, "success", len(plans))
+            if not force and store.is_plan_sets_fresh(project_id):
+                plan_sets = store.get_plan_sets(project_id)
+                store.finish_sync_run(run_id, "success", len(plan_sets))
                 return {
-                    "plans": plans,
+                    "plan_sets": plan_sets,
                     "project_id": project_id,
                     "from_cache": True,
-                    "fetched_at": store.get_plans_synced_at(project_id),
+                    "fetched_at": store.get_plan_sets_synced_at(project_id),
                 }
-            logger.info(f"Fetching plans from StackCT for project {project_id}...")
-            pages = _run_async(_fetch_plans_from_browser(project_id))
+            logger.info(f"Fetching plan sets from StackCT for project {project_id}...")
+            sets = _run_async(_fetch_plan_sets_from_browser(project_id))
 
         synced_at = datetime.now().isoformat()
-        store.upsert_plans(project_id, pages, synced_at)
-        store.finish_sync_run(run_id, "success", len(pages))
+        store.upsert_plan_sets(project_id, sets, synced_at)
+        store.finish_sync_run(run_id, "success", len(sets))
         return {
-            "plans": pages,
+            "plan_sets": sets,
             "project_id": project_id,
             "from_cache": False,
             "fetched_at": synced_at,
         }
     except Exception as e:
-        logger.error(f"Plan sync failed for project {project_id}: {e}")
+        logger.error(f"Plan-set sync failed for project {project_id}: {e}")
         err = str(e)
         store.finish_sync_run(run_id, "error", error_message=err)
-        plans = store.get_plans(project_id)
+        plan_sets = store.get_plan_sets(project_id)
+        if plan_sets:
+            return {
+                "plan_sets": plan_sets,
+                "project_id": project_id,
+                "from_cache": True,
+                "stale": True,
+                "fetched_at": store.get_plan_sets_synced_at(project_id),
+                "warning": "Live fetch failed; showing cached plan sets.",
+            }
+        return {"plan_sets": [], "error": err, "project_id": project_id}
+
+
+def sync_project_plans(
+    project_id: int,
+    folder_id: int,
+    force: bool = False,
+) -> dict:
+    """
+    Sync drawing pages for one plan set (folder) into SQLite.
+    Returns: {plans, project_id, folder_id, fetched_at, from_cache, stale?, warning?, error?}
+    """
+    store.init_db()
+
+    if not force and store.is_plans_fresh(project_id, folder_id):
+        plans = store.get_plans(project_id, folder_id)
+        if plans is not None:
+            logger.info(
+                f"Returning {len(plans)} plans from DB for project {project_id} "
+                f"folder {folder_id}"
+            )
+            return {
+                "plans": plans,
+                "project_id": project_id,
+                "folder_id": folder_id,
+                "from_cache": True,
+                "fetched_at": store.get_plans_synced_at(project_id, folder_id),
+            }
+
+    run_id = store.record_sync_run(
+        "plans", project_id=project_id, folder_id=folder_id
+    )
+    try:
+        with _browser_lock:
+            if not force and store.is_plans_fresh(project_id, folder_id):
+                plans = store.get_plans(project_id, folder_id)
+                store.finish_sync_run(run_id, "success", len(plans))
+                return {
+                    "plans": plans,
+                    "project_id": project_id,
+                    "folder_id": folder_id,
+                    "from_cache": True,
+                    "fetched_at": store.get_plans_synced_at(project_id, folder_id),
+                }
+            logger.info(
+                f"Fetching plans from StackCT for project {project_id} "
+                f"folder {folder_id}..."
+            )
+            pages = _run_async(
+                _fetch_plans_in_folder_from_browser(project_id, folder_id)
+            )
+
+        synced_at = datetime.now().isoformat()
+        store.upsert_plans(project_id, folder_id, pages, synced_at)
+        store.finish_sync_run(run_id, "success", len(pages))
+        return {
+            "plans": pages,
+            "project_id": project_id,
+            "folder_id": folder_id,
+            "from_cache": False,
+            "fetched_at": synced_at,
+        }
+    except Exception as e:
+        logger.error(
+            f"Plan sync failed for project {project_id} folder {folder_id}: {e}"
+        )
+        err = str(e)
+        store.finish_sync_run(run_id, "error", error_message=err)
+        plans = store.get_plans(project_id, folder_id)
         if plans:
             return {
                 "plans": plans,
                 "project_id": project_id,
+                "folder_id": folder_id,
                 "from_cache": True,
                 "stale": True,
-                "fetched_at": store.get_plans_synced_at(project_id),
+                "fetched_at": store.get_plans_synced_at(project_id, folder_id),
                 "warning": "Live fetch failed; showing cached plans.",
             }
-        return {"plans": [], "error": err, "project_id": project_id}
+        return {
+            "plans": [],
+            "error": err,
+            "project_id": project_id,
+            "folder_id": folder_id,
+        }
 
 
 def sync_projects_if_stale() -> None:
