@@ -1208,6 +1208,10 @@ function escHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function escAttr(s) {
+  return escHtml(s);
+}
+
 function formatSummaryHtml(text) {
   const lines = String(text).split('\n');
   let html = '<div class="summary-view">';
