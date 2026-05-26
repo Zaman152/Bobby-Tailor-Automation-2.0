@@ -30,6 +30,9 @@ prefetch_in_background()
 # In-memory job tracker
 jobs: dict = {}
 
+# PDF uploads awaiting page selection (upload_id -> metadata)
+uploads: dict = {}
+
 
 # ── Error Handlers ───────────────────────────────────────────────────────────
 
@@ -194,7 +197,8 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
         log("Job failed — see server logs")
 
 
-def _pdf_job(job_id: str, pdf_path: str, project_name: str):
+def _pdf_job(job_id: str, pdf_path: str, project_name: str,
+             selected_pages: Optional[list] = None):
     """Background thread for PDF analysis."""
     from pdf_analyzer import run_pdf_analysis
 
@@ -227,13 +231,18 @@ def _pdf_job(job_id: str, pdf_path: str, project_name: str):
 
     jobs[job_id]["status"] = "running"
     jobs[job_id]["started_at"] = datetime.now().isoformat()
+    pages_desc = f"pages {selected_pages}" if selected_pages else "all pages"
     jobs[job_id]["log"].append({
         "timestamp": datetime.now().isoformat(),
         "type": "info",
-        "message": f"Starting PDF analysis: {project_name}"
+        "message": f"Starting PDF analysis: {project_name} ({pages_desc})"
     })
     try:
-        result = run_pdf_analysis(pdf_path, project_name, progress_callback=progress)
+        result = run_pdf_analysis(
+            pdf_path, project_name,
+            selected_pages=selected_pages,
+            progress_callback=progress,
+        )
         jobs[job_id]["status"] = "done"
         jobs[job_id]["result"] = result
         total = result.get("total_line_items", 0)
@@ -309,9 +318,84 @@ def run_stackct():
     return jsonify({"job_id": job_id})
 
 
+@app.route("/api/pdf/upload", methods=["POST"])
+def upload_pdf():
+    """Upload a PDF and return metadata for page selection (no analysis)."""
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    f = request.files["file"]
+    if not f.filename or not f.filename.lower().endswith(".pdf"):
+        return jsonify({"error": "Only PDF files accepted"}), 400
+
+    upload_id = str(uuid.uuid4())[:8]
+    save_path = os.path.join("uploads", f"{upload_id}_{f.filename}")
+    f.save(save_path)
+
+    from pdf_analyzer import get_pdf_metadata
+    meta = get_pdf_metadata(save_path)
+
+    uploads[upload_id] = {
+        "save_path": save_path,
+        "filename": f.filename,
+        **meta,
+    }
+
+    return jsonify({
+        "upload_id": upload_id,
+        "filename": f.filename,
+        "page_count": meta["page_count"],
+        "file_size_bytes": meta["file_size_bytes"],
+        "pages": meta["pages"],
+    })
+
+
+@app.route("/api/pdf/run", methods=["POST"])
+def run_pdf_from_upload():
+    """Start PDF analysis from a previous upload with optional page selection."""
+    data = request.json or {}
+    upload_id = data.get("upload_id")
+    project_name = data.get("project_name")
+    selected_pages = data.get("selected_pages")
+
+    if not upload_id:
+        return jsonify({"error": "upload_id required"}), 400
+
+    upload = uploads.get(upload_id)
+    if not upload:
+        return jsonify({"error": "Upload not found or expired"}), 404
+
+    pdf_path = upload["save_path"]
+    if not os.path.isfile(pdf_path):
+        return jsonify({"error": "Upload file missing on server"}), 404
+
+    if not project_name:
+        project_name = Path(upload.get("filename", "PDF Project")).stem
+
+    job_id = str(uuid.uuid4())[:8]
+    jobs[job_id] = {
+        "id": job_id, "type": "pdf", "status": "queued",
+        "progress": 0, "log": [], "result": None, "error": None,
+        "project": project_name,
+        "file": upload.get("filename"),
+        "started_at": None,
+        "current_sheet": {"index": 0, "total": 0, "name": None, "phase": None},
+        "sheets_completed": [],
+        "selected_pages": selected_pages,
+    }
+
+    t = threading.Thread(
+        target=_pdf_job,
+        args=(job_id, pdf_path, project_name, selected_pages),
+        daemon=True,
+    )
+    t.start()
+    return jsonify({"job_id": job_id})
+
+
 @app.route("/api/run/pdf", methods=["POST"])
 def run_pdf():
-    """Upload a PDF and start analysis job."""
+    """Upload a PDF and start analysis job (legacy — all pages, single step)."""
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 

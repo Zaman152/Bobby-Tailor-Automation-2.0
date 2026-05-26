@@ -141,7 +141,7 @@
         </div>
       </section>
 
-      <!-- ── PDF Upload Page ── -->
+      <!-- ── PDF Upload Page (Master §8.6) ── -->
       <section id="page-pdf" class="page-section">
         <div class="card">
           <h2>Analyze a PDF Floor Plan</h2>
@@ -153,15 +153,34 @@
 
           <div class="field">
             <label>PDF file</label>
-            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <div class="drop-zone" id="dropZone">
               <div class="dz-icon">📄</div>
               <p>Drop a PDF here or <strong>click to browse</strong></p>
               <p class="file-name" id="selectedFileName"></p>
             </div>
-            <input type="file" id="fileInput" accept=".pdf" onchange="onFileSelected(this)" />
+            <input type="file" id="fileInput" accept=".pdf" />
+            <p class="pdf-upload-meta" id="pdfUploadMeta" style="display:none"></p>
           </div>
 
-          <button class="run-btn" id="runPdfBtn" onclick="runPDF()" disabled>
+          <div class="page-selection" id="pageSelection" style="display:none">
+            <label class="page-mode-option">
+              <input type="radio" name="pageMode" value="all" checked>
+              Analyze all <span id="totalPageCount">0</span> pages
+            </label>
+            <label class="page-mode-option">
+              <input type="radio" name="pageMode" value="select">
+              Select specific pages:
+            </label>
+            <div id="pdfPageListWrap" class="pdf-page-list-wrap" style="display:none">
+              <div class="page-checkboxes" id="pdfPageList"></div>
+              <div class="page-controls">
+                <button type="button" class="btn-ghost btn-sm" id="pdfSelectAllBtn">Select All</button>
+                <button type="button" class="btn-ghost btn-sm" id="pdfSelectNoneBtn">Select None</button>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" class="run-btn" id="runPdfBtn" disabled>
             ▶ Analyze PDF
           </button>
         </div>
