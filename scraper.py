@@ -37,6 +37,7 @@ def _make_log_entry(msg: str, entry_type: str = "info",
 
 async def run_project_scrape(project_id: int, project_name: str,
                              page_ids_filter: Optional[List[int]] = None,
+                             folder_id: Optional[int] = None,
                              log_callback: Optional[Callable] = None,
                              progress_callback: Optional[Callable] = None) -> dict:
     def log(msg: str, entry: dict = None):
@@ -63,9 +64,13 @@ async def run_project_scrape(project_id: int, project_name: str,
             return {"error": "login_failed"}
 
         log("Logged in. Discovering drawing pages...")
-        pages = await browser.get_all_page_ids(project_id)
+        if folder_id is not None:
+            pages = await browser.get_page_ids_in_folder(project_id, folder_id)
+            log(f"Using plan set folder_id={folder_id}")
+        else:
+            pages = await browser.get_all_page_ids(project_id)
         if not pages:
-            log("No drawing pages found for this project")
+            log("No drawing pages found for this project/plan set")
             return {"error": "no_pages_found"}
 
         log(f"Found {len(pages)} drawing pages — starting analysis...")
@@ -145,7 +150,12 @@ async def run_project_scrape(project_id: int, project_name: str,
             all_extracted.append(extracted)
 
         log("Generating report (raw CSV + calculated CSV + summary + JSON)...")
-        report = generate_report(project_name, all_extracted, all_estimates)
+        report = generate_report(
+            project_name,
+            all_extracted,
+            all_estimates,
+            folder_id=folder_id,
+        )
         log(f"Report saved — {report.get('sheets_processed', 0)} sheets, "
             f"{report.get('total_line_items', 0)} raw items, "
             f"{report.get('total_calculated_items', 0)} calculated takeoff items")

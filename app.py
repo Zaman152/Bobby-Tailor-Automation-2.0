@@ -251,7 +251,7 @@ def _run_async(coro):
 
 
 def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name: str,
-                 page_ids: Optional[list] = None):
+                 page_ids: Optional[list] = None, folder_id: Optional[int] = None):
     """Background thread for StackCT scraping."""
     from scraper import run_all_projects, run_project_scrape
 
@@ -294,9 +294,14 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
         if mode == "all":
             result = _run_async(run_all_projects(log_callback=log, progress_callback=progress))
         else:
-            result = _run_async(run_project_scrape(project_id, project_name,
-                                                   page_ids_filter=page_ids,
-                                                   log_callback=log, progress_callback=progress))
+            result = _run_async(run_project_scrape(
+                project_id,
+                project_name,
+                page_ids_filter=page_ids,
+                folder_id=folder_id,
+                log_callback=log,
+                progress_callback=progress,
+            ))
         jobs[job_id]["status"] = "done"
         jobs[job_id]["result"] = result
         jobs[job_id]["progress"] = 100
@@ -402,28 +407,74 @@ def get_sheet_counts():
     return jsonify(_counts())
 
 
+@app.route("/api/projects/<int:project_id>/sync-plan-sets", methods=["POST"])
+def sync_plan_sets_route(project_id):
+    """Warm plan-set (folder) index for a project into SQLite."""
+    from stackct_sync import sync_project_plan_sets
+    force = request.args.get("force") == "1"
+    return jsonify(sync_project_plan_sets(project_id, force=force))
+
+
+@app.route("/api/projects/<int:project_id>/plan-sets")
+def get_plan_sets_route(project_id):
+    """Return plan sets (folders) for a project (DB-first). Query: ?refresh=1"""
+    from project_cache import get_project_plan_sets as _get
+    force = request.args.get("refresh") == "1"
+    return jsonify(_get(project_id, force_refresh=force))
+
+
+@app.route("/api/projects/<int:project_id>/plan-sets/<int:folder_id>/plans")
+def get_folder_plans(project_id, folder_id):
+    """Return drawing pages for one plan set (DB-first). Query: ?refresh=1"""
+    from project_cache import get_project_plans as _get_plans
+    force = request.args.get("refresh") == "1"
+    background = request.args.get("background") == "1"
+    return jsonify(
+        _get_plans(
+            project_id,
+            folder_id,
+            force_refresh=force,
+            background=background,
+        )
+    )
+
+
 @app.route("/api/projects/<int:project_id>/sync-plans", methods=["POST"])
 def sync_plans(project_id):
-    """Warm plan list for a project into SQLite (serialized browser login)."""
+    """Warm plan list for one folder into SQLite. Requires folder_id in JSON or query."""
     from stackct_sync import sync_project_plans
     force = request.args.get("force") == "1"
-    result = sync_project_plans(project_id, force=force)
-    return jsonify(result)
+    body = request.get_json(silent=True) or {}
+    folder_id = body.get("folder_id")
+    if folder_id is None:
+        folder_id = request.args.get("folder_id", type=int)
+    if folder_id is None:
+        return jsonify({
+            "error": "folder_id required. Call /plan-sets first, then sync a folder.",
+        }), 400
+    return jsonify(sync_project_plans(project_id, int(folder_id), force=force))
 
 
 @app.route("/api/projects/<int:project_id>/plans")
 def get_plans(project_id):
-    """Return drawing page list for plan selection (DB-first).
-
-    Query: ?refresh=1 force live sync; ?background=1 non-blocking empty response.
-    """
+    """Legacy plans route — requires folder_id query param."""
+    folder_id = request.args.get("folder_id", type=int)
+    if folder_id is None:
+        return jsonify({
+            "error": "folder_id required. Use GET /api/projects/<id>/plan-sets first.",
+            "hint": "/api/projects/{}/plan-sets".format(project_id),
+        }), 400
     from project_cache import get_project_plans as _get_plans
     force = request.args.get("refresh") == "1"
     background = request.args.get("background") == "1"
-    result = _get_plans(
-        project_id, force_refresh=force, background=background
+    return jsonify(
+        _get_plans(
+            project_id,
+            folder_id,
+            force_refresh=force,
+            background=background,
+        )
     )
-    return jsonify(result)
 
 
 @app.route("/api/run/stackct", methods=["POST"])
@@ -434,6 +485,24 @@ def run_stackct():
     project_id = data.get("project_id")
     project_name = data.get("project_name", "Project")
     page_ids = data.get("page_ids")          # Optional list of specific page IDs to analyze
+    folder_id = data.get("folder_id")
+
+    # Validate page_ids belong to folder when both provided
+    if mode == "specific" and project_id and page_ids and folder_id is not None:
+        import stackct_store as _store
+        _store.init_db()
+        allowed = {
+            p["page_id"]
+            for p in _store.get_plans(int(project_id), int(folder_id))
+        }
+        if allowed:
+            bad = [pid for pid in page_ids if int(pid) not in allowed]
+            if bad:
+                return jsonify({
+                    "error": (
+                        f"page_ids {bad[:5]} are not in plan set folder {folder_id}"
+                    ),
+                }), 400
 
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
@@ -447,7 +516,7 @@ def run_stackct():
 
     t = threading.Thread(
         target=_stackct_job,
-        args=(job_id, mode, project_id, project_name, page_ids),
+        args=(job_id, mode, project_id, project_name, page_ids, folder_id),
         daemon=True
     )
     t.start()

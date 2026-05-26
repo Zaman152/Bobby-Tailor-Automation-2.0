@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 def generate_report(project_name: str,
                     all_extracted: list,
-                    all_estimates: Optional[list] = None) -> dict:
+                    all_estimates: Optional[list] = None,
+                    folder_id: Optional[int] = None) -> dict:
     """
     Build the final takeoff report.
 
@@ -29,6 +30,7 @@ def generate_report(project_name: str,
         all_extracted: list of Claude's raw extractions, one per drawing page
         all_estimates: list of items returned by calculator.apply_estimation_tables()
                        — already has calculated quantities, waste factors, source tracing
+        folder_id: Optional StackCT folder/plan-set ID for this run
     """
     all_estimates = all_estimates or []
     output_root = Path(OUTPUT_DIR)
@@ -60,6 +62,7 @@ def generate_report(project_name: str,
 
     report = {
         "project_name": project_name,
+        "folder_id": folder_id,
         "generated_at": datetime.now().isoformat(),
         "sheets_processed": len(all_extracted),
         "total_line_items": len(raw_line_items),
