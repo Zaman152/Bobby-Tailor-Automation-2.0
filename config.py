@@ -10,7 +10,7 @@ if not _env_path.exists():
 load_dotenv(dotenv_path=_env_path, override=True)
 
 # StackCT Credentials (set in .env file)
-STACKCT_EMAIL = os.getenv("STACKCT_EMAIL", "muhammad@klouded.com")
+STACKCT_EMAIL = os.getenv("STACKCT_EMAIL", "")
 STACKCT_PASSWORD = os.getenv("STACKCT_PASSWORD", "")
 
 # Claude API
@@ -41,3 +41,22 @@ SCREENSHOTS_DIR = os.path.join(OUTPUT_DIR, "screenshots")
 
 # Schedule (cron expression)
 RUN_SCHEDULE = os.getenv("RUN_SCHEDULE", "0 8 * * *")  # daily at 8am
+
+# Environment validation
+REQUIRED_ENV_VARS = ["STACKCT_EMAIL", "STACKCT_PASSWORD", "ANTHROPIC_API_KEY"]
+
+def validate_required_env() -> None:
+    """Validate that all required environment variables are set.
+    
+    Raises:
+        ValueError: If any required environment variable is missing or empty.
+    """
+    missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
+    if missing_vars:
+        raise ValueError(
+            f"Missing required environment variables: {', '.join(missing_vars)}\n"
+            f"Please set them in .env file at project root."
+        )
+
+# Validate on import
+validate_required_env()
