@@ -271,6 +271,54 @@ python3 main.py
 python3 main.py --project-id 7409312 --project-name "Some Project"
 ```
 
+## API Reference
+
+### POST `/api/run/stackct` — Start a StackCT job
+
+**Full run (default):**
+```json
+{
+  "mode": "specific",
+  "project_id": 7409312,
+  "project_name": "My Project",
+  "page_ids": [101, 102, 103],
+  "folder_id": 5
+}
+```
+
+**Analyze-only — re-run Claude on an existing capture without browser:**
+```json
+{
+  "project_name": "My Project",
+  "analyze_only": true
+}
+```
+Automatically finds the most-recent run folder for `project_name`. Uses the
+existing `manifest.json` to skip pages already analyzed (unless they have no
+`{page_id}_analysis.json` cache). Useful to recover from mid-run crashes or
+re-analyze with a new Claude model.
+
+**Analyze-only with explicit folder:**
+```json
+{
+  "project_name": "My Project",
+  "analyze_only": true,
+  "manifest_dir": "My_Project_20260601_143000"
+}
+```
+`manifest_dir` can be an absolute path or a folder name relative to
+`output/screenshots/`.
+
+**Response:**
+```json
+{ "job_id": "a1b2c3d4" }
+```
+
+**Job object** (`GET /api/jobs/<job_id>`):
+- `mode_detail`: `"full"` or `"analyze_only"` — indicates which mode ran.
+
+---
+
 ## Output
 
 Each run creates its own folder under `./output/`:

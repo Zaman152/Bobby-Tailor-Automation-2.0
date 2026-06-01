@@ -250,10 +250,108 @@ def _run_async(coro):
         loop.close()
 
 
+# User-facing job error messages (safe for UI — no stack traces)
+JOB_ERROR_MESSAGES = {
+    "login_failed": "StackCT login failed. Check email and password in Settings.",
+    "no_pages_found": "No drawing pages found for this project or plan set.",
+    "no_matching_pages": "None of the selected sheets were found in this plan set.",
+    "all_sheets_failed": "Every sheet failed during capture or analysis. See the job log for details.",
+    "scrape_failed": "The takeoff job failed unexpectedly. Check server logs for details.",
+}
+
+
+def _user_facing_job_error(error_code: str) -> str:
+    if isinstance(error_code, str) and error_code.startswith("analysis:"):
+        return f"Analysis failed on one or more sheets ({error_code})."
+    return JOB_ERROR_MESSAGES.get(str(error_code), "The job failed. Check server logs for details.")
+
+
+def _finalize_stackct_job(job_id: str, result, log):
+    """Set job status from scraper result — handles errors, partial success, and full success."""
+    if not isinstance(result, dict):
+        jobs[job_id]["status"] = "error"
+        jobs[job_id]["error"] = JOB_ERROR_MESSAGES["scrape_failed"]
+        log(jobs[job_id]["error"])
+        return
+
+    if result.get("error"):
+        jobs[job_id]["status"] = "error"
+        jobs[job_id]["error"] = _user_facing_job_error(result["error"])
+        jobs[job_id]["result"] = result
+        log(jobs[job_id]["error"])
+        if result.get("sheets_failed"):
+            n = len(result["sheets_failed"])
+            log(f"{n} sheet(s) failed before report generation.")
+        return
+
+    jobs[job_id]["status"] = "done"
+    jobs[job_id]["result"] = result
+    jobs[job_id]["progress"] = 100
+    jobs[job_id]["error"] = None
+
+    total_items = result.get("total_line_items", 0)
+    sheets_ok = result.get("sheets_succeeded") or result.get("sheets_processed", 0)
+
+    if result.get("partial"):
+        failed_n = len(result.get("sheets_failed") or [])
+        skipped_n = len(result.get("sheets_skipped") or [])
+        log(
+            f"Complete with warnings — {sheets_ok} sheets OK, "
+            f"{failed_n} failed, {skipped_n} skipped · {total_items} takeoff items"
+        )
+        jobs[job_id]["warning"] = (
+            f"Partial report: {failed_n} sheet(s) failed, {skipped_n} skipped."
+        )
+    else:
+        log(
+            f"Complete! {result.get('sheets_processed', 0)} sheets · "
+            f"{total_items} takeoff items extracted"
+        )
+
+
+def _resolve_manifest_dir(
+    manifest_dir: Optional[str], project_name: str
+) -> Optional[Path]:
+    """
+    Resolve the run folder containing manifest.json for analyze-only mode.
+
+    Tries explicit *manifest_dir* first (absolute or relative to SCREENSHOTS_DIR),
+    then auto-discovers the most-recent run folder for *project_name*.
+    """
+    from config import SCREENSHOTS_DIR as _SCREENSHOTS_DIR
+
+    base = Path(_SCREENSHOTS_DIR)
+
+    if manifest_dir:
+        p = Path(manifest_dir)
+        if not p.is_absolute():
+            p = base / manifest_dir
+        if p.is_dir() and (p / "manifest.json").exists():
+            return p
+        return None
+
+    # Auto-discover: newest run folder whose manifest.json exists
+    if not base.exists():
+        return None
+    safe_name = project_name.replace(" ", "_").replace("/", "-")
+    candidates = sorted(
+        [
+            d for d in base.iterdir()
+            if d.is_dir()
+            and d.name.startswith(safe_name)
+            and (d / "manifest.json").exists()
+        ],
+        key=lambda d: d.stat().st_mtime,
+        reverse=True,
+    )
+    return candidates[0] if candidates else None
+
+
 def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name: str,
-                 page_ids: Optional[list] = None, folder_id: Optional[int] = None):
+                 page_ids: Optional[list] = None, folder_id: Optional[int] = None,
+                 analyze_only: bool = False, manifest_dir: Optional[str] = None):
     """Background thread for StackCT scraping."""
-    from scraper import run_all_projects, run_project_scrape
+    from scraper import run_all_projects, run_project_scrape, run_analyze_from_manifest
 
     def log(msg_or_entry):
         """Accept either plain string or structured entry dict."""
@@ -289,29 +387,45 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
 
     jobs[job_id]["status"] = "running"
     jobs[job_id]["started_at"] = datetime.now().isoformat()
-    log("Logging into StackCT...")
     try:
-        if mode == "all":
-            result = _run_async(run_all_projects(log_callback=log, progress_callback=progress))
-        else:
-            result = _run_async(run_project_scrape(
-                project_id,
-                project_name,
-                page_ids_filter=page_ids,
-                folder_id=folder_id,
+        if analyze_only:
+            log("Analyze-only mode — loading manifest, skipping browser...")
+            resolved_dir = _resolve_manifest_dir(manifest_dir, project_name)
+            if resolved_dir is None:
+                jobs[job_id]["status"] = "error"
+                jobs[job_id]["error"] = (
+                    "No manifest directory found for analyze-only mode. "
+                    "Run a full capture first or specify manifest_dir."
+                )
+                log(jobs[job_id]["error"])
+                return
+            log(f"Resuming from: {resolved_dir}")
+            result = _run_async(run_analyze_from_manifest(
+                screenshots_dir=resolved_dir,
                 log_callback=log,
                 progress_callback=progress,
             ))
-        jobs[job_id]["status"] = "done"
-        jobs[job_id]["result"] = result
-        jobs[job_id]["progress"] = 100
-        total = result.get("total_line_items", 0) if isinstance(result, dict) else 0
-        log(f"Complete! {result.get('sheets_processed', 0)} sheets · {total} takeoff items extracted")
-    except Exception as e:
+        else:
+            log("Logging into StackCT...")
+            if mode == "all":
+                result = _run_async(
+                    run_all_projects(log_callback=log, progress_callback=progress)
+                )
+            else:
+                result = _run_async(run_project_scrape(
+                    project_id,
+                    project_name,
+                    page_ids_filter=page_ids,
+                    folder_id=folder_id,
+                    log_callback=log,
+                    progress_callback=progress,
+                ))
+        _finalize_stackct_job(job_id, result, log)
+    except Exception:
         logger.exception("StackCT job failed")
         jobs[job_id]["status"] = "error"
-        jobs[job_id]["error"] = "The job failed. Check server logs for details."
-        log("Job failed — see server logs")
+        jobs[job_id]["error"] = JOB_ERROR_MESSAGES["scrape_failed"]
+        log(jobs[job_id]["error"])
 
 
 def _pdf_job(job_id: str, pdf_path: str, project_name: str,
@@ -412,15 +526,23 @@ def sync_plan_sets_route(project_id):
     """Warm plan-set (folder) index for a project into SQLite."""
     from stackct_sync import sync_project_plan_sets
     force = request.args.get("force") == "1"
-    return jsonify(sync_project_plan_sets(project_id, force=force))
+    count_sheets = request.args.get("counts") == "1"
+    return jsonify(
+        sync_project_plan_sets(project_id, force=force, count_sheets=count_sheets)
+    )
 
 
 @app.route("/api/projects/<int:project_id>/plan-sets")
 def get_plan_sets_route(project_id):
-    """Return plan sets (folders) for a project (DB-first). Query: ?refresh=1"""
+    """Return plan sets (folders) for a project (DB-first).
+
+    Query: ?refresh=1 — full sync with per-folder sheet counts (slow)
+           ?wait=1 — block until fast folder list is ready (Preview Plans)
+    """
     from project_cache import get_project_plan_sets as _get
     force = request.args.get("refresh") == "1"
-    return jsonify(_get(project_id, force_refresh=force))
+    wait = request.args.get("wait") == "1"
+    return jsonify(_get(project_id, force_refresh=force, wait=wait))
 
 
 @app.route("/api/projects/<int:project_id>/plan-sets/<int:folder_id>/plans")
@@ -437,6 +559,55 @@ def get_folder_plans(project_id, folder_id):
             background=background,
         )
     )
+
+
+def _stackct_project_name(project_id: int) -> str:
+    import stackct_store as store
+
+    store.init_db()
+    for p in store.list_projects():
+        if p.get("id") == project_id:
+            return p.get("name") or f"Project_{project_id}"
+    return f"Project_{project_id}"
+
+
+@app.route("/api/projects/<int:project_id>/sheet-previews")
+def sheet_previews(project_id):
+    """Map page_id → preview_url (if HD screenshot exists) and stackct_url."""
+    from project_cache import get_project_plans as _get_plans
+    from sheet_preview import build_sheet_preview_payload
+
+    folder_id = request.args.get("folder_id", type=int)
+    if folder_id is None:
+        return jsonify({"error": "folder_id required"}), 400
+
+    data = _get_plans(project_id, folder_id, force_refresh=False, background=False)
+    plans = data.get("plans") or []
+    name = (request.args.get("project_name") or "").strip() or _stackct_project_name(project_id)
+    previews = build_sheet_preview_payload(
+        project_id, name, plans, folder_id=folder_id
+    )
+    return jsonify({"previews": {str(k): v for k, v in previews.items()}})
+
+
+@app.route("/api/projects/<int:project_id>/sheet-preview/<int:page_id>")
+def serve_sheet_preview(project_id, page_id):
+    """Serve an HD drawing image from a prior takeoff run (JPEG or PNG)."""
+    from project_cache import get_project_plans as _get_plans
+    from sheet_preview import resolve_screenshot_path
+
+    folder_id = request.args.get("folder_id", type=int)
+    if folder_id is None:
+        return jsonify({"error": "folder_id required"}), 400
+
+    name = (request.args.get("project_name") or "").strip() or _stackct_project_name(project_id)
+    data = _get_plans(project_id, folder_id, force_refresh=False, background=False)
+    plans = data.get("plans") or []
+    path = resolve_screenshot_path(project_id, page_id, name, plans)
+    if not path:
+        return jsonify({"error": "Screenshot not found"}), 404
+    mime = "image/jpeg" if str(path).lower().endswith((".jpg", ".jpeg")) else "image/png"
+    return send_file(path, mimetype=mime, max_age=3600)
 
 
 @app.route("/api/projects/<int:project_id>/sync-plans", methods=["POST"])
@@ -479,16 +650,32 @@ def get_plans(project_id):
 
 @app.route("/api/run/stackct", methods=["POST"])
 def run_stackct():
-    """Start a StackCT scraping job."""
+    """
+    Start a StackCT scraping job.
+
+    Body parameters:
+        mode (str): "all" | "specific" — ignored when analyze_only=true.
+        project_id (int): StackCT project ID (required for mode="specific").
+        project_name (str): Human-readable project name.
+        page_ids (list[int]): Optional subset of page IDs (mode="specific").
+        folder_id (int): Optional plan-set folder ID.
+        analyze_only (bool): Skip capture; re-run Claude on an existing
+            manifest. Requires a prior capture run for project_name.
+        manifest_dir (str): Optional explicit run folder path (absolute or
+            relative to output/screenshots). Auto-discovers latest run when
+            omitted. Only used when analyze_only=true.
+    """
     data = request.json or {}
     mode = data.get("mode", "all")           # "all" | "specific"
     project_id = data.get("project_id")
     project_name = data.get("project_name", "Project")
     page_ids = data.get("page_ids")          # Optional list of specific page IDs to analyze
     folder_id = data.get("folder_id")
+    analyze_only: bool = bool(data.get("analyze_only", False))
+    manifest_dir: Optional[str] = data.get("manifest_dir") or None
 
     # Validate page_ids belong to folder when both provided
-    if mode == "specific" and project_id and page_ids and folder_id is not None:
+    if not analyze_only and mode == "specific" and project_id and page_ids and folder_id is not None:
         import stackct_store as _store
         _store.init_db()
         allowed = {
@@ -504,11 +691,13 @@ def run_stackct():
                     ),
                 }), 400
 
+    mode_detail = "analyze_only" if analyze_only else "full"
+
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
         "id": job_id, "type": "stackct", "status": "queued",
         "progress": 0, "log": [], "result": None, "error": None,
-        "project": project_name, "mode": mode,
+        "project": project_name, "mode": mode, "mode_detail": mode_detail,
         "started_at": None,
         "current_sheet": {"index": 0, "total": 0, "name": None, "phase": None},
         "sheets_completed": []
@@ -517,6 +706,7 @@ def run_stackct():
     t = threading.Thread(
         target=_stackct_job,
         args=(job_id, mode, project_id, project_name, page_ids, folder_id),
+        kwargs={"analyze_only": analyze_only, "manifest_dir": manifest_dir},
         daemon=True
     )
     t.start()
@@ -651,6 +841,7 @@ def job_status(job_id):
         "log": job["log"][-50:],
         "project": job["project"],
         "error": job["error"],
+        "warning": job.get("warning"),
         "has_result": job["result"] is not None,
     })
 
@@ -708,6 +899,7 @@ def list_reports():
         files = {}
         for filename, key in [
             ("takeoff.json",     "json"),
+            ("takeoff_summary.csv", "takeoff_summary_csv"),
             ("raw_items.csv",    "raw_csv"),
             ("calculations.csv", "calculated_csv"),
             ("summary.txt",      "summary"),
@@ -761,6 +953,64 @@ def list_reports():
     # Newest first by created time
     runs.sort(key=lambda r: r["created"], reverse=True)
     return jsonify({"reports": runs})
+
+
+@app.route("/api/reports/<run_folder>")
+@login_required
+def get_report(run_folder: str):
+    """Return metadata for a single report run."""
+    if "/" in run_folder or ".." in run_folder:
+        return jsonify({"error": "Invalid path"}), 400
+
+    sub = Path(OUTPUT_DIR) / run_folder
+    if not sub.is_dir():
+        return jsonify({"error": "Not found"}), 404
+
+    files = {}
+    for filename, key in [
+        ("takeoff.json",        "json"),
+        ("takeoff_summary.csv", "takeoff_summary_csv"),
+        ("raw_items.csv",       "raw_csv"),
+        ("calculations.csv",    "calculated_csv"),
+        ("summary.txt",         "summary"),
+    ]:
+        f = sub / filename
+        if f.exists():
+            files[key] = {"filename": filename, "size": f.stat().st_size}
+
+    if not files:
+        return jsonify({"error": "Not found"}), 404
+
+    cost_usd = sheets_processed = raw_items_count = calculated_count = None
+    json_file = sub / "takeoff.json"
+    if json_file.exists():
+        try:
+            with open(json_file) as jf:
+                td = json.load(jf)
+            api_usage = td.get("api_usage", {})
+            cost_usd = api_usage.get("total_cost_usd")
+            sheets_processed = td.get("sheets_processed")
+            raw_items_count = td.get("total_line_items")
+            calculated_count = td.get("total_calculated_items")
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    import re as _re
+    m = _re.match(r"^(.*)_(\d{8}_\d{6})$", sub.name)
+    project_name = m.group(1).replace("_", " ") if m else sub.name
+    timestamp = m.group(2) if m else ""
+
+    return jsonify({
+        "run_folder": sub.name,
+        "project_name": project_name,
+        "timestamp": timestamp,
+        "created": sub.stat().st_ctime,
+        "files": files,
+        "total_cost_usd": cost_usd,
+        "sheets_processed": sheets_processed,
+        "raw_items_count": raw_items_count,
+        "calculated_count": calculated_count,
+    })
 
 
 @app.route("/api/reports/<run_folder>/<filename>")
