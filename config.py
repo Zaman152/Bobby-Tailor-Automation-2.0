@@ -48,6 +48,9 @@ STACKCT_CACHE_TTL_HOURS = int(os.getenv("STACKCT_CACHE_TTL_HOURS", "24"))
 # Preview settings
 MAX_PREVIEW_ROWS = int(os.getenv("MAX_PREVIEW_ROWS", "500"))  # Cap for CSV preview
 
+# Screenshot reuse: skip blob download when a matching file already exists on disk
+REUSE_SCREENSHOTS = os.getenv("REUSE_SCREENSHOTS", "true").lower() in ("1", "true", "yes")
+
 # Schedule (cron expression)
 RUN_SCHEDULE = os.getenv("RUN_SCHEDULE", "0 8 * * *")  # daily at 8am
 
