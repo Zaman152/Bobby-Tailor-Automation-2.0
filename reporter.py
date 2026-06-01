@@ -21,7 +21,9 @@ logger = logging.getLogger(__name__)
 def generate_report(project_name: str,
                     all_extracted: list,
                     all_estimates: Optional[list] = None,
-                    folder_id: Optional[int] = None) -> dict:
+                    folder_id: Optional[int] = None,
+                    cross_references: Optional[list] = None,
+                    linked_sheets: Optional[list] = None) -> dict:
     """
     Build the final takeoff report.
 
@@ -31,8 +33,17 @@ def generate_report(project_name: str,
         all_estimates: list of items returned by calculator.apply_estimation_tables()
                        — already has calculated quantities, waste factors, source tracing
         folder_id: Optional StackCT folder/plan-set ID for this run
+        cross_references: Optional list of cross-reference links between sheets
+        linked_sheets: Optional list of linked-sheet metadata dicts from Phase 18;
+                       each has at minimum {page_id, sheet_name, ref_from} and optional
+                       suggested_only=True when AUTO_INCLUDE_LINKED_SHEETS is off
     """
     all_estimates = all_estimates or []
+
+    # Phase 18: linked sheet metadata — split into auto-added vs. suggested-only
+    linked_added = [m for m in (linked_sheets or []) if not m.get("suggested_only")]
+    linked_suggested = [m for m in (linked_sheets or []) if m.get("suggested_only")]
+
     output_root = Path(OUTPUT_DIR)
     output_root.mkdir(parents=True, exist_ok=True)
 
@@ -48,6 +59,10 @@ def generate_report(project_name: str,
 
     # Calculated takeoff = estimator output with full traceability
     calculated_items = _normalize_calculated(all_estimates)
+
+    specification_tables = _collect_specification_tables(all_extracted)
+    from aggregator import aggregate_takeoff
+    takeoff_summary = aggregate_takeoff(calculated_items)
 
     # Aggregate API usage across all sheets
     total_cost = sum(d.get("_cost_usd", 0) for d in all_extracted)
@@ -75,6 +90,13 @@ def generate_report(project_name: str,
             "models_used": model_counts,
         },
         "calculated_takeoff": calculated_items,         # Section 5 deliverable
+        "takeoff_summary": takeoff_summary,
+        "specification_tables": specification_tables,
+        "cross_references": cross_references or [],
+        "linked_sheets_added": linked_added,
+        "linked_sheets_suggested": linked_suggested,
+        "linked_sheets_added_count": len(linked_added),
+        "linked_sheets_suggested_count": len(linked_suggested),
         "raw_line_items": raw_line_items,               # Source-of-truth list
         "by_sheet": _group_by_sheet(raw_line_items + calculated_items),
         "by_category": _group_by_category(raw_line_items),
@@ -106,7 +128,9 @@ def generate_report(project_name: str,
     json_path = run_dir / "takeoff.json"
     csv_raw   = run_dir / "raw_items.csv"
     csv_calc  = run_dir / "calculations.csv"      # ← THE CALCULATIONS FILE
+    csv_summary = run_dir / "takeoff_summary.csv"
     txt_path  = run_dir / "summary.txt"
+    spec_json = run_dir / "spec_tables.json"
 
     with open(json_path, "w") as f:
         json.dump(report, f, indent=2)
@@ -121,6 +145,18 @@ def generate_report(project_name: str,
         _write_calculated_csv(calculated_items, csv_calc)
     except Exception as e:
         logger.error(f"Failed to write calculated CSV: {e}")
+
+    try:
+        _write_takeoff_summary_csv(takeoff_summary, csv_summary)
+    except Exception as e:
+        logger.error(f"Failed to write takeoff summary CSV: {e}")
+
+    if specification_tables:
+        try:
+            with open(spec_json, "w") as f:
+                json.dump(specification_tables, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to write spec_tables.json: {e}")
 
     try:
         _write_summary(report, txt_path)
@@ -146,10 +182,30 @@ def generate_report(project_name: str,
         "json":           str(json_path),
         "raw_csv":        str(csv_raw),
         "calculated_csv": str(csv_calc),   # NEW name: calculations.csv
+        "takeoff_summary_csv": str(csv_summary),
         "summary_txt":    str(txt_path),
+        "spec_tables_json": str(spec_json) if specification_tables else None,
     }
     report["_run_folder_name"] = run_dir.name
     return report
+
+
+def _collect_specification_tables(all_extracted: list) -> List[Dict[str, Any]]:
+    tables = []
+    for d in all_extracted:
+        sheet = d.get("_source_sheet", "unknown")
+        for sched in d.get("schedules", []):
+            if sched.get("table_purpose") != "specification_reference":
+                continue
+            tables.append({
+                "name": sched.get("name"),
+                "source_sheet": sheet,
+                "lookup_key": sched.get("lookup_key"),
+                "columns": sched.get("columns", []),
+                "rows": sched.get("rows", []),
+                "description": sched.get("description", ""),
+            })
+    return tables
 
 
 # ─── Flatten raw extractions ─────────────────────────────────────────────────
@@ -300,6 +356,7 @@ def _normalize_calculated(estimates: list) -> List[Dict[str, Any]]:
             "calculated_unit": e.get("unit", ""),
             "waste_factor": e.get("waste_factor_applied", 1.0),
             "formula_applied": e.get("formula", ""),   # NEW: shows the actual math
+            "approximate": e.get("approximate", False),
             "estimation_table": e.get("table_used", "none"),
             "source_sheet": e.get("source_sheet", ""),
             "source_location": e.get("source_location", ""),
@@ -352,13 +409,29 @@ def _write_raw_csv(items: list, path: Path):
             w.writerows(items)
 
 
+def _write_takeoff_summary_csv(aggregated: list, path: Path):
+    """StackCT-style consolidated takeoff summary."""
+    fields = ["item", "quantity", "unit", "source_sheets", "line_count"]
+    with open(path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+        w.writeheader()
+        for row in aggregated:
+            w.writerow({
+                "item": row.get("item"),
+                "quantity": row.get("quantity_fmt") or row.get("quantity"),
+                "unit": row.get("unit"),
+                "source_sheets": ", ".join(row.get("source_sheets", [])),
+                "line_count": row.get("line_count", 0),
+            })
+
+
 def _write_calculated_csv(items: list, path: Path):
     """Calculated takeoff CSV — quantities with estimation tables applied + traceability."""
     fields = [
         "item_type", "description",
         "raw_value", "raw_unit",
         "calculated_quantity", "calculated_unit",
-        "waste_factor", "formula_applied", "estimation_table",
+        "waste_factor", "formula_applied", "approximate", "estimation_table",
         "source_sheet", "source_location", "source_text", "specification"
     ]
     with open(path, "w", newline="") as f:
@@ -432,6 +505,21 @@ def _write_summary(report: dict, path: Path):
     lines += ["", "─" * 70, "CALCULATED TAKEOFF BY ESTIMATION TABLE", "─" * 70]
     for tbl, data in report.get("by_table", {}).items():
         lines.append(f"  {_s(tbl).upper():15s}  {_i(data.get('count')):>4} items")
+
+    summary_rows = report.get("takeoff_summary", [])
+    if summary_rows:
+        lines += [
+            "",
+            "═" * 70,
+            "PROJECT TAKEOFF SUMMARY (CONSOLIDATED)",
+            "═" * 70,
+            f"  {'ITEM':<40} {'QTY':>12}  {'UNIT':<8}",
+            "─" * 70,
+        ]
+        for row in summary_rows:
+            lines.append(
+                f"  {row.get('item', ''):<40} {row.get('quantity_fmt', ''):>12}  {row.get('unit', ''):<8}"
+            )
 
     lines += ["", "─" * 70, "DETAILED CALCULATED TAKEOFF (with sources)", "─" * 70]
     for item in report.get("calculated_takeoff", []):

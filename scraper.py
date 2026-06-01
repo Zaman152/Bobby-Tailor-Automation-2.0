@@ -699,6 +699,7 @@ async def run_project_scrape(project_id: int, project_name: str,
             all_estimates,
             folder_id=folder_id,
             cross_references=cross_refs,
+            linked_sheets=linked_meta,
         )
 
         if sheets_failed or sheets_skipped or _cancelled:
@@ -727,8 +728,6 @@ async def run_project_scrape(project_id: int, project_name: str,
             log(f"         summary → {Path(files.get('summary_txt', '')).name}")
 
         report["screenshots_dir"] = str(screenshots_dir)
-        report["linked_sheets_added"] = [m for m in linked_meta if not m.get("suggested_only")]
-        report["linked_sheets_suggested"] = [m for m in linked_meta if m.get("suggested_only")]
         return report
 
     except Exception as exc:
