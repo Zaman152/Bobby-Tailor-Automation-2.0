@@ -11,9 +11,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 18 of 18 (Linked Sheet Resolution) — IN PROGRESS  
-Plan: 3/5 complete  
-Status: 18-01 (linked_sheets.py), 18-03 (config + PageEntry) executed  
-Last activity: 2026-06-02 — Executed 18-03-PLAN.md
+Plan: 4/5 complete  
+Status: 18-01 (linked_sheets.py), 18-03 (config + PageEntry), 18-02 (scraper integration) executed  
+Last activity: 2026-06-02 — Executed 18-02-PLAN.md
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -153,5 +153,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-02  
-Stopped at: Completed 18-03-PLAN.md (config constants + PageEntry.source)  
-Resume file: `.planning/phases/18-linked-sheet-resolution/18-04-PLAN.md` (scraper integration)
+Stopped at: Completed 18-02-PLAN.md (scraper linked sheet integration)  
+Resume file: `.planning/phases/18-linked-sheet-resolution/18-04-PLAN.md`
