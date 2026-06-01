@@ -376,6 +376,7 @@ async def run_project_scrape(project_id: int, project_name: str,
     browser_closed = False
     all_extracted: List[dict] = []
     all_estimates: List[dict] = []
+    linked_meta: List[dict] = []
     sheets_failed: List[Dict[str, Any]] = []
     sheets_skipped: List[Dict[str, Any]] = []
 
@@ -632,6 +633,33 @@ async def run_project_scrape(project_id: int, project_name: str,
                 _cancelled = True
 
         # ================================================================
+        # PASS 2a/2b/2c — Linked sheet discovery, capture, analyze
+        # ================================================================
+        if not _cancelled:
+            new_extracted, new_estimates, linked_meta = await _discover_and_add_linked_sheets(
+                browser=browser,
+                project_id=project_id,
+                project_name=project_name,
+                folder_id=folder_id,
+                all_extracted=all_extracted,
+                manifest=manifest,
+                mpath=mpath,
+                screenshots_dir=screenshots_dir,
+                cached_screenshots=cached_screenshots,
+                log=log,
+                progress_callback=progress_callback,
+                cancel_check=cancel_check,
+            )
+            all_extracted.extend(new_extracted)
+            all_estimates.extend(new_estimates)
+            if linked_meta:
+                actual_added = [m for m in linked_meta if not m.get("suggested_only")]
+                if actual_added:
+                    log(
+                        f"Linked sheets added: {len(actual_added)} page(s) captured and analyzed"
+                    )
+
+        # ================================================================
         # PASS 3 — Report
         # ================================================================
         successful = [d for d in all_extracted if "error" not in d]
@@ -699,6 +727,8 @@ async def run_project_scrape(project_id: int, project_name: str,
             log(f"         summary → {Path(files.get('summary_txt', '')).name}")
 
         report["screenshots_dir"] = str(screenshots_dir)
+        report["linked_sheets_added"] = [m for m in linked_meta if not m.get("suggested_only")]
+        report["linked_sheets_suggested"] = [m for m in linked_meta if m.get("suggested_only")]
         return report
 
     except Exception as exc:
