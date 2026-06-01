@@ -51,6 +51,19 @@ MAX_PREVIEW_ROWS = int(os.getenv("MAX_PREVIEW_ROWS", "500"))  # Cap for CSV prev
 # Screenshot reuse: skip blob download when a matching file already exists on disk
 REUSE_SCREENSHOTS = os.getenv("REUSE_SCREENSHOTS", "true").lower() in ("1", "true", "yes")
 
+# Linked sheet auto-follow (Phase 18)
+# When true, sheets referenced via cross-references are automatically captured
+# and analyzed to resolve target_sheet_not_found entries.
+AUTO_INCLUDE_LINKED_SHEETS = os.getenv(
+    "AUTO_INCLUDE_LINKED_SHEETS", "true"
+).lower() in ("1", "true", "yes")
+
+# Maximum linked sheets to add per run (cost/time guard)
+MAX_LINKED_SHEETS = int(os.getenv("MAX_LINKED_SHEETS", "10"))
+
+# Maximum recursive link-follow depth (v1: 1 = no recursion)
+MAX_LINKED_DEPTH = int(os.getenv("MAX_LINKED_DEPTH", "1"))
+
 # Schedule (cron expression)
 RUN_SCHEDULE = os.getenv("RUN_SCHEDULE", "0 8 * * *")  # daily at 8am
 
