@@ -119,11 +119,29 @@ async def _capture_sheet_screenshot(
         return False, f"capture_error:{type(exc).__name__}"
 
 
+def _weighted_progress(idx: int, total: int, phase: str) -> int:
+    """Return a weighted progress percentage that reflects the true job phase.
+
+    Capturing: 0–40%, Analyzing: 40–90%, Reporting: 95–100%.
+    This prevents the bar from appearing stuck at <10% while Claude processes
+    sheet 1 of many during the analyze pass.
+    """
+    frac = (idx / total) if total else 0.0
+    if phase == "capturing":
+        return int(frac * 40)
+    if phase in ("analyzing", "complete"):
+        return int(40 + frac * 50)
+    if phase == "reporting":
+        return 95
+    return int(frac * 100)
+
+
 async def run_project_scrape(project_id: int, project_name: str,
                              page_ids_filter: Optional[List[int]] = None,
                              folder_id: Optional[int] = None,
                              log_callback: Optional[Callable] = None,
-                             progress_callback: Optional[Callable] = None) -> dict:
+                             progress_callback: Optional[Callable] = None,
+                             cancel_check: Optional[Callable[[], bool]] = None) -> dict:
     def log(msg: str, entry: dict = None):
         logger.info(msg)
         if log_callback:
@@ -275,6 +293,11 @@ async def run_project_scrape(project_id: int, project_name: str,
 
             manifest.save(mpath)
 
+            # Cooperative cancellation — checked between sheets
+            if cancel_check and cancel_check():
+                log("Cancelled by user during capture pass")
+                break
+
         # Close browser before Claude phase — releases browser resources
         await browser.close()
         browser_closed = True
@@ -286,11 +309,18 @@ async def run_project_scrape(project_id: int, project_name: str,
             + (f", {total - captured_ok} failed/skipped" if captured_ok < total else "")
         )
 
+        # Cooperative cancellation — between capture and analyze passes
+        _cancelled = cancel_check and cancel_check()
+        if _cancelled:
+            log("Cancelled by user between capture and analyze passes")
+
         # ================================================================
         # PASS 2 — Analyze (no browser; Claude processes each screenshot)
         # ================================================================
         log("Pass 2 — Analyzing captured screenshots with Claude...")
         for idx, (page_info, entry) in enumerate(zip(pages, manifest.pages), 1):
+            if _cancelled:
+                break
             page_id = page_info["page_id"]
             sheet_name = entry.sheet_name
 
@@ -385,11 +415,24 @@ async def run_project_scrape(project_id: int, project_name: str,
 
             manifest.save(mpath)
 
+            # Cooperative cancellation — checked between sheets
+            if not _cancelled and cancel_check and cancel_check():
+                log("Cancelled by user during analyze pass")
+                _cancelled = True
+
         # ================================================================
-        # PASS 3 — Report (unchanged)
+        # PASS 3 — Report
         # ================================================================
         successful = [d for d in all_extracted if "error" not in d]
         if not successful:
+            if _cancelled:
+                return {
+                    "_cancelled": True,
+                    "error": "cancelled",
+                    "sheets_failed": sheets_failed,
+                    "sheets_skipped": sheets_skipped,
+                    "screenshots_dir": str(screenshots_dir),
+                }
             log(
                 f"All {total} sheet(s) failed — no report generated. "
                 f"See sheet errors above."
@@ -401,6 +444,11 @@ async def run_project_scrape(project_id: int, project_name: str,
                 "screenshots_dir": str(screenshots_dir),
             }
 
+        if _cancelled:
+            log(f"Cancelled — generating partial report from {len(successful)} completed sheet(s)...")
+
+        if progress_callback:
+            progress_callback(total, total, "Generating report", phase="reporting")
         log("Resolving cross-references and spec lookups...")
         cross_refs = resolve_cross_references(all_extracted)
         all_estimates = resolve_spec_lookups(all_extracted, all_estimates)
@@ -414,14 +462,17 @@ async def run_project_scrape(project_id: int, project_name: str,
             cross_references=cross_refs,
         )
 
-        if sheets_failed or sheets_skipped:
+        if sheets_failed or sheets_skipped or _cancelled:
             report["partial"] = True
             report["sheets_failed"] = sheets_failed
             report["sheets_skipped"] = sheets_skipped
             report["sheets_succeeded"] = len(successful)
+            if _cancelled:
+                report["_cancelled"] = True
             log(
                 f"Report saved (partial) — {len(successful)}/{total} sheets OK, "
                 f"{len(sheets_failed)} failed, {len(sheets_skipped)} skipped"
+                + (" (cancelled)" if _cancelled else "")
             )
         else:
             log(
@@ -460,6 +511,7 @@ async def run_analyze_from_manifest(
     force: bool = False,
     log_callback: Optional[Callable] = None,
     progress_callback: Optional[Callable] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
 ) -> dict:
     """
     Analyze-only pass using an existing run manifest.
@@ -518,8 +570,11 @@ async def run_analyze_from_manifest(
     all_estimates: List[dict] = []
     sheets_failed: List[Dict[str, Any]] = []
     sheets_skipped: List[Dict[str, Any]] = []
+    _cancelled = False
 
     for idx, entry in enumerate(pages, 1):
+        if _cancelled:
+            break
         page_id = entry.page_id
         sheet_name = entry.sheet_name
 
@@ -678,9 +733,22 @@ async def run_analyze_from_manifest(
 
         run_manifest.save(mpath)
 
+        # Cooperative cancellation — checked between sheets
+        if not _cancelled and cancel_check and cancel_check():
+            log("Cancelled by user during analyze pass")
+            _cancelled = True
+
     # Report ------------------------------------------------------------------
     successful = [d for d in all_extracted if "error" not in d]
     if not successful:
+        if _cancelled:
+            return {
+                "_cancelled": True,
+                "error": "cancelled",
+                "sheets_failed": sheets_failed,
+                "sheets_skipped": sheets_skipped,
+                "screenshots_dir": str(screenshots_dir),
+            }
         log(
             f"All {total} sheet(s) failed — no report generated. "
             "Check capture statuses and re-run with force=True if needed."
@@ -692,6 +760,11 @@ async def run_analyze_from_manifest(
             "screenshots_dir": str(screenshots_dir),
         }
 
+    if _cancelled:
+        log(f"Cancelled — generating partial report from {len(successful)} completed sheet(s)...")
+
+    if progress_callback:
+        progress_callback(total, total, "Generating report", phase="reporting")
     log("Resolving cross-references and spec lookups...")
     cross_refs = resolve_cross_references(all_extracted)
     all_estimates = resolve_spec_lookups(all_extracted, all_estimates)
@@ -705,14 +778,17 @@ async def run_analyze_from_manifest(
         cross_references=cross_refs,
     )
 
-    if sheets_failed or sheets_skipped:
+    if sheets_failed or sheets_skipped or _cancelled:
         report["partial"] = True
         report["sheets_failed"] = sheets_failed
         report["sheets_skipped"] = sheets_skipped
         report["sheets_succeeded"] = len(successful)
+        if _cancelled:
+            report["_cancelled"] = True
         log(
             f"Report saved (partial) — {len(successful)}/{total} sheets OK, "
             f"{len(sheets_failed)} failed, {len(sheets_skipped)} skipped"
+            + (" (cancelled)" if _cancelled else "")
         )
     else:
         log(

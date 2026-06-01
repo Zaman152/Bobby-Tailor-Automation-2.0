@@ -274,6 +274,20 @@ def _finalize_stackct_job(job_id: str, result, log):
         log(jobs[job_id]["error"])
         return
 
+    # Cancelled: scraper stopped early; preserve "cancelled" status set by endpoint
+    if result.get("_cancelled"):
+        if result.get("error") == "cancelled":
+            # No sheets completed — nothing to save
+            log("Job cancelled — no sheets completed.")
+        else:
+            # Partial report saved
+            jobs[job_id]["result"] = result
+            sheets_ok = result.get("sheets_succeeded", 0)
+            jobs[job_id]["warning"] = f"Job cancelled — partial report from {sheets_ok} sheet(s)."
+            log(jobs[job_id]["warning"])
+        jobs[job_id]["current_phase"] = "cancelled"
+        return
+
     if result.get("error"):
         jobs[job_id]["status"] = "error"
         jobs[job_id]["error"] = _user_facing_job_error(result["error"])
@@ -288,6 +302,7 @@ def _finalize_stackct_job(job_id: str, result, log):
     jobs[job_id]["result"] = result
     jobs[job_id]["progress"] = 100
     jobs[job_id]["error"] = None
+    jobs[job_id]["current_phase"] = "done"
 
     total_items = result.get("total_line_items", 0)
     sheets_ok = result.get("sheets_succeeded") or result.get("sheets_processed", 0)
@@ -369,10 +384,22 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
         if len(jobs[job_id]["log"]) > 200:
             jobs[job_id]["log"] = jobs[job_id]["log"][-150:]
 
+    def _weighted_pct(current: int, total: int, phase: str) -> int:
+        """Weighted progress: capturing 0-40%, analyzing 40-90%, reporting 95%."""
+        frac = (current / total) if total else 0.0
+        if phase == "capturing":
+            return int(frac * 40)
+        if phase in ("analyzing", "complete"):
+            return int(40 + frac * 50)
+        if phase == "reporting":
+            return 95
+        return int(frac * 100)
+
     def progress(current: int, total: int, sheet: str,
                  phase: str = "analyzing", extraction: dict = None):
-        pct = int(current / total * 100) if total else 0
+        pct = _weighted_pct(current, total, phase)
         jobs[job_id]["progress"] = pct
+        jobs[job_id]["current_phase"] = phase
         jobs[job_id]["current_sheet"] = {
             "index": current,
             "total": total,
@@ -384,6 +411,9 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
                 "name": sheet,
                 "extraction": extraction
             })
+
+    def cancel_check() -> bool:
+        return bool(jobs[job_id].get("_cancel"))
 
     jobs[job_id]["status"] = "running"
     jobs[job_id]["started_at"] = datetime.now().isoformat()
@@ -404,6 +434,7 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
                 screenshots_dir=resolved_dir,
                 log_callback=log,
                 progress_callback=progress,
+                cancel_check=cancel_check,
             ))
         else:
             log("Logging into StackCT...")
@@ -419,6 +450,7 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
                     folder_id=folder_id,
                     log_callback=log,
                     progress_callback=progress,
+                    cancel_check=cancel_check,
                 ))
         _finalize_stackct_job(job_id, result, log)
     except Exception:
@@ -699,6 +731,7 @@ def run_stackct():
         "progress": 0, "log": [], "result": None, "error": None,
         "project": project_name, "mode": mode, "mode_detail": mode_detail,
         "started_at": None,
+        "current_phase": None,
         "current_sheet": {"index": 0, "total": 0, "name": None, "phase": None},
         "sheets_completed": []
     }
@@ -834,6 +867,7 @@ def job_status(job_id):
         "progress": job["progress"],
         "started_at": job.get("started_at"),
         "current_sheet": cs,
+        "current_phase": job.get("current_phase") or (cs.get("phase") if cs else None),
         "sheets_completed": len(completed),
         "total_sheets": cs.get("total", 0),
         "sheet_log": completed[-10:],
