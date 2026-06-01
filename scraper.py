@@ -454,6 +454,283 @@ async def run_project_scrape(project_id: int, project_name: str,
             log("Browser closed")
 
 
+async def run_analyze_from_manifest(
+    screenshots_dir: Optional[Path] = None,
+    manifest_path_override: Optional[Path] = None,
+    force: bool = False,
+    log_callback: Optional[Callable] = None,
+    progress_callback: Optional[Callable] = None,
+) -> dict:
+    """
+    Analyze-only pass using an existing run manifest.
+
+    Recovers from mid-run crashes: loads manifest.json from a previous run,
+    skips pages with analysis_status='ok' (unless force=True), re-runs Claude
+    on pending/failed pages, writes report.  No browser required.
+
+    Args:
+        screenshots_dir: Run folder containing manifest.json and screenshots.
+        manifest_path_override: Explicit path to manifest.json (overrides screenshots_dir).
+        force: Re-analyze all pages regardless of existing analysis_status.
+        log_callback: Optional callable for structured log entries.
+        progress_callback: Optional callable for progress updates.
+
+    Returns:
+        Report dict (same shape as run_project_scrape) or error dict.
+    """
+    import json as _json
+
+    def log(msg: str, entry: dict = None):
+        logger.info(msg)
+        if log_callback:
+            log_callback(entry if entry else msg)
+
+    # Resolve manifest path ---------------------------------------------------
+    if manifest_path_override:
+        mpath = Path(manifest_path_override)
+        if screenshots_dir is None:
+            screenshots_dir = mpath.parent
+    elif screenshots_dir is not None:
+        screenshots_dir = Path(screenshots_dir)
+        mpath = manifest_path(screenshots_dir)
+    else:
+        return {"error": "analyze_manifest_no_dir"}
+
+    if not mpath.exists():
+        log(f"Manifest not found: {mpath}")
+        return {"error": "manifest_not_found", "path": str(mpath)}
+
+    log(f"Loading manifest: {mpath}")
+    try:
+        run_manifest = RunManifest.load(mpath)
+    except Exception as exc:
+        log(f"Failed to load manifest: {exc}")
+        return {"error": "manifest_load_failed", "message": str(exc)}
+
+    project_name = run_manifest.project_name
+    folder_id = run_manifest.folder_id
+    pages = run_manifest.pages
+    total = len(pages)
+
+    log(f"Analyze-only: {project_name} — {total} page(s) in manifest")
+
+    all_extracted: List[dict] = []
+    all_estimates: List[dict] = []
+    sheets_failed: List[Dict[str, Any]] = []
+    sheets_skipped: List[Dict[str, Any]] = []
+
+    for idx, entry in enumerate(pages, 1):
+        page_id = entry.page_id
+        sheet_name = entry.sheet_name
+
+        # Skip pages that were never captured ----------------------------------
+        if entry.capture_status != "ok":
+            if entry.capture_status == "failed":
+                entry.analysis_status = "skipped"
+                all_extracted.append(
+                    _failed_extraction(page_id, sheet_name, "capture_failed")
+                )
+                sheets_failed.append({
+                    "page_id": page_id,
+                    "sheet_name": sheet_name,
+                    "reason": "capture_failed",
+                })
+            else:
+                entry.analysis_status = "skipped"
+                sheets_skipped.append({
+                    "page_id": page_id,
+                    "sheet_name": sheet_name,
+                    "reason": entry.capture_status,
+                })
+            run_manifest.save(mpath)
+            continue
+
+        if not entry.screenshot_rel:
+            log(f"  [{sheet_name}] manifest entry has no screenshot filename — skipping")
+            entry.analysis_status = "failed"
+            sheets_failed.append({
+                "page_id": page_id,
+                "sheet_name": sheet_name,
+                "reason": "no_screenshot_rel",
+            })
+            run_manifest.save(mpath)
+            continue
+
+        screenshot_path = screenshots_dir / entry.screenshot_rel
+        if not screenshot_path.exists():
+            log(f"  [{sheet_name}] screenshot missing on disk: {entry.screenshot_rel}")
+            entry.analysis_status = "failed"
+            sheets_failed.append({
+                "page_id": page_id,
+                "sheet_name": sheet_name,
+                "reason": "screenshot_missing",
+            })
+            run_manifest.save(mpath)
+            continue
+
+        # Per-page analysis cache: {page_id}_analysis.json beside screenshot --
+        cache_file = screenshots_dir / f"{page_id}_analysis.json"
+
+        if entry.analysis_status == "ok" and not force:
+            if cache_file.exists():
+                try:
+                    cached = _json.loads(cache_file.read_text(encoding="utf-8"))
+                    all_extracted.append(cached)
+                    estimates = apply_estimation_tables(cached)
+                    all_estimates.extend(estimates)
+                    log(
+                        f"[{idx}/{total}] {sheet_name}: loaded from analysis cache",
+                        _make_log_entry(
+                            f"[{idx}/{total}] {sheet_name}: from cache",
+                            "sheet_progress", idx, total, sheet_name,
+                        ),
+                    )
+                    if progress_callback:
+                        progress_callback(
+                            idx, total, sheet_name, phase="complete",
+                            extraction={"cached": True},
+                        )
+                    continue
+                except Exception:
+                    pass  # Cache corrupted → fall through to re-analyze
+            # No valid cache file but status=ok → re-analyze to rebuild cache
+            log(f"[{idx}/{total}] {sheet_name}: no cache file, re-analyzing")
+
+        # Run analysis --------------------------------------------------------
+        try:
+            if progress_callback:
+                progress_callback(idx, total, sheet_name, phase="analyzing")
+            log(
+                f"[{idx}/{total}] Analyzing {sheet_name} with Claude...",
+                _make_log_entry(
+                    f"[{idx}/{total}] Analyzing {sheet_name}",
+                    "sheet_progress", idx, total, sheet_name,
+                ),
+            )
+
+            extracted = analyze_drawing(str(screenshot_path), sheet_name)
+            extracted["_page_id"] = page_id
+            extracted["_source_sheet"] = sheet_name
+
+            if "error" in extracted:
+                err = extracted.get("error", "analysis_failed")
+                log(f"  Warning: analysis error on {sheet_name}: {err}")
+                entry.analysis_status = "failed"
+                sheets_failed.append({
+                    "page_id": page_id,
+                    "sheet_name": sheet_name,
+                    "reason": f"analysis:{err}",
+                })
+            else:
+                # Save analysis JSON cache beside screenshot
+                try:
+                    cache_file.write_text(
+                        _json.dumps(extracted, indent=2), encoding="utf-8"
+                    )
+                except Exception as cache_err:
+                    logger.warning(
+                        "Could not write analysis cache for %s: %s", sheet_name, cache_err
+                    )
+
+                n_meas = len(extracted.get("measurements", []))
+                n_comp = len(extracted.get("components", []))
+                extraction_counts = {
+                    "measurements": n_meas,
+                    "components": n_comp,
+                    "rooms": len(extracted.get("rooms", [])),
+                    "schedules": len(extracted.get("schedules", [])),
+                }
+                msg = (
+                    f"  {sheet_name}: {n_meas} measurements, "
+                    f"{n_comp} components extracted"
+                )
+                log(
+                    msg,
+                    _make_log_entry(
+                        msg, "sheet_complete", idx, total, sheet_name, extraction_counts
+                    ),
+                )
+                if progress_callback:
+                    progress_callback(
+                        idx, total, sheet_name,
+                        phase="complete", extraction=extraction_counts,
+                    )
+                estimates = apply_estimation_tables(extracted)
+                if estimates:
+                    log(f"  {sheet_name}: {len(estimates)} calculated takeoff items")
+                all_estimates.extend(estimates)
+                entry.analysis_status = "ok"
+
+            all_extracted.append(extracted)
+
+        except Exception as exc:
+            logger.exception("Unhandled analysis error on sheet %s", sheet_name)
+            reason = type(exc).__name__
+            msg = f"  Analysis error on {sheet_name}: {reason} — continuing"
+            log(msg, _make_log_entry(msg, "sheet_error", idx, total, sheet_name))
+            entry.analysis_status = "failed"
+            sheets_failed.append({
+                "page_id": page_id,
+                "sheet_name": sheet_name,
+                "reason": reason,
+            })
+            all_extracted.append(_failed_extraction(page_id, sheet_name, reason))
+
+        run_manifest.save(mpath)
+
+    # Report ------------------------------------------------------------------
+    successful = [d for d in all_extracted if "error" not in d]
+    if not successful:
+        log(
+            f"All {total} sheet(s) failed — no report generated. "
+            "Check capture statuses and re-run with force=True if needed."
+        )
+        return {
+            "error": ERROR_ALL_SHEETS_FAILED,
+            "sheets_failed": sheets_failed,
+            "sheets_skipped": sheets_skipped,
+            "screenshots_dir": str(screenshots_dir),
+        }
+
+    log("Resolving cross-references and spec lookups...")
+    cross_refs = resolve_cross_references(all_extracted)
+    all_estimates = resolve_spec_lookups(all_extracted, all_estimates)
+
+    log("Generating report (raw CSV + calculated CSV + summary + JSON)...")
+    report = generate_report(
+        project_name,
+        all_extracted,
+        all_estimates,
+        folder_id=folder_id,
+        cross_references=cross_refs,
+    )
+
+    if sheets_failed or sheets_skipped:
+        report["partial"] = True
+        report["sheets_failed"] = sheets_failed
+        report["sheets_skipped"] = sheets_skipped
+        report["sheets_succeeded"] = len(successful)
+        log(
+            f"Report saved (partial) — {len(successful)}/{total} sheets OK, "
+            f"{len(sheets_failed)} failed, {len(sheets_skipped)} skipped"
+        )
+    else:
+        log(
+            f"Report saved — {report.get('sheets_processed', 0)} sheets, "
+            f"{report.get('total_line_items', 0)} raw items, "
+            f"{report.get('total_calculated_items', 0)} calculated takeoff items"
+        )
+
+    files = report.get("_files", {})
+    if files:
+        log(f"  Files: raw items → {Path(files.get('raw_csv', '')).name}")
+        log(f"         calculations → {Path(files.get('calculated_csv', '')).name}")
+        log(f"         summary → {Path(files.get('summary_txt', '')).name}")
+
+    report["screenshots_dir"] = str(screenshots_dir)
+    return report
+
+
 async def run_all_projects(log_callback: Optional[Callable] = None,
                            progress_callback: Optional[Callable] = None) -> dict:
     def log(msg: str):
