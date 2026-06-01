@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 17 execution — resume at Plan 17-05
+**Current focus:** Phase 18 planned (linked sheets); finish Phase 17 UAT first
 
 ## Current Position
 
-Phase: 17 of 17 (Production Takeoff Pipeline) — EXECUTING  
-Plan: 4/5 complete (17-01 ✓, 17-02 ✓, 17-03 ✓, 17-04 ✓)  
-Status: In progress — resume at Plan 17-05  
-Last activity: 2026-06-02 — 17-04 shipped (phase-aware progress / cooperative cancel / monitor UI)
+Phase: 18 of 18 (Linked Sheet Resolution) — IN PROGRESS  
+Plan: 1/5 complete  
+Status: 18-01 executed (linked_sheets.py core module + 18 unit tests)  
+Last activity: 2026-06-02 — Executed 18-01-PLAN.md
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -152,6 +152,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-02 00:11 UTC+5  
-Stopped at: Completed 17-03-PLAN.md (crash recovery / analyze-only API)  
-Resume file: None
+Last session: 2026-06-02  
+Stopped at: Completed 18-01-PLAN.md (linked_sheets.py core module)  
+Resume file: `.planning/phases/18-linked-sheet-resolution/18-03-PLAN.md` (wave 2 next per wave order)
