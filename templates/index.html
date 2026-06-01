@@ -133,9 +133,6 @@
             <button type="button" class="preview-btn" id="previewPlansBtn" disabled>
               Preview Plans →
             </button>
-            <button type="button" class="btn-ghost btn-sm" id="refreshPlansBtn" disabled title="Force live sync from StackCT">
-              ↻ Refresh plans
-            </button>
             <button type="button" class="run-btn run-btn-secondary" id="runStackctBtn" onclick="runStackCT()">
               ▶ Run All
             </button>
@@ -144,8 +141,13 @@
           <!-- Plan set picker (StackCT folders) -->
           <div id="planSetPanel" class="plan-panel plan-set-panel" style="display:none">
             <div class="plan-set-header">
-              <h3 class="plan-set-title">Plan sets</h3>
-              <span id="planSetCount" class="plan-set-count-badge"></span>
+              <div class="plan-set-header-title">
+                <h3 class="plan-set-title">Plan sets</h3>
+                <span id="planSetCount" class="plan-set-count-badge"></span>
+              </div>
+              <button type="button" class="btn-ghost btn-sm plan-set-refresh-btn" id="refreshPlansBtn" disabled title="Force live sync from StackCT">
+                ↻ Sync from StackCT
+              </button>
             </div>
             <p class="plan-set-hint" id="planSetHint">Choose a plan set (issue package), then load drawing sheets.</p>
             <div class="plan-set-list" id="planSetList" role="radiogroup" aria-label="Plan sets"></div>
@@ -256,6 +258,7 @@
             <div class="monitor-header-right">
               <span class="monitor-started" id="monitorStarted">Started: —</span>
               <span class="status-badge badge-running" id="monitorStatus">● RUNNING</span>
+              <span class="phase-badge" id="monitorPhaseBadge" style="display:none"></span>
             </div>
           </div>
 

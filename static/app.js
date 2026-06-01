@@ -134,8 +134,25 @@ async function loadProjects(force = false) {
 
     if (status) {
       const when = data.fetched_at ? new Date(data.fetched_at).toLocaleString() : '';
-      let tag = data.syncing ? 'Syncing…' : (data.from_cache ? 'Cached' + (data.stale ? ' · refreshing' : '') : 'Live');
+      let tag;
+      if (data.names_refreshing) {
+        tag = 'Refreshing names…';
+      } else if (data.syncing) {
+        tag = 'Syncing…';
+      } else if (data.from_cache && data.stale) {
+        tag = 'Cached · refreshing';
+      } else if (data.from_cache) {
+        tag = 'Cached';
+      } else {
+        tag = 'Live';
+      }
       status.textContent = tag + ' · ' + allProjects.length + ' projects' + (when ? ' · ' + when : '');
+
+      // Warn when most names are still placeholders (stale DB)
+      const placeholders = allProjects.filter(p => /^Project_\d+$/.test(p.name || '')).length;
+      if (placeholders > allProjects.length * 0.3) {
+        status.textContent += ' · ' + placeholders + ' unnamed — click ↻ Refresh to fix';
+      }
     }
   } catch (e) {
     listEl.innerHTML = '<p class="empty">Network error loading projects</p>';
@@ -176,7 +193,7 @@ function renderProjectList(projects) {
   listEl.innerHTML = filtered.map(p => {
     const isSelected = selectedProject && selectedProject.id === p.id;
     const meta = projectSheetCounts[p.id];
-    let countLabel = '<span class="sheet-count-unknown" title="Preview to load plan sets">—</span>';
+    let countLabel = '<span class="sheet-count-unknown" title="Plan set count loads from cache or background sync">—</span>';
     if (meta != null) {
       if (typeof meta === 'object') {
         const sets = meta.plan_set_count;
@@ -202,27 +219,57 @@ function renderProjectList(projects) {
   }).join('');
 }
 
+function applyPlanSetCountsFromApi(projectId, data) {
+  const sets = data.plan_sets || [];
+  if (!sets.length && !data.syncing) return;
+  let sheetTotal = null;
+  if (sets.length && sets.every(s => s.sheet_count != null)) {
+    sheetTotal = sets.reduce((n, s) => n + (s.sheet_count || 0), 0);
+  }
+  projectSheetCounts[projectId] = {
+    plan_set_count: sets.length || projectSheetCounts[projectId]?.plan_set_count,
+    sheet_count: sheetTotal,
+  };
+  renderProjectList(allProjects);
+}
+
+function pollPlanSetCounts(projectId, attemptsLeft) {
+  if (attemptsLeft <= 0) return;
+  if (!selectedProject || selectedProject.id !== projectId) return;
+  fetch('/api/projects/' + projectId + '/plan-sets', { credentials: 'same-origin' })
+    .then(r => (r.ok ? r.json() : null))
+    .then(data => {
+      if (!data) return;
+      applyPlanSetCountsFromApi(projectId, data);
+      if (data.syncing && attemptsLeft > 1) {
+        setTimeout(() => pollPlanSetCounts(projectId, attemptsLeft - 1), 2500);
+      }
+    })
+    .catch(() => {});
+}
+
+/** DB-first plan set index — never blocks on a full StackCT login from the UI thread. */
+function warmPlanSetCounts(projectId) {
+  const meta = projectSheetCounts[projectId];
+  if (meta && meta.plan_set_count != null) return;
+
+  fetch('/api/projects/' + projectId + '/plan-sets', { credentials: 'same-origin' })
+    .then(r => (r.ok ? r.json() : null))
+    .then(data => {
+      if (!data) return;
+      applyPlanSetCountsFromApi(projectId, data);
+      if (data.syncing) pollPlanSetCounts(projectId, 12);
+    })
+    .catch(() => {});
+}
+
 function onProjectSelect(projectId, projectName) {
   resetPlanSelection();
   selectedProject = { id: projectId, name: projectName };
   document.getElementById('projectMeta').textContent = 'Project ID: ' + projectId;
   renderProjectList(allProjects);
   updatePreviewButton();
-  apiFetch('/api/projects/' + projectId + '/sync-plan-sets', { method: 'POST' })
-    .then(r => r.json())
-    .then(data => {
-      if (data.plan_sets && data.plan_sets.length) {
-        const totalSheets = data.plan_sets.reduce(
-          (n, s) => n + (s.sheet_count || 0), 0
-        );
-        projectSheetCounts[projectId] = {
-          plan_set_count: data.plan_sets.length,
-          sheet_count: totalSheets || null,
-        };
-        renderProjectList(allProjects);
-      }
-    })
-    .catch(() => {});
+  warmPlanSetCounts(projectId);
 }
 
 function updatePreviewButton() {
@@ -478,8 +525,8 @@ function stopJobPolling() {
 async function pollJobMonitor(jobId) {
   try {
     const res = await fetch('/api/status/' + jobId, { credentials: 'same-origin' });
+    if (!res.ok) return;
     const job = await res.json();
-    if (job.error) return;
 
     updateMonitorUI(job);
 
@@ -502,6 +549,26 @@ function updateMonitorUI(job) {
   statusEl.textContent = statusLabels[job.status] || job.status;
   statusEl.className = 'status-badge badge-' + (job.status === 'cancelled' ? 'cancelled' : job.status);
 
+  // Phase badge — shows current operation phase during a run
+  const phaseBadge = document.getElementById('monitorPhaseBadge');
+  if (phaseBadge) {
+    const phase = job.current_phase || (job.current_sheet && job.current_sheet.phase);
+    const phaseLabels = {
+      capturing:  'Capturing',
+      analyzing:  'Analyzing',
+      reporting:  'Reporting',
+      complete:   'Analyzing',
+    };
+    const phaseLabel = phase && phaseLabels[phase];
+    if (phaseLabel && job.status === 'running') {
+      phaseBadge.textContent = phaseLabel;
+      phaseBadge.className = 'phase-badge phase-' + phase;
+      phaseBadge.style.display = '';
+    } else {
+      phaseBadge.style.display = 'none';
+    }
+  }
+
   const pct = job.progress || 0;
   document.getElementById('monitorProgressFill').style.width = pct + '%';
   document.getElementById('monitorPercent').textContent = pct + '%';
@@ -518,9 +585,12 @@ function updateMonitorUI(job) {
       'Started: ' + t.toLocaleTimeString();
   }
 
-  if (cs.name) {
-    document.getElementById('monitorCurrentSheet').innerHTML =
-      'Currently analyzing: <strong>' + escHtml(cs.name) + '</strong>';
+  const sheetEl = document.getElementById('monitorCurrentSheet');
+  if (cs.name && job.status === 'running') {
+    const phaseVerb = cs.phase === 'capturing' ? 'Capturing' : 'Analyzing';
+    sheetEl.innerHTML =
+      phaseVerb + ': <strong>' + escHtml(cs.name) + '</strong>';
+    sheetEl.className = 'monitor-current-sheet';
   }
 
   renderMonitorSheetLog(job);
@@ -583,11 +653,35 @@ function handleJobCompletion(job) {
   const navMonitor = document.getElementById('navJobMonitor');
   if (navMonitor) navMonitor.style.display = 'none';
 
+  // Hide phase badge on completion
+  const phaseBadge = document.getElementById('monitorPhaseBadge');
+  if (phaseBadge) phaseBadge.style.display = 'none';
+
+  const sheetEl = document.getElementById('monitorCurrentSheet');
   if (job.status === 'done') {
+    if (job.warning) {
+      sheetEl.innerHTML =
+        '<span class="monitor-warning-banner">⚠ ' + escHtml(job.warning) + '</span>';
+    } else {
+      sheetEl.innerHTML = '<span class="monitor-success-text">✓ Job completed successfully.</span>';
+    }
     setTimeout(() => {
       navigateTo('reports');
       loadReports();
     }, 2000);
+  } else if (job.status === 'cancelled') {
+    if (job.warning) {
+      sheetEl.innerHTML =
+        '<span class="monitor-warning-banner">⊘ ' + escHtml(job.warning) + '</span>';
+    } else {
+      sheetEl.innerHTML = '<span class="monitor-warning-banner">⊘ Job cancelled.</span>';
+    }
+    if (job.has_result) {
+      setTimeout(() => { navigateTo('reports'); loadReports(); }, 2500);
+    }
+  } else if (job.status === 'error' && job.error) {
+    sheetEl.innerHTML =
+      '<span class="monitor-error-banner">✗ ' + escHtml(job.error) + '</span>';
   }
 }
 
@@ -1071,7 +1165,9 @@ function renderPlanSets(planSets) {
   list.innerHTML = planSets.map(ps => {
     const fid = ps.folder_id;
     const selected = selectedPlanSet && selectedPlanSet.folder_id === fid;
-    const sheets = ps.sheet_count != null ? ps.sheet_count + ' sheets' : 'sheet count unknown';
+    const sheets = ps.sheet_count != null
+      ? ps.sheet_count + ' sheets'
+      : 'use Load sheets for count';
     return '<label class="plan-set-card' + (selected ? ' selected' : '') + '" data-folder-id="' + fid + '">' +
       '<input type="radio" name="planSetPick" value="' + fid + '"' + (selected ? ' checked' : '') + '>' +
       '<div class="plan-set-card-body">' +
@@ -1107,9 +1203,13 @@ async function fetchPlanSets(projectId, forceRefresh) {
   const sheetPanel = document.getElementById('planSelectionPanel');
   if (setPanel) setPanel.style.display = 'block';
   if (sheetPanel) sheetPanel.style.display = 'none';
-  planSetList.innerHTML = '<p class="loading"><span class="spinner"></span> Loading plan sets…</p>';
+  planSetList.innerHTML = '<p class="loading"><span class="spinner"></span> ' +
+    (forceRefresh ? 'Syncing from StackCT…' : 'Loading plan sets…') + '</p>';
 
-  const url = '/api/projects/' + projectId + '/plan-sets' + (forceRefresh ? '?refresh=1' : '');
+  const params = new URLSearchParams();
+  if (forceRefresh) params.set('refresh', '1');
+  else params.set('wait', '1');
+  const url = '/api/projects/' + projectId + '/plan-sets?' + params.toString();
   const maxPolls = 40;
   let polls = 0;
 
@@ -1121,9 +1221,22 @@ async function fetchPlanSets(projectId, forceRefresh) {
 
   try {
     let data = await loadOnce();
-    while (data.syncing && polls < maxPolls) {
+    // Show cached plan sets immediately while a background refresh runs
+    if (data.plan_sets && data.plan_sets.length && data.syncing) {
+      allPlanSets = data.plan_sets;
+      renderPlanSets(allPlanSets);
+      const hint = document.getElementById('planSetHint');
+      if (hint) {
+        hint.innerHTML = 'Select an issue package (plan set), then load sheets.' + formatCachePill(data);
+      }
+    }
+    while (
+      data.syncing &&
+      !(data.plan_sets && data.plan_sets.length) &&
+      polls < maxPolls
+    ) {
       planSetList.innerHTML = '<p class="loading"><span class="spinner"></span> Syncing plan sets from StackCT…</p>';
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise(r => setTimeout(r, 1500));
       polls++;
       data = await loadOnce();
     }
@@ -1136,7 +1249,7 @@ async function fetchPlanSets(projectId, forceRefresh) {
 
     allPlanSets = data.plan_sets || [];
     if (!allPlanSets.length) {
-      planSetList.innerHTML = '<p class="empty">No plan sets found. Try ↻ Refresh plans.</p>';
+      planSetList.innerHTML = '<p class="empty">No plan sets found. Use <strong>Sync from StackCT</strong> above to fetch the latest folders.</p>';
       return;
     }
 
@@ -1145,16 +1258,17 @@ async function fetchPlanSets(projectId, forceRefresh) {
       hint.innerHTML = 'Select an issue package (plan set), then load sheets.' + formatCachePill(data);
     }
 
+    const allHaveCounts = allPlanSets.every(s => s.sheet_count != null);
     projectSheetCounts[projectId] = {
       plan_set_count: allPlanSets.length,
-      sheet_count: allPlanSets.reduce((n, s) => n + (s.sheet_count || 0), 0) || null,
+      sheet_count: allHaveCounts
+        ? allPlanSets.reduce((n, s) => n + (s.sheet_count || 0), 0)
+        : null,
     };
     renderProjectList(allProjects);
 
     if (allPlanSets.length === 1) {
       selectPlanSet(allPlanSets[0]);
-      await fetchPlans(projectId, allPlanSets[0].folder_id, false);
-      return;
     }
 
     renderPlanSets(allPlanSets);
@@ -1256,6 +1370,7 @@ async function fetchPlans(projectId, folderId, forceRefresh) {
     }
 
     renderPlans(allPlans);
+    enrichPlanPreviews(projectId, folderId);
     const meta = document.getElementById('projectMeta');
     if (meta && selectedProject && selectedPlanSet) {
       meta.textContent = 'Project ID: ' + projectId + ' · ' + selectedPlanSet.name +
@@ -1279,11 +1394,73 @@ async function fetchPlans(projectId, folderId, forceRefresh) {
   }
 }
 
+function stackctSheetUrl(projectId, pageId) {
+  return 'https://go.stackct.com/app/#/Takeoff/' + projectId + '/Page/' + pageId + '/@0,0,0z';
+}
+
+function planPreviewCell(plan, projectId) {
+  const stackUrl = plan.stackct_url || stackctSheetUrl(projectId, plan.page_id);
+  if (plan.preview_url) {
+    const title = escAttr(plan.sheet_name || 'Sheet');
+    return '<button type="button" class="plan-thumb-btn" data-preview-url="' + escAttr(plan.preview_url) + '" data-title="' + title + '" title="View HD screenshot">' +
+      '<img class="plan-thumb" src="' + escAttr(plan.preview_url) + '" alt="" loading="lazy">' +
+    '</button>';
+  }
+  return '<a class="plan-open-stackct" href="' + escAttr(stackUrl) + '" target="_blank" rel="noopener noreferrer" title="Open drawing in StackCT">Open ↗</a>';
+}
+
+async function enrichPlanPreviews(projectId, folderId) {
+  if (!selectedProject || selectedProject.id !== projectId) return;
+  const pname = encodeURIComponent(selectedProject.name || '');
+  try {
+    const res = await fetch(
+      '/api/projects/' + projectId + '/sheet-previews?folder_id=' + folderId + '&project_name=' + pname,
+      { credentials: 'same-origin' }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    const previews = data.previews || {};
+    allPlans.forEach(p => {
+      const info = previews[String(p.page_id)];
+      if (!info) return;
+      p.preview_url = info.preview_url || null;
+      p.stackct_url = info.stackct_url;
+    });
+    if (selectedProject.id === projectId) renderPlans(allPlans);
+  } catch (_) {
+    /* preview enrichment is optional */
+  }
+}
+
+function openSheetPreview(url, title) {
+  let modal = document.getElementById('sheetPreviewModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'sheetPreviewModal';
+    modal.className = 'sheet-preview-modal';
+    modal.hidden = true;
+    modal.innerHTML =
+      '<div class="sheet-preview-dialog" role="dialog" aria-modal="true">' +
+        '<button type="button" class="sheet-preview-close" aria-label="Close">×</button>' +
+        '<p class="sheet-preview-title"></p>' +
+        '<img class="sheet-preview-img" alt="">' +
+      '</div>';
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal || e.target.closest('.sheet-preview-close')) modal.hidden = true;
+    });
+    document.body.appendChild(modal);
+  }
+  modal.querySelector('.sheet-preview-title').textContent = title || '';
+  modal.querySelector('.sheet-preview-img').src = url;
+  modal.hidden = false;
+}
+
 function renderPlans(plans) {
   const planList = document.getElementById('planList');
   if (!planList) return;
   const filterEl = document.getElementById('planTypeFilter');
   const filterType = filterEl ? filterEl.value : '';
+  const projectId = selectedProject ? selectedProject.id : null;
 
   const visible = filterType
     ? plans.filter(p => p.sheet_type === filterType)
@@ -1299,8 +1476,13 @@ function renderPlans(plans) {
     const badgeClass = getSheetTypeBadgeClass(plan.sheet_type);
     const typeName = formatSheetType(plan.sheet_type);
     const inputId = 'plan-' + plan.page_id;
+    const preview = projectId ? planPreviewCell(plan, projectId) : '';
+    const stackLink = projectId && plan.preview_url
+      ? '<a class="plan-stackct-link" href="' + escAttr(plan.stackct_url || stackctSheetUrl(projectId, plan.page_id)) + '" target="_blank" rel="noopener noreferrer" title="Open in StackCT">StackCT ↗</a>'
+      : '';
     return '<div class="plan-item" data-type="' + escAttr(plan.sheet_type) + '" data-page-id="' + plan.page_id + '">' +
       '<input type="checkbox" id="' + inputId + '" checked>' +
+      (preview ? '<div class="plan-preview-col">' + preview + stackLink + '</div>' : '') +
       '<label for="' + inputId + '" class="plan-label">' +
         '<span class="sheet-name">' + escHtml(plan.sheet_name || 'Unnamed Sheet') + '</span>' +
       '</label>' +
@@ -1310,6 +1492,13 @@ function renderPlans(plans) {
 
   planList.querySelectorAll('input[type="checkbox"]').forEach(cb => {
     cb.addEventListener('change', updateRunButtonCount);
+  });
+  planList.querySelectorAll('.plan-thumb-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openSheetPreview(btn.dataset.previewUrl, btn.dataset.title);
+    });
   });
 
   document.getElementById('selectAllPlans').checked = true;
