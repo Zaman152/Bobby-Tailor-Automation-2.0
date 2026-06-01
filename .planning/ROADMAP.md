@@ -27,6 +27,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [ ] **Phase 15: Premium UI/UX Revamp** — Preview workspace, stepper, design system (Masterv2 §8)
 - [ ] **Phase 16: Takeoff Accuracy (v2.1)** — Cross-refs, spec tables, consolidated summary (Masterv2 Addendum)
 - [ ] **Phase 17: Production Takeoff Pipeline** — Screenshot reuse, two-phase capture/analyze, resume, demo-grade job UX
+- [ ] **Phase 18: Linked Sheet Resolution** — Auto-follow drawing cross-refs; capture/analyze linked detail sheets
 
 ## Phase Details
 
@@ -605,6 +606,57 @@ Debug (demo failure): `.planning/debug/job-failure-slash-in-filename.md`
 
 ---
 
+### Phase 18: Linked Sheet Resolution
+
+**Goal:** Drawing cross-references (detail bubbles, civil structure refs) automatically pull in linked StackCT pages — capture, analyze, and resolve specs without the operator manually selecting every referenced sheet.
+
+**Depends on:** Phase 16 (cross-ref extraction + resolver), Phase 17 (two-phase pipeline, manifest, reuse), Phase 13/14 (`stackct_store.get_plans`)
+
+**Requirements:** LINK-01, LINK-02, LINK-03, LINK-04, LINK-05, LINK-06
+
+| ID | Requirement |
+|----|-------------|
+| LINK-01 | Map `ref_sheet` codes to `page_id` via SQLite catalog + fuzzy sheet-name matching |
+| LINK-02 | Collect refs from `cross_references[]` and `civil_structures[].detail_ref_sheet` |
+| LINK-03 | `AUTO_INCLUDE_LINKED_SHEETS` + `MAX_LINKED_SHEETS` config (default include, cap cost) |
+| LINK-04 | Linked capture/analyze pass in scraper before final cross-ref resolution |
+| LINK-05 | Job + report metadata (`linked_sheets_added`); monitor notice |
+| LINK-06 | Integration tests, README, `18-UAT.md` sign-off |
+
+**Success Criteria:**
+
+1. Run 5 sheets that reference C-4 detail → C-4 auto-captured/analyzed without manual selection
+2. `takeoff.json` cross_references show `resolution_status: resolved` for in-catalog targets
+3. `AUTO_INCLUDE_LINKED_SHEETS=false` → `linked_sheets_suggested[]` only, no extra Claude calls
+4. `MAX_LINKED_SHEETS=2` truncates queue with log warning
+5. Linked pass respects cancel and REUSE_SCREENSHOTS
+6. `18-UAT.md` signed off
+
+**Plans:** 5 plans in 5 waves
+
+| Wave | Plans | Description |
+|------|-------|-------------|
+| 1 | 18-01 | `linked_sheets.py` matcher + collector + unit tests |
+| 2 | 18-03 | Config flags + `PageEntry.source` on manifest |
+| 3 | 18-02 | Scraper linked discover/capture/analyze pass |
+| 4 | 18-04 | Reporter JSON, job API, monitor UI |
+| 5 | 18-05 | Integration tests, README, UAT checkpoint |
+
+Plans:
+
+- [ ] 18-01-PLAN.md — ref_sheet → page_id matcher
+- [ ] 18-02-PLAN.md — scraper linked pass (wave 3, after config)
+- [ ] 18-03-PLAN.md — AUTO_INCLUDE_LINKED_SHEETS config (wave 2)
+- [ ] 18-04-PLAN.md — report + monitor linked sheets UX
+- [ ] 18-05-PLAN.md — tests, README, 18-UAT.md
+
+Research: `.planning/phases/18-linked-sheet-resolution/18-RESEARCH.md`  
+Context: `.planning/phases/18-linked-sheet-resolution/18-CONTEXT.md`
+
+**Note:** Phase 17 UAT should complete first; Phase 18 builds on the production pipeline.
+
+---
+
 ### Phase 18: Linked Sheet Auto-Follow
 
 **Goal:** Production-ready handling of drawing cross-references — automatically discover linked detail sheets from Claude extraction, map ref_sheet codes to StackCT page_ids via catalog, capture/analyze linked pages, and resolve cross-references without requiring the operator to manually select every referenced sheet.
@@ -646,6 +698,29 @@ Context: `.planning/phases/18-linked-sheet-resolution/18-CONTEXT.md`
 
 ---
 
+### Phase 19: Job History & Run Archive
+
+**Goal:** Persistent job history with a Job History tab — operators see past runs,
+success/partial/failed/cancelled outcomes, errors/warnings, and links to reports; survives
+Flask restart.
+
+**Requirements:** HIST-01 through HIST-06
+
+**Plans:** 5 plans in 5 sequential waves
+
+Plans:
+
+- [ ] 19-01-PLAN.md — job_store.py (schema + outcome derivation + save/list/get) + config.py + app.py finalize hooks
+- [ ] 19-02-PLAN.md — app.py: GET /api/jobs/history list + GET /api/jobs/history/<job_id> detail endpoints
+- [ ] 19-03-PLAN.md — UI: Job History nav tab + list page + filter chips + table + detail expand panel + CSS badges
+- [ ] 19-04-PLAN.md — Polish: Open Report action, outcome summary line, row accent borders
+- [ ] 19-05-PLAN.md — Tests (test_job_store.py + test_job_history_api.py) + README.md + UAT checkpoint
+
+Research: `.planning/phases/19-job-history/19-RESEARCH.md`
+Context: `.planning/phases/19-job-history/19-CONTEXT.md`
+
+---
+
 ## v2 (Out of Roadmap)
 
 | Item | Notes |
@@ -656,7 +731,7 @@ Context: `.planning/phases/18-linked-sheet-resolution/18-CONTEXT.md`
 
 ## Progress
 
-**Execution order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → **15** → **16** → **17**
+**Execution order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → **15** → **16** → **17** → **18**
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -677,8 +752,10 @@ Context: `.planning/phases/18-linked-sheet-resolution/18-CONTEXT.md`
 | 15. Premium UI/UX Revamp | 0/6 | Planned | — |
 | 16. Takeoff Accuracy (v2.1) | 5/5 | Complete | 2026-05-26 |
 | 17. Production Takeoff Pipeline | 4/5 | Awaiting UAT | 2026-06-02 |
+| 18. Linked Sheet Resolution | 5/5 | Awaiting UAT | 2026-06-02 |
+| 19. Job History & Run Archive | 0/5 | Planned | — |
 
 ---
 *Roadmap created: 2026-05-26*  
-*Updated: 2026-05-26 — Masterv2.md source; Phase 16 v2.1 accuracy addendum*  
+*Updated: 2026-06-02 — Phase 19 Job History & Run Archive added (5 plans, 5 waves)*  
 *Aligned with Masterv2 Phase 1–3 ordering; Flask-in-place for v1*
