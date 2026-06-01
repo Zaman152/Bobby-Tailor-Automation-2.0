@@ -4,9 +4,9 @@
 
 Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable estimator tool: fix deployment and browser reliability first, add cost transparency and Master Phase 1 critical UX (plan selection, report preview), then layer settings, live job monitoring, and the industrial UI shell. v1 extends Flask in place; FastAPI migration (ARCH-01) stays in v2.
 
-**Depth:** comprehensive (11 phases)  
+**Depth:** comprehensive (16 phases)  
 **Stack:** Python, Flask, Playwright, Anthropic Claude Vision — per PROJECT.md  
-**Source of truth:** `Master.md` v2.0 (implementation order §7, UI spec §8, agent steps §9)
+**Source of truth:** `Masterv2.md` v2.0 + Addendum v2.1 (implementation order §7, UI spec §8, accuracy §C, agent steps §9)
 
 ## Phases
 
@@ -23,6 +23,10 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [ ] **Phase 11: PDF Selection & Production Docs** — PDF page picker; VPS README
 - [x] **Phase 12: Application Authentication** — Login sessions, protected routes/APIs, seeded admin for production deploy
 - [x] **Phase 13: StackCT Data & Persistence Layer** — SQLite catalog, sync service, DB-first APIs, sheet counts without per-preview scrape
+- [ ] **Phase 14: StackCT Plan Sets** — Folder-first preview; plan set picker before sheets
+- [ ] **Phase 15: Premium UI/UX Revamp** — Preview workspace, stepper, design system (Masterv2 §8)
+- [ ] **Phase 16: Takeoff Accuracy (v2.1)** — Cross-refs, spec tables, consolidated summary (Masterv2 Addendum)
+- [ ] **Phase 17: Production Takeoff Pipeline** — Screenshot reuse, two-phase capture/analyze, resume, demo-grade job UX
 
 ## Phase Details
 
@@ -394,6 +398,254 @@ Research: `.planning/phases/13-stackct-data-persistence/13-RESEARCH.md`
 
 ---
 
+### Phase 14: StackCT Plan Sets (Folder-First Preview)
+
+**Goal:** Preview Plans follows StackCT’s real hierarchy: user picks a **plan set** (folder/version) inside the project, then sees and runs **only that set’s sheets** — never a flat merge of all folders.
+
+**Depends on:** Phase 13 (SQLite catalog, browser lock), Phase 4 (plan selection + `page_ids` run filter)
+
+**Requirements:** PLANSET-01, PLANSET-02, PLANSET-03, PLANSET-04, PLANSET-05, PLANSET-06, PLANSET-07, PLANSET-08
+
+| ID | Requirement |
+|----|-------------|
+| PLANSET-01 | `browser.get_plan_sets` discovers deduplicated folders per project |
+| PLANSET-02 | Pages synced and stored per `(project_id, folder_id, page_id)` |
+| PLANSET-03 | API `GET .../plan-sets` and `GET .../plan-sets/<folder_id>/plans` |
+| PLANSET-04 | UI shows plan set picker before sheet checklist |
+| PLANSET-05 | Run API requires `folder_id` and validates `page_ids` |
+| PLANSET-06 | Direct-grid fallback for projects without folder cards (e.g. ATL 081) |
+| PLANSET-07 | Project list shows plan set count, not misleading merged sheet total |
+| PLANSET-08 | Multi-project audit documented (`14-DISCOVERY.md`) |
+
+**Success Criteria:**
+
+1. Morehouse (7416168): Preview shows **2** sets (MSP3 v1 / v2); v2 loads **180** sheets, v1 loads **120**
+2. Multi-set projects (6/7 in audit) show set picker; user cannot run mixed-folder `page_ids`
+3. Single-set projects auto-select the only set and proceed to sheets
+4. Cached catalog in SQLite includes `project_plan_sets` table; plans keyed by folder
+
+**Plans:** 4 plans in 4 waves
+
+| Wave | Plans | Parallel | Description |
+|------|-------|----------|-------------|
+| 1 | 14-01 | — | Browser plan-set discovery + folder-scoped pages + dedupe |
+| 2 | 14-02 | — | SQLite schema v2 + sync |
+| 3 | 14-03 | — | REST APIs + run validation |
+| 4 | 14-04 | — | Two-step UI + human verify |
+
+Plans:
+
+- [ ] 14-01-PLAN.md — `get_plan_sets`, `get_page_ids_in_folder`, dedupe tests
+- [ ] 14-02-PLAN.md — `project_plan_sets` table, folder-scoped sync
+- [ ] 14-03-PLAN.md — `/plan-sets` APIs, `folder_id` on run
+- [ ] 14-04-PLAN.md — Plan set picker UI, project list counts
+
+Research: `.planning/phases/14-stackct-plan-sets/14-RESEARCH.md`  
+Discovery: `.planning/phases/14-stackct-plan-sets/14-DISCOVERY.md` (7-project audit)
+
+---
+
+### Phase 15: Premium UI/UX Revamp
+
+**Goal:** Transform the app into a premium estimator product — clear preview vs export actions, a full-screen **Report Preview Workspace** for analyzing calculations, guided plan-set workflow, polished monitor/settings, and Motion-driven interactions (vanilla JS; no React rewrite).
+
+**Depends on:** Phase 8 (shell), Phase 5 (preview APIs), Phase 10 patterns (reports/monitor — superseded visually), Phase 14 (plan sets)
+
+**Requirements:** UX-01, UX-02, UX-03, UX-04, UX-05, UX-06, UX-07, UX-08, UX-09, UX-10, UX-11, UX-12
+
+| ID | Requirement |
+|----|-------------|
+| UX-01 | Design tokens v2 + dark industrial `design-system/bobby-tailor/MASTER.md` |
+| UX-02 | Shared modal / drawer / toast primitives with a11y |
+| UX-03 | Reports: preview CTA distinct from export/download |
+| UX-04 | Full-screen report preview workspace (run list + tabs + export rail) |
+| UX-05 | Calculations/raw: Grid.js-grade table (sort, filter, export selection) |
+| UX-06 | URL deep-link for open report + tab |
+| UX-07 | Projects: stepper Project → Plan set → Sheets → Run |
+| UX-08 | Job monitor + sidebar mini-card polish |
+| UX-09 | Motion system + `prefers-reduced-motion` |
+| UX-10 | 21st.dev MCP components documented in execution |
+| UX-11 | Responsive 375–1440 |
+| UX-12 | Login / Settings / PDF visual parity |
+
+**Success Criteria:**
+
+1. User can instantly tell **Open preview** vs **Export/download** on every report card
+2. Inside preview workspace, user switches Summary / Calculations / Raw / JSON **without losing context** and can switch runs from a side list
+3. Calculations view supports sort, filter, confidence styling, formula visibility, export filtered CSV
+4. Projects flow shows guided stepper for plan sets (Morehouse: 2 sets → pick → 180 sheets)
+5. ui-ux-pro-max checklist + `15-UAT.md` signed off
+
+**Plans:** 6 plans in 3 waves
+
+| Wave | Plans | Parallel | Description |
+|------|-------|----------|-------------|
+| 1 | 15-01, 15-02 | yes | Design system + UI primitives |
+| 2 | 15-03, 15-04 | yes | Report workspace + Projects stepper |
+| 3 | 15-05, 15-06 | sequential | Shell pages polish → motion, 3D, UAT |
+
+Plans:
+
+- [ ] 15-01-PLAN.md — Design tokens, ui-polish.css, MASTER.md dark industrial
+- [ ] 15-02-PLAN.md — Modal, drawer, toast, Motion extensions
+- [ ] 15-03-PLAN.md — Report Preview Workspace + Grid.js analysis
+- [ ] 15-04-PLAN.md — Projects stepper + plan-set UX
+- [ ] 15-05-PLAN.md — Job monitor, login, settings, PDF polish
+- [ ] 15-06-PLAN.md — Motion/3D, a11y, responsive, 15-UAT.md
+
+Research: `.planning/phases/15-premium-ui-ux-revamp/15-RESEARCH.md`  
+Design system: `design-system/bobby-tailor/MASTER.md`
+
+**Tooling (execute phase):** ui-ux-pro-max skill, 21st.dev MCP (`21st_magic_component_builder`, `component_refiner`), Motion One CDN (existing `ui-motion.js`), optional Three.js on login only.
+
+---
+
+### Phase 16: Takeoff Accuracy (Masterv2 v2.1)
+
+**Goal:** Production-accurate quantities — classify spec vs takeoff tables, resolve drawing cross-references, consolidate output to StackCT-style `takeoff_summary`, and handle civil/site items (pipe runs, structures, elevations) without false measurements.
+
+**Depends on:** Phases 1–3 (calculator/reporter), Phase 5 (preview APIs; extended in 16-05). Best after Phase 15 for summary preview UX (can execute backend 16-01–04 in parallel with 15).
+
+**Requirements:** ACCURACY-01 through ACCURACY-12
+
+| ID | Requirement |
+|----|-------------|
+| ACCURACY-01 | Extraction prompt v2.1 (table_purpose, cross_references, pipe_runs, civil_structures) |
+| ACCURACY-02 | Calculator skips non-takeoff schedule purposes |
+| ACCURACY-03 | Specification tables stored as reference library in report |
+| ACCURACY-04 | Cross-reference resolution pass for in-run sheets |
+| ACCURACY-05 | `aggregator.py` consolidates calculated items by trade name |
+| ACCURACY-06 | `takeoff_summary.csv` matches StackCT item/qty/unit format |
+| ACCURACY-07 | Civil/site estimation tables in calculator |
+| ACCURACY-08 | GL/INV/elevation values excluded from measurement math |
+| ACCURACY-09 | Approximate (±) flag in calculations output |
+| ACCURACY-10 | Pipe slope % not treated as quantity |
+| ACCURACY-11 | Spec lookup enrichment for pipe/size matches |
+| ACCURACY-12 | In-browser preview of consolidated takeoff summary |
+
+**Success Criteria:**
+
+1. Manufacturer/spec tables produce **zero** rows in `calculations.csv`
+2. `takeoff_summary.csv` shows one row per trade item with **summed** quantity across sheets (e.g. total LF striping)
+3. `takeoff.json` includes `cross_references` with `resolved_spec` or `target_sheet_not_found`
+4. Civil drawing items (catch basin, pipe LF, trench drain) appear under correct item types — no GL=845 in calculations
+5. `16-UAT.md` signed off against Masterv2 §C.7 matrix
+
+**Plans:** 5 plans in 5 waves
+
+| Wave | Plans | Parallel | Description |
+|------|-------|----------|-------------|
+| 1 | 16-01 | — | EXTRACTION_PROMPT v2.1 |
+| 2 | 16-02 | — | Calculator guards + civil tables + numeric filters |
+| 3 | 16-03 | — | Cross-reference resolver in scraper |
+| 4 | 16-04 | — | aggregator.py + reporter outputs |
+| 5 | 16-05 | — | Preview UI + 16-UAT.md |
+
+Plans:
+
+- [x] 16-01-PLAN.md — Replace extraction prompt (Masterv2 §C.8)
+- [x] 16-02-PLAN.md — table_purpose guards, civil tables, elevation/slope filters
+- [x] 16-03-PLAN.md — Cross-reference resolution pass
+- [x] 16-04-PLAN.md — aggregate_takeoff + takeoff_summary.csv
+- [x] 16-05-PLAN.md — Summary preview tab + accuracy UAT
+
+Research: `.planning/phases/16-takeoff-accuracy-v21/16-RESEARCH.md`  
+Gap analysis: `.planning/MASTERv2-GAP-ANALYSIS.md`
+
+---
+
+### Phase 17: Production Takeoff Pipeline
+
+**Goal:** Takeoff runs are production-ready for client demos and VPS — reuse cached screenshots, capture all sheets before Claude analysis, survive per-sheet failures with partial reports, and resume from disk without re-login.
+
+**Depends on:** Phase 2 (capture), Phase 4 (page selection), Phase 7 (job monitor), Phase 13 (catalog lock patterns), `sheet_preview.find_screenshot_paths`
+
+**Requirements:** PIPE-01, PIPE-02, PIPE-03, PIPE-04, PIPE-05
+
+| ID | Requirement |
+|----|-------------|
+| PIPE-01 | Reuse existing screenshots when `REUSE_SCREENSHOTS=true` (skip blob re-download) |
+| PIPE-02 | Two-phase pipeline: bulk capture then analyze (browser closed before Claude) |
+| PIPE-03 | `manifest.json` per run; analyze-only mode from manifest without browser |
+| PIPE-04 | Phase-aware progress, cooperative cancel, partial report + UI warnings |
+| PIPE-05 | Per-sheet resilience; sanitized filenames; user-facing job errors |
+
+**Success Criteria:**
+
+1. Re-run on a project with cached screenshots completes capture phase in under 30 seconds for 10 sheets
+2. A 45-sheet job that fails on 3 sheets still produces `takeoff.json` and CSVs for the other 42
+3. Sheet names with `/` or `\` never crash the job
+4. Operator can re-analyze an interrupted run from disk without StackCT login
+5. Job monitor shows Capturing / Analyzing / Reporting phases with accurate progress
+6. `17-UAT.md` demo script signed off
+
+**Plans:** 5 plans in 5 waves
+
+| Wave | Plans | Parallel | Description |
+|------|-------|----------|-------------|
+| 1 | 17-01 | — | Screenshot reuse via find_screenshot_paths |
+| 2 | 17-02 | — | Two-phase capture + manifest.json |
+| 3 | 17-03 | — | Analyze-only / resume from manifest |
+| 4 | 17-04 | — | Phase progress, cancel, monitor UX |
+| 5 | 17-05 | — | Integration tests, README, UAT checkpoint |
+
+Plans:
+
+- [ ] 17-01-PLAN.md — REUSE_SCREENSHOTS + scraper cache integration
+- [ ] 17-02-PLAN.md — capture_manifest.py + two-pass scraper
+- [ ] 17-03-PLAN.md — analyze_only API + run_analyze_from_manifest
+- [ ] 17-04-PLAN.md — Weighted progress, cancel, monitor polish
+- [ ] 17-05-PLAN.md — Tests, README, 17-UAT.md human verify
+
+Research: `.planning/phases/17-production-takeoff-pipeline/17-RESEARCH.md`  
+Context: `.planning/phases/17-production-takeoff-pipeline/17-CONTEXT.md`  
+Debug (demo failure): `.planning/debug/job-failure-slash-in-filename.md`
+
+**Hotfix (pre-phase, landed):** Per-sheet error isolation, `_safe_sheet_filename`, partial reports, UI error messages — restart Flask to apply.
+
+---
+
+### Phase 18: Linked Sheet Auto-Follow
+
+**Goal:** Production-ready handling of drawing cross-references — automatically discover linked detail sheets from Claude extraction, map ref_sheet codes to StackCT page_ids via catalog, capture/analyze linked pages, and resolve cross-references without requiring the operator to manually select every referenced sheet.
+
+**Depends on:** Phase 16 (cross_references.py, prompt), Phase 17 (two-phase scraper, manifest, reuse, progress, cancel), Phase 13/14 (stackct_store.get_plans)
+
+**Requirements:** LINK-01, LINK-02, LINK-03, LINK-04, LINK-05, LINK-06
+
+**Success Criteria** (what must be TRUE):
+
+1. `match_ref_to_page("C-4", catalog)` returns correct page_id via fuzzy normalization
+2. After Pass 2 analyze, unresolved cross-ref targets are automatically captured and analyzed (Pass 2a/2b/2c)
+3. `takeoff.json` contains `linked_sheets_added[]` and `linked_sheets_suggested[]`
+4. `/api/status` exposes `linked_sheets_count`; monitor UI shows auto-add notice
+5. `AUTO_INCLUDE_LINKED_SHEETS=false` surfaces suggestions only — no extra browser sessions
+6. `MAX_LINKED_SHEETS` cap enforced; cancel/partial-report behavior unaffected
+7. `18-UAT.md` sign-off
+
+**Plans:** 5 plans in 5 waves
+
+| Wave | Plans | Parallel | Description |
+|------|-------|----------|-------------|
+| 1 | 18-01 | — | linked_sheets.py matcher + collector + unit tests |
+| 2 | 18-02 | — | Scraper Pass 2a/2b/2c integration (depends 18-01) |
+| 3 | 18-03 | — | Config vars + PageEntry.source + .env.example (depends 18-02) |
+| 4 | 18-04 | — | reporter JSON fields + /api/status + monitor UI (depends 18-02, 18-03) |
+| 5 | 18-05 | — | Integration tests + README + 18-UAT.md human verify (depends 18-04) |
+
+Plans:
+
+- [ ] 18-01-PLAN.md — linked_sheets.py: match_ref_to_page + collect_unresolved_refs + unit tests
+- [ ] 18-02-PLAN.md — scraper.py: _discover_and_add_linked_sheets + Pass 2a/2b/2c in run_project_scrape
+- [ ] 18-03-PLAN.md — config.py AUTO_INCLUDE_LINKED_SHEETS/MAX_LINKED_SHEETS + PageEntry.source + .env.example
+- [ ] 18-04-PLAN.md — reporter.py linked_sheets param + app.py job fields + static/app.js monitor notice
+- [ ] 18-05-PLAN.md — Integration tests + README linked-sheet section + 18-UAT.md (human checkpoint)
+
+Research: `.planning/phases/18-linked-sheet-resolution/18-RESEARCH.md`
+Context: `.planning/phases/18-linked-sheet-resolution/18-CONTEXT.md`
+
+---
+
 ## v2 (Out of Roadmap)
 
 | Item | Notes |
@@ -404,7 +656,7 @@ Research: `.planning/phases/13-stackct-data-persistence/13-RESEARCH.md`
 
 ## Progress
 
-**Execution order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13
+**Execution order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → **15** → **16** → **17**
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -421,7 +673,12 @@ Research: `.planning/phases/13-stackct-data-persistence/13-RESEARCH.md`
 | 11. PDF Selection & Production Docs | 0/TBD | Not started | — |
 | 12. Application Authentication | 3/3 | Complete | 2026-05-26 |
 | 13. StackCT Data & Persistence | 4/4 | Complete | 2026-05-26 |
+| 14. StackCT Plan Sets | 0/4 | In progress | — |
+| 15. Premium UI/UX Revamp | 0/6 | Planned | — |
+| 16. Takeoff Accuracy (v2.1) | 5/5 | Complete | 2026-05-26 |
+| 17. Production Takeoff Pipeline | 4/5 | Awaiting UAT | 2026-06-02 |
 
 ---
 *Roadmap created: 2026-05-26*  
-*Aligned with Master.md Phase 1–3 ordering; Flask-in-place for v1*
+*Updated: 2026-05-26 — Masterv2.md source; Phase 16 v2.1 accuracy addendum*  
+*Aligned with Masterv2 Phase 1–3 ordering; Flask-in-place for v1*
