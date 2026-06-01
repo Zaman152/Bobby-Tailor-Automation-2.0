@@ -23,6 +23,7 @@ class PageEntry:
     screenshot_rel: Optional[str]  # filename relative to screenshots_dir
     capture_status: str            # "pending" | "ok" | "failed" | "skipped"
     analysis_status: str           # "pending" | "ok" | "failed" | "skipped"
+    source: Optional[str] = None  # "linked_ref" for auto-added pages; None for user-selected
 
 
 @dataclass
@@ -71,6 +72,7 @@ class RunManifest:
                     screenshot_rel=p.get("screenshot_rel"),
                     capture_status=p.get("capture_status", "pending"),
                     analysis_status=p.get("analysis_status", "pending"),
+                    source=p.get("source"),
                 )
                 for p in data.get("pages", [])
             ],
