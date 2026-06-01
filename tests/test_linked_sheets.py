@@ -1,9 +1,20 @@
 """
 Unit tests for linked_sheets.py — matcher and collector functions.
+
+Also contains integration-level tests for the full linked-sheet pipeline
+(`scraper._discover_and_add_linked_sheets`) using mocked browser and catalog.
 """
+import asyncio
+import tempfile
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
 from linked_sheets import collect_unresolved_refs, match_ref_to_page
+from capture_manifest import PageEntry, RunManifest
+import scraper
+from scraper import _discover_and_add_linked_sheets
 
 
 # ---------------------------------------------------------------------------
@@ -242,3 +253,261 @@ class TestCollectUnresolvedRefs:
         ]
         result = collect_unresolved_refs(extractions, already_in_run=set())
         assert result == []
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — full _discover_and_add_linked_sheets pipeline
+# ---------------------------------------------------------------------------
+
+def _make_manifest(project_id: int, page_entries: list) -> RunManifest:
+    """Helper: build a RunManifest from a list of PageEntry objects."""
+    return RunManifest(
+        project_id=project_id,
+        project_name="Test Project",
+        folder_id=1,
+        pages=list(page_entries),
+    )
+
+
+def _make_browser_mock() -> MagicMock:
+    """Return a mock StackCTBrowser with async start/login/close."""
+    browser = MagicMock()
+    browser.start = AsyncMock(return_value=None)
+    browser.login = AsyncMock(return_value=True)
+    browser.close = AsyncMock(return_value=None)
+    browser.page = None
+    return browser
+
+
+class TestIntegrationLinkedSheets:
+    """Integration tests: mock browser + catalog → test full pipeline."""
+
+    def test_integration_linked_page_captured_and_analyzed(self):
+        """2 selected pages + 1 unresolved ref → linked page captured, cross-ref resolves."""
+        catalog = [{"page_id": 201, "sheet_name": "C-4 - CIVIL SITE PLAN", "folder_id": 1}]
+        all_extracted = [
+            {
+                "_source_sheet": "A-1 - ARCH PLAN",
+                "cross_references": [
+                    {"ref_sheet": "C-4", "ref_number": "17", "item_described": "manhole"}
+                ],
+                "civil_structures": [],
+            }
+        ]
+        manifest = _make_manifest(
+            project_id=99,
+            page_entries=[
+                PageEntry(
+                    page_id=101,
+                    sheet_name="A-1 - ARCH PLAN",
+                    screenshot_rel="101_arch.jpg",
+                    capture_status="ok",
+                    analysis_status="ok",
+                )
+            ],
+        )
+        browser = _make_browser_mock()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            mpath = tmppath / "manifest.json"
+
+            with (
+                patch("scraper.stackct_store.get_plans", return_value=catalog),
+                patch(
+                    "scraper._capture_sheet_screenshot",
+                    new=AsyncMock(return_value=(True, None)),
+                ),
+                patch(
+                    "scraper.analyze_drawing",
+                    return_value={
+                        "measurements": [],
+                        "components": [],
+                        "_source_sheet": "C-4 - CIVIL SITE PLAN",
+                    },
+                ),
+                patch("scraper.apply_estimation_tables", return_value=[]),
+                patch("scraper.AUTO_INCLUDE_LINKED_SHEETS", True),
+                patch("scraper.MAX_LINKED_SHEETS", 10),
+            ):
+                new_extracted, new_estimates, linked_meta = asyncio.run(
+                    _discover_and_add_linked_sheets(
+                        browser=browser,
+                        project_id=99,
+                        project_name="Test Project",
+                        folder_id=1,
+                        all_extracted=all_extracted,
+                        manifest=manifest,
+                        mpath=mpath,
+                        screenshots_dir=tmppath,
+                        cached_screenshots={},
+                        log=lambda msg: None,
+                        progress_callback=None,
+                        cancel_check=None,
+                    )
+                )
+
+        assert len(linked_meta) == 1
+        assert linked_meta[0]["page_id"] == 201
+        assert len(new_extracted) == 1
+
+    def test_integration_max_linked_sheets_truncates(self):
+        """MAX_LINKED_SHEETS=1 with 3 refs → only 1 linked page captured."""
+        catalog = [
+            {"page_id": 201, "sheet_name": "C-4 - CIVIL SITE PLAN", "folder_id": 1},
+            {"page_id": 202, "sheet_name": "C-5 - CIVIL GRADING PLAN", "folder_id": 1},
+            {"page_id": 203, "sheet_name": "C-6 - CIVIL UTILITY PLAN", "folder_id": 1},
+        ]
+        all_extracted = [
+            {
+                "_source_sheet": "A-1 - ARCH PLAN",
+                "cross_references": [
+                    {"ref_sheet": "C-4"},
+                    {"ref_sheet": "C-5"},
+                    {"ref_sheet": "C-6"},
+                ],
+                "civil_structures": [],
+            }
+        ]
+        manifest = _make_manifest(
+            project_id=99,
+            page_entries=[
+                PageEntry(
+                    page_id=101,
+                    sheet_name="A-1",
+                    screenshot_rel="101.jpg",
+                    capture_status="ok",
+                    analysis_status="ok",
+                )
+            ],
+        )
+        browser = _make_browser_mock()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            mpath = tmppath / "manifest.json"
+
+            with (
+                patch("scraper.stackct_store.get_plans", return_value=catalog),
+                patch(
+                    "scraper._capture_sheet_screenshot",
+                    new=AsyncMock(return_value=(True, None)),
+                ),
+                patch(
+                    "scraper.analyze_drawing",
+                    return_value={"measurements": [], "components": []},
+                ),
+                patch("scraper.apply_estimation_tables", return_value=[]),
+                patch("scraper.AUTO_INCLUDE_LINKED_SHEETS", True),
+                patch("scraper.MAX_LINKED_SHEETS", 1),
+            ):
+                new_extracted, new_estimates, linked_meta = asyncio.run(
+                    _discover_and_add_linked_sheets(
+                        browser=browser,
+                        project_id=99,
+                        project_name="Test Project",
+                        folder_id=1,
+                        all_extracted=all_extracted,
+                        manifest=manifest,
+                        mpath=mpath,
+                        screenshots_dir=tmppath,
+                        cached_screenshots={},
+                        log=lambda msg: None,
+                        progress_callback=None,
+                        cancel_check=None,
+                    )
+                )
+
+        assert len(linked_meta) == 1
+
+    def test_integration_auto_include_false_suggests_only(self):
+        """AUTO_INCLUDE_LINKED_SHEETS=false → new_extracted empty, suggested_only=True."""
+        catalog = [{"page_id": 201, "sheet_name": "C-4 - CIVIL SITE PLAN", "folder_id": 1}]
+        all_extracted = [
+            {
+                "_source_sheet": "A-1 - ARCH PLAN",
+                "cross_references": [{"ref_sheet": "C-4"}],
+                "civil_structures": [],
+            }
+        ]
+        manifest = _make_manifest(
+            project_id=99,
+            page_entries=[
+                PageEntry(
+                    page_id=101,
+                    sheet_name="A-1",
+                    screenshot_rel="101.jpg",
+                    capture_status="ok",
+                    analysis_status="ok",
+                )
+            ],
+        )
+        browser = _make_browser_mock()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            mpath = tmppath / "manifest.json"
+
+            with (
+                patch("scraper.stackct_store.get_plans", return_value=catalog),
+                patch("scraper.AUTO_INCLUDE_LINKED_SHEETS", False),
+                patch("scraper.MAX_LINKED_SHEETS", 10),
+            ):
+                new_extracted, new_estimates, linked_meta = asyncio.run(
+                    _discover_and_add_linked_sheets(
+                        browser=browser,
+                        project_id=99,
+                        project_name="Test Project",
+                        folder_id=1,
+                        all_extracted=all_extracted,
+                        manifest=manifest,
+                        mpath=mpath,
+                        screenshots_dir=tmppath,
+                        cached_screenshots={},
+                        log=lambda msg: None,
+                        progress_callback=None,
+                        cancel_check=None,
+                    )
+                )
+
+        assert new_extracted == []
+        assert len(linked_meta) == 1
+        assert linked_meta[0]["suggested_only"] is True
+
+    def test_integration_empty_catalog_returns_empty(self):
+        """Empty catalog → all return values are empty lists (no crash)."""
+        all_extracted = [
+            {
+                "_source_sheet": "A-1 - ARCH PLAN",
+                "cross_references": [{"ref_sheet": "C-4"}],
+                "civil_structures": [],
+            }
+        ]
+        manifest = _make_manifest(project_id=99, page_entries=[])
+        browser = _make_browser_mock()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmppath = Path(tmpdir)
+            mpath = tmppath / "manifest.json"
+
+            with patch("scraper.stackct_store.get_plans", return_value=[]):
+                new_extracted, new_estimates, linked_meta = asyncio.run(
+                    _discover_and_add_linked_sheets(
+                        browser=browser,
+                        project_id=99,
+                        project_name="Test Project",
+                        folder_id=1,
+                        all_extracted=all_extracted,
+                        manifest=manifest,
+                        mpath=mpath,
+                        screenshots_dir=tmppath,
+                        cached_screenshots={},
+                        log=lambda msg: None,
+                        progress_callback=None,
+                        cancel_check=None,
+                    )
+                )
+
+        assert new_extracted == []
+        assert new_estimates == []
+        assert linked_meta == []
