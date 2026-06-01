@@ -11,9 +11,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 18 of 18 (Linked Sheet Resolution) — COMPLETE  
-Plan: 4/4 complete  
-Status: 18-01, 18-02, 18-03, 18-04 all executed  
-Last activity: 2026-06-02 — Executed 18-04-PLAN.md (reporter + API + monitor UI)
+Plan: 5/5 complete  
+Status: 18-01 through 18-05 all executed  
+Last activity: 2026-06-02 — Executed 18-05-PLAN.md (integration tests + README + UAT)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -153,5 +153,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-02  
-Stopped at: Completed 18-04-PLAN.md (reporter JSON + /api/status + monitor UI notice)  
-Resume file: None — Phase 18 complete
+Stopped at: Completed 18-05-PLAN.md (integration tests + README + UAT checklist) — awaiting human UAT sign-off  
+Resume file: .planning/phases/18-linked-sheet-resolution/18-UAT.md
