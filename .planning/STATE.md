@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 17 execution — resume at Plan 17-02 (two-phase capture/analyze)
+**Current focus:** Phase 17 execution — resume at Plan 17-04
 
 ## Current Position
 
 Phase: 17 of 17 (Production Takeoff Pipeline) — EXECUTING  
-Plan: 2/5 complete (17-01 ✓, 17-02 ✓)  
-Status: In progress — resume at Plan 17-03 (crash recovery / resume)  
-Last activity: 2026-06-01 — 17-02 shipped (two-pass capture/analyze + capture_manifest)
+Plan: 3/5 complete (17-01 ✓, 17-02 ✓, 17-03 ✓)  
+Status: In progress — resume at Plan 17-04  
+Last activity: 2026-06-02 — 17-03 shipped (crash recovery / analyze-only API)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -118,6 +118,15 @@ None yet.
 | `shutil.copy2` copies cached file to new run dir (preserves metadata) | 17-01 |
 | Cache map built once before sheet loop via `find_screenshot_paths` | 17-01 |
 
+### 17-03 Decisions
+
+| Decision | Source |
+|----------|--------|
+| `{page_id}_analysis.json` cache beside screenshot; missing cache triggers re-analyze even when manifest says ok | 17-03 |
+| analyze_only auto-discovers latest run folder by project_name prefix + mtime sort | 17-03 |
+| `mode_detail: "full" \| "analyze_only"` on job dict for UI/log differentiation | 17-03 |
+| `force=False` skips ok+cached pages; `force=True` re-runs all | 17-03 |
+
 ### 17-02 Decisions
 
 | Decision | Source |
@@ -137,6 +146,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-01 23:59 UTC+5  
-Stopped at: Completed 17-02-PLAN.md (two-pass capture/analyze + manifest)  
+Last session: 2026-06-02 00:11 UTC+5  
+Stopped at: Completed 17-03-PLAN.md (crash recovery / analyze-only API)  
 Resume file: None
