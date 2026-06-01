@@ -556,6 +556,7 @@ function updateMonitorUI(job) {
     const phaseLabels = {
       capturing:  'Capturing',
       analyzing:  'Analyzing',
+      linking:    'Linking',
       reporting:  'Reporting',
       complete:   'Analyzing',
     };
@@ -591,6 +592,22 @@ function updateMonitorUI(job) {
     sheetEl.innerHTML =
       phaseVerb + ': <strong>' + escHtml(cs.name) + '</strong>';
     sheetEl.className = 'monitor-current-sheet';
+  }
+
+  // Phase 18: linked sheets notice
+  const linkedCount = job.linked_sheets_count || 0;
+  const suggestedCount = job.linked_sheets_suggested_count || 0;
+  const linkedNoticeEl = document.getElementById('linked-sheets-notice');
+  if (linkedNoticeEl) {
+    if (linkedCount > 0) {
+      linkedNoticeEl.textContent = `Added ${linkedCount} linked detail sheet${linkedCount !== 1 ? 's' : ''} automatically`;
+      linkedNoticeEl.style.display = 'block';
+    } else if (suggestedCount > 0) {
+      linkedNoticeEl.textContent = `${suggestedCount} linked sheet${suggestedCount !== 1 ? 's' : ''} discovered (AUTO_INCLUDE_LINKED_SHEETS=false)`;
+      linkedNoticeEl.style.display = 'block';
+    } else {
+      linkedNoticeEl.style.display = 'none';
+    }
   }
 
   renderMonitorSheetLog(job);

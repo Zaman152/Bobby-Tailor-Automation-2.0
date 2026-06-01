@@ -304,6 +304,10 @@ def _finalize_stackct_job(job_id: str, result, log):
     jobs[job_id]["error"] = None
     jobs[job_id]["current_phase"] = "done"
 
+    # Phase 18: linked sheet counts for monitor UI
+    jobs[job_id]["linked_sheets_count"] = result.get("linked_sheets_added_count", 0)
+    jobs[job_id]["linked_sheets_suggested_count"] = result.get("linked_sheets_suggested_count", 0)
+
     total_items = result.get("total_line_items", 0)
     sheets_ok = result.get("sheets_succeeded") or result.get("sheets_processed", 0)
 
@@ -385,11 +389,11 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
             jobs[job_id]["log"] = jobs[job_id]["log"][-150:]
 
     def _weighted_pct(current: int, total: int, phase: str) -> int:
-        """Weighted progress: capturing 0-40%, analyzing 40-90%, reporting 95%."""
+        """Weighted progress: capturing 0-40%, analyzing/linking 40-90%, reporting 95%."""
         frac = (current / total) if total else 0.0
         if phase == "capturing":
             return int(frac * 40)
-        if phase in ("analyzing", "complete"):
+        if phase in ("analyzing", "complete", "linking"):
             return int(40 + frac * 50)
         if phase == "reporting":
             return 95
@@ -733,7 +737,9 @@ def run_stackct():
         "started_at": None,
         "current_phase": None,
         "current_sheet": {"index": 0, "total": 0, "name": None, "phase": None},
-        "sheets_completed": []
+        "sheets_completed": [],
+        "linked_sheets_count": 0,
+        "linked_sheets_suggested_count": 0,
     }
 
     t = threading.Thread(
@@ -877,6 +883,8 @@ def job_status(job_id):
         "error": job["error"],
         "warning": job.get("warning"),
         "has_result": job["result"] is not None,
+        "linked_sheets_count": job.get("linked_sheets_count", 0),
+        "linked_sheets_suggested_count": job.get("linked_sheets_suggested_count", 0),
     })
 
 
