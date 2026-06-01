@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 17 execution — resume at Plan 17-04
+**Current focus:** Phase 17 execution — resume at Plan 17-05
 
 ## Current Position
 
 Phase: 17 of 17 (Production Takeoff Pipeline) — EXECUTING  
-Plan: 3/5 complete (17-01 ✓, 17-02 ✓, 17-03 ✓)  
-Status: In progress — resume at Plan 17-04  
-Last activity: 2026-06-02 — 17-03 shipped (crash recovery / analyze-only API)
+Plan: 4/5 complete (17-01 ✓, 17-02 ✓, 17-03 ✓, 17-04 ✓)  
+Status: In progress — resume at Plan 17-05  
+Last activity: 2026-06-02 — 17-04 shipped (phase-aware progress / cooperative cancel / monitor UI)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -49,6 +49,12 @@ From 03-01 (Per-Sheet Usage Capture):
 - Hardcoded PRICING dict with float rates (Haiku/Sonnet/Opus per MTok); default to Sonnet for unknown models
 - Usage metadata on extraction dicts: `_tokens_in`, `_tokens_out`, `_cost_usd`, `_model_used`
 - Error returns include zero-value usage fields for safe reporter aggregation
+
+From 17-04 (Production Job UX):
+
+- cancel_check Callable pattern: scraper reads jobs[job_id].get("_cancel") via lambda; _cancelled flag breaks sheet loop cleanly
+- Partial-on-cancel: _cancelled=True in result dict; _finalize preserves "cancelled" status from endpoint; saves partial result with warning
+- Weighted progress bands: capturing 0–40%, analyzing 40–90%, reporting 95%, done 100%
 
 From 03-02 (Run-Level Aggregation):
 
