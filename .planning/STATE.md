@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 17 Production Takeoff Pipeline (planned); demo hotfix landed in scraper/app
+**Current focus:** Phase 17 execution — resume at Plan 17-02 (two-phase capture/analyze)
 
 ## Current Position
 
-Phase: 17 of 17 (Production Takeoff Pipeline) — IN PROGRESS  
-Plan: 1/5 complete  
-Status: 17-01 complete (screenshot reuse wired in scraper); REUSE_SCREENSHOTS=true by default  
-Last activity: 2026-06-01 — Completed 17-01-PLAN.md (screenshot reuse)
+Phase: 17 of 17 (Production Takeoff Pipeline) — EXECUTING  
+Plan: 2/5 complete (17-01 ✓, 17-02 ✓)  
+Status: In progress — resume at Plan 17-03 (crash recovery / resume)  
+Last activity: 2026-06-01 — 17-02 shipped (two-pass capture/analyze + capture_manifest)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -118,6 +118,16 @@ None yet.
 | `shutil.copy2` copies cached file to new run dir (preserves metadata) | 17-01 |
 | Cache map built once before sheet loop via `find_screenshot_paths` | 17-01 |
 
+### 17-02 Decisions
+
+| Decision | Source |
+|----------|--------|
+| Manifest saved after every page state change (crash-recovery foundation for 17-03) | 17-02 |
+| Atomic tmp+replace write prevents corrupt JSON on mid-write crash | 17-02 |
+| `screenshot_rel` stores filename only — `screenshots_dir` is run root | 17-02 |
+| `browser_closed` flag in `finally` prevents double-close after Pass 1 | 17-02 |
+| `phase="capturing"` in progress_callback during Pass 1 | 17-02 |
+
 ### Blockers/Concerns
 
 - StackCT DOM brittleness (`#canvas-interaction`, `[data-page-id]`, Auth0) — mitigated in Phase 2
@@ -127,6 +137,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-01  
-Stopped at: Completed 17-01-PLAN.md — screenshot reuse wired in scraper  
+Last session: 2026-06-01 23:59 UTC+5  
+Stopped at: Completed 17-02-PLAN.md (two-pass capture/analyze + manifest)  
 Resume file: None
