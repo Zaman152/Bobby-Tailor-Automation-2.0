@@ -9,11 +9,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from linked_sheets import collect_unresolved_refs, match_ref_to_page
 from capture_manifest import PageEntry, RunManifest
-import scraper
 from scraper import _discover_and_add_linked_sheets
 
 
