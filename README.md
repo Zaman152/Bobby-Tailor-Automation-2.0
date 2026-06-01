@@ -348,6 +348,34 @@ Identify partial outputs by checking:
 python3 -c "import json; d=json.load(open('output/My_Project_.../takeoff.json')); print(d.get('partial', False))"
 ```
 
+### Linked Sheet Auto-Follow (Phase 18)
+
+When a drawing sheet references a detail on another sheet (e.g., detail bubble "17 / C-4"),
+the scraper automatically discovers and captures the linked sheet before resolving
+cross-references.
+
+**Configuration:**
+
+| Variable | Default | Description |
+|---|---|---|
+| `AUTO_INCLUDE_LINKED_SHEETS` | `true` | Capture and analyze linked sheets automatically |
+| `MAX_LINKED_SHEETS` | `10` | Maximum linked sheets added per run (cost guard) |
+| `MAX_LINKED_DEPTH` | `1` | Recursion depth (v1: no recursive follow) |
+
+**Behavior when `AUTO_INCLUDE_LINKED_SHEETS=true`:**
+- After analyzing selected sheets, unresolved `ref_sheet` codes are collected
+- Linked page_ids are matched from the StackCT catalog (same folder only)
+- Linked pages are captured and analyzed in a second pass
+- `takeoff.json` includes `linked_sheets_added[]` with `{page_id, sheet_name, ref_from}`
+- Cross-references previously marked `target_sheet_not_found` may now resolve
+
+**Behavior when `AUTO_INCLUDE_LINKED_SHEETS=false`:**
+- No extra capture; `takeoff.json` includes `linked_sheets_suggested[]` for manual follow-up
+
+**Limits:**
+- Only sheets in the same `folder_id` are followed
+- Recursive link-following (depth > 1) is not supported in v1
+
 ---
 
 ## API Reference
