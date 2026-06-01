@@ -16,7 +16,9 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Callable, List, Dict, Any
-from config import SCREENSHOTS_DIR, REUSE_SCREENSHOTS
+from config import SCREENSHOTS_DIR, REUSE_SCREENSHOTS, AUTO_INCLUDE_LINKED_SHEETS, MAX_LINKED_SHEETS
+from linked_sheets import collect_unresolved_refs, match_ref_to_page
+import stackct_store
 from browser import StackCTBrowser
 from capture_manifest import PageEntry, RunManifest, manifest_path
 from sheet_preview import find_screenshot_paths
@@ -134,6 +136,215 @@ def _weighted_progress(idx: int, total: int, phase: str) -> int:
     if phase == "reporting":
         return 95
     return int(frac * 100)
+
+
+async def _discover_and_add_linked_sheets(
+    browser: "StackCTBrowser",
+    project_id: int,
+    project_name: str,
+    folder_id: Optional[int],
+    all_extracted: List[dict],
+    manifest: "RunManifest",
+    mpath: Path,
+    screenshots_dir: Path,
+    cached_screenshots: "dict[int, Path]",
+    log: Callable,
+    progress_callback: Optional[Callable],
+    cancel_check: Optional[Callable[[], bool]],
+) -> "tuple[List[dict], List[dict], List[dict]]":
+    """Pass 2a–2c: discover linked pages, capture them, analyze them.
+
+    Returns (new_extracted, new_estimates, linked_meta) where:
+      new_extracted: extraction dicts for linked pages
+      new_estimates: calculator results for linked pages
+      linked_meta: list of {page_id, sheet_name, ref_from} for report metadata
+    """
+    # ----------------------------------------------------------------
+    # Pass 2a — Discover unresolved cross-reference targets
+    # ----------------------------------------------------------------
+    already_in_run: set[int] = {e.page_id for e in manifest.pages}
+    refs = collect_unresolved_refs(all_extracted, already_in_run)
+
+    if not refs:
+        log("Linked sheets: no cross-references found — skipping linked pass")
+        return [], [], []
+
+    catalog = stackct_store.get_plans(project_id, folder_id)
+    if not catalog:
+        logger.warning(
+            "Linked sheet discovery: catalog empty for project %s folder %s — "
+            "sync the plan set first",
+            project_id,
+            folder_id,
+        )
+        log(
+            "WARNING: Linked sheet catalog empty — sync plan set to enable linked capture"
+        )
+        return [], [], []
+
+    # Match refs to catalog page_ids and build the capture queue
+    linked_queue: list[dict] = []
+    seen_page_ids: set[int] = set()
+
+    for ref in refs:
+        match = match_ref_to_page(ref["ref_sheet"], catalog)
+        if match is None:
+            continue
+        page_id = match["page_id"]
+        if page_id in already_in_run or page_id in seen_page_ids:
+            continue
+        seen_page_ids.add(page_id)
+        linked_queue.append(
+            {
+                "page_id": page_id,
+                "sheet_name": match["sheet_name"],
+                "ref_from": ref.get("from_sheet", ""),
+            }
+        )
+
+    if len(linked_queue) > MAX_LINKED_SHEETS:
+        dropped = len(linked_queue) - MAX_LINKED_SHEETS
+        log(
+            f"Linked sheets: capped at {MAX_LINKED_SHEETS} "
+            f"(dropped {dropped} low-priority entries)"
+        )
+        linked_queue = linked_queue[:MAX_LINKED_SHEETS]
+
+    if not AUTO_INCLUDE_LINKED_SHEETS:
+        log("AUTO_INCLUDE_LINKED_SHEETS=false — skipping linked capture")
+        return (
+            [],
+            [],
+            [
+                {
+                    "page_id": x["page_id"],
+                    "sheet_name": x["sheet_name"],
+                    "ref_from": x["ref_from"],
+                    "suggested_only": True,
+                }
+                for x in linked_queue
+            ],
+        )
+
+    if not linked_queue:
+        log("Linked sheets: no new linked sheets to capture")
+        return [], [], []
+
+    log(f"Linked sheets: queued {len(linked_queue)} page(s) for capture and analysis")
+
+    # ----------------------------------------------------------------
+    # Pass 2b — Capture linked pages (browser required)
+    # ----------------------------------------------------------------
+    newly_captured: list[tuple[dict, PageEntry]] = []
+
+    try:
+        await browser.start()
+        if not await browser.login():
+            log("ERROR: Linked sheet capture — browser login failed")
+            return [], [], [{"error": "login_failed"}]
+
+        for entry_info in linked_queue:
+            if cancel_check and cancel_check():
+                log("Cancelled by user during linked capture pass")
+                break
+
+            page_id = entry_info["page_id"]
+            sheet_name = entry_info["sheet_name"]
+            screenshot_path = (
+                screenshots_dir
+                / f"linked_{page_id}_{_safe_sheet_filename(sheet_name)}.jpg"
+            )
+
+            page_entry = PageEntry(
+                page_id=page_id,
+                sheet_name=sheet_name,
+                screenshot_rel=screenshot_path.name,
+                capture_status="pending",
+                analysis_status="pending",
+                source="linked_ref",
+            )
+            manifest.pages.append(page_entry)
+
+            # Reuse cached screenshot if available
+            cached_path = cached_screenshots.get(page_id)
+            if cached_path and cached_path.is_file() and cached_path.stat().st_size > 1000:
+                screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(cached_path, screenshot_path)
+                log(f"  [linked] Using cached screenshot for {sheet_name}")
+                page_entry.capture_status = "ok"
+            else:
+                log(f"  [linked] Capturing {sheet_name} (page_id={page_id})...")
+                captured, skip_reason = await _capture_sheet_screenshot(
+                    browser, project_id, page_id, sheet_name,
+                    screenshot_path, screenshots_dir, log,
+                )
+                if captured:
+                    page_entry.capture_status = "ok"
+                else:
+                    reason = skip_reason or "capture_failed"
+                    log(f"  [linked] Could not capture {sheet_name} ({reason})")
+                    page_entry.capture_status = "failed"
+
+            manifest.save(mpath)
+
+            if page_entry.capture_status == "ok":
+                newly_captured.append((entry_info, page_entry))
+
+    finally:
+        await browser.close()
+
+    # ----------------------------------------------------------------
+    # Pass 2c — Analyze linked pages (no browser)
+    # ----------------------------------------------------------------
+    new_extracted: list[dict] = []
+    new_estimates: list[dict] = []
+    linked_meta: list[dict] = []
+
+    for entry_info, page_entry in newly_captured:
+        if cancel_check and cancel_check():
+            log("Cancelled by user during linked analysis pass")
+            break
+
+        page_id = page_entry.page_id
+        sheet_name = page_entry.sheet_name
+        screenshot_path = screenshots_dir / page_entry.screenshot_rel
+
+        try:
+            log(f"  [linked] Analyzing {sheet_name} with Claude...")
+            extracted = analyze_drawing(str(screenshot_path), sheet_name)
+            extracted["_page_id"] = page_id
+            extracted["_source_sheet"] = sheet_name
+
+            if "error" in extracted:
+                err = extracted.get("error", "analysis_failed")
+                log(f"  [linked] Warning: analysis error on {sheet_name}: {err}")
+                page_entry.analysis_status = "failed"
+                new_extracted.append(extracted)
+            else:
+                estimates = apply_estimation_tables(extracted)
+                if estimates:
+                    log(f"  [linked] {sheet_name}: {len(estimates)} takeoff items")
+                new_estimates.extend(estimates)
+                new_extracted.append(extracted)
+                page_entry.analysis_status = "ok"
+                linked_meta.append(
+                    {
+                        "page_id": page_id,
+                        "sheet_name": sheet_name,
+                        "ref_from": entry_info["ref_from"],
+                    }
+                )
+
+        except Exception as exc:
+            logger.exception("Linked analysis error on sheet %s", sheet_name)
+            reason = type(exc).__name__
+            log(f"  [linked] Analysis error on {sheet_name}: {reason} — continuing")
+            page_entry.analysis_status = "failed"
+            new_extracted.append(_failed_extraction(page_id, sheet_name, reason))
+
+        manifest.save(mpath)
+
+    return new_extracted, new_estimates, linked_meta
 
 
 async def run_project_scrape(project_id: int, project_name: str,
