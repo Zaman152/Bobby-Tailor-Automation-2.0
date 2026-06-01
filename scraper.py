@@ -1,6 +1,13 @@
 """
 Main orchestrator: scrapes all drawing pages, runs Claude vision, applies
 estimation tables, and generates a structured takeoff report with source tracing.
+
+Two-phase execution model:
+  Pass 1 (Capture)  — browser required; screenshots all pages into run folder;
+                      writes manifest.json after each page; closes browser.
+  Pass 2 (Analyze)  — no browser; Claude processes every captured screenshot;
+                      updates manifest.json after each page.
+  Pass 3 (Report)   — aggregation, cross-refs, CSV/summary output.
 """
 import asyncio
 import logging
@@ -11,6 +18,7 @@ from datetime import datetime
 from typing import Optional, Callable, List, Dict, Any
 from config import SCREENSHOTS_DIR, REUSE_SCREENSHOTS
 from browser import StackCTBrowser
+from capture_manifest import PageEntry, RunManifest, manifest_path
 from sheet_preview import find_screenshot_paths
 from claude_analyzer import analyze_drawing, make_navigation_decision
 from calculator import apply_estimation_tables, resolve_spec_lookups
@@ -128,13 +136,24 @@ async def run_project_scrape(project_id: int, project_name: str,
     screenshots_dir = Path(SCREENSHOTS_DIR) / f"{safe_name}_{ts}"
     screenshots_dir.mkdir(parents=True, exist_ok=True)
 
+    manifest = RunManifest(
+        project_id=project_id,
+        project_name=project_name,
+        folder_id=folder_id,
+    )
+    mpath = manifest_path(screenshots_dir)
+
     browser = StackCTBrowser()
+    browser_closed = False
     all_extracted: List[dict] = []
     all_estimates: List[dict] = []
     sheets_failed: List[Dict[str, Any]] = []
     sheets_skipped: List[Dict[str, Any]] = []
 
     try:
+        # ----------------------------------------------------------------
+        # Login + page discovery
+        # ----------------------------------------------------------------
         await browser.start()
         log("Browser started, logging in...")
         if not await browser.login():
@@ -151,7 +170,7 @@ async def run_project_scrape(project_id: int, project_name: str,
             log("No drawing pages found for this project/plan set")
             return {"error": ERROR_NO_PAGES}
 
-        log(f"Found {len(pages)} drawing pages — starting analysis...")
+        log(f"Found {len(pages)} drawing pages — starting capture pass...")
 
         if page_ids_filter:
             pages = [p for p in pages if p["page_id"] in page_ids_filter]
@@ -169,17 +188,35 @@ async def run_project_scrape(project_id: int, project_name: str,
             if cached_screenshots:
                 log(f"Screenshot cache: {len(cached_screenshots)} prior files found for reuse")
 
+        # Populate manifest with all pages in pending state
         for idx, page_info in enumerate(pages, 1):
-            page_id = page_info["page_id"]
             sheet_name = page_info["sheet_name"] or f"Page_{idx}"
+            manifest.pages.append(PageEntry(
+                page_id=page_info["page_id"],
+                sheet_name=sheet_name,
+                screenshot_rel=None,
+                capture_status="pending",
+                analysis_status="pending",
+            ))
+        manifest.save(mpath)
+
+        # ================================================================
+        # PASS 1 — Capture (browser required)
+        # All screenshots are taken before any Claude API call.
+        # ================================================================
+        log("Pass 1 — Capturing all screenshots...")
+        for idx, (page_info, entry) in enumerate(zip(pages, manifest.pages), 1):
+            page_id = page_info["page_id"]
+            sheet_name = entry.sheet_name
+
+            screenshot_path = (
+                screenshots_dir / f"{idx:03d}_{_safe_sheet_filename(sheet_name)}.jpg"
+            )
+            entry.screenshot_rel = screenshot_path.name
 
             try:
                 if progress_callback:
-                    progress_callback(idx, total, sheet_name, phase="screenshotting")
-
-                screenshot_path = (
-                    screenshots_dir / f"{idx:03d}_{_safe_sheet_filename(sheet_name)}.jpg"
-                )
+                    progress_callback(idx, total, sheet_name, phase="capturing")
 
                 # --- screenshot reuse ---
                 cached_path = cached_screenshots.get(page_id)
@@ -187,11 +224,8 @@ async def run_project_scrape(project_id: int, project_name: str,
                     screenshot_path.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(cached_path, screenshot_path)
                     msg = f"[{idx}/{total}] Using cached screenshot for {sheet_name}"
-                    log(
-                        msg,
-                        _make_log_entry(msg, "sheet_progress", idx, total, sheet_name),
-                    )
-                    captured, skip_reason = True, None
+                    log(msg, _make_log_entry(msg, "sheet_progress", idx, total, sheet_name))
+                    entry.capture_status = "ok"
                 else:
                     log(
                         f"[{idx}/{total}] Screenshotting {sheet_name}...",
@@ -205,27 +239,80 @@ async def run_project_scrape(project_id: int, project_name: str,
                         screenshot_path, screenshots_dir, log,
                     )
 
-                if not captured:
-                    if skip_reason == "navigation_skip":
-                        log(f"  Skipping {sheet_name} (navigation decision)")
-                        sheets_skipped.append({
-                            "page_id": page_id,
-                            "sheet_name": sheet_name,
-                            "reason": skip_reason,
-                        })
+                    if not captured:
+                        if skip_reason == "navigation_skip":
+                            log(f"  Skipping {sheet_name} (navigation decision)")
+                            entry.capture_status = "skipped"
+                            sheets_skipped.append({
+                                "page_id": page_id,
+                                "sheet_name": sheet_name,
+                                "reason": skip_reason,
+                            })
+                        else:
+                            reason = skip_reason or "capture_failed"
+                            msg = f"  Could not capture {sheet_name} ({reason})"
+                            log(msg, _make_log_entry(msg, "sheet_error", idx, total, sheet_name))
+                            entry.capture_status = "failed"
+                            sheets_failed.append({
+                                "page_id": page_id,
+                                "sheet_name": sheet_name,
+                                "reason": reason,
+                            })
                     else:
-                        msg = f"  Could not capture {sheet_name} ({skip_reason or 'unknown'})"
-                        log(msg, _make_log_entry(msg, "sheet_error", idx, total, sheet_name))
-                        sheets_failed.append({
-                            "page_id": page_id,
-                            "sheet_name": sheet_name,
-                            "reason": skip_reason or "capture_failed",
-                        })
-                        all_extracted.append(
-                            _failed_extraction(page_id, sheet_name, skip_reason or "capture_failed")
-                        )
-                    continue
+                        entry.capture_status = "ok"
 
+            except Exception as exc:
+                logger.exception("Unhandled capture error on sheet %s", sheet_name)
+                reason = type(exc).__name__
+                msg = f"  Capture error on {sheet_name}: {reason} — continuing"
+                log(msg, _make_log_entry(msg, "sheet_error", idx, total, sheet_name))
+                entry.capture_status = "failed"
+                sheets_failed.append({
+                    "page_id": page_id,
+                    "sheet_name": sheet_name,
+                    "reason": reason,
+                })
+
+            manifest.save(mpath)
+
+        # Close browser before Claude phase — releases browser resources
+        await browser.close()
+        browser_closed = True
+        log("Browser closed after capture pass")
+
+        captured_ok = sum(1 for e in manifest.pages if e.capture_status == "ok")
+        log(
+            f"Pass 1 complete — {captured_ok}/{total} pages captured"
+            + (f", {total - captured_ok} failed/skipped" if captured_ok < total else "")
+        )
+
+        # ================================================================
+        # PASS 2 — Analyze (no browser; Claude processes each screenshot)
+        # ================================================================
+        log("Pass 2 — Analyzing captured screenshots with Claude...")
+        for idx, (page_info, entry) in enumerate(zip(pages, manifest.pages), 1):
+            page_id = page_info["page_id"]
+            sheet_name = entry.sheet_name
+
+            if entry.capture_status != "ok":
+                # Propagate capture failures into the extracted list
+                if entry.capture_status == "failed":
+                    capture_reason = next(
+                        (f["reason"] for f in sheets_failed if f["page_id"] == page_id),
+                        "capture_failed",
+                    )
+                    entry.analysis_status = "skipped"
+                    all_extracted.append(
+                        _failed_extraction(page_id, sheet_name, capture_reason)
+                    )
+                else:
+                    entry.analysis_status = "skipped"
+                manifest.save(mpath)
+                continue
+
+            screenshot_path = screenshots_dir / entry.screenshot_rel
+
+            try:
                 if progress_callback:
                     progress_callback(idx, total, sheet_name, phase="analyzing")
                 log(
@@ -243,6 +330,7 @@ async def run_project_scrape(project_id: int, project_name: str,
                 if "error" in extracted:
                     err = extracted.get("error", "analysis_failed")
                     log(f"  Warning: analysis error on {sheet_name}: {err}")
+                    entry.analysis_status = "failed"
                     sheets_failed.append({
                         "page_id": page_id,
                         "sheet_name": sheet_name,
@@ -278,14 +366,16 @@ async def run_project_scrape(project_id: int, project_name: str,
                     if estimates:
                         log(f"  {sheet_name}: {len(estimates)} calculated takeoff items")
                     all_estimates.extend(estimates)
+                    entry.analysis_status = "ok"
 
                 all_extracted.append(extracted)
 
             except Exception as exc:
-                logger.exception("Unhandled error on sheet %s", sheet_name)
+                logger.exception("Unhandled analysis error on sheet %s", sheet_name)
                 reason = type(exc).__name__
-                msg = f"  Error on {sheet_name}: {reason} — continuing with remaining sheets"
+                msg = f"  Analysis error on {sheet_name}: {reason} — continuing"
                 log(msg, _make_log_entry(msg, "sheet_error", idx, total, sheet_name))
+                entry.analysis_status = "failed"
                 sheets_failed.append({
                     "page_id": page_id,
                     "sheet_name": sheet_name,
@@ -293,6 +383,11 @@ async def run_project_scrape(project_id: int, project_name: str,
                 })
                 all_extracted.append(_failed_extraction(page_id, sheet_name, reason))
 
+            manifest.save(mpath)
+
+        # ================================================================
+        # PASS 3 — Report (unchanged)
+        # ================================================================
         successful = [d for d in all_extracted if "error" not in d]
         if not successful:
             log(
@@ -354,8 +449,9 @@ async def run_project_scrape(project_id: int, project_name: str,
         }
 
     finally:
-        await browser.close()
-        log("Browser closed")
+        if not browser_closed:
+            await browser.close()
+            log("Browser closed")
 
 
 async def run_all_projects(log_callback: Optional[Callable] = None,
