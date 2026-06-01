@@ -6,16 +6,16 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Milestone v1.0 — all 13 phases executed
+**Current focus:** Phase 17 Production Takeoff Pipeline (planned); demo hotfix landed in scraper/app
 
 ## Current Position
 
-Phase: 14 of 14 (StackCT Plan Sets & Folders) — COMPLETE  
-Plan: 4/4 complete  
-Status: Phase 14 complete — all 4 plans executed 2026-05-26  
-Last activity: 2026-05-26 — `/gsd-execute-phase 14` (browser, schema, sync, API, UI)
+Phase: 17 of 17 (Production Takeoff Pipeline) — IN PROGRESS  
+Plan: 1/5 complete  
+Status: 17-01 complete (screenshot reuse wired in scraper); REUSE_SCREENSHOTS=true by default  
+Last activity: 2026-06-01 — Completed 17-01-PLAN.md (screenshot reuse)
 
-Progress: [██████████] 100% (all 14 phases complete)
+Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
 ## Performance Metrics
 
@@ -39,7 +39,7 @@ Progress: [██████████] 100% (all 14 phases complete)
 
 From PROJECT.md Key Decisions (roadmap-relevant):
 
-- Master.md is planning source of truth
+- Masterv2.md is planning source of truth (replaces Master.md for new work)
 - Master Phase 1 critical UX (plan select + preview) before full UI shell — reflected in phases 4–5 before 8–10
 - Keep Flask monolith; extract static JS/CSS on UI rebuild (Phase 8)
 - FastAPI (ARCH-01) deferred to v2 per user directive
@@ -110,6 +110,14 @@ From 14-04 (Two-Step Plan Selection UI):
 
 None yet.
 
+### 17-01 Decisions
+
+| Decision | Source |
+|----------|--------|
+| `REUSE_SCREENSHOTS` defaults to true; set false to force fresh downloads | 17-01 |
+| `shutil.copy2` copies cached file to new run dir (preserves metadata) | 17-01 |
+| Cache map built once before sheet loop via `find_screenshot_paths` | 17-01 |
+
 ### Blockers/Concerns
 
 - StackCT DOM brittleness (`#canvas-interaction`, `[data-page-id]`, Auth0) — mitigated in Phase 2
@@ -119,6 +127,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-26  
-Stopped at: Phase 12 execution complete — ready for `/gsd-audit-milestone`  
+Last session: 2026-06-01  
+Stopped at: Completed 17-01-PLAN.md — screenshot reuse wired in scraper  
 Resume file: None
