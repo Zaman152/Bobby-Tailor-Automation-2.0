@@ -271,6 +271,85 @@ python3 main.py
 python3 main.py --project-id 7409312 --project-name "Some Project"
 ```
 
+## Production takeoff runs
+
+### Recommended sheet count
+
+For live client demos, select **≤ 15 sheets** per run. Larger sets are fine for unattended VPS jobs but can exceed demo session time.
+
+```json
+{
+  "mode": "specific",
+  "project_id": 7409312,
+  "project_name": "Demo Project",
+  "page_ids": [101, 102, 103, 104, 105],
+  "folder_id": 5
+}
+```
+
+### REUSE_SCREENSHOTS behavior
+
+Set `REUSE_SCREENSHOTS=true` (default) to skip re-downloading pages you already have:
+
+- On each run start, Bobby Tailor scans prior `output/screenshots/<ProjectName>_*/` folders for existing images.
+- Any page whose `.jpg` is found and is **> 1 000 bytes** is copied to the new run folder via `shutil.copy2` — no browser load, no download.
+- Pages with no cached image proceed through the normal browser capture.
+- To force a completely fresh capture, set `REUSE_SCREENSHOTS=false` in `.env`.
+
+**When reuse helps:** Re-analyzing the same set of drawings with a different Claude model — captures complete in seconds.
+
+### Two-phase capture / analyze explanation
+
+Bobby Tailor deliberately splits every job into two phases:
+
+1. **Pass 1 — Capture** (browser required): All screenshots are downloaded before Claude is called once. The browser is closed after this pass to free memory.
+2. **Pass 2 — Analyze** (no browser): Claude processes each captured image and writes `{page_id}_analysis.json` beside the screenshot as a crash-recovery cache.
+3. **Pass 3 — Report**: Aggregates all extractions into `takeoff.json`, `calculations.csv`, `raw_items.csv`, and `summary.txt`.
+
+Progress weights reflect this split: capturing = 0–40%, analyzing = 40–90%, reporting = 95–100%.
+
+### analyze_only — recovery after crash
+
+If the server or Claude call fails mid-analysis, restart without re-screenshotting:
+
+```bash
+# Via API — finds the latest run folder for "My Project" automatically
+POST /api/run/stackct
+{
+  "project_name": "My Project",
+  "analyze_only": true
+}
+```
+
+Or with an explicit folder:
+
+```bash
+POST /api/run/stackct
+{
+  "project_name": "My Project",
+  "analyze_only": true,
+  "manifest_dir": "My_Project_20260601_143000"
+}
+```
+
+Pages with an existing `{page_id}_analysis.json` cache are **skipped** automatically. Only pages still `pending` or `failed` are sent to Claude, so you pay only for the work not yet done.
+
+### Partial reports
+
+If some sheets fail (capture error, Claude timeout, etc.) the run still completes:
+
+- Successful sheets produce a full `takeoff.json` + CSVs.
+- Failed sheets appear in `sheets_failed` in the JSON and are logged in `summary.txt`.
+- A `partial: true` flag is set in `takeoff.json` when at least one sheet failed.
+
+Identify partial outputs by checking:
+
+```bash
+python3 -c "import json; d=json.load(open('output/My_Project_.../takeoff.json')); print(d.get('partial', False))"
+```
+
+---
+
 ## API Reference
 
 ### POST `/api/run/stackct` — Start a StackCT job
