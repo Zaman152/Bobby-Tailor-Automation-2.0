@@ -59,6 +59,7 @@ const PAGE_TITLES = {
   pdf: 'Upload PDF',
   reports: 'Reports',
   'job-monitor': 'Job Monitor',
+  'job-history': 'Job History',
   settings: 'Settings'
 };
 
@@ -69,6 +70,9 @@ let openPreviewTab = {};
 let currentJobId = null;
 let monitorPollInterval = null;
 let currentPdfUpload = null;
+let _historyOffset = 0;
+const _historyLimit = 50;
+let _historyActiveOutcome = '';
 
 function navigateTo(pageName) {
   const target = document.getElementById('page-' + pageName);
@@ -90,6 +94,10 @@ function navigateTo(pageName) {
 
   if (pageName === 'reports') loadReports();
   if (pageName === 'projects' && !projectsLoaded) loadProjects();
+  if (pageName === 'job-history') {
+    _historyOffset = 0;
+    fetchHistoryList();
+  }
 }
 
 // ── Mode ───────────────────────────────────────────────────────────────────
@@ -1742,3 +1750,216 @@ bindPlanSelectionEvents();
 bindReportsAndMonitorEvents();
 bindPdfEvents();
 startActiveJobPolling();
+
+// ── Job History (Phase 19) ─────────────────────────────────────────────────
+
+function initJobHistory() {
+  document.querySelectorAll('#historyFilters .filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#historyFilters .filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      _historyActiveOutcome = chip.dataset.outcome || '';
+      _historyOffset = 0;
+      fetchHistoryList();
+    });
+  });
+}
+
+async function fetchHistoryList() {
+  const loading = document.getElementById('historyLoading');
+  const tableWrap = document.getElementById('historyTableWrap');
+  const empty = document.getElementById('historyEmpty');
+  const pagination = document.getElementById('historyPagination');
+  if (!loading || !tableWrap || !empty) return;
+
+  loading.style.display = '';
+  tableWrap.style.display = 'none';
+  empty.style.display = 'none';
+  if (pagination) pagination.style.display = 'none';
+
+  try {
+    let url = `/api/jobs/history?limit=${_historyLimit}&offset=${_historyOffset}`;
+    if (_historyActiveOutcome) url += `&outcome=${encodeURIComponent(_historyActiveOutcome)}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    renderHistoryTable(data.runs || []);
+
+    if (pagination && (data.runs.length === _historyLimit || _historyOffset > 0)) {
+      pagination.style.display = '';
+      document.getElementById('historyPageInfo').textContent =
+        `Showing ${_historyOffset + 1}–${_historyOffset + data.runs.length}`;
+      document.getElementById('historyPrevBtn').disabled = _historyOffset === 0;
+      document.getElementById('historyNextBtn').disabled = data.runs.length < _historyLimit;
+    }
+  } catch (err) {
+    console.error('History fetch error:', err);
+    empty.innerHTML = '<p>Failed to load history.</p>';
+    empty.style.display = '';
+  } finally {
+    loading.style.display = 'none';
+  }
+}
+
+function historyPage(dir) {
+  _historyOffset = Math.max(0, _historyOffset + dir * _historyLimit);
+  fetchHistoryList();
+}
+
+function renderHistoryTable(runs) {
+  const tbody = document.getElementById('historyTableBody');
+  const tableWrap = document.getElementById('historyTableWrap');
+  const empty = document.getElementById('historyEmpty');
+  if (!tbody || !tableWrap || !empty) return;
+
+  if (!runs || runs.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+
+  tableWrap.style.display = '';
+  tbody.innerHTML = runs.map(run => {
+    const time = run.started_at ? new Date(run.started_at).toLocaleString() : '—';
+    const project = escHtml(run.project_name || '—');
+    const type = run.job_type === 'stackct' ? 'StackCT' : 'PDF';
+    const badge = historyOutcomeBadge(run.outcome);
+    const sheets = _historySheetsSummary(run);
+    const duration = _historyDuration(run.duration_sec);
+    const actions = _historyActions(run);
+    const rowClass = run.outcome ? `history-row history-row--${run.outcome}` : 'history-row';
+
+    return `<tr class="${rowClass}" data-job-id="${escHtml(run.job_id)}">
+      <td class="history-time">${time}</td>
+      <td class="history-project">${project}</td>
+      <td class="history-type">${type}</td>
+      <td class="history-status">${badge}</td>
+      <td class="history-sheets">${sheets}</td>
+      <td class="history-duration">${duration}</td>
+      <td class="history-actions">${actions}</td>
+    </tr>
+    <tr class="history-detail-row" id="detail-${escHtml(run.job_id)}" style="display:none">
+      <td colspan="7">
+        <div class="history-detail-panel">
+          <p class="detail-muted">Click Details to load log tail.</p>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('.btn-history-expand').forEach(btn => {
+    btn.addEventListener('click', () => toggleHistoryDetail(btn.dataset.jobId));
+  });
+}
+
+function historyOutcomeBadge(outcome) {
+  const map = {
+    success: 'badge-done',
+    partial: 'badge-partial',
+    failed: 'badge-error',
+    cancelled: 'badge-cancelled',
+  };
+  const cls = map[outcome] || 'badge-unknown';
+  const label = outcome ? outcome.charAt(0).toUpperCase() + outcome.slice(1) : 'Unknown';
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+function _historySheetsSummary(run) {
+  if (!run.sheets_total && !run.sheets_succeeded) return '—';
+  const total = run.sheets_total || run.sheets_succeeded || 0;
+  const ok = run.sheets_succeeded || 0;
+  if (run.sheets_failed) return `${ok}/${total} (${run.sheets_failed} failed)`;
+  return `${ok}/${total}`;
+}
+
+function _historyDuration(sec) {
+  if (!sec) return '—';
+  if (sec < 60) return `${Math.round(sec)}s`;
+  return `${Math.floor(sec / 60)}m ${Math.round(sec % 60)}s`;
+}
+
+function _historyActions(run) {
+  let html = `<button type="button" class="btn btn-sm btn-history-expand" data-job-id="${escHtml(run.job_id)}">Details</button>`;
+  if (run.run_folder) {
+    const folder = escHtml(run.run_folder).replace(/'/g, "\\'");
+    html += ` <button type="button" class="btn btn-sm btn-history-report" onclick="openHistoryReport('${folder}')">Open Report</button>`;
+  }
+  return html;
+}
+
+function _outcomeSummaryLine(run) {
+  const outcome = run.outcome || 'unknown';
+  const label = outcome.charAt(0).toUpperCase() + outcome.slice(1);
+  const parts = [];
+
+  if (run.sheets_succeeded != null && run.sheets_total != null) {
+    parts.push(`${run.sheets_succeeded}/${run.sheets_total} sheets`);
+  } else if (run.sheets_succeeded != null) {
+    parts.push(`${run.sheets_succeeded} sheets`);
+  }
+
+  if (run.sheets_failed) parts.push(`${run.sheets_failed} failed`);
+  if (run.linked_sheets_added) parts.push(`${run.linked_sheets_added} linked sheets added`);
+  if (run.duration_sec) parts.push(_historyDuration(run.duration_sec));
+
+  const detail = parts.length ? ` — ${parts.join(', ')}` : '';
+  const cls = {
+    success: 'detail-success',
+    partial: 'detail-warning',
+    failed: 'detail-error',
+    cancelled: 'detail-muted',
+  }[outcome] || 'detail-muted';
+  return `<p class="${cls} outcome-summary"><strong>${label}${detail}</strong></p>`;
+}
+
+async function toggleHistoryDetail(jobId) {
+  const detailRow = document.getElementById(`detail-${jobId}`);
+  if (!detailRow) return;
+
+  if (detailRow.style.display !== 'none') {
+    detailRow.style.display = 'none';
+    return;
+  }
+
+  detailRow.style.display = '';
+  const panel = detailRow.querySelector('.history-detail-panel');
+  if (!panel || !panel.querySelector('.detail-muted')) return;
+
+  try {
+    const resp = await fetch(`/api/jobs/history/${encodeURIComponent(jobId)}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const run = await resp.json();
+    renderHistoryDetail(panel, run);
+  } catch (err) {
+    panel.innerHTML = `<p class="detail-error">Failed to load details: ${escHtml(err.message)}</p>`;
+  }
+}
+
+function renderHistoryDetail(panel, run) {
+  const logLines = Array.isArray(run.log_tail) ? run.log_tail : [];
+  const logHtml = logLines.length
+    ? `<pre class="log-tail">${logLines.map(l => {
+        if (typeof l === 'string') return escHtml(l);
+        return escHtml(`[${l.type || 'info'}] ${l.message || JSON.stringify(l)}`);
+      }).join('\n')}</pre>`
+    : '';
+
+  panel.innerHTML = `
+    ${_outcomeSummaryLine(run)}
+    ${run.error_message ? `<p class="detail-error"><strong>Error:</strong> ${escHtml(run.error_message)}</p>` : ''}
+    ${run.warning_message ? `<p class="detail-warning"><strong>Warning:</strong> ${escHtml(run.warning_message)}</p>` : ''}
+    ${run.linked_sheets_added ? `<p><strong>Linked sheets added:</strong> ${run.linked_sheets_added}</p>` : ''}
+    ${logHtml || "<p class='detail-muted'>No log tail available.</p>"}
+  `;
+}
+
+function openHistoryReport(runFolder) {
+  if (!runFolder) return;
+  if (window.reportWorkspace?.openReportWorkspace) {
+    window.reportWorkspace.openReportWorkspace(runFolder);
+    return;
+  }
+  navigateTo('reports');
+}
+
+initJobHistory();

@@ -49,6 +49,10 @@
         <span class="nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></span>
         <span>Job Monitor</span>
       </a>
+      <a class="nav-item" data-page="job-history" onclick="navigateTo('job-history'); return false;" href="#" id="navJobHistory">
+        <span class="nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+        <span>Job History</span>
+      </a>
       <div class="nav-divider"></div>
       <a class="nav-item" href="/settings">
         <span class="nav-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
@@ -292,6 +296,50 @@
           <div class="monitor-actions">
             <button type="button" class="btn-danger" id="cancelJobBtn">Cancel Job</button>
             <button type="button" class="btn-ghost" onclick="navigateTo('projects')">← Back to Projects</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Job History (Phase 19) ── -->
+      <section id="page-job-history" class="page-section">
+        <div class="card">
+          <h2>Job History</h2>
+          <p class="page-subtitle" style="margin-top:0;color:var(--text-tertiary);font-size:13px;">Past takeoff and PDF analysis runs</p>
+
+          <div class="history-filters" id="historyFilters">
+            <button type="button" class="filter-chip active" data-outcome="">All</button>
+            <button type="button" class="filter-chip" data-outcome="success">Success</button>
+            <button type="button" class="filter-chip" data-outcome="partial">Partial</button>
+            <button type="button" class="filter-chip" data-outcome="failed">Failed</button>
+            <button type="button" class="filter-chip" data-outcome="cancelled">Cancelled</button>
+          </div>
+
+          <div id="historyLoading" class="loading-state" style="display:none">Loading history…</div>
+          <div id="historyEmpty" class="empty-state" style="display:none">
+            <p>No job history yet — run a takeoff from Projects.</p>
+          </div>
+
+          <div class="table-responsive" id="historyTableWrap" style="display:none">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Project</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Sheets</th>
+                  <th>Duration</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody"></tbody>
+            </table>
+          </div>
+
+          <div class="history-pagination" id="historyPagination" style="display:none">
+            <button type="button" class="btn-ghost" id="historyPrevBtn" onclick="historyPage(-1)">← Previous</button>
+            <span id="historyPageInfo"></span>
+            <button type="button" class="btn-ghost" id="historyNextBtn" onclick="historyPage(1)">Next →</button>
           </div>
         </div>
       </section>

@@ -1529,3 +1529,176 @@ select:focus, input[type="text"]:focus {
   gap: 8px;
   margin-top: 10px;
 }
+
+/* ── Job History (Phase 19) ──────────────────────────────────────────────── */
+
+.history-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1rem 0 1.25rem;
+}
+
+.filter-chip {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.filter-chip:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.filter-chip.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: #fff;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.history-table thead th {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 2px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.history-table tbody tr.history-row {
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.1s;
+}
+
+.history-table tbody tr.history-row:hover {
+  background: var(--bg-elevated);
+}
+
+.history-table td {
+  padding: 0.65rem 0.75rem;
+  vertical-align: middle;
+}
+
+.history-row--success {
+  box-shadow: inset 3px 0 0 var(--accent-success);
+}
+
+.history-row--partial {
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+
+.history-row--failed {
+  box-shadow: inset 3px 0 0 var(--accent-danger);
+}
+
+.history-row--cancelled {
+  box-shadow: inset 3px 0 0 var(--text-tertiary);
+}
+
+.history-time {
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  font-size: 0.8rem;
+}
+
+.history-project {
+  font-weight: 500;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-duration,
+.history-sheets {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.history-actions {
+  white-space: nowrap;
+}
+
+.history-detail-row td {
+  padding: 0;
+}
+
+.history-detail-panel {
+  padding: 1rem 1.5rem;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.85rem;
+}
+
+.detail-error {
+  color: var(--accent-danger);
+  margin: 0 0 0.5rem;
+}
+
+.detail-warning {
+  color: #d97706;
+  margin: 0 0 0.5rem;
+}
+
+.detail-muted {
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.detail-success {
+  color: var(--accent-success);
+}
+
+.outcome-summary {
+  margin: 0 0 0.75rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.log-tail {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-top: 0.75rem;
+}
+
+.badge-partial {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.badge-cancelled {
+  background: rgba(156, 163, 175, 0.2);
+  color: var(--text-tertiary);
+}
+
+.history-pagination {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+.btn-history-report {
+  margin-left: 0.25rem;
+}
