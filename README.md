@@ -59,6 +59,7 @@ mkdir -p uploads output output/screenshots
 | `CANVAS_STABILITY_TIMEOUT` | Max seconds waiting for canvas render | `15` |
 | `CANVAS_STABILITY_CHECKS` | Consecutive stable hashes before capture | `2` |
 | `MAX_PREVIEW_ROWS` | CSV preview row cap in web UI | `500` |
+| `JOB_HISTORY_RETENTION_DAYS` | Days to keep job history in SQLite (0 = forever) | `90` |
 | `RUN_SCHEDULE` | Cron expression for scheduled runs | `0 8 * * *` |
 
 See `.env.example` for the full list and comments.
@@ -270,6 +271,15 @@ python3 main.py
 # CLI — specific project
 python3 main.py --project-id 7409312 --project-name "Some Project"
 ```
+
+### Job History
+
+The **Job History** tab provides a persistent record of all completed takeoff and PDF analysis runs. History survives Flask restarts (stored in SQLite alongside the StackCT project cache).
+
+- Filter by outcome: Success, Partial, Failed, Cancelled
+- Expand any row to see error/warning messages and the last 80 log lines
+- **Open Report** opens the run directly in the Reports workspace
+- Retention: configure `JOB_HISTORY_RETENTION_DAYS` in `.env` (default: 90 days; set `0` to disable pruning)
 
 ## Production takeoff runs
 
