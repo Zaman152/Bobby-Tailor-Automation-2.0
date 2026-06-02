@@ -84,6 +84,73 @@
 - [x] **DATA-08**: Project/plan APIs expose `from_cache`, `stale`, and `syncing` metadata
 - [x] **DATA-09**: UI shows sheet counts on load; plan preview uses DB when fresh
 
+### Takeoff Accuracy — Masterv2 v2.1 (Phase 16)
+
+- [x] **ACCURACY-01**: Extraction prompt includes table_purpose, cross_references, pipe_runs, civil_structures
+- [x] **ACCURACY-02**: Calculator skips specification_reference and general_notes schedules
+- [x] **ACCURACY-03**: Specification tables stored in report as reference library (not calculated)
+- [x] **ACCURACY-04**: Cross-reference resolution pass for sheets in the same run
+- [x] **ACCURACY-05**: Project-level takeoff_summary via aggregator module
+- [x] **ACCURACY-06**: takeoff_summary.csv export (item, quantity, unit) matches StackCT format
+- [x] **ACCURACY-07**: Civil/site estimation tables (storm pipe, catch basin, striping, etc.)
+- [x] **ACCURACY-08**: GL/INV/elevation values excluded from measurement calculations
+- [x] **ACCURACY-09**: Approximate (±) quantities flagged in calculations output
+- [x] **ACCURACY-10**: Pipe slope percentages not treated as takeoff quantities
+- [x] **ACCURACY-11**: Spec lookup enrichment when pipe size matches reference tables
+- [x] **ACCURACY-12**: In-browser preview of consolidated takeoff summary
+
+### Production Takeoff Pipeline (Phase 17)
+
+- [ ] **PIPE-01**: Reuse cached screenshots via `REUSE_SCREENSHOTS` and `find_screenshot_paths`
+- [ ] **PIPE-02**: Two-phase pipeline — bulk capture then analyze (browser closed before Claude)
+- [ ] **PIPE-03**: `manifest.json` per run; analyze-only resume without StackCT login
+- [ ] **PIPE-04**: Phase-aware progress, cooperative cancel, partial report UI warnings
+- [~] **PIPE-05**: Per-sheet resilience, sanitized filenames, user-facing job error messages *(hotfix landed; full UX in 17-04)*
+
+### Linked Sheet Resolution (Phase 18)
+
+- [ ] **LINK-01**: Map ref_sheet codes to page_id via catalog + fuzzy matching
+- [ ] **LINK-02**: Collect refs from cross_references and civil_structures.detail_ref_sheet
+- [ ] **LINK-03**: AUTO_INCLUDE_LINKED_SHEETS + MAX_LINKED_SHEETS config
+- [ ] **LINK-04**: Linked capture/analyze pass in scraper before final resolve
+- [ ] **LINK-05**: Job/report linked_sheets_added metadata + monitor notice
+- [ ] **LINK-06**: Integration tests, README, 18-UAT.md sign-off
+
+### Job History & Run Archive (Phase 19)
+
+- [x] **HIST-01**: Terminal job states (done, error, cancelled) persist to SQLite on completion
+- [x] **HIST-02**: History survives Flask restart — not limited to in-memory `jobs` dict
+- [x] **HIST-03**: Job History nav tab lists recent runs newest-first (project, type, outcome, time, duration)
+- [x] **HIST-04**: Outcome badges distinguish success, partial, failed, and cancelled with user-facing error/warning text
+- [x] **HIST-05**: Detail panel shows log tail, sheet stats, and Open Report when a run folder exists
+- [x] **HIST-06**: `GET /api/jobs/history` and `GET /api/jobs/history/<job_id>` with pagination and outcome filter
+
+### StackCT Plan Sets (Phase 14)
+
+- [ ] **PLANSET-01**: Browser discovers deduplicated plan sets (folders) per project via `[data-folder-id]`
+- [ ] **PLANSET-02**: Drawing pages stored and synced per `(project_id, folder_id, page_id)`
+- [ ] **PLANSET-03**: APIs expose plan set list and folder-scoped plan list
+- [ ] **PLANSET-04**: UI shows plan set picker before sheet checklist (Preview Plans)
+- [ ] **PLANSET-05**: Run accepts `folder_id` and validates `page_ids` belong to that set
+- [ ] **PLANSET-06**: Direct-grid fallback when StackCT has no folder cards but has sheets
+- [ ] **PLANSET-07**: Project list shows plan set count (not misleading merged sheet total)
+- [ ] **PLANSET-08**: Multi-project audit documented and dedupe rules tested
+
+### Premium UI/UX (Phase 15)
+
+- [ ] **UX-01**: Design tokens v2 documented in `design-system/bobby-tailor/MASTER.md` (dark industrial)
+- [ ] **UX-02**: Shared modal, drawer, and toast primitives with focus trap and Esc close
+- [ ] **UX-03**: Report cards distinguish **Open preview** from **Export/download** actions
+- [ ] **UX-04**: Full-screen report preview workspace (run list, tabs, export rail)
+- [ ] **UX-05**: Calculations/raw tables use production grid (sort, filter, export filtered rows)
+- [ ] **UX-06**: URL deep-link restores open report and active tab
+- [ ] **UX-07**: Projects page uses guided stepper: Project → Plan set → Sheets → Run
+- [ ] **UX-08**: Job monitor and sidebar mini-card match premium shell
+- [ ] **UX-09**: Motion animations with `prefers-reduced-motion` fallback
+- [ ] **UX-10**: 21st.dev MCP components used and documented for key surfaces
+- [ ] **UX-11**: Responsive layouts verified at 375, 768, 1024, 1440px
+- [ ] **UX-12**: Login, Settings, and PDF pages visually aligned with main shell
+
 ## v2 Requirements
 
 ### Architecture & Scale
@@ -103,10 +170,9 @@
 - **AUTO-02**: Email or Slack notification on run completion
 - **AUTO-03**: Diff mode comparing runs since last take-off
 
-### Export & Auth
+### Export
 
 - **EXP-01**: Excel export with summary dashboard and conditional formatting
-- **AUTH-01**: Simple password protection or HTTP basic auth for production
 
 ## Out of Scope
 
@@ -163,12 +229,70 @@
 | DEPLOY-01 | Phase 1 | Complete |
 | DEPLOY-02 | Phase 11 | Complete |
 | DEPLOY-03 | Phase 1 | Complete |
+| DATA-01 | Phase 13 | Complete |
+| DATA-02 | Phase 13 | Complete |
+| DATA-03 | Phase 13 | Complete |
+| DATA-04 | Phase 13 | Complete |
+| DATA-05 | Phase 13 | Complete |
+| DATA-06 | Phase 13 | Complete |
+| DATA-07 | Phase 13 | Complete |
+| DATA-08 | Phase 13 | Complete |
+| DATA-09 | Phase 13 | Complete |
+| PLANSET-01 | Phase 14 | Pending |
+| PLANSET-02 | Phase 14 | Pending |
+| PLANSET-03 | Phase 14 | Pending |
+| PLANSET-04 | Phase 14 | Pending |
+| PLANSET-05 | Phase 14 | Pending |
+| PLANSET-06 | Phase 14 | Pending |
+| PLANSET-07 | Phase 14 | Pending |
+| PLANSET-08 | Phase 14 | Pending |
+| UX-01 | Phase 15 | Pending |
+| UX-02 | Phase 15 | Pending |
+| UX-03 | Phase 15 | Pending |
+| UX-04 | Phase 15 | Pending |
+| UX-05 | Phase 15 | Pending |
+| UX-06 | Phase 15 | Pending |
+| UX-07 | Phase 15 | Pending |
+| UX-08 | Phase 15 | Pending |
+| UX-09 | Phase 15 | Pending |
+| UX-10 | Phase 15 | Pending |
+| UX-11 | Phase 15 | Pending |
+| UX-12 | Phase 15 | Pending |
+| ACCURACY-01 | Phase 16 | Complete |
+| ACCURACY-02 | Phase 16 | Complete |
+| ACCURACY-03 | Phase 16 | Complete |
+| ACCURACY-04 | Phase 16 | Complete |
+| ACCURACY-05 | Phase 16 | Complete |
+| ACCURACY-06 | Phase 16 | Complete |
+| ACCURACY-07 | Phase 16 | Complete |
+| ACCURACY-08 | Phase 16 | Complete |
+| ACCURACY-09 | Phase 16 | Complete |
+| ACCURACY-10 | Phase 16 | Complete |
+| ACCURACY-11 | Phase 16 | Complete |
+| ACCURACY-12 | Phase 16 | Complete |
+| PIPE-01 | Phase 17 | Pending |
+| PIPE-02 | Phase 17 | Pending |
+| PIPE-03 | Phase 17 | Pending |
+| PIPE-04 | Phase 17 | Pending |
+| PIPE-05 | Phase 17 | Partial (hotfix: per-sheet errors, safe filenames, partial reports) |
+| LINK-01 | Phase 18 | Pending |
+| LINK-02 | Phase 18 | Pending |
+| LINK-03 | Phase 18 | Pending |
+| LINK-04 | Phase 18 | Pending |
+| LINK-05 | Phase 18 | Pending |
+| LINK-06 | Phase 18 | Pending |
+| HIST-01 | Phase 19 | Complete |
+| HIST-02 | Phase 19 | Complete |
+| HIST-03 | Phase 19 | Complete |
+| HIST-04 | Phase 19 | Complete |
+| HIST-05 | Phase 19 | Complete |
+| HIST-06 | Phase 19 | Complete |
 
 **Coverage:**
-- v1 requirements: 35 total
-- Mapped to phases: 35
+- v1 requirements: 84 total (incl. Phase 14–19)
+- Mapped to phases: 84
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-05-26*
-*Last updated: 2026-05-26 after roadmap traceability (11 phases, comprehensive depth)*
+*Last updated: 2026-05-26 — Phase 16 Takeoff Accuracy (ACCURACY-01–12) from Masterv2 v2.1*

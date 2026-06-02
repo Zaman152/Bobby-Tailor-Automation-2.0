@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 18 planned (linked sheets); finish Phase 17 UAT first
+**Current focus:** Phase 19 — UAT sign-off (Job History shipped, 22 tests pass)
 
 ## Current Position
 
-Phase: 18 of 18 (Linked Sheet Resolution) — COMPLETE  
-Plan: 5/5 complete  
-Status: 18-01 through 18-05 all executed  
-Last activity: 2026-06-02 — Executed 18-05-PLAN.md (integration tests + README + UAT)
+Phase: 19 of 19 (Job History & Run Archive) — AWAITING UAT  
+Plan: 5/5 code complete (19-05 UAT pending)  
+Status: Job History tab live; history persists in SQLite  
+Last activity: 2026-06-02 — `/gsd-execute-phase 19`
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 

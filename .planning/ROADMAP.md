@@ -710,11 +710,11 @@ Flask restart.
 
 Plans:
 
-- [ ] 19-01-PLAN.md — job_store.py (schema + outcome derivation + save/list/get) + config.py + app.py finalize hooks
-- [ ] 19-02-PLAN.md — app.py: GET /api/jobs/history list + GET /api/jobs/history/<job_id> detail endpoints
-- [ ] 19-03-PLAN.md — UI: Job History nav tab + list page + filter chips + table + detail expand panel + CSS badges
-- [ ] 19-04-PLAN.md — Polish: Open Report action, outcome summary line, row accent borders
-- [ ] 19-05-PLAN.md — Tests (test_job_store.py + test_job_history_api.py) + README.md + UAT checkpoint
+- [x] 19-01-PLAN.md — job_store.py (schema + outcome derivation + save/list/get) + config.py + app.py finalize hooks
+- [x] 19-02-PLAN.md — app.py: GET /api/jobs/history list + GET /api/jobs/history/<job_id> detail endpoints
+- [x] 19-03-PLAN.md — UI: Job History nav tab + list page + filter chips + table + detail expand panel + CSS badges
+- [x] 19-04-PLAN.md — Polish: Open Report action, outcome summary line, row accent borders
+- [~] 19-05-PLAN.md — Tests (test_job_store.py + test_job_history_api.py) + README.md + UAT checkpoint *(tests pass; UAT pending)*
 
 Research: `.planning/phases/19-job-history/19-RESEARCH.md`
 Context: `.planning/phases/19-job-history/19-CONTEXT.md`
