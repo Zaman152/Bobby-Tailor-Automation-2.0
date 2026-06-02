@@ -45,6 +45,9 @@ SCREENSHOTS_DIR = os.path.join(OUTPUT_DIR, "screenshots")
 STACKCT_DB_PATH = Path(OUTPUT_DIR) / "stackct.db"
 STACKCT_CACHE_TTL_HOURS = int(os.getenv("STACKCT_CACHE_TTL_HOURS", "24"))
 
+# Job history retention (Phase 19) — 0 disables pruning
+JOB_HISTORY_RETENTION_DAYS: int = int(os.environ.get("JOB_HISTORY_RETENTION_DAYS", "90"))
+
 # Preview settings
 MAX_PREVIEW_ROWS = int(os.getenv("MAX_PREVIEW_ROWS", "500"))  # Cap for CSV preview
 

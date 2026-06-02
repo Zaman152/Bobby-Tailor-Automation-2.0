@@ -3,6 +3,7 @@ Flask web app — project selector UI + job runner.
 """
 import asyncio
 import json
+import re
 import threading
 import uuid
 import logging
@@ -51,7 +52,9 @@ os.makedirs("uploads", exist_ok=True)
 
 # SQLite catalog + background StackCT sync on startup
 import stackct_store
+import job_store
 stackct_store.init_db()
+job_store.init_schema()
 
 from project_cache import prefetch_in_background
 prefetch_in_background()
@@ -266,12 +269,22 @@ def _user_facing_job_error(error_code: str) -> str:
     return JOB_ERROR_MESSAGES.get(str(error_code), "The job failed. Check server logs for details.")
 
 
+def _persist_job_history(job_id: str, job_type: str) -> None:
+    try:
+        job_store.save_job_run(jobs[job_id], job_id=job_id, job_type=job_type)
+    except Exception:
+        logger.exception("Failed to persist job run %s to history", job_id)
+
+
 def _finalize_stackct_job(job_id: str, result, log):
     """Set job status from scraper result — handles errors, partial success, and full success."""
+    jobs[job_id]["finished_at"] = datetime.now().isoformat()
+
     if not isinstance(result, dict):
         jobs[job_id]["status"] = "error"
         jobs[job_id]["error"] = JOB_ERROR_MESSAGES["scrape_failed"]
         log(jobs[job_id]["error"])
+        _persist_job_history(job_id, "stackct")
         return
 
     # Cancelled: scraper stopped early; preserve "cancelled" status set by endpoint
@@ -286,6 +299,9 @@ def _finalize_stackct_job(job_id: str, result, log):
             jobs[job_id]["warning"] = f"Job cancelled — partial report from {sheets_ok} sheet(s)."
             log(jobs[job_id]["warning"])
         jobs[job_id]["current_phase"] = "cancelled"
+        if jobs[job_id].get("status") != "cancelled":
+            jobs[job_id]["status"] = "cancelled"
+        _persist_job_history(job_id, "stackct")
         return
 
     if result.get("error"):
@@ -296,6 +312,7 @@ def _finalize_stackct_job(job_id: str, result, log):
         if result.get("sheets_failed"):
             n = len(result["sheets_failed"])
             log(f"{n} sheet(s) failed before report generation.")
+        _persist_job_history(job_id, "stackct")
         return
 
     jobs[job_id]["status"] = "done"
@@ -326,6 +343,8 @@ def _finalize_stackct_job(job_id: str, result, log):
             f"Complete! {result.get('sheets_processed', 0)} sheets · "
             f"{total_items} takeoff items extracted"
         )
+
+    _persist_job_history(job_id, "stackct")
 
 
 def _resolve_manifest_dir(
@@ -426,12 +445,14 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
             log("Analyze-only mode — loading manifest, skipping browser...")
             resolved_dir = _resolve_manifest_dir(manifest_dir, project_name)
             if resolved_dir is None:
+                jobs[job_id]["finished_at"] = datetime.now().isoformat()
                 jobs[job_id]["status"] = "error"
                 jobs[job_id]["error"] = (
                     "No manifest directory found for analyze-only mode. "
                     "Run a full capture first or specify manifest_dir."
                 )
                 log(jobs[job_id]["error"])
+                _persist_job_history(job_id, "stackct")
                 return
             log(f"Resuming from: {resolved_dir}")
             result = _run_async(run_analyze_from_manifest(
@@ -459,9 +480,11 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
         _finalize_stackct_job(job_id, result, log)
     except Exception:
         logger.exception("StackCT job failed")
+        jobs[job_id]["finished_at"] = datetime.now().isoformat()
         jobs[job_id]["status"] = "error"
         jobs[job_id]["error"] = JOB_ERROR_MESSAGES["scrape_failed"]
         log(jobs[job_id]["error"])
+        _persist_job_history(job_id, "stackct")
 
 
 def _pdf_job(job_id: str, pdf_path: str, project_name: str,
@@ -511,14 +534,18 @@ def _pdf_job(job_id: str, pdf_path: str, project_name: str,
             progress_callback=progress,
         )
         jobs[job_id]["status"] = "done"
+        jobs[job_id]["finished_at"] = datetime.now().isoformat()
         jobs[job_id]["result"] = result
         total = result.get("total_line_items", 0)
         jobs[job_id]["progress"] = 100
         jobs[job_id]["log"].append(f"Done — {result.get('sheets_processed',0)} sheets, {total} takeoff items extracted")
+        _persist_job_history(job_id, "pdf")
     except Exception as e:
         logger.exception("PDF job failed")
+        jobs[job_id]["finished_at"] = datetime.now().isoformat()
         jobs[job_id]["status"] = "error"
         jobs[job_id]["error"] = "The job failed. Check server logs for details."
+        _persist_job_history(job_id, "pdf")
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -924,6 +951,38 @@ def get_active_job():
                 }
             })
     return jsonify({"active": False, "job": None})
+
+
+@app.route("/api/jobs/history")
+@login_required
+def job_history_list():
+    """Paginated list of completed job runs, newest first."""
+    try:
+        limit = min(int(request.args.get("limit", 50)), 200)
+        offset = max(int(request.args.get("offset", 0)), 0)
+    except (ValueError, TypeError):
+        limit, offset = 50, 0
+
+    outcome_filter = request.args.get("outcome") or None
+    valid_outcomes = {"success", "partial", "failed", "cancelled"}
+    if outcome_filter and outcome_filter not in valid_outcomes:
+        return jsonify({"error": f"Invalid outcome filter: {outcome_filter}"}), 400
+
+    runs = job_store.list_job_runs(limit=limit, offset=offset, outcome=outcome_filter)
+    return jsonify({"runs": runs, "limit": limit, "offset": offset})
+
+
+@app.route("/api/jobs/history/<job_id>")
+@login_required
+def job_history_detail(job_id: str):
+    """Full detail for a single completed job run, including log tail."""
+    if not re.match(r"^[a-zA-Z0-9\-]{1,64}$", job_id):
+        return jsonify({"error": "Invalid job_id format"}), 400
+
+    run = job_store.get_job_run(job_id)
+    if run is None:
+        return jsonify({"error": "Job not found in history"}), 404
+    return jsonify(run)
 
 
 @app.route("/api/reports")
