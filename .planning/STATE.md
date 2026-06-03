@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — Takeoff Measurement Precision (Plan 20-01 complete)
+**Current focus:** Phase 20 — Takeoff Measurement Precision (Plans 20-00 + 20-01 complete)
 
 ## Current Position
 
 Phase: 20 of 20+ (Takeoff Measurement Precision) — In progress  
-Plan: 1/7 complete (20-01 done)  
-Status: Title-block sheet ID extraction shipped; 22 tests pass  
-Last activity: 2026-06-03 — `gsd-execute-phase 20-01`
+Plan: 2/7 complete (20-00 pipeline skeleton + 20-01 title-block fix done)  
+Status: TakeoffPipeline + PASS_MATRIX skeleton shipped; title-block sheet ID fix shipped; 89 tests pass  
+Last activity: 2026-06-03 — `gsd-execute-phase 20-00`
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -116,6 +116,16 @@ From 14-04 (Two-Step Plan Selection UI):
 
 None yet.
 
+### 20-00 Decisions
+
+| Decision | Source |
+|----------|--------|
+| MODEL_ROUTING uses CLAUDE_MODEL_SCHEDULES config constant, not hardcoded slug | 20-00 |
+| TakeoffPipeline accepts optional analyzer= callable (dependency injection for tests) | 20-00 |
+| merge_passes defined as stub in takeoff_pipeline; canonical version moves to claude_analyzer in 20-03 | 20-00 |
+| plan_passes returns copy of PASS_MATRIX list to prevent mutation of module constant | 20-00 |
+| classify_sheet_type_from_text defaults to floor_plan when ambiguous (safest: runs count+measure) | 20-00 |
+
 ### 20-01 Decisions
 
 | Decision | Source |
@@ -161,5 +171,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-06-03  
-Stopped at: Completed 20-01-PLAN.md (title-block extraction + noise filter + 22 tests)  
-Resume file: .planning/phases/20-takeoff-measurement-precision/20-02-PLAN.md
+Stopped at: Completed 20-00-PLAN.md (pipeline skeleton + PASS_MATRIX + TakeoffPipeline + 67 tests)  
+Resume file: .planning/phases/20-takeoff-measurement-precision/20-01-PLAN.md
