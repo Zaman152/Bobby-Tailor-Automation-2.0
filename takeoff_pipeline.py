@@ -200,7 +200,7 @@ class TakeoffPipeline:
         )
 
         # Step 2 — determine passes
-        passes = plan_passes(resolved_type)
+        passes = plan_passes(resolved_type, title_block_text=title_block_text)
 
         if not passes:
             # title_sheet — skip entirely; zero API calls
@@ -293,7 +293,7 @@ class TakeoffPipeline:
         for i, page in enumerate(pages, 1):
             image_path = page["image_path"]
             sheet_name = page.get("sheet_name", f"Page_{i}")
-            sheet_type = page.get("sheet_type_hint")
+            sheet_type = page.get("sheet_type_hint") or page.get("sheet_type")
             title_block_text = page.get("title_block_text", "")
 
             if progress_callback:

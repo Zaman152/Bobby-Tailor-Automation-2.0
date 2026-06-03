@@ -66,16 +66,18 @@ class TestPassMatrix:
             "title_sheet must have empty pass list (zero API cost)"
         )
 
-    def test_civil_site_has_count_and_measure(self):
-        assert PASS_MATRIX["civil_site"] == ["count", "measure"], (
-            "civil_site includes count pass to extract bollards, hydrants, and other EA structures"
-        )
+    def test_civil_site_is_measure_only(self):
+        assert PASS_MATRIX["civil_site"] == ["measure"]
 
     def test_schedule_is_schedule_only(self):
         assert PASS_MATRIX["schedule"] == ["schedule"]
 
-    def test_floor_plan_has_count_measure_and_schedule(self):
+    def test_floor_plan_has_count_and_measure(self):
         passes = PASS_MATRIX["floor_plan"]
+        assert passes == ["count", "measure"]
+
+    def test_floor_plan_adds_schedule_when_legend_in_title_block(self):
+        passes = plan_passes("floor_plan", title_block_text="QUANTITY LEGEND TABLE")
         assert passes == ["count", "measure", "schedule"]
 
     def test_elevation_has_count_and_measure(self):
@@ -104,11 +106,8 @@ class TestPlanPasses:
         assert "count" in result
         assert "measure" in result
 
-    def test_civil_site_returns_count_and_measure(self):
-        result = plan_passes("civil_site")
-        assert result == ["count", "measure"], (
-            "civil_site should run count pass for bollards/hydrants then measure for linear items"
-        )
+    def test_civil_site_returns_measure_only(self):
+        assert plan_passes("civil_site") == ["measure"]
 
     def test_schedule_returns_schedule_only(self):
         assert plan_passes("schedule") == ["schedule"]

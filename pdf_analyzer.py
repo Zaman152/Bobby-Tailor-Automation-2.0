@@ -222,9 +222,16 @@ def run_pdf_analysis(
                 progress_callback(idx + 1, total, sheet, phase="converting")
 
             img_path = _page_to_image(pdf_path, i, str(img_dir))
+            sheet_type_hint = None
+            try:
+                from sheet_pass_matrix import classify_sheet_type_from_text
+                sheet_type_hint = classify_sheet_type_from_text(title_block_text)
+            except ImportError:
+                pass
             pipeline_pages.append({
                 "image_path": img_path,
                 "sheet_name": sheet,
+                "sheet_type_hint": sheet_type_hint,
                 "title_block_text": title_block_text,
                 "page_num": i + 1,
             })

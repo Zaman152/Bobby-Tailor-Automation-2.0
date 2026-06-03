@@ -36,9 +36,9 @@ logger = logging.getLogger(__name__)
 # Maps canonical sheet_type → ordered list of extraction pass names.
 # ---------------------------------------------------------------------------
 PASS_MATRIX: dict[str, list[str]] = {
-    "floor_plan":  ["count", "measure", "schedule"],  # + legend/qty tables on plan sheets
+    "floor_plan":  ["count", "measure"],   # symbol count + area/linear runs
     "elevation":   ["count", "measure"],   # facade items + linear dimensions
-    "civil_site":  ["count", "measure"],   # bollards/hydrants/drains (count) + linear runs (measure)
+    "civil_site":  ["measure"],            # linear runs and areas; no symbol grid
     "schedule":    ["schedule"],           # dense table → Sonnet unconditionally
     "detail":      ["count", "measure"],   # Sonnet; dimension vs symbol disambiguation
     "title_sheet": [],                     # SKIP — no take-off data, zero API cost
@@ -62,7 +62,6 @@ MODEL_ROUTING: dict[tuple[str, str], str] = {
     # Roof/MEP measure: pipe/duct runs require length precision
     ("roof_plan",  "measure"):   CLAUDE_MODEL_SCHEDULES,
     ("mep_plan",   "measure"):   CLAUDE_MODEL_SCHEDULES,
-    # Floor-plan legends (Crow A-101 style takeoff tables) need Sonnet schedule pass
     ("floor_plan", "schedule"):  CLAUDE_MODEL_SCHEDULES,
 }
 
@@ -146,11 +145,13 @@ def classify_sheet_type_from_text(title_block_text: str, full_page_text: str = "
     return "floor_plan"
 
 
-def plan_passes(sheet_type: str) -> list[str]:
+def plan_passes(sheet_type: str, title_block_text: str = "") -> list[str]:
     """Return the ordered extraction passes for a sheet type.
 
     Args:
         sheet_type: Canonical sheet_type value.
+        title_block_text: Optional title-block OCR text; used to add a schedule
+            pass on floor plans that include a quantity/takeoff legend table.
 
     Returns:
         Ordered list of pass names e.g. ["count", "measure"].
@@ -160,7 +161,13 @@ def plan_passes(sheet_type: str) -> list[str]:
     if sheet_type not in PASS_MATRIX:
         logger.warning("plan_passes: unknown sheet_type %r — using measure-only fallback", sheet_type)
         return ["measure"]
-    return list(PASS_MATRIX[sheet_type])
+    passes = list(PASS_MATRIX[sheet_type])
+    if sheet_type == "floor_plan" and title_block_text:
+        tb = title_block_text.upper()
+        if re.search(r"TAKE\s*-?\s*OFF|QUANTITY\s+LEGEND|LEGEND\s+TABLE|TAKEOFF\s+LEGEND", tb):
+            if "schedule" not in passes:
+                passes.append("schedule")
+    return passes
 
 
 def pick_model_for_pass(

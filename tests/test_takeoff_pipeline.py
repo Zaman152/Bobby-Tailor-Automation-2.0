@@ -167,13 +167,13 @@ class TestFloorPlanPasses:
         call_order = []
 
         def mock_analyzer(image_path, sheet_name, **kwargs):
-            call_order.append(len(call_order))
-            return _make_count_result() if len(call_order) == 1 else _make_measure_result()
+            call_order.append(kwargs.get("pass_type"))
+            return _make_count_result() if kwargs.get("pass_type") == "count" else _make_measure_result()
 
         pipeline = TakeoffPipeline(analyzer=mock_analyzer)
         pipeline.run_sheet("A2.1.png", "A2.1", sheet_type="floor_plan")
 
-        assert call_order == [0, 1], "Expected two ordered calls"
+        assert call_order == ["count", "measure"]
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +300,7 @@ class TestMergePasses:
 
 class TestAutoClassify:
     def test_auto_classify_floor_plan_from_title_block(self):
-        mock_analyzer = _make_analyzer([_make_count_result(), _make_measure_result()])
+        mock_analyzer = _make_analyzer(_make_floor_plan_responses())
         pipeline = TakeoffPipeline(analyzer=mock_analyzer)
 
         result = pipeline.run_sheet(
