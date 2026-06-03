@@ -22,12 +22,18 @@ import stackct_store
 from browser import StackCTBrowser
 from capture_manifest import PageEntry, RunManifest, manifest_path
 from sheet_preview import find_screenshot_paths
-from claude_analyzer import analyze_drawing, make_navigation_decision
-from calculator import apply_estimation_tables, resolve_spec_lookups
+from claude_analyzer import make_navigation_decision
+from calculator import apply_estimation_tables, resolve_spec_lookups, _detect_project_type
+from takeoff_pipeline import TakeoffPipeline
 from cross_references import resolve_cross_references
 from reporter import generate_report
 
 logger = logging.getLogger(__name__)
+
+# Shared TakeoffPipeline instance — stateless; safe to reuse across jobs.
+# Using a singleton avoids repeated module-level setup while keeping the
+# analyzer injectable in tests via TakeoffPipeline(analyzer=...).
+_pipeline = TakeoffPipeline()
 
 # User-facing error codes returned in result dict (mapped to messages in app.py)
 ERROR_LOGIN_FAILED = "login_failed"
@@ -151,13 +157,15 @@ async def _discover_and_add_linked_sheets(
     log: Callable,
     progress_callback: Optional[Callable],
     cancel_check: Optional[Callable[[], bool]],
-) -> "tuple[List[dict], List[dict], List[dict]]":
+) -> "tuple[List[dict], List[dict]]":
     """Pass 2a–2c: discover linked pages, capture them, analyze them.
 
-    Returns (new_extracted, new_estimates, linked_meta) where:
-      new_extracted: extraction dicts for linked pages
-      new_estimates: calculator results for linked pages
+    Returns (new_extracted, linked_meta) where:
+      new_extracted: extraction dicts for linked pages (title_sheets excluded)
       linked_meta: list of {page_id, sheet_name, ref_from} for report metadata
+
+    Estimates are NOT computed here — the caller (run_project_scrape) batches
+    estimation after all sheets (including linked) with a single project_type.
     """
     # ----------------------------------------------------------------
     # Pass 2a — Discover unresolved cross-reference targets
@@ -167,7 +175,7 @@ async def _discover_and_add_linked_sheets(
 
     if not refs:
         log("Linked sheets: no cross-references found — skipping linked pass")
-        return [], [], []
+        return [], []
 
     catalog = stackct_store.get_plans(project_id, folder_id)
     if not catalog:
@@ -180,7 +188,7 @@ async def _discover_and_add_linked_sheets(
         log(
             "WARNING: Linked sheet catalog empty — sync plan set to enable linked capture"
         )
-        return [], [], []
+        return [], []
 
     # Match refs to catalog page_ids and build the capture queue
     linked_queue: list[dict] = []
@@ -214,7 +222,6 @@ async def _discover_and_add_linked_sheets(
         log("AUTO_INCLUDE_LINKED_SHEETS=false — skipping linked capture")
         return (
             [],
-            [],
             [
                 {
                     "page_id": x["page_id"],
@@ -228,7 +235,7 @@ async def _discover_and_add_linked_sheets(
 
     if not linked_queue:
         log("Linked sheets: no new linked sheets to capture")
-        return [], [], []
+        return [], []
 
     log(f"Linked sheets: queued {len(linked_queue)} page(s) for capture and analysis")
 
@@ -241,7 +248,7 @@ async def _discover_and_add_linked_sheets(
         await browser.start()
         if not await browser.login():
             log("ERROR: Linked sheet capture — browser login failed")
-            return [], [], [{"error": "login_failed"}]
+            return [], [{"error": "login_failed"}]
 
         for entry_info in linked_queue:
             if cancel_check and cancel_check():
@@ -297,7 +304,6 @@ async def _discover_and_add_linked_sheets(
     # Pass 2c — Analyze linked pages (no browser)
     # ----------------------------------------------------------------
     new_extracted: list[dict] = []
-    new_estimates: list[dict] = []
     linked_meta: list[dict] = []
 
     for entry_info, page_entry in newly_captured:
@@ -310,8 +316,8 @@ async def _discover_and_add_linked_sheets(
         screenshot_path = screenshots_dir / page_entry.screenshot_rel
 
         try:
-            log(f"  [linked] Analyzing {sheet_name} with Claude...")
-            extracted = analyze_drawing(str(screenshot_path), sheet_name)
+            log(f"  [linked] Analyzing {sheet_name} with Claude (multi-pass)...")
+            extracted = _pipeline.run_sheet(str(screenshot_path), sheet_name)
             extracted["_page_id"] = page_id
             extracted["_source_sheet"] = sheet_name
 
@@ -320,11 +326,14 @@ async def _discover_and_add_linked_sheets(
                 log(f"  [linked] Warning: analysis error on {sheet_name}: {err}")
                 page_entry.analysis_status = "failed"
                 new_extracted.append(extracted)
+            elif extracted.get("_skipped"):
+                log(f"  [linked] {sheet_name}: skipped (title_sheet — zero API cost)")
+                page_entry.analysis_status = "skipped"
+                # Do not append skipped to new_extracted; caller batches estimates anyway
             else:
-                estimates = apply_estimation_tables(extracted)
-                if estimates:
-                    log(f"  [linked] {sheet_name}: {len(estimates)} takeoff items")
-                new_estimates.extend(estimates)
+                n_meas = len(extracted.get("measurements", []))
+                n_comp = len(extracted.get("components", []))
+                log(f"  [linked] {sheet_name}: {n_meas} measurements, {n_comp} components")
                 new_extracted.append(extracted)
                 page_entry.analysis_status = "ok"
                 linked_meta.append(
@@ -344,7 +353,7 @@ async def _discover_and_add_linked_sheets(
 
         manifest.save(mpath)
 
-    return new_extracted, new_estimates, linked_meta
+    return new_extracted, linked_meta
 
 
 async def run_project_scrape(project_id: int, project_name: str,
@@ -380,27 +389,62 @@ async def run_project_scrape(project_id: int, project_name: str,
     sheets_failed: List[Dict[str, Any]] = []
     sheets_skipped: List[Dict[str, Any]] = []
 
+    def _cancelled_response() -> dict:
+        return {
+            "_cancelled": True,
+            "error": "cancelled",
+            "sheets_failed": sheets_failed,
+            "sheets_skipped": sheets_skipped,
+            "screenshots_dir": str(screenshots_dir),
+        }
+
     try:
         # ----------------------------------------------------------------
         # Login + page discovery
         # ----------------------------------------------------------------
+        if progress_callback:
+            progress_callback(0, 0, "Starting browser…", phase="capturing")
+        if cancel_check and cancel_check():
+            log("Cancelled by user before browser start")
+            return _cancelled_response()
+
         await browser.start()
         log("Browser started, logging in...")
+        if progress_callback:
+            progress_callback(0, 0, "Logging into StackCT…", phase="capturing")
+        if cancel_check and cancel_check():
+            await browser.close()
+            browser_closed = True
+            log("Cancelled by user during login")
+            return _cancelled_response()
+
         if not await browser.login():
             log("Login failed — check StackCT credentials in Settings")
             return {"error": ERROR_LOGIN_FAILED}
 
+        if cancel_check and cancel_check():
+            await browser.close()
+            browser_closed = True
+            log("Cancelled by user after login")
+            return _cancelled_response()
+
         log("Logged in. Discovering drawing pages...")
+        if progress_callback:
+            progress_callback(0, 0, "Discovering drawing pages…", phase="capturing")
         if folder_id is not None:
             pages = await browser.get_page_ids_in_folder(project_id, folder_id)
             log(f"Using plan set folder_id={folder_id}")
         else:
             pages = await browser.get_all_page_ids(project_id)
+        if cancel_check and cancel_check():
+            await browser.close()
+            browser_closed = True
+            log("Cancelled by user during page discovery")
+            return _cancelled_response()
+
         if not pages:
             log("No drawing pages found for this project/plan set")
             return {"error": ERROR_NO_PAGES}
-
-        log(f"Found {len(pages)} drawing pages — starting capture pass...")
 
         if page_ids_filter:
             pages = [p for p in pages if p["page_id"] in page_ids_filter]
@@ -410,6 +454,9 @@ async def run_project_scrape(project_id: int, project_name: str,
                 return {"error": ERROR_NO_MATCHING_PAGES}
 
         total = len(pages)
+        log(f"Found {total} drawing pages — starting capture pass...")
+        if progress_callback:
+            progress_callback(0, total, "Starting capture…", phase="capturing")
 
         # Build cache map once for the whole run when reuse is enabled
         cached_screenshots: dict[int, Path] = {}
@@ -565,7 +612,7 @@ async def run_project_scrape(project_id: int, project_name: str,
                     ),
                 )
 
-                extracted = analyze_drawing(str(screenshot_path), sheet_name)
+                extracted = _pipeline.run_sheet(str(screenshot_path), sheet_name)
                 extracted["_page_id"] = page_id
                 extracted["_source_sheet"] = sheet_name
 
@@ -577,6 +624,14 @@ async def run_project_scrape(project_id: int, project_name: str,
                         "page_id": page_id,
                         "sheet_name": sheet_name,
                         "reason": f"analysis:{err}",
+                    })
+                elif extracted.get("_skipped"):
+                    log(f"  {sheet_name}: skipped (title_sheet — zero API cost)")
+                    entry.analysis_status = "skipped"
+                    sheets_skipped.append({
+                        "page_id": page_id,
+                        "sheet_name": sheet_name,
+                        "reason": "title_sheet",
                     })
                 else:
                     n_meas = len(extracted.get("measurements", []))
@@ -604,10 +659,7 @@ async def run_project_scrape(project_id: int, project_name: str,
                             idx, total, sheet_name,
                             phase="complete", extraction=extraction_counts,
                         )
-                    estimates = apply_estimation_tables(extracted)
-                    if estimates:
-                        log(f"  {sheet_name}: {len(estimates)} calculated takeoff items")
-                    all_estimates.extend(estimates)
+                    # Estimates deferred — computed in batch with project_type after all sheets
                     entry.analysis_status = "ok"
 
                 all_extracted.append(extracted)
@@ -636,7 +688,7 @@ async def run_project_scrape(project_id: int, project_name: str,
         # PASS 2a/2b/2c — Linked sheet discovery, capture, analyze
         # ================================================================
         if not _cancelled:
-            new_extracted, new_estimates, linked_meta = await _discover_and_add_linked_sheets(
+            new_extracted, linked_meta = await _discover_and_add_linked_sheets(
                 browser=browser,
                 project_id=project_id,
                 project_name=project_name,
@@ -651,7 +703,7 @@ async def run_project_scrape(project_id: int, project_name: str,
                 cancel_check=cancel_check,
             )
             all_extracted.extend(new_extracted)
-            all_estimates.extend(new_estimates)
+            # Batch estimation (with project_type) happens below after all sheets
             if linked_meta:
                 actual_added = [m for m in linked_meta if not m.get("suggested_only")]
                 if actual_added:
@@ -660,8 +712,20 @@ async def run_project_scrape(project_id: int, project_name: str,
                     )
 
         # ================================================================
-        # PASS 3 — Report
+        # PASS 3 — Batch estimation with detected project_type, then Report
         # ================================================================
+        # Detect project_type ONCE across all sheets (main + linked) so
+        # apply_estimation_tables uses a consistent type for the whole set.
+        _successful_extracted = [
+            e for e in all_extracted
+            if "error" not in e and not e.get("_skipped")
+        ]
+        _project_type = _detect_project_type(_successful_extracted)
+        logger.info("run_project_scrape: project_type=%r for %d sheets", _project_type, len(_successful_extracted))
+        all_estimates = []
+        for _e in _successful_extracted:
+            all_estimates.extend(apply_estimation_tables(_e, project_type=_project_type))
+
         successful = [d for d in all_extracted if "error" not in d]
         if not successful:
             if _cancelled:
@@ -871,8 +935,7 @@ async def run_analyze_from_manifest(
                 try:
                     cached = _json.loads(cache_file.read_text(encoding="utf-8"))
                     all_extracted.append(cached)
-                    estimates = apply_estimation_tables(cached)
-                    all_estimates.extend(estimates)
+                    # Estimates deferred — computed in batch with project_type after loop
                     log(
                         f"[{idx}/{total}] {sheet_name}: loaded from analysis cache",
                         _make_log_entry(
@@ -903,7 +966,7 @@ async def run_analyze_from_manifest(
                 ),
             )
 
-            extracted = analyze_drawing(str(screenshot_path), sheet_name)
+            extracted = _pipeline.run_sheet(str(screenshot_path), sheet_name)
             extracted["_page_id"] = page_id
             extracted["_source_sheet"] = sheet_name
 
@@ -915,6 +978,14 @@ async def run_analyze_from_manifest(
                     "page_id": page_id,
                     "sheet_name": sheet_name,
                     "reason": f"analysis:{err}",
+                })
+            elif extracted.get("_skipped"):
+                log(f"  {sheet_name}: skipped (title_sheet — zero API cost)")
+                entry.analysis_status = "skipped"
+                sheets_skipped.append({
+                    "page_id": page_id,
+                    "sheet_name": sheet_name,
+                    "reason": "title_sheet",
                 })
             else:
                 # Save analysis JSON cache beside screenshot
@@ -950,10 +1021,7 @@ async def run_analyze_from_manifest(
                         idx, total, sheet_name,
                         phase="complete", extraction=extraction_counts,
                     )
-                estimates = apply_estimation_tables(extracted)
-                if estimates:
-                    log(f"  {sheet_name}: {len(estimates)} calculated takeoff items")
-                all_estimates.extend(estimates)
+                # Estimates deferred — computed in batch with project_type after loop
                 entry.analysis_status = "ok"
 
             all_extracted.append(extracted)
@@ -977,6 +1045,20 @@ async def run_analyze_from_manifest(
         if not _cancelled and cancel_check and cancel_check():
             log("Cancelled by user during analyze pass")
             _cancelled = True
+
+    # Batch estimation — detect project_type once across all sheets, then apply
+    _successful_extracted = [
+        e for e in all_extracted
+        if "error" not in e and not e.get("_skipped")
+    ]
+    _project_type = _detect_project_type(_successful_extracted)
+    logger.info(
+        "run_analyze_from_manifest: project_type=%r for %d sheets",
+        _project_type, len(_successful_extracted),
+    )
+    all_estimates = []
+    for _e in _successful_extracted:
+        all_estimates.extend(apply_estimation_tables(_e, project_type=_project_type))
 
     # Report ------------------------------------------------------------------
     successful = [d for d in all_extracted if "error" not in d]
@@ -1048,17 +1130,23 @@ async def run_analyze_from_manifest(
 
 
 async def run_all_projects(log_callback: Optional[Callable] = None,
-                           progress_callback: Optional[Callable] = None) -> dict:
+                           progress_callback: Optional[Callable] = None,
+                           cancel_check: Optional[Callable[[], bool]] = None) -> dict:
     def log(msg: str):
         logger.info(msg)
         if log_callback:
             log_callback(msg)
+
+    if cancel_check and cancel_check():
+        return {"_cancelled": True, "error": "cancelled"}
 
     browser = StackCTBrowser()
     results = {}
     try:
         await browser.start()
         log("Logging in to fetch project list...")
+        if cancel_check and cancel_check():
+            return {"_cancelled": True, "error": "cancelled"}
         if not await browser.login():
             return {"error": ERROR_LOGIN_FAILED}
         projects = await browser.get_all_projects()
@@ -1067,11 +1155,14 @@ async def run_all_projects(log_callback: Optional[Callable] = None,
         await browser.close()
 
     for i, p in enumerate(projects, 1):
+        if cancel_check and cancel_check():
+            return {"_cancelled": True, "error": "cancelled", "partial_results": results}
         log(f"[{i}/{len(projects)}] Starting project: {p['name']}")
         results[p["name"]] = await run_project_scrape(
             p["id"], p["name"],
             log_callback=log_callback,
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
+            cancel_check=cancel_check,
         )
 
     return results

@@ -9,10 +9,10 @@ import os
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
-from claude_analyzer import analyze_drawing
-from calculator import apply_estimation_tables, resolve_spec_lookups
+from calculator import resolve_spec_lookups
 from cross_references import resolve_cross_references
 from reporter import generate_report
+from takeoff_pipeline import TakeoffPipeline
 from config import SCREENSHOTS_DIR
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,29 @@ def _is_noise_sheet_candidate(candidate: str, page_text: str) -> bool:
             if candidate in match.group(0):
                 return True
     return False
+
+
+def _page_to_image(pdf_path: str, page_num: int, output_dir: str) -> str:
+    """Render a single PDF page to a PNG image at 2× scale.
+
+    Args:
+        pdf_path:   Path to the PDF file.
+        page_num:   0-based page index.
+        output_dir: Directory to save the image.
+
+    Returns:
+        Absolute path to the saved PNG file.
+    """
+    doc = fitz.open(pdf_path)
+    try:
+        page = doc[page_num]
+        mat = fitz.Matrix(2.0, 2.0)  # 2× scaling for legibility
+        pix = page.get_pixmap(matrix=mat)
+        img_path = str(Path(output_dir) / f"page_{page_num + 1:04d}.png")
+        pix.save(img_path)
+        return img_path
+    finally:
+        doc.close()
 
 
 def get_title_block_text(doc: fitz.Document, page_num: int) -> str:
@@ -147,6 +170,20 @@ def run_pdf_analysis(
     selected_pages: Optional[list[int]] = None,
     progress_callback=None,
 ) -> dict:
+    """Run multi-pass extraction on a PDF via TakeoffPipeline.
+
+    Pass 1 converts each page to an image (emits "converting" progress).
+    Pass 2 delegates to TakeoffPipeline.run_project which handles:
+      - sheet-type classification per page (from title-block text)
+      - title_sheet skip (zero API calls)
+      - count + measure + schedule passes as appropriate
+      - QuantityVerifier sanity check
+      - project_type detection once across all sheets
+      - apply_estimation_tables with uniform project_type
+
+    The return value and downstream resolve/report calls are unchanged so
+    app.py's _pdf_job requires no modification.
+    """
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe = project_name.replace(" ", "_").replace("/", "-")
     img_dir = Path(SCREENSHOTS_DIR) / f"{safe}_{ts}"
@@ -170,38 +207,57 @@ def run_pdf_analysis(
     total = len(pages_to_process)
     logger.info(f"Processing PDF ({total} of {total_pages} pages): {pdf_path}")
 
-    all_extracted = []
-    all_estimates = []
+    # ----------------------------------------------------------------
+    # Pass 1 — Convert PDF pages to images
+    # ----------------------------------------------------------------
+    doc = fitz.open(pdf_path)
+    pipeline_pages: list[dict] = []
+    try:
+        for idx, i in enumerate(pages_to_process):
+            sheet = _sheet_name_from_doc(doc, i)
+            title_block_text = get_title_block_text(doc, i)
 
-    for idx, i in enumerate(pages_to_process):
-        sheet = _sheet_name(pdf_path, i)
-        logger.info(f"[{idx + 1}/{total}] {sheet}")
-
-        if progress_callback:
-            progress_callback(idx + 1, total, sheet, phase="converting")
-
-        img_path = _page_to_image(pdf_path, i, str(img_dir))
-
-        if progress_callback:
-            progress_callback(idx + 1, total, sheet, phase="analyzing")
-
-        extracted = analyze_drawing(img_path, sheet)
-        extracted["_page_num"] = i + 1
-        all_extracted.append(extracted)
-
-        if "error" not in extracted:
-            extraction_counts = {
-                "measurements": len(extracted.get("measurements", [])),
-                "components": len(extracted.get("components", [])),
-                "rooms": len(extracted.get("rooms", [])),
-                "schedules": len(extracted.get("schedules", [])),
-            }
+            logger.info(f"[{idx + 1}/{total}] Converting {sheet} (page {i + 1})")
             if progress_callback:
+                progress_callback(idx + 1, total, sheet, phase="converting")
+
+            img_path = _page_to_image(pdf_path, i, str(img_dir))
+            pipeline_pages.append({
+                "image_path": img_path,
+                "sheet_name": sheet,
+                "title_block_text": title_block_text,
+                "page_num": i + 1,
+            })
+    finally:
+        doc.close()
+
+    # ----------------------------------------------------------------
+    # Pass 2 — Multi-pass extraction via TakeoffPipeline
+    # ----------------------------------------------------------------
+    def _progress(current: int, total_: int, sheet_name: str) -> None:
+        if progress_callback:
+            progress_callback(current, total_, sheet_name, phase="analyzing")
+
+    pipeline = TakeoffPipeline()
+    all_extracted, all_estimates, _project_type = pipeline.run_project(
+        pipeline_pages, progress_callback=_progress
+    )
+
+    # Emit "complete" progress for each successfully analyzed sheet
+    if progress_callback:
+        for idx, extracted in enumerate(all_extracted):
+            if "error" not in extracted:
+                extraction_counts = {
+                    "measurements": len(extracted.get("measurements", [])),
+                    "components": len(extracted.get("components", [])),
+                    "rooms": len(extracted.get("rooms", [])),
+                    "schedules": len(extracted.get("schedules", [])),
+                }
                 progress_callback(
-                    idx + 1, total, sheet,
+                    idx + 1, total,
+                    extracted.get("_sheet_name", extracted.get("_source_sheet", "")),
                     phase="complete", extraction=extraction_counts,
                 )
-            all_estimates.extend(apply_estimation_tables(extracted))
 
     cross_refs = resolve_cross_references(all_extracted)
     all_estimates = resolve_spec_lookups(all_extracted, all_estimates)
