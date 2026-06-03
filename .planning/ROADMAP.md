@@ -28,6 +28,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [ ] **Phase 16: Takeoff Accuracy (v2.1)** — Cross-refs, spec tables, consolidated summary (Masterv2 Addendum)
 - [ ] **Phase 17: Production Takeoff Pipeline** — Screenshot reuse, two-phase capture/analyze, resume, demo-grade job UX
 - [ ] **Phase 18: Linked Sheet Resolution** — Auto-follow drawing cross-refs; capture/analyze linked detail sheets
+- [ ] **Phase 20: Takeoff Measurement Precision** — ≥97% numeric accuracy vs golden take-offs; multi-pass extraction
 
 ## Phase Details
 
@@ -721,6 +722,64 @@ Context: `.planning/phases/19-job-history/19-CONTEXT.md`
 
 ---
 
+### Phase 20: Takeoff Measurement Precision
+
+**Goal:** ≥97% numeric accuracy vs client golden take-offs (Crow Cass industrial + Bob's Discount retail). Values must match reference quantities; no visual markup overlays needed.
+
+**Depends on:** Phase 16 (extraction prompt v2.1, aggregator, cross-refs), Phase 17 (PDF pipeline)
+
+**Requirements:** ACCURACY-20-01 through ACCURACY-20-12
+
+| ID | Requirement |
+|----|-------------|
+| ACCURACY-20-01 | Title-block sheet parsing searches bottom-right 20% region; ASTM false positives eliminated |
+| ACCURACY-20-02 | Golden CSV fixtures for Crow Cass (10 items) and Bob's Discount (12 items) |
+| ACCURACY-20-03 | GoldenValidator class compares AI output vs golden with per-item tolerance |
+| ACCURACY-20-04 | COUNT_PROMPT for discrete EA items distinguishes dimensions from counts |
+| ACCURACY-20-05 | SCHEDULE_PROMPT for focused schedule re-read with Sonnet model |
+| ACCURACY-20-06 | Multi-pass merge deduplicates components (count-pass wins on confidence) |
+| ACCURACY-20-07 | PROJECT_TYPE_PROFILES: industrial (sealed_concrete, exposed_structure) vs retail (flooring, ceiling) |
+| ACCURACY-20-08 | ESTIMATION_TABLES: sealed_concrete, cmu_wall, internal_tilt_up_wall, canopy, eifs, cmu_paint, gas_pipe, lintel |
+| ACCURACY-20-09 | MEASURE_ADDENDUM: gas piping + lintel_runs[] extraction in prompt |
+| ACCURACY-20-10 | ITEM_NAME_MAP expanded with ~14 entries; door types (HM/WD/AL) distinguished |
+| ACCURACY-20-11 | QuantityVerifier sanity gate + VERIFY_PROMPT retry for flagged items |
+| ACCURACY-20-12 | Model routing: elevation/detail sheets → Sonnet for count pass; schedule pass → Sonnet |
+
+**Success Criteria** (what must be TRUE):
+
+1. `pytest tests/test_golden_takeoff.py -v -m golden` exits 0 on both Crow Cass and Bob's Discount
+2. Golden score ≥ 97% per project (≥97% of line items within tolerance)
+3. EA counts exact or within ±1; SF/LF/CY within ±3%
+4. No wrong item types (e.g. Flooring ≠ Sealed Concrete for industrial)
+5. Sheet IDs never contain ASTM standard numbers (E283, A156)
+6. Gas piping and lintels appear in takeoff_summary with correct LF values
+7. `20-UAT.md` signed off with per-item accuracy matrix
+
+**Plans:** 7 plans in 5 waves
+
+| Wave | Plans | Parallel | Description |
+|------|-------|----------|-------------|
+| 1 | 20-01, 20-02 | yes | Title-block fix + Golden fixtures/validator |
+| 2 | 20-03, 20-04 | yes | COUNT_PROMPT multi-pass + Project-type profiles |
+| 3 | 20-05 | — | MEASURE addendum + lintel calc + ITEM_NAME_MAP |
+| 4 | 20-06 | — | Pipeline wiring + QuantityVerifier + model routing |
+| 5 | 20-07 | — | Golden test iteration + UAT + accuracy gate |
+
+Plans:
+
+- [ ] 20-01-PLAN.md — Title-block sheet parsing fix (pdf_analyzer.py)
+- [ ] 20-02-PLAN.md — Golden fixtures + GoldenValidator + test skeleton
+- [ ] 20-03-PLAN.md — COUNT_PROMPT + SCHEDULE_PROMPT + merge_passes (claude_analyzer.py)
+- [ ] 20-04-PLAN.md — Project-type profiles + new ESTIMATION_TABLES (calculator.py)
+- [ ] 20-05-PLAN.md — MEASURE addendum (gas pipe, lintels) + lintel calculator + ITEM_NAME_MAP expansion
+- [ ] 20-06-PLAN.md — Multi-pass pipeline wiring + QuantityVerifier + model routing
+- [ ] 20-07-PLAN.md — Golden test iteration + 20-UAT.md + accuracy gate
+
+Research: `.planning/phases/20-takeoff-measurement-precision/20-RESEARCH.md`
+Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
+
+---
+
 ## v2 (Out of Roadmap)
 
 | Item | Notes |
@@ -731,7 +790,7 @@ Context: `.planning/phases/19-job-history/19-CONTEXT.md`
 
 ## Progress
 
-**Execution order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → **15** → **16** → **17** → **18**
+**Execution order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 → 13 → 14 → **15** → **16** → **17** → **18** → **19** → **20**
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -754,8 +813,9 @@ Context: `.planning/phases/19-job-history/19-CONTEXT.md`
 | 17. Production Takeoff Pipeline | 4/5 | Awaiting UAT | 2026-06-02 |
 | 18. Linked Sheet Resolution | 5/5 | Awaiting UAT | 2026-06-02 |
 | 19. Job History & Run Archive | 0/5 | Planned | — |
+| 20. Takeoff Measurement Precision | 0/7 | Planned | — |
 
 ---
 *Roadmap created: 2026-05-26*  
-*Updated: 2026-06-02 — Phase 19 Job History & Run Archive added (5 plans, 5 waves)*  
+*Updated: 2026-06-03 — Phase 20 Takeoff Measurement Precision added (7 plans, 5 waves)*  
 *Aligned with Masterv2 Phase 1–3 ordering; Flask-in-place for v1*
