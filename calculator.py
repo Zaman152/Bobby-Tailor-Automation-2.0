@@ -220,11 +220,10 @@ ESTIMATION_TABLES = {
         "keywords": ["eifs", "exterior insulation", "dryvit", "synthetic stucco"],
     },
     "cmu_paint": {
-        "unit_out": "gallons",
-        "coverage_per_gallon": 200,   # CMU block paint covers less — 200 sf/gal
-        "coats": 2,
-        "formula": "ceil(area × coats / 200)",
-        "description": "CMU/masonry block paint gallons (2 coats)",
+        "unit_out": "sq_ft",
+        "waste_factor": 1.0,
+        "formula": "area (SF of CMU surface to paint)",
+        "description": "CMU/masonry wall surface area to paint (SF)",
         "keywords": ["cmu paint", "block paint", "masonry paint", "epoxy block"],
     },
     "gas_pipe": {
@@ -484,6 +483,12 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
         # Single dimension annotations (mounting heights, clearances, etc.) belong in
         # raw_items.csv, not calculations.csv — they're references, not order quantities.
         if formula_used in ("no formula", "", None):
+            return None
+
+        # GATE: EA items derived from dimension measurements must be whole numbers ≥ 1.
+        # A fractional EA value (e.g. 0.10 bollards, 0.01 stairs) means a dimension
+        # annotation was misclassified as a count.  Drop to prevent noise in the takeoff.
+        if calc_unit == "ea" and isinstance(calc_qty, (int, float)) and calc_qty < 1:
             return None
 
         table = ESTIMATION_TABLES.get(item_type, {})
@@ -983,7 +988,7 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
         sheets = math.ceil(value * wf / sheet)
         return sheets, "sheets", f"ceil({value:.0f} × {wf} / {sheet}sf/sheet) = {sheets} sheets"
 
-    if item_type in ("paint", "cmu_paint"):
+    if item_type == "paint":
         cov = table["coverage_per_gallon"]
         coats = table["coats"]
         gallons = math.ceil(value * coats / cov)
@@ -1026,7 +1031,7 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
 
     if item_type in ("concrete_pavement", "asphalt", "tilt_up_wall", "exposed_structure",
                       "exterior_soffit", "sealed_concrete", "cmu_wall", "internal_tilt_up_wall",
-                      "canopy", "eifs"):
+                      "canopy", "eifs", "cmu_paint"):
         wf = table.get("waste_factor", 1.0)
         return value * wf, "sq_ft", f"{value:.0f} sf × {wf} = {value * wf:.0f} sf"
 
@@ -1204,7 +1209,8 @@ def _detect_project_type(all_pages: List[dict]) -> str:
         ],
         "retail": [
             "retail", "store", "showroom", "merchandise", "sales floor",
-            "storefront", "tenant", "shopping",
+            "storefront", "shopping",
+            # omit bare "tenant" — matches "Tenant Space" on industrial warehouses
         ],
         "office": [
             "office", "tenant improvement", r"\bti\b", "corporate",
@@ -1226,14 +1232,31 @@ def _detect_project_type(all_pages: List[dict]) -> str:
 
     scores: Dict[str, int] = {k: 0 for k in _KEYWORD_SCORES}
     for page in all_pages:
-        title = (page.get("sheet_title") or page.get("_source_sheet") or "").lower()
+        title = (page.get("sheet_title") or page.get("_source_sheet") or page.get("_sheet_name") or "").lower()
         notes = (page.get("notes") or "").lower()
-        sheet_type = (page.get("sheet_type") or "").lower()
+        sheet_type = (page.get("sheet_type") or page.get("_sheet_type") or "").lower()
         combined = f"{title} {notes} {sheet_type}"
         for ptype, keywords in _KEYWORD_SCORES.items():
             for kw in keywords:
                 if re.search(kw, combined, re.IGNORECASE):
                     scores[ptype] += 1
+        # Content signals: large sealed-concrete / tilt-up rooms → industrial
+        for room in page.get("rooms") or []:
+            if not isinstance(room, dict):
+                continue
+            room_text = " ".join(
+                filter(None, [
+                    room.get("notes") or "",
+                    " ".join(room.get("materials") or []),
+                    room.get("name") or "",
+                ])
+            ).lower()
+            if re.search(
+                r"sealed\s*concrete|tilt[- ]?up|warehouse|distribution|manufacturing",
+                room_text,
+                re.IGNORECASE,
+            ):
+                scores["industrial"] += 2
 
     best_score = max(scores.values())
     if best_score == 0:

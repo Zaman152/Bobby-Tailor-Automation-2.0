@@ -7,6 +7,12 @@ from typing import Optional, Tuple
 import anthropic
 from config import ANTHROPIC_API_KEY, CLAUDE_MODEL, CLAUDE_MODEL_SCHEDULES
 
+try:
+    from json_repair import repair_json as _repair_json
+    _JSON_REPAIR_AVAILABLE = True
+except ImportError:
+    _JSON_REPAIR_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -411,7 +417,7 @@ def analyze_drawing(
         # saving ~90% on repeated drawing analyses.
         response = client.messages.create(
             model=model,
-            max_tokens=8000,  # tables/panel schedules can produce a lot of JSON
+            max_tokens=16000,  # complex schedules/floor plans can produce 10k+ tokens of JSON
             system=[
                 {
                     "type": "text",
@@ -475,7 +481,24 @@ def analyze_drawing(
         return extracted
 
     except json.JSONDecodeError as e:
-        logger.error(f"Claude returned invalid JSON: {e}")
+        logger.warning(f"Claude returned invalid JSON ({e}); attempting repair")
+        if _JSON_REPAIR_AVAILABLE:
+            try:
+                repaired = _repair_json(raw_text, return_objects=True)
+                if isinstance(repaired, dict):
+                    repaired["_tokens_in"] = input_tokens
+                    repaired["_tokens_out"] = output_tokens
+                    repaired["_cost_usd"] = round(cost_usd, 6)
+                    repaired["_model_used"] = model
+                    repaired["_pass_type"] = pass_type
+                    repaired["_source_sheet"] = sheet_name
+                    repaired["_screenshot"] = screenshot_path
+                    repaired["_repaired"] = True
+                    logger.info(f"  [{pass_type}] JSON repaired — proceeding with partial extraction")
+                    return repaired
+            except Exception as repair_err:
+                logger.error(f"JSON repair also failed: {repair_err}")
+        logger.error(f"Claude returned invalid JSON (unrecoverable): {e}")
         return {
             "error": "invalid_json",
             "raw": raw_text,

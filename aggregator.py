@@ -49,7 +49,7 @@ ITEM_NAME_MAP = [
     (r"internal.*tilt|interior.*tilt|int.*tilt.*up", "Interior Tilt Up Walls", "SF"),
     (r"tilt.*up.*wall|tiltup.*wall|precast.*panel|ext.*tilt", "Exterior Tilt Up Wall", "SF"),
     # CMU paint BEFORE CMU Wall (both match \bcmu\b; paint is more specific)
-    (r"cmu.*paint|block.*paint|masonry.*paint|epoxy.*block", "CMU Paint", "gallons"),
+    (r"cmu.*paint|block.*paint|masonry.*paint|epoxy.*block", "CMU Paint", "SF"),
     (r"\bcmu\b|masonry.*wall|block.*wall|concrete.*masonry", "CMU Wall", "SF"),
     (r"\blintel\b|steel.*lintel|angle.*lintel", "Lintels", "LF"),
     (r"stair", "Stairs", "EA"),
@@ -107,7 +107,7 @@ ITEM_NAME_MAP = [
 
 
 def _extract_spec_for_name(canonical: str, description: str) -> str:
-    if "Column" in canonical:
+    if "Column" in canonical or "Ladder" in canonical:
         m = re.search(r"h[-\s]*(\d+\'?\s*\d*\"?)", description, re.IGNORECASE)
         if m:
             return f"H-{m.group(1)}"

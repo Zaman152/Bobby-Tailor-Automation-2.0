@@ -36,9 +36,9 @@ logger = logging.getLogger(__name__)
 # Maps canonical sheet_type → ordered list of extraction pass names.
 # ---------------------------------------------------------------------------
 PASS_MATRIX: dict[str, list[str]] = {
-    "floor_plan":  ["count", "measure"],   # symbol count + area/linear runs
+    "floor_plan":  ["count", "measure", "schedule"],  # + legend/qty tables on plan sheets
     "elevation":   ["count", "measure"],   # facade items + linear dimensions
-    "civil_site":  ["measure"],            # linear runs and areas; no symbol grid
+    "civil_site":  ["count", "measure"],   # bollards/hydrants/drains (count) + linear runs (measure)
     "schedule":    ["schedule"],           # dense table → Sonnet unconditionally
     "detail":      ["count", "measure"],   # Sonnet; dimension vs symbol disambiguation
     "title_sheet": [],                     # SKIP — no take-off data, zero API cost
@@ -62,6 +62,8 @@ MODEL_ROUTING: dict[tuple[str, str], str] = {
     # Roof/MEP measure: pipe/duct runs require length precision
     ("roof_plan",  "measure"):   CLAUDE_MODEL_SCHEDULES,
     ("mep_plan",   "measure"):   CLAUDE_MODEL_SCHEDULES,
+    # Floor-plan legends (Crow A-101 style takeoff tables) need Sonnet schedule pass
+    ("floor_plan", "schedule"):  CLAUDE_MODEL_SCHEDULES,
 }
 
 # ---------------------------------------------------------------------------

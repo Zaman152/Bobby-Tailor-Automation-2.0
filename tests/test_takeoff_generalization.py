@@ -507,7 +507,14 @@ def test_aggregator_frame_hm_canonical():
 
 @pytest.mark.generalization
 def test_aggregator_ladder_canonical():
-    assert _agg("Ladder H-20 to roof hatch") == "Ladder"
+    # Height-annotated ladders now get spec suffix (e.g. "H-20'") for golden accuracy
+    result = _agg("Ladder H-20 to roof hatch")
+    assert result.startswith("Ladder"), f"Expected Ladder[...], got {result!r}"
+
+@pytest.mark.generalization
+def test_aggregator_ladder_no_height():
+    # Ladder without height annotation maps to plain "Ladder"
+    assert _agg("access ladder to mezzanine") == "Ladder"
 
 
 @pytest.mark.generalization
