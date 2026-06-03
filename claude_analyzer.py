@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 import anthropic
 from config import ANTHROPIC_API_KEY, CLAUDE_MODEL, CLAUDE_MODEL_SCHEDULES
 
@@ -18,21 +18,41 @@ PRICING = {
 }
 
 
-def _pick_model(sheet_name: str) -> str:
-    """Choose smarter model for sheets whose name suggests heavy tabular content.
-    StackCT sheet naming conventions:
-      E* = electrical (panel schedules, riser diagrams)
-      M* = mechanical (equipment schedules, fan coil schedules)
-      P* = plumbing schedules
-      *SCHEDULE* / *PANEL* / *RISER* explicitly named
+def _pick_model(
+    sheet_name: str,
+    pass_type: str = "measure",
+    sheet_type: Optional[str] = None,
+) -> str:
+    """Choose the best Claude model for a given pass type and sheet context.
+
+    Priority:
+      1. sheet_pass_matrix.MODEL_ROUTING lookup when sheet_type is provided
+         (explicit per-(sheet_type, pass_type) Sonnet overrides).
+      2. Sheet-name keyword heuristic — MEP codes and schedule-named sheets
+         route to CLAUDE_MODEL_SCHEDULES.
+      3. Default CLAUDE_MODEL (Haiku) for everything else.
+
+    The sheet_pass_matrix import is deferred inside the function to avoid a
+    circular dependency (sheet_pass_matrix imports _pick_model at module level).
     """
+    # 1. Routing table lookup when sheet_type is known
+    if sheet_type:
+        try:
+            from sheet_pass_matrix import MODEL_ROUTING  # deferred to avoid circular import
+            routed = MODEL_ROUTING.get((sheet_type, pass_type))
+            if routed:
+                return routed
+        except ImportError:
+            pass
+
+    # 2. Name-based heuristic (backward-compatible fallback)
     if not sheet_name:
         return CLAUDE_MODEL
     upper = sheet_name.upper()
     schedule_keywords = ("SCHEDULE", "PANEL", "RISER", "EQUIPMENT", "FIXTURE")
     if any(kw in upper for kw in schedule_keywords):
         return CLAUDE_MODEL_SCHEDULES
-    # Electrical/mechanical/plumbing sheet codes (E3.1, M0.3, P1.0, etc.)
+    # MEP sheet codes: E3.1 (electrical), M0.3 (mechanical), P1.0 (plumbing)
     if re.match(r"^[EMP]\d", upper):
         return CLAUDE_MODEL_SCHEDULES
     return CLAUDE_MODEL
@@ -294,30 +314,56 @@ def encode_image(filepath: str) -> Tuple[str, str]:
         return base64.standard_b64encode(raw).decode("utf-8"), media_type
 
 
-def analyze_drawing(screenshot_path: str, sheet_name: str = "") -> dict:
+def analyze_drawing(
+    screenshot_path: str,
+    sheet_name: str = "",
+    pass_type: str = "measure",
+    model_override: Optional[str] = None,
+) -> dict:
+    """Send a drawing screenshot to Claude for vision-based extraction.
+
+    Args:
+        screenshot_path: Absolute path to the sheet image file.
+        sheet_name:      Sheet identifier used for logging and model selection.
+        pass_type:       Which extraction pass to run:
+                           "measure"  — full EXTRACTION_PROMPT (default; backward compat)
+                           "count"    — COUNT_PROMPT (discrete EA symbols only)
+                           "schedule" — SCHEDULE_PROMPT (tables/schedules only)
+        model_override:  When set, use this model slug directly; bypasses _pick_model.
+
+    Returns:
+        Structured extraction dict.  On error, returns a dict with "error" key.
     """
-    Send a drawing screenshot to Claude for vision analysis.
-    Returns structured extraction data.
-    """
-    logger.info(f"Analyzing drawing: {sheet_name or screenshot_path}")
+    logger.info(f"Analyzing drawing: {sheet_name or screenshot_path} [pass={pass_type}]")
+
+    # Select system prompt for this pass
+    if pass_type == "count":
+        system_prompt = COUNT_PROMPT
+    elif pass_type == "schedule":
+        system_prompt = SCHEDULE_PROMPT
+    else:
+        system_prompt = EXTRACTION_PROMPT  # "measure" or unknown → full extraction
 
     try:
         image_data, media_type = encode_image(screenshot_path)
 
-        # Auto-select smarter model for sheets likely to contain dense tables
-        model = _pick_model(sheet_name)
+        # Model selection: explicit override wins; otherwise routing heuristic
+        if model_override:
+            model = model_override
+        else:
+            model = _pick_model(sheet_name, pass_type)
         if model != CLAUDE_MODEL:
-            logger.info(f"  Using {model} for table-heavy sheet")
+            logger.info(f"  Using {model} for sheet (pass={pass_type})")
 
-        # Use a system prompt with cache_control so the large extraction prompt
-        # is cached after the first call — saves ~90% on repeated drawing analyses.
+        # System prompt with cache_control: cached after first call per-prompt,
+        # saving ~90% on repeated drawing analyses.
         response = client.messages.create(
             model=model,
             max_tokens=8000,  # tables/panel schedules can produce a lot of JSON
             system=[
                 {
                     "type": "text",
-                    "text": EXTRACTION_PROMPT,
+                    "text": system_prompt,
                     "cache_control": {"type": "ephemeral"},
                 }
             ],
@@ -335,7 +381,11 @@ def analyze_drawing(screenshot_path: str, sheet_name: str = "") -> dict:
                         },
                         {
                             "type": "text",
-                            "text": f"Sheet name: {sheet_name}\n\nAnalyze this drawing and return the JSON." if sheet_name else "Analyze this drawing and return the JSON.",
+                            "text": (
+                                f"Sheet name: {sheet_name}\n\nAnalyze this drawing and return the JSON."
+                                if sheet_name
+                                else "Analyze this drawing and return the JSON."
+                            ),
                         }
                     ],
                 }
@@ -362,11 +412,14 @@ def analyze_drawing(screenshot_path: str, sheet_name: str = "") -> dict:
         extracted["_tokens_out"] = output_tokens
         extracted["_cost_usd"] = round(cost_usd, 6)
         extracted["_model_used"] = model
+        extracted["_pass_type"] = pass_type
         extracted["_source_sheet"] = sheet_name
         extracted["_screenshot"] = screenshot_path
-        logger.info(f"  Extracted {len(extracted.get('measurements', []))} measurements, "
-                    f"{len(extracted.get('components', []))} components "
-                    f"[{input_tokens} in / {output_tokens} out tokens, ${cost_usd:.6f}]")
+        logger.info(
+            f"  [{pass_type}] Extracted {len(extracted.get('measurements', []))} measurements, "
+            f"{len(extracted.get('components', []))} components "
+            f"[{input_tokens} in / {output_tokens} out tokens, ${cost_usd:.6f}]"
+        )
         return extracted
 
     except json.JSONDecodeError as e:
@@ -374,6 +427,7 @@ def analyze_drawing(screenshot_path: str, sheet_name: str = "") -> dict:
         return {
             "error": "invalid_json",
             "raw": raw_text,
+            "_pass_type": pass_type,
             "_source_sheet": sheet_name,
             "_tokens_in": input_tokens,
             "_tokens_out": output_tokens,
@@ -384,12 +438,72 @@ def analyze_drawing(screenshot_path: str, sheet_name: str = "") -> dict:
         logger.error(f"Analysis failed: {e}")
         return {
             "error": str(e),
+            "_pass_type": pass_type,
             "_source_sheet": sheet_name,
             "_tokens_in": 0,
             "_tokens_out": 0,
             "_cost_usd": 0,
             "_model_used": "",
         }
+
+
+def merge_passes(
+    count_result: dict,
+    measure_result: dict,
+    schedule_result: Optional[dict] = None,
+) -> dict:
+    """Merge multi-pass extraction results into a single unified dict.
+
+    Merge strategy:
+    - ``measure_result`` is the base (SF/LF quantities, pipe_runs, rooms,
+      measurements, lintel_runs — all area/linear data comes from here).
+    - ``count_result`` components are merged in, with high-confidence EA counts
+      preferred over measure-pass nulls for the same component.
+    - ``schedule_result`` replaces the ``schedules[]`` list when present.
+    - Deduplication is by normalised component name (case-insensitive strip).
+      Duplicate EA counts are never summed — count-pass wins on confidence.
+
+    This is the canonical implementation.  ``takeoff_pipeline.merge_passes``
+    delegates to this function so both entry points remain in sync.
+
+    Args:
+        count_result:    Extraction dict from the "count" pass.
+        measure_result:  Extraction dict from the "measure" pass (may be empty
+                         dict ``{}`` when only a count pass was run).
+        schedule_result: Extraction dict from the "schedule" pass, or None.
+
+    Returns:
+        Merged extraction dict with deduplicated components.
+    """
+    merged: dict = dict(measure_result)
+
+    # Index measure-pass components by normalised name for O(1) dedup lookups
+    seen: dict[str, dict] = {
+        c["name"].strip().lower(): c
+        for c in merged.get("components", [])
+        if isinstance(c, dict) and c.get("name")
+    }
+
+    for c in count_result.get("components", []):
+        if not isinstance(c, dict) or not c.get("name"):
+            continue
+        key = c["name"].strip().lower()
+        if key not in seen:
+            # New EA component from count pass — append it
+            merged.setdefault("components", []).append(c)
+            seen[key] = c
+        else:
+            existing = seen[key]
+            # Upgrade quantity when count-pass is high-confidence and measure-pass is null
+            if c.get("confidence") == "high" and existing.get("quantity") is None:
+                existing["quantity"] = c["quantity"]
+                existing["_count_pass_upgrade"] = True
+
+    # Schedule pass replaces schedules[] when present and non-empty
+    if schedule_result and schedule_result.get("schedules"):
+        merged["schedules"] = schedule_result["schedules"]
+
+    return merged
 
 
 def make_navigation_decision(screenshot_path: str, current_state: dict) -> dict:

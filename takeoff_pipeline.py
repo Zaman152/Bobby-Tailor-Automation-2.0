@@ -12,8 +12,9 @@ Architecture:
   4. merge_passes → deduplicated unified result dict
 
 Phase notes:
-  - 20-00 (this file): pipeline skeleton + merge stub + routing wired in.
-  - 20-03: analyze_drawing gains pass_type + model_override kwargs → remove stub.
+  - 20-00: pipeline skeleton + merge stub + routing wired in.
+  - 20-03: analyze_drawing gained pass_type + model_override; stub removed;
+           merge_passes canonical impl lives in claude_analyzer.
   - 20-06: pdf_analyzer.py and scraper.py swapped to call TakeoffPipeline.
 """
 
@@ -28,65 +29,18 @@ from sheet_pass_matrix import (
     pick_model_for_pass,
 )
 
-# Module-level import makes analyze_drawing patchable in tests:
+# Module-level imports make these symbols patchable in tests:
 #   unittest.mock.patch("takeoff_pipeline.analyze_drawing", ...)
 from claude_analyzer import analyze_drawing  # noqa: F401 (re-exported for patching)
+from claude_analyzer import merge_passes  # noqa: F401 (canonical; stub below removed)
 
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# merge_passes — stub implementation (canonical version moved to claude_analyzer in 20-03)
-# ---------------------------------------------------------------------------
-
-def merge_passes(
-    count_result: dict,
-    measure_result: dict,
-    schedule_result: Optional[dict],
-) -> dict:
-    """Merge three pass results into a single extraction dict.
-
-    Strategy:
-      - measure_result is the base (SF/LF quantities, pipe_runs, rooms).
-      - count_result components are merged in, preferring high-confidence EA counts
-        over measure-pass nulls.
-      - schedule_result replaces the schedules[] list when present.
-
-    This stub is superseded by claude_analyzer.merge_passes in plan 20-03.
-    Both implementations must produce identical output for the same inputs.
-
-    Args:
-        count_result:    Extraction dict from the "count" pass.
-        measure_result:  Extraction dict from the "measure" pass.
-        schedule_result: Extraction dict from the "schedule" pass, or None.
-
-    Returns:
-        Merged extraction dict with deduplicated components.
-    """
-    merged = dict(measure_result)
-
-    # Index measure-pass components by normalised name for deduplication
-    seen: dict[str, dict] = {
-        c["name"].lower(): c
-        for c in merged.get("components", [])
-    }
-
-    for c in count_result.get("components", []):
-        key = c["name"].lower()
-        if key not in seen:
-            # New component from count pass — add to merged list
-            merged.setdefault("components", []).append(c)
-            seen[key] = c
-        else:
-            existing = seen[key]
-            # Upgrade quantity if count-pass is high-confidence and measure-pass is null
-            if c.get("confidence") == "high" and existing.get("quantity") is None:
-                existing["quantity"] = c["quantity"]
-
-    if schedule_result:
-        merged["schedules"] = schedule_result.get("schedules", [])
-
-    return merged
+# merge_passes is imported from claude_analyzer (canonical implementation, plan 20-03).
+# It is also re-exported here so callers that imported it from takeoff_pipeline continue
+# to work without modification.
+# (The stub that previously lived here has been removed.)
 
 
 # ---------------------------------------------------------------------------
@@ -214,11 +168,6 @@ class TakeoffPipeline:
     ) -> dict:
         """Execute a single extraction pass via analyze_drawing.
 
-        NOTE (20-03): analyze_drawing will gain pass_type + model_override
-        kwargs in plan 20-03.  Until then, the call uses the current
-        signature (screenshot_path, sheet_name) and pass differentiation
-        is implemented via the model routing table only.
-
         Args:
             image_path:     Path to the sheet image.
             sheet_name:     Sheet identifier for logging and model selection.
@@ -235,9 +184,12 @@ class TakeoffPipeline:
         else:
             logger.info("  pass=%r sheet=%r (default model)", pass_type, sheet_name)
 
-        # TODO(20-03): add pass_type=pass_type, model_override=model_override
-        # once claude_analyzer.analyze_drawing accepts those kwargs.
-        result = self._analyzer(image_path, sheet_name)
+        result = self._analyzer(
+            image_path,
+            sheet_name,
+            pass_type=pass_type,
+            model_override=model_override,
+        )
 
         if not isinstance(result, dict):
             logger.warning(
