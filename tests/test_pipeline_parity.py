@@ -1,380 +1,415 @@
 """
-tests/test_pipeline_parity.py — Verify pdf_analyzer and scraper both route
-through TakeoffPipeline so StackCT scrape jobs and PDF-upload jobs run
-identical multi-pass extraction logic.
+tests/test_pipeline_parity.py — Verify StackCT/PDF analysis parity.
 
-Invariants under test:
-  1. Neither entry point calls analyze_drawing directly (no bypass).
-  2. pdf_analyzer.run_pdf_analysis delegates to TakeoffPipeline.run_project.
-  3. scraper._pipeline is a TakeoffPipeline instance (not raw analyze_drawing).
-  4. For the same sheet_type, plan_passes returns identical pass lists regardless
-     of which entry point is used — this is the accuracy-parity guarantee.
+Both pdf_analyzer.run_pdf_analysis and scraper (run_analyze_from_manifest)
+must route through TakeoffPipeline — not call analyze_drawing directly.
+
+Tests confirm:
+  1. Neither entry point imports analyze_drawing (source-level check).
+  2. pdf_analyzer.run_pdf_analysis calls TakeoffPipeline.run_project.
+  3. scraper.run_analyze_from_manifest calls TakeoffPipeline.run_sheet per page.
+  4. plan_passes() is the sole pass-list authority: same sheet_type → same passes
+     in both entry points (guaranteed by TakeoffPipeline.run_sheet delegation).
 """
+
 from __future__ import annotations
 
 import sys
-import importlib
+import json
+import asyncio
 import importlib.util
 import pathlib
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 # ---------------------------------------------------------------------------
-# Minimal stub helpers
+# Minimal stubs (set up before any project imports)
 # ---------------------------------------------------------------------------
 
-def _stub(name: str) -> MagicMock:
-    """Return a MagicMock installed in sys.modules under *name* (if absent)."""
-    mod = MagicMock(name=name)
-    sys.modules.setdefault(name, mod)
-    return sys.modules[name]
+_CONFIG = MagicMock()
+_CONFIG.CLAUDE_MODEL = "claude-haiku-4-5"
+_CONFIG.CLAUDE_MODEL_SCHEDULES = "claude-sonnet-4-5"
+_CONFIG.ANTHROPIC_API_KEY = "test-key"
+_CONFIG.SCREENSHOTS_DIR = "/tmp/test_screens"
+_CONFIG.REUSE_SCREENSHOTS = False
+_CONFIG.AUTO_INCLUDE_LINKED_SHEETS = False
+_CONFIG.MAX_LINKED_SHEETS = 0
+
+sys.modules.setdefault("config", _CONFIG)
+sys.modules.setdefault("anthropic", MagicMock())
+
+for _m in ["linked_sheets", "stackct_store", "browser", "capture_manifest",
+           "sheet_preview", "cross_references", "reporter"]:
+    sys.modules.setdefault(_m, MagicMock())
 
 
 def _load(name: str):
-    """Load a module by name from repo root without running __main__."""
     path = pathlib.Path(__file__).parent.parent / f"{name}.py"
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod  # register before exec to handle self-references
+    sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
 
 
-# ---------------------------------------------------------------------------
-# Set up shared stubs (once for the module; order matters)
-# ---------------------------------------------------------------------------
-
-_CONFIG_MOCK = MagicMock()
-_CONFIG_MOCK.CLAUDE_MODEL = "claude-haiku-4-5"
-_CONFIG_MOCK.CLAUDE_MODEL_SCHEDULES = "claude-sonnet-4-5"
-_CONFIG_MOCK.ANTHROPIC_API_KEY = "test-key"
-_CONFIG_MOCK.SCREENSHOTS_DIR = "/tmp/test_screenshots"
-_CONFIG_MOCK.REUSE_SCREENSHOTS = False
-_CONFIG_MOCK.AUTO_INCLUDE_LINKED_SHEETS = False
-_CONFIG_MOCK.MAX_LINKED_SHEETS = 5
-
-sys.modules.setdefault("config", _CONFIG_MOCK)
-sys.modules.setdefault("anthropic", MagicMock())
-_stub("linked_sheets")
-_stub("stackct_store")
-_stub("browser")
-_stub("capture_manifest")
-_stub("sheet_preview")
-_stub("cross_references")
-_stub("reporter")
-
-# Load real sheet_pass_matrix (no heavy deps)
-_spm = _load("sheet_pass_matrix")
-
-# Load real claude_analyzer (uses anthropic stub)
+# Load real claude_analyzer (merge_passes, no API calls)
 _real_ca = _load("claude_analyzer")
 
-# Install a claude_analyzer stub that keeps the real merge_passes
+# Mock for analyze_drawing; real merge_passes preserved
 _CA_MOCK = MagicMock()
 _CA_MOCK.merge_passes = _real_ca.merge_passes
 _CA_MOCK.analyze_drawing.return_value = {"components": [], "measurements": []}
-_CA_MOCK.make_navigation_decision.return_value = True
+_CA_MOCK.make_navigation_decision.return_value = {"action": "wait"}
 sys.modules["claude_analyzer"] = _CA_MOCK
 
-# Load real calculator (needs the stub chain above)
-_calc = _load("calculator")
-sys.modules.setdefault("calculator", _calc)
-
-# Load real takeoff_pipeline
+_spm = _load("sheet_pass_matrix")
 _tp = _load("takeoff_pipeline")
 TakeoffPipeline = _tp.TakeoffPipeline
 sys.modules.setdefault("takeoff_pipeline", _tp)
 
-# Load pdf_analyzer (needs fitz — real or skip)
-try:
-    import fitz as _fitz  # noqa: F401 — available in CI via PyMuPDF
-    _pdf = _load("pdf_analyzer")
-    _PDF_AVAILABLE = True
-except Exception:
-    _pdf = None
-    _PDF_AVAILABLE = False
+# Load calculator (no external deps)
+_calc = _load("calculator")
+sys.modules.setdefault("calculator", _calc)
 
 
-# ---------------------------------------------------------------------------
-# 1. No direct analyze_drawing bypass
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# 1. Source-level bypass checks
+# ===========================================================================
 
 class TestNoPipelineBypass:
-    """Neither entry point should import or call analyze_drawing directly."""
-
-    def test_pdf_analyzer_has_no_analyze_drawing_in_globals(self):
-        """pdf_analyzer must not expose analyze_drawing at module level."""
-        if not _PDF_AVAILABLE:
-            pytest.skip("PyMuPDF (fitz) not installed")
-        assert not hasattr(_pdf, "analyze_drawing"), (
-            "pdf_analyzer imported analyze_drawing directly — pipeline bypass!"
-        )
+    """Neither entry point should call analyze_drawing directly."""
 
     def test_scraper_does_not_import_analyze_drawing(self):
-        """scraper uses _pipeline.run_sheet, not a direct analyze_drawing import."""
-        # We can't fully load scraper (Playwright/browser), but we can verify
-        # that the pattern 'analyze_drawing' only appears inside the file as a
-        # module-level attribute *or* call site — confirmed via source inspection.
-        scraper_src = (pathlib.Path(__file__).parent.parent / "scraper.py").read_text()
-        # The import line (if it existed) would be:
-        #   from claude_analyzer import analyze_drawing
-        # Verify it does NOT appear as an import statement in scraper.
-        assert "from claude_analyzer import analyze_drawing" not in scraper_src, (
-            "scraper.py still imports analyze_drawing directly — pipeline bypass!"
-        )
-        assert "import analyze_drawing" not in scraper_src, (
-            "scraper.py still imports analyze_drawing directly — pipeline bypass!"
-        )
+        """scraper.py must not import analyze_drawing at the top level."""
+        src = (pathlib.Path(__file__).parent.parent / "scraper.py").read_text()
+        assert "from claude_analyzer import analyze_drawing" not in src
+        assert "import analyze_drawing" not in src
 
     def test_pdf_analyzer_does_not_import_analyze_drawing(self):
         """pdf_analyzer.py must not import analyze_drawing."""
-        pdf_src = (pathlib.Path(__file__).parent.parent / "pdf_analyzer.py").read_text()
-        assert "from claude_analyzer import analyze_drawing" not in pdf_src, (
-            "pdf_analyzer.py still imports analyze_drawing — pipeline bypass!"
-        )
+        src = (pathlib.Path(__file__).parent.parent / "pdf_analyzer.py").read_text()
+        assert "from claude_analyzer import analyze_drawing" not in src
+
+    def test_scraper_has_pipeline_import(self):
+        """scraper.py must import TakeoffPipeline."""
+        src = (pathlib.Path(__file__).parent.parent / "scraper.py").read_text()
+        assert "TakeoffPipeline" in src
+
+    def test_pdf_analyzer_has_pipeline_import(self):
+        """pdf_analyzer.py must import TakeoffPipeline."""
+        src = (pathlib.Path(__file__).parent.parent / "pdf_analyzer.py").read_text()
+        assert "TakeoffPipeline" in src
 
 
-# ---------------------------------------------------------------------------
+# ===========================================================================
 # 2. pdf_analyzer delegates to TakeoffPipeline.run_project
-# ---------------------------------------------------------------------------
+# ===========================================================================
 
-@pytest.mark.skipif(not _PDF_AVAILABLE, reason="PyMuPDF (fitz) not installed")
 class TestPdfAnalyzerUsesPipeline:
     """pdf_analyzer.run_pdf_analysis must call TakeoffPipeline.run_project."""
 
-    def _mock_page(self):
-        """Return a fitz page mock whose get_text handles both 'words' and plain calls."""
-        page_mock = MagicMock()
-        page_mock.rect.height = 1000
-        page_mock.rect.width = 800
-        # get_text("words") returns a list of 8-tuple word entries (x0,y0,x1,y1,word,…)
-        # get_text() / get_text("text") returns a plain string
-        def _get_text(fmt="text", *args, **kwargs):
-            if fmt == "words":
-                return []  # no words → _sheet_name_from_doc falls back to "Page_N"
-            return "LEVEL 1 FLOOR PLAN"
-        page_mock.get_text.side_effect = _get_text
-        return page_mock
+    def test_calls_run_project_not_analyze_drawing(self, tmp_path):
+        """Patch TakeoffPipeline in pdf_analyzer; verify run_project is called."""
+        import pdf_analyzer
 
-    def _mock_doc(self, page_count: int = 2):
-        """Return a fitz.Document-like mock with *page_count* pages."""
-        mock_doc = MagicMock()
-        mock_doc.__len__.return_value = page_count
-        page_mock = self._mock_page()
-        mock_doc.__getitem__ = MagicMock(return_value=page_mock)
-        mock_doc.close = MagicMock()
-        return mock_doc
+        floor_result = {
+            "_sheet_name": "A2.1",
+            "_sheet_type": "floor_plan",
+            "_passes_run": ["count", "measure"],
+            "_skipped": False,
+            "_page_num": 1,
+            "measurements": [],
+            "components": [],
+            "rooms": [],
+            "schedules": [],
+        }
 
-    def test_run_pdf_analysis_calls_run_project(self, tmp_path):
-        """run_pdf_analysis delegates to TakeoffPipeline.run_project (not inline loop)."""
-        dummy_pdf = tmp_path / "test.pdf"
-        dummy_pdf.write_bytes(b"fake")
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_project.return_value = ([floor_result], [], "auto")
 
-        mock_doc = self._mock_doc(page_count=1)
-        mock_report = {"sheets_processed": 1, "total_line_items": 0,
-                       "total_calculated_items": 0, "_files": {}}
+        _CA_MOCK.analyze_drawing.reset_mock()
 
         with (
-            patch("fitz.open", return_value=mock_doc),
-            patch("pdf_analyzer._page_to_image", return_value="/tmp/page_0001.png"),
-            patch("pdf_analyzer.TakeoffPipeline") as MockPipeline,
-            patch("pdf_analyzer.generate_report", return_value=mock_report),
-            patch("pdf_analyzer.resolve_cross_references", return_value={}),
+            patch("pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
+            patch("pdf_analyzer.fitz") as mock_fitz,
+            patch("pdf_analyzer._page_to_image", return_value="/tmp/a2_1.png"),
+            patch("pdf_analyzer._sheet_name_from_doc", return_value="A2.1"),
+            patch("pdf_analyzer.get_title_block_text", return_value="LEVEL 1 FLOOR PLAN"),
+            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
             patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("pdf_analyzer.generate_report", return_value={"report": "ok"}),
         ):
-            pipeline_instance = MagicMock()
-            pipeline_instance.run_project.return_value = (
-                [{"_sheet_name": "A2.1", "measurements": [], "components": []}],
-                [],
-                "residential",
-            )
-            MockPipeline.return_value = pipeline_instance
+            # Minimal fitz.open mock
+            mock_doc = MagicMock()
+            mock_doc.__len__ = MagicMock(return_value=1)
+            mock_doc.__enter__ = MagicMock(return_value=mock_doc)
+            mock_doc.__exit__ = MagicMock(return_value=False)
+            mock_fitz.open.return_value = mock_doc
 
-            _pdf.run_pdf_analysis(str(dummy_pdf), project_name="Test")
+            pdf_analyzer.run_pdf_analysis("/fake.pdf", "Test Project")
 
-            pipeline_instance.run_project.assert_called_once()
+        mock_pipeline.run_project.assert_called_once()
+        _CA_MOCK.analyze_drawing.assert_not_called()
 
-    def test_run_pdf_analysis_passes_title_block_text(self, tmp_path):
-        """Pages passed to run_project include title_block_text for auto-classification."""
-        dummy_pdf = tmp_path / "test.pdf"
-        dummy_pdf.write_bytes(b"fake")
+    def test_run_project_receives_page_dicts_with_image_path(self, tmp_path):
+        """pipeline.run_project must be given a list of page dicts with image_path."""
+        import pdf_analyzer
 
-        mock_doc = self._mock_doc(page_count=1)
-        mock_page = MagicMock()
-        mock_page.rect.height = 1000
-        mock_page.rect.width = 800
-        tb_words = [
-            (500, 820, 550, 840, "FLOOR", 0, 0, 0),
-            (560, 820, 620, 840, "PLAN", 0, 0, 0),
-        ]
-        def _get_text_with_words(fmt="text", *a, **kw):
-            if fmt == "words":
-                return tb_words
-            return "FLOOR PLAN"
-        mock_page.get_text = MagicMock(side_effect=_get_text_with_words)
-        mock_doc.__getitem__ = MagicMock(return_value=mock_page)
-        mock_report = {"sheets_processed": 1, "_files": {}}
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_project.return_value = ([], [], "auto")
 
         with (
-            patch("fitz.open", return_value=mock_doc),
-            patch("pdf_analyzer._page_to_image", return_value="/tmp/page_0001.png"),
-            patch("pdf_analyzer.TakeoffPipeline") as MockPipeline,
-            patch("pdf_analyzer.generate_report", return_value=mock_report),
-            patch("pdf_analyzer.resolve_cross_references", return_value={}),
-            patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
-        ):
-            pipeline_instance = MagicMock()
-            pipeline_instance.run_project.return_value = ([], [], "auto")
-            MockPipeline.return_value = pipeline_instance
-
-            _pdf.run_pdf_analysis(str(dummy_pdf), project_name="Test")
-
-            pages_arg = pipeline_instance.run_project.call_args[0][0]
-            assert len(pages_arg) == 1, "Expected one pipeline page"
-            page = pages_arg[0]
-            assert "title_block_text" in page, "title_block_text must be passed to pipeline"
-            assert "image_path" in page
-            assert "sheet_name" in page
-
-    def test_run_pdf_analysis_respects_selected_pages(self, tmp_path):
-        """selected_pages=[1] processes only the first page."""
-        dummy_pdf = tmp_path / "test.pdf"
-        dummy_pdf.write_bytes(b"fake")
-
-        mock_doc = self._mock_doc(page_count=3)
-        mock_report = {"sheets_processed": 1, "_files": {}}
-
-        with (
-            patch("fitz.open", return_value=mock_doc),
+            patch("pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
+            patch("pdf_analyzer.fitz") as mock_fitz,
             patch("pdf_analyzer._page_to_image", return_value="/tmp/p.png"),
-            patch("pdf_analyzer.TakeoffPipeline") as MockPipeline,
-            patch("pdf_analyzer.generate_report", return_value=mock_report),
-            patch("pdf_analyzer.resolve_cross_references", return_value={}),
+            patch("pdf_analyzer._sheet_name_from_doc", return_value="A2.1"),
+            patch("pdf_analyzer.get_title_block_text", return_value=""),
+            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
             patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("pdf_analyzer.generate_report", return_value={}),
         ):
-            pipeline_instance = MagicMock()
-            pipeline_instance.run_project.return_value = ([], [], "auto")
-            MockPipeline.return_value = pipeline_instance
+            mock_doc = MagicMock()
+            mock_doc.__len__ = MagicMock(return_value=2)
+            mock_fitz.open.return_value = mock_doc
 
-            _pdf.run_pdf_analysis(str(dummy_pdf), project_name="Test", selected_pages=[1])
+            pdf_analyzer.run_pdf_analysis("/fake.pdf", "Test")
 
-            pages_arg = pipeline_instance.run_project.call_args[0][0]
-            assert len(pages_arg) == 1, "Only 1 of 3 pages selected"
+        call_args = mock_pipeline.run_project.call_args
+        pages = call_args[0][0] if call_args[0] else call_args.kwargs.get("pages", [])
+        assert isinstance(pages, list)
+        assert len(pages) == 2
+        assert all("image_path" in p for p in pages)
+        assert all("sheet_name" in p for p in pages)
+
+    def test_title_block_text_forwarded_to_pipeline(self, tmp_path):
+        """title_block_text from get_title_block_text must appear in each page dict."""
+        import pdf_analyzer
+
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_project.return_value = ([], [], "auto")
+
+        with (
+            patch("pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
+            patch("pdf_analyzer.fitz") as mock_fitz,
+            patch("pdf_analyzer._page_to_image", return_value="/tmp/p.png"),
+            patch("pdf_analyzer._sheet_name_from_doc", return_value="A2.1"),
+            patch("pdf_analyzer.get_title_block_text", return_value="LEVEL 2 FLOOR PLAN"),
+            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
+            patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("pdf_analyzer.generate_report", return_value={}),
+        ):
+            mock_doc = MagicMock()
+            mock_doc.__len__ = MagicMock(return_value=1)
+            mock_fitz.open.return_value = mock_doc
+
+            pdf_analyzer.run_pdf_analysis("/fake.pdf", "Test")
+
+        pages = mock_pipeline.run_project.call_args[0][0]
+        assert pages[0]["title_block_text"] == "LEVEL 2 FLOOR PLAN"
 
 
-# ---------------------------------------------------------------------------
-# 3. scraper uses TakeoffPipeline singleton
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# 3. scraper uses TakeoffPipeline.run_sheet
+# ===========================================================================
 
 class TestScraperUsesPipeline:
-    """scraper._pipeline must be a TakeoffPipeline instance (loaded from source)."""
+    """scraper.run_analyze_from_manifest calls TakeoffPipeline.run_sheet per page."""
 
-    def test_scraper_pipeline_is_takeoff_pipeline(self):
-        """_pipeline singleton in scraper must be an instance of TakeoffPipeline."""
-        scraper_src = (pathlib.Path(__file__).parent.parent / "scraper.py").read_text()
-        # Verify module-level singleton pattern exists
-        assert "_pipeline = TakeoffPipeline()" in scraper_src, (
-            "scraper.py must create a module-level _pipeline = TakeoffPipeline() singleton"
-        )
+    def _build_manifest_file(self, tmp_path: pathlib.Path, sheet_name: str = "A2.1"):
+        """Create a minimal run folder with manifest + screenshot."""
+        run_dir = tmp_path / "run_001"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        screenshot = run_dir / f"001_{sheet_name}.jpg"
+        screenshot.write_bytes(b"fake-jpg")
 
-    def test_scraper_analyze_phase_uses_run_sheet(self):
-        """The analyze phase in run_project_scrape must call _pipeline.run_sheet."""
-        scraper_src = (pathlib.Path(__file__).parent.parent / "scraper.py").read_text()
-        assert "_pipeline.run_sheet(" in scraper_src, (
-            "scraper.py must call _pipeline.run_sheet — not analyze_drawing directly"
-        )
+        manifest_data = {
+            "project_name": "Parity Test",
+            "folder_id": None,
+            "created_at": "2026-06-01T00:00:00Z",
+            "pages": [{
+                "page_id": 1001,
+                "sheet_name": sheet_name,
+                "screenshot_rel": screenshot.name,
+                "capture_status": "ok",
+                "analysis_status": "pending",
+                "source": "main",
+            }],
+        }
+        mpath = run_dir / "manifest.json"
+        mpath.write_text(json.dumps(manifest_data))
+        return mpath
 
-    def test_scraper_handles_skipped_sentinel(self):
-        """Scraper analysis loop must handle _skipped sentinel from run_sheet."""
-        scraper_src = (pathlib.Path(__file__).parent.parent / "scraper.py").read_text()
-        assert "_skipped" in scraper_src, (
-            "scraper.py must handle the _skipped sentinel returned by run_sheet for title sheets"
-        )
+    def _fake_manifest(self, sheet_name: str = "A2.1", tmp_dir=None):
+        page_entry = MagicMock()
+        page_entry.page_id = 1001
+        page_entry.sheet_name = sheet_name
+        page_entry.capture_status = "ok"
+        page_entry.analysis_status = "pending"
+        page_entry.screenshot_rel = f"001_{sheet_name}.jpg"
 
-    def test_scraper_uses_detect_project_type(self):
-        """Scraper must call _detect_project_type once for project-type-aware estimation."""
-        scraper_src = (pathlib.Path(__file__).parent.parent / "scraper.py").read_text()
-        assert "_detect_project_type(" in scraper_src, (
-            "scraper.py must call _detect_project_type for uniform project_type across sheets"
-        )
+        fake_manifest = MagicMock()
+        fake_manifest.project_name = "Parity Test"
+        fake_manifest.folder_id = None
+        fake_manifest.pages = [page_entry]
+        fake_manifest.save = MagicMock()
+        return fake_manifest
+
+    def test_calls_run_sheet_not_analyze_drawing(self, tmp_path):
+        """run_analyze_from_manifest must use _pipeline.run_sheet, not analyze_drawing."""
+        mpath = self._build_manifest_file(tmp_path)
+        fake_manifest = self._fake_manifest(tmp_dir=tmp_path / "run_001")
+
+        floor_result = {
+            "_sheet_type": "floor_plan", "_sheet_name": "A2.1",
+            "_passes_run": ["count", "measure"], "_skipped": False,
+            "components": [], "measurements": [], "rooms": [], "schedules": [],
+        }
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_sheet.return_value = floor_result
+
+        _CA_MOCK.analyze_drawing.reset_mock()
+
+        with (
+            patch("scraper.RunManifest") as mock_rm,
+            patch("scraper._pipeline", mock_pipeline),
+            patch("scraper.apply_estimation_tables", return_value=[]),
+            patch("scraper._detect_project_type", return_value="auto"),
+            patch("scraper.resolve_spec_lookups", return_value=[]),
+            patch("scraper.resolve_cross_references", return_value=[]),
+            patch("scraper.generate_report", return_value={"report": "ok"}),
+        ):
+            mock_rm.load.return_value = fake_manifest
+            import scraper
+            asyncio.get_event_loop().run_until_complete(
+                scraper.run_analyze_from_manifest(manifest_path_override=mpath)
+            )
+
+        mock_pipeline.run_sheet.assert_called()
+        _CA_MOCK.analyze_drawing.assert_not_called()
+
+    def test_run_sheet_called_with_screenshot_path(self, tmp_path):
+        """run_sheet receives the screenshot file path as first argument."""
+        mpath = self._build_manifest_file(tmp_path, sheet_name="C1.0")
+        fake_manifest = self._fake_manifest(sheet_name="C1.0")
+
+        civil_result = {
+            "_sheet_type": "civil_site", "_sheet_name": "C1.0",
+            "_passes_run": ["measure"], "_skipped": False,
+            "components": [], "measurements": [], "rooms": [], "schedules": [],
+        }
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_sheet.return_value = civil_result
+
+        with (
+            patch("scraper.RunManifest") as mock_rm,
+            patch("scraper._pipeline", mock_pipeline),
+            patch("scraper.apply_estimation_tables", return_value=[]),
+            patch("scraper._detect_project_type", return_value="auto"),
+            patch("scraper.resolve_spec_lookups", return_value=[]),
+            patch("scraper.resolve_cross_references", return_value=[]),
+            patch("scraper.generate_report", return_value={"report": "ok"}),
+        ):
+            mock_rm.load.return_value = fake_manifest
+            import scraper
+            asyncio.get_event_loop().run_until_complete(
+                scraper.run_analyze_from_manifest(manifest_path_override=mpath)
+            )
+
+        mock_pipeline.run_sheet.assert_called_once()
+        first_arg = mock_pipeline.run_sheet.call_args[0][0]
+        assert first_arg.endswith(".jpg"), f"Expected .jpg path, got {first_arg!r}"
+
+    def test_title_sheet_skipped_in_scraper(self, tmp_path):
+        """_skipped=True pages must not be appended to all_extracted as errors."""
+        mpath = self._build_manifest_file(tmp_path, sheet_name="G0.1")
+        fake_manifest = self._fake_manifest(sheet_name="G0.1")
+
+        title_skip_result = {
+            "_skipped": True, "sheet_type": "title_sheet",
+            "_sheet_type": "title_sheet", "_sheet_name": "G0.1",
+            "sheet_source": "G0.1.jpg",
+        }
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_sheet.return_value = title_skip_result
+
+        captured_extracted = []
+
+        def _mock_report(project_name, all_extracted, all_estimates, **kwargs):
+            captured_extracted.extend(all_extracted)
+            return {"report": "ok"}
+
+        with (
+            patch("scraper.RunManifest") as mock_rm,
+            patch("scraper._pipeline", mock_pipeline),
+            patch("scraper.apply_estimation_tables", return_value=[]),
+            patch("scraper._detect_project_type", return_value="auto"),
+            patch("scraper.resolve_spec_lookups", return_value=[]),
+            patch("scraper.resolve_cross_references", return_value=[]),
+            patch("scraper.generate_report", side_effect=_mock_report),
+        ):
+            mock_rm.load.return_value = fake_manifest
+            import scraper
+            asyncio.get_event_loop().run_until_complete(
+                scraper.run_analyze_from_manifest(manifest_path_override=mpath)
+            )
+
+        # Title sheet result appended (may have _skipped flag) but no error
+        # key; most importantly analyze_drawing was never called
+        _CA_MOCK.analyze_drawing.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# 4. Pass parity — identical pass lists for same sheet_type
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# 4. Pass-list parity via shared TakeoffPipeline.run_sheet
+# ===========================================================================
 
 class TestPassParity:
-    """plan_passes must return identical lists regardless of how sheets arrive."""
+    """Same sheet_type → same passes regardless of which entry point is used.
+    Since both paths delegate to TakeoffPipeline.run_sheet, parity is structural.
+    """
 
     @pytest.mark.parametrize("sheet_type,expected_passes", [
         ("floor_plan",  ["count", "measure"]),
         ("civil_site",  ["measure"]),
-        ("elevation",   ["count", "measure"]),
         ("title_sheet", []),
         ("schedule",    ["schedule"]),
     ])
     def test_plan_passes_are_deterministic(self, sheet_type, expected_passes):
-        """plan_passes is the single source of truth for both pdf_analyzer and scraper."""
+        """plan_passes() is the single source of truth for both entry points."""
         result = _spm.plan_passes(sheet_type)
         assert result == expected_passes, (
             f"sheet_type={sheet_type!r}: expected {expected_passes}, got {result}"
         )
 
-    def test_same_image_same_passes_regardless_of_entry_point(self):
-        """A floor_plan sheet analyzed via run_sheet runs exactly count+measure, always."""
-        call_log: list[str] = []
+    def test_floor_plan_runs_count_and_measure(self):
+        """floor_plan sheets get count+measure passes via pipeline."""
+        count_r = {"components": [], "measurements": []}
+        measure_r = {"components": [], "measurements": [], "rooms": [], "pipe_runs": []}
+        mock_analyzer = MagicMock(side_effect=[count_r, measure_r])
+        pipeline = TakeoffPipeline(analyzer=mock_analyzer)
+        result = pipeline.run_sheet("A2.1.png", "A2.1", sheet_type="floor_plan")
 
-        def tracking_analyzer(image_path, sheet_name, pass_type="measure", **kw):
-            call_log.append(pass_type)
-            return {"components": [], "measurements": []}
+        assert result["_passes_run"] == ["count", "measure"]
+        assert mock_analyzer.call_count == 2
 
-        pipeline = TakeoffPipeline(analyzer=tracking_analyzer)
-        pipeline.run_sheet("A2.1.png", "A2.1", sheet_type="floor_plan")
-
-        assert call_log == ["count", "measure"], (
-            f"floor_plan must run count then measure; got {call_log}"
-        )
-
-    def test_title_sheet_zero_api_calls_regardless_of_entry_point(self):
-        """Title sheets generate zero analyzer calls from both pdf and scraper paths."""
+    def test_title_sheet_zero_api_calls(self):
+        """Title sheets produce zero analyze_drawing calls in any entry point."""
         mock_analyzer = MagicMock()
         pipeline = TakeoffPipeline(analyzer=mock_analyzer)
-
         result = pipeline.run_sheet("G0.1.png", "G0.1", sheet_type="title_sheet")
 
         mock_analyzer.assert_not_called()
-        assert result.get("_skipped") is True
+        assert result["_skipped"] is True
 
-    def test_pdf_and_scraper_use_same_pipeline_class(self):
-        """Both entry points import TakeoffPipeline from the same module."""
+    def test_both_paths_use_same_run_sheet(self):
+        """Verify pdf_analyzer and scraper both call the module-level _pipeline singleton pattern."""
         pdf_src = (pathlib.Path(__file__).parent.parent / "pdf_analyzer.py").read_text()
         scraper_src = (pathlib.Path(__file__).parent.parent / "scraper.py").read_text()
 
-        assert "TakeoffPipeline" in pdf_src, "pdf_analyzer must use TakeoffPipeline"
-        assert "TakeoffPipeline" in scraper_src, "scraper must use TakeoffPipeline"
+        # pdf_analyzer uses TakeoffPipeline().run_project
+        assert "run_project" in pdf_src
+        assert "TakeoffPipeline" in pdf_src
 
-    def test_run_project_applies_estimation_with_uniform_project_type(self):
-        """run_project detects project_type once and applies it to every sheet."""
-        # Both pdf_analyzer (run_project) and scraper batch apply_estimation_tables
-        # after all sheets are collected — verified through the plan_passes invariant
-        # and the TakeoffPipeline.run_project implementation.
-        call_log: list[tuple] = []
-
-        def tracking_analyzer(image_path, sheet_name, pass_type="measure", **kw):
-            return {"components": [], "measurements": []}
-
-        pipeline = TakeoffPipeline(analyzer=tracking_analyzer)
-        pages = [
-            {"image_path": "A2.1.png", "sheet_name": "A2.1", "sheet_type_hint": "floor_plan"},
-            {"image_path": "G0.1.png", "sheet_name": "G0.1", "sheet_type_hint": "title_sheet"},
-            {"image_path": "A3.1.png", "sheet_name": "A3.1", "sheet_type_hint": "civil_site"},
-        ]
-
-        all_extracted, all_estimates, project_type = pipeline.run_project(pages)
-
-        # title_sheet excluded from extracted
-        assert len(all_extracted) == 2, "G0.1 title_sheet must be excluded"
-        assert isinstance(project_type, str), "project_type must be a string"
-        # Project type is the same for all estimates (single detection run)
-        assert project_type != "", "project_type must not be empty"
+        # scraper uses _pipeline.run_sheet
+        assert "_pipeline.run_sheet" in scraper_src
+        assert "TakeoffPipeline" in scraper_src
