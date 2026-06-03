@@ -39,11 +39,11 @@ Run: `pytest tests/test_takeoff_generalization.py -v`
 | Architectural | Canopy, EIFS, CMU Paint, Doors-HM, Doors-WD, Doors-AL, Frame-HM, Ladder, Lift | ✅ PASS |
 | MEP | Fan Coil Units, Air Handling Units, Exhaust Fans, Duct LF, Conduit LF, Gas Piping, Storm Pipe | ✅ PASS |
 
-**Total: 55/55 passed (100%) — 2026-06-04**
+**Total: 99/99 passed (100%) — 2026-06-04 (updated 20-10: +4 new tests for civil_site count pass, Ladder height spec, CMU Paint SF unit)**
 
 ---
 
-## 2. Golden Regression
+## 2. Golden regression
 
 End-to-end PDF → `run_pdf_analysis` → `GoldenValidator` accuracy check.
 
@@ -68,50 +68,69 @@ Run: `pytest tests/test_golden_takeoff.py -v -m golden`
 ### Crow Cass (Industrial Distribution Center)
 
 **PDF required:** `tests/fixtures/crow_cass/crow_cass_plans.pdf`  
-**Status:** RUN 2026-06-04 — **20.0% score (2/10 PASS)** — below 97% threshold
+**Status:** RUN 2026-06-04 (20-10 run 3) — **20.0% score (2/10 PASS)** — below 97% threshold
 
 Golden items (10 items across floor_plan, elevation, detail sheet types):
 
-| Item | Qty | Unit | Tolerance |
-|------|-----|------|-----------|
-| Bollards | 28 | EA | exact_or_within_1 |
-| CMU Wall | 2,204.33 | SF | ±3% |
-| Columns-H-35' | 132 | EA | exact_or_within_1 |
-| Exposed Structure | 395,673.42 | SF | ±3% |
-| Internal Tilt up walls | 108,442.66 | SF | ±3% |
-| Ladder-H-20' | 1 | EA | exact_or_within_1 |
-| Lift | 1 | EA | exact_or_within_1 |
-| Mobilization | 1 | EA | exact_or_within_1 |
-| Sealed Concrete | 395,673.42 | SF | ±3% |
-| Stairs | 10 | EA | exact_or_within_1 |
+| Item | Golden Qty | Unit | Tolerance | Run 3 AI | Status |
+|------|-----------|------|-----------|----------|--------|
+| Bollards | 28 | EA | exact_or_within_1 | 1.05 | FAIL |
+| CMU Wall | 2,204.33 | SF | ±3% | 8.00 | FAIL |
+| Columns-H-35' | 132 | EA | exact_or_within_1 | — | MISSING |
+| Exposed Structure | 395,673.42 | SF | ±3% | 397,556 | **PASS** |
+| Internal Tilt up walls | 108,442.66 | SF | ±3% | — | MISSING |
+| Ladder-H-20' | 1 | EA | exact_or_within_1 | — | MISSING |
+| Lift | 1 | EA | exact_or_within_1 | — | MISSING |
+| Mobilization | 1 | EA | exact_or_within_1 | — | MISSING |
+| Sealed Concrete | 395,673.42 | SF | ±3% | 397,556 | **PASS** |
+| Stairs | 10 | EA | exact_or_within_1 | — | MISSING |
 
-**Measured (2026-06-04):** PASS — Sealed Concrete, Exposed Structure. FAIL/MISSING — all other golden rows.
+**Run date:** 2026-06-04 · Commit: 12c057a  
+**Score: 20.0% (2/10) — below 97% threshold**
+
+**Root-cause analysis (general — not project-specific):**
+- Bollards (1.05 vs 28): Claude-Haiku-4.5 doesn't reliably count large grids of site plan symbols; civil_site count pass was added (20-10) but Haiku still only detects ~1 bollard vs 28 actual
+- CMU Wall (8 vs 2,204 SF): AI extracts component count (8 units) rather than total wall area; needs elevation sheet area measurement accumulation
+- Columns-H-35', Stairs, Ladder, Lift, Mobilization, Internal Tilt Up Walls: Absent from AI output — Haiku misses these on complex industrial warehouse drawings
+- Exposed Structure + Sealed Concrete: Both pass consistently (large floor area, correctly extracted)
 
 To run: `pytest tests/test_golden_takeoff.py -v -m golden -k crow`
 
 ### Bob's Discount (Retail Furniture Store)
 
 **PDF required:** `tests/fixtures/bobs_discount/bobs_discount_plans.pdf`  
-**Status:** PDF present — full golden run **not completed** this session (requires ~15 min API)
+**Status:** RUN 2026-06-04 (20-10 run 3) — **0.0% score (0/12 PASS)** — below 97% threshold
 
 Golden items (12 items across floor_plan, elevation, schedule, roof_plan, detail sheet types):
 
-| Item | Qty | Unit | Tolerance |
-|------|-----|------|-----------|
-| Bollards | 11 | EA | exact_or_within_1 |
-| Canopy | 79.44 | SF | ±3% |
-| CMU Paint | 16,218.94 | SF | ±3% |
-| Doors-HM | 5 | EA | exact_or_within_1 |
-| Doors-WD | 7 | EA | exact_or_within_1 |
-| EIFS | 3,053.04 | SF | ±3% |
-| Frame-HM | 12 | EA | exact_or_within_1 |
-| Gas Piping | 886.77 | LF | ±3% |
-| Ladder-H-24' | 1 | EA | exact_or_within_1 |
-| Lift | 1 | EA | exact_or_within_1 |
-| Lintels | 179.24 | LF | ±3% |
-| Mobilization | 1 | EA | exact_or_within_1 |
+| Item | Golden Qty | Unit | Tolerance | Run 3 AI | Status |
+|------|-----------|------|-----------|----------|--------|
+| Bollards | 11 | EA | exact_or_within_1 | — | MISSING |
+| Canopy | 79.44 | SF | ±3% | — | MISSING |
+| CMU Paint | 16,218.94 | SF | ±3% | — | MISSING |
+| Doors-HM | 5 | EA | exact_or_within_1 | 3 | FAIL (40%) |
+| Doors-WD | 7 | EA | exact_or_within_1 | 3 | FAIL (57%) |
+| EIFS | 3,053.04 | SF | ±3% | — | MISSING |
+| Frame-HM | 12 | EA | exact_or_within_1 | — | MISSING |
+| Gas Piping | 886.77 | LF | ±3% | — | MISSING |
+| Ladder-H-24' | 1 | EA | exact_or_within_1 | — | MISSING |
+| Lift | 1 | EA | exact_or_within_1 | — | MISSING |
+| Lintels | 179.24 | LF | ±3% | — | MISSING |
+| Mobilization | 1 | EA | exact_or_within_1 | — | MISSING |
 
-To run: place PDF, then `pytest tests/test_golden_takeoff.py -v -m golden -k bobs`
+**Run date:** 2026-06-04 · Commit: 12c057a  
+**Score: 0.0% (0/12) — below 97% threshold**
+
+**Root-cause analysis (general — not project-specific):**
+- Doors-HM/WD: Door schedule partially extracted (3 of 5/7) — Haiku misses rows from multi-page door schedule
+- Frame-HM MISSING: HM frame rows not identified separately from door rows in schedule output
+- CMU Paint, EIFS, Canopy, Lintels: Absent from AI output — exterior elevation sheets not yielding SF measurements
+- Gas Piping: Not extracted from roof/MEP plan — needs explicit pipe_runs[] output from Claude
+- Bollards: civil_site count pass now runs (20-10 fix) but Haiku doesn't count symbols reliably
+- Ladder-H-24', Lift, Mobilization: One-off EA items not found in Haiku's extraction output
+- Stairs (from Crow Cass): EA fractional filter (20-10) correctly suppressed the noise value 0.01
+
+To run: `pytest tests/test_golden_takeoff.py -v -m golden -k bobs`
 
 ---
 
@@ -135,7 +154,7 @@ Run: `pytest tests/ -v -k parity`
 
 ### Automated (CI)
 
-- [x] `pytest tests/test_takeoff_generalization.py -v` — 55/55 PASS
+- [x] `pytest tests/test_takeoff_generalization.py -v` — **99/99 PASS** (2026-06-04 post 20-10)
 - [x] `pytest tests/test_golden_takeoff.py -v -k "validator_logic"` — 1/1 PASS
 - [x] No project-specific hardcoding in `calculator.py`, `aggregator.py`, or `takeoff_pipeline.py`
 - [x] `sheet_coverage.json` documents fixture scope (separate from PASS_MATRIX product scope)
@@ -143,8 +162,8 @@ Run: `pytest tests/ -v -k parity`
 ### Human Verification (required for sign-off)
 
 - [ ] `pytest tests/test_takeoff_generalization.py -v` — run locally and confirm all green
-- [x] `pytest tests/test_golden_takeoff.py -v -m golden -k crow` — ran; **20%** (needs iteration)
-- [ ] `pytest tests/test_golden_takeoff.py -v -m golden -k bobs` — PDF present; run and confirm ≥97%
+- [x] `pytest tests/test_golden_takeoff.py -v -m golden -k crow` — ran 3×; **20% (2/10)** — below 97% (see gap analysis above)
+- [x] `pytest tests/test_golden_takeoff.py -v -m golden -k bobs` — ran 3×; **0% (0/12)** — below 97% (see gap analysis above)
 - [ ] Upload a **new** plan (not Crow/Bob) and verify `takeoff_summary` produces sensible trade items
 - [ ] Confirm industrial PDF → `Sealed Concrete` (not flooring)
 - [ ] Confirm retail PDF → `Flooring` (not sealed concrete)
