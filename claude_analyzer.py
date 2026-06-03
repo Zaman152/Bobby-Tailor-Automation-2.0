@@ -131,6 +131,17 @@ Return ONLY valid JSON. No markdown, no commentary, no code fences.
       "raw_text": "full annotation"
     }
   ],
+  "lintel_runs": [
+    {
+      "mark": "L-4",
+      "size": "6×4×5/16 A36",
+      "individual_length_ft": 6.0,
+      "count": 12,
+      "total_lf": 72.0,
+      "location": "above storefront openings at Gridline B",
+      "raw_text": "L-4 @ 6'-0\" ea"
+    }
+  ],
   "civil_structures": [
     {
       "id": "BB CI#2",
@@ -152,11 +163,52 @@ Return ONLY valid JSON. No markdown, no commentary, no code fences.
 RULES:
 1. TABLE CLASSIFICATION: takeoff_schedule = rows with real quantities to install. specification_reference = manufacturer catalogs, pipe sizing charts — set use_for_takeoff: false. general_notes = numbered notes only.
 2. CROSS-REFERENCES: Every detail bubble (circle number + sheet box) goes in cross_references[].
-3. PIPE RUNS: "25 LF - 12\\"Ø SCH 40 PVC @ 4.81%" → pipe_runs[] with length_lf, diameter_in, slope_pct — NOT in measurements[].
-4. CIVIL STRUCTURES: Catch basins/manholes with GL/INV → civil_structures[], NOT measurements[].
-5. APPROXIMATE: ± prefix → set approximate: true on measurement.
-6. EXCLUDE from measurements[]: scale, temperatures, GL/INV/EL/ELEV values, slope % alone, SEE SHEET refs without qty.
-7. NEVER fabricate quantities. Read EVERY schedule row including spares."""
+3. PIPE RUNS: Any linear pipe/duct/conduit annotation (storm, gas, HVAC, electrical) → pipe_runs[]. NEVER put run lengths in measurements[]. "25 LF - 12\\"Ø SCH 40 PVC @ 4.81%" → pipe_runs[] with length_lf, diameter_in, slope_pct. Gas line "886 LF Black Steel" → pipe_runs[] with material="black steel".
+4. LINTEL RUNS: Structural steel lintel callouts (L-1, L-4, etc.) → lintel_runs[]. Compute total_lf = individual_length_ft × count when annotated. NEVER put lintel lengths in measurements[].
+5. CIVIL STRUCTURES: Catch basins/manholes with GL/INV → civil_structures[], NOT measurements[].
+6. APPROXIMATE: ± prefix → set approximate: true on measurement.
+7. EXCLUDE from measurements[]: scale, temperatures, GL/INV/EL/ELEV values, slope % alone, SEE SHEET refs without qty.
+8. NEVER fabricate quantities. Read EVERY schedule row including spares."""
+
+
+MEASURE_ADDENDUM = """
+MEASURE PASS ADDENDUM — EXTENDED LINEAR RUNS
+
+PIPE RUNS — extend pipe_runs[] to cover ALL piping and mechanical runs (not just storm drainage):
+- Storm/sanitary: PVC, RCP, HDPE, DIP (include slope_pct when shown)
+- Gas: black steel pipe, CSST, corrugated stainless steel, yellow PE gas line
+- Mechanical/HVAC: copper type L, copper type M, CPVC, refrigerant lines (linesets), condensate piping
+- Site/irrigation: polyethylene, Schedule 80 PVC (non-storm context)
+- Fire suppression: Schedule 10/40 steel, CPVC (sprinkler piping)
+- HVAC ductwork: material="rectangular duct" / "spiral duct" / "flex duct" (LF of duct centerline)
+- Electrical conduit: material="EMT conduit" / "PVC conduit" / "rigid conduit"
+- Electrical wireway / cable tray: material="wireway" / "cable tray"
+
+Use the material field to distinguish type: "black steel", "CSST", "copper type L", "PVC SCH 40", "EMT conduit".
+A roof plan annotation "886.77 LF - 2\" Black Steel" → one pipe_run entry (length_lf=886.77, material="black steel").
+NEVER put any of these linear run lengths in measurements[] — all must be in pipe_runs[].
+
+LINTEL RUNS — extract into lintel_runs[] (separate array, already in schema):
+Lintels are structural steel angles above door/window openings, identified by callout marks (L-1, L-4, etc.)
+on elevation or detail sheets with individual length × count annotations.
+- If total_lf is annotated directly, use it; else compute individual_length_ft × count.
+- If count is not shown, set count=1 and total_lf=individual_length_ft.
+- NEVER put lintel lengths in measurements[] when lintel_runs[] is used.
+
+Example lintel annotation "L-4 @ 6'-0\" ea × 12 locations" →
+  lintel_runs: [{mark:"L-4", size:"6×4×5/16 A36", individual_length_ft:6.0, count:12, total_lf:72.0}]
+
+SITE LINEAR RUNS — also use pipe_runs[] for site construction linear items:
+- Striping: material="striping" (pavement marking LF)
+- Guard rail: material="guard rail" or "w-beam guardrail"
+- Hand rail: material="hand rail" or "pipe rail"
+- Trench drain: material="trench drain" or "channel drain"
+- Curb and gutter: material="curb and gutter"
+These items go in pipe_runs[] with material set; length_lf is the run length.
+"""
+
+# Append extended linear run rules to the measure-pass prompt.
+EXTRACTION_PROMPT = EXTRACTION_PROMPT + MEASURE_ADDENDUM
 
 
 COUNT_PROMPT = """You are a professional quantity surveyor counting discrete construction items on this drawing.

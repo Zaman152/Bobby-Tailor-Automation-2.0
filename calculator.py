@@ -241,6 +241,20 @@ ESTIMATION_TABLES = {
         "description": "Steel lintel LF over openings",
         "keywords": ["lintel", "steel lintel", "angle lintel", "l-4", "lintel run"],
     },
+    "duct_lf": {
+        "unit_out": "lf",
+        "waste_factor": 1.10,
+        "formula": "length × 1.10",
+        "description": "HVAC ductwork LF (10% allowance for fittings/connections)",
+        "keywords": ["duct lf", "ductwork", "rectangular duct", "round duct", "spiral duct", "flex duct"],
+    },
+    "conduit_lf": {
+        "unit_out": "lf",
+        "waste_factor": 1.10,
+        "formula": "length × 1.10",
+        "description": "Electrical conduit LF (10% allowance for fittings)",
+        "keywords": ["conduit", "emt", "pvc conduit", "rigid conduit", "wireway", "cable tray", "raceway"],
+    },
 }
 
 
@@ -375,9 +389,10 @@ def apply_estimation_tables(extracted_data: dict, project_type: str = "auto") ->
     for sched in extracted_data.get("schedules", []):
         estimates.extend(_calculate_from_schedule(sched, sheet_name))
 
-    # 5) Pipe runs and civil structures (v2.1)
+    # 5) Pipe runs, civil structures, and lintel runs (v2.1)
     estimates.extend(_calculate_from_pipe_runs(extracted_data.get("pipe_runs", []), sheet_name))
     estimates.extend(_calculate_from_civil_structures(extracted_data.get("civil_structures", []), sheet_name))
+    estimates.extend(_calculate_from_lintel_runs(extracted_data.get("lintel_runs", []), sheet_name))
 
     logger.info(f"  Calculated {len(estimates)} estimates from {sheet_name}")
     return estimates
@@ -664,13 +679,35 @@ def _schedule_is_takeoff(sched: dict) -> bool:
 
 
 def _detect_pipe_item_type(run: dict) -> str:
-    """Classify a pipe run as gas_pipe, trench_drain, or storm_pipe from material/raw_text."""
+    """Classify a pipe run into a calculator item type from material/raw_text.
+
+    Classification priority (first match wins):
+      gas_pipe   — gas, black steel, CSST, yellow PE
+      duct_lf    — HVAC ductwork (rectangular/spiral/flex duct)
+      conduit_lf — electrical conduit, wireway, cable tray, raceway
+      guard_rail — guard rail run material
+      hand_rail  — hand rail / pipe rail
+      striping   — pavement marking / striping
+      trench_drain — trench/channel drain
+      storm_pipe — default (PVC, HDPE, RCP, other piping)
+    """
     material = (run.get("material") or "").lower()
     raw_text = (run.get("raw_text") or "").lower()
     pipe_type = (run.get("type") or "").lower()
     combined = f"{material} {raw_text} {pipe_type}"
+
     if re.search(r"gas\b|gas\s*pip|black\s*steel|csst|yellow\s*pe|gas\s*line", combined):
         return "gas_pipe"
+    if re.search(r"duct\b|ductwork|rectangular\s*duct|spiral\s*duct|flex\s*duct|sheet\s*metal\s*duct", combined):
+        return "duct_lf"
+    if re.search(r"\bconduit\b|emt\b|wireway|cable\s*tray|raceway\b", combined):
+        return "conduit_lf"
+    if re.search(r"guard\s*rail|guardrail|barrier\s*rail|w.?beam", combined):
+        return "guard_rail"
+    if re.search(r"hand\s*rail|handrail|stair\s*rail|pipe\s*rail", combined):
+        return "hand_rail"
+    if re.search(r"\bstrip|pavement\s*mark|lane\s*mark", combined):
+        return "striping"
     if re.search(r"trench.*drain|channel.*drain|slot.*drain|linear.*drain", combined):
         return "trench_drain"
     return "storm_pipe"
@@ -761,6 +798,61 @@ def _calculate_from_civil_structures(structures: list, sheet_name: str) -> List[
             "source_raw": spec,
             "table_used": item_type,
             "specification": spec,
+        })
+    return results
+
+
+def _calculate_from_lintel_runs(lintel_runs: list, sheet_name: str) -> List[dict]:
+    """Convert lintel_runs[] entries into takeoff items (LF with 5% waste).
+
+    Each run can supply total_lf directly, or individual_length_ft × count.
+    Runs with zero computed length are silently skipped.
+    """
+    results = []
+    for run in lintel_runs:
+        if not isinstance(run, dict):
+            continue
+        total_lf = run.get("total_lf")
+        if not total_lf:
+            ind = run.get("individual_length_ft") or 0
+            cnt = run.get("count") or 1
+            try:
+                total_lf = float(ind) * float(cnt)
+            except (TypeError, ValueError):
+                total_lf = 0
+        try:
+            total_lf = float(total_lf)
+        except (TypeError, ValueError):
+            continue
+        if total_lf <= 0:
+            continue
+
+        mark = run.get("mark", "")
+        size = run.get("size", "")
+        ind_lf = run.get("individual_length_ft")
+        cnt = run.get("count")
+        desc = f"Lintel {mark} {size}".strip()
+        if ind_lf and cnt:
+            formula_str = f"{ind_lf} lf × {cnt} = {total_lf} lf"
+        else:
+            formula_str = f"{total_lf} lf (total annotated)"
+
+        calc_qty, calc_unit, formula_out = _apply_formula("lintel", total_lf, "lf", str(total_lf))
+        table = ESTIMATION_TABLES.get("lintel", {})
+        results.append({
+            "item_type": "lintel",
+            "description": desc or "Lintel run",
+            "raw_value": total_lf,
+            "raw_unit": "lf",
+            "quantity": round(calc_qty, 2),
+            "unit": calc_unit,
+            "waste_factor_applied": table.get("waste_factor", 1.05),
+            "formula": formula_out,
+            "source_sheet": sheet_name,
+            "source_location": run.get("location", ""),
+            "source_raw": run.get("raw_text", ""),
+            "table_used": "lintel",
+            "specification": f"mark={mark}" if mark else "",
         })
     return results
 
@@ -920,7 +1012,7 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
         return value * wf, "sq_ft", f"{value:.0f} sf × {wf} waste"
 
     if item_type in ("storm_pipe", "trench_drain", "guard_rail", "hand_rail", "striping",
-                      "gas_pipe", "lintel"):
+                      "gas_pipe", "lintel", "duct_lf", "conduit_lf"):
         wf = table.get("waste_factor", 1.0)
         return value * wf, "lf", f"{value:.0f} lf × {wf} = {value * wf:.0f} lf"
 
