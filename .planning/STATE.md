@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — Takeoff Measurement Precision (Plans 20-00 + 20-01 complete)
+**Current focus:** Phase 20 — Takeoff Measurement Precision (Plans 20-00 through 20-03 complete)
 
 ## Current Position
 
 Phase: 20 of 20+ (Takeoff Measurement Precision) — In progress  
-Plan: 3/7 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness)  
-Status: GoldenValidator + generalization test harness live; 20 tests pass (17 pass, 3 xfail)  
-Last activity: 2026-06-03 — Completed 20-02-PLAN.md (accuracy test harness)
+Plan: 4/7 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness + 20-03 prompts)  
+Status: COUNT_PROMPT + SCHEDULE_PROMPT + merge_passes + analyze_drawing pass_type/model_override live  
+Last activity: 2026-06-03 — Completed 20-03-PLAN.md (generalized prompts + multi-pass infrastructure)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -126,6 +126,16 @@ None yet.
 | plan_passes returns copy of PASS_MATRIX list to prevent mutation of module constant | 20-00 |
 | classify_sheet_type_from_text defaults to floor_plan when ambiguous (safest: runs count+measure) | 20-00 |
 
+### 20-03 Decisions
+
+| Decision | Source |
+|----------|--------|
+| COUNT_PROMPT returns `has_schedules` bool so TakeoffPipeline can conditionally invoke schedule pass | 20-03 |
+| `analyze_drawing` default `pass_type="measure"` preserves all existing single-pass caller behavior | 20-03 |
+| `_pick_model` deferred `MODEL_ROUTING` import avoids circular dependency with sheet_pass_matrix | 20-03 |
+| Canonical `merge_passes` lives in `claude_analyzer`; `takeoff_pipeline` re-exports for backward compat | 20-03 |
+| `merge_passes` uses `strip().lower()` for dedup keys to handle trailing whitespace in Claude output | 20-03 |
+
 ### 20-01 Decisions
 
 | Decision | Source |
@@ -170,6 +180,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-03  
-Stopped at: Completed 20-00-PLAN.md (pipeline skeleton + PASS_MATRIX + TakeoffPipeline + 67 tests)  
-Resume file: .planning/phases/20-takeoff-measurement-precision/20-01-PLAN.md
+Last session: 2026-06-03 18:46 UTC  
+Stopped at: Completed 20-03-PLAN.md (COUNT_PROMPT + SCHEDULE_PROMPT + analyze_drawing pass_type + merge_passes)  
+Resume file: .planning/phases/20-takeoff-measurement-precision/20-04-PLAN.md
