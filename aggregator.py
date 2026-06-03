@@ -16,11 +16,17 @@ ITEM_NAME_MAP = [
     (r"headwall|flared end|end section|\bfes\b|wingwall", "Headwall", "EA"),
     (r"trench drain|channel drain|slot drain|linear drain", "Trench Drain", "LF"),
     (r"gas.*pip|gas\s*pipe|black\s*steel.*pip|csst.*pip|gas\s*line", "Gas Piping", "LF"),
+    # Fire hydrant before conduit/storm to avoid \bfh\b ambiguity
+    (r"fire.*hydrant|\bfh\b", "Fire Hydrants", "EA"),
+    (r"area.*drain|floor.*drain|cleanout", "Area Drain / Cleanout", "EA"),
     # Conduit/duct before storm pipe to prevent PVC conduit matching \bpvc\b
     (r"\bconduit\b|\bemt\b|wireway|cable.*tray|raceway\b", "Conduit LF", "LF"),
     (r"duct.*lf|ductwork|\bduct\b(?!.*liner)", "Duct LF", "LF"),
+    # Sanitary pipe BEFORE storm pipe so sanitary descriptions don't collapse to Storm Pipe
+    (r"sanitary.*pipe|sanitary.*sewer|\bss\s*pipe\b", "Sanitary Pipe", "LF"),
     # Storm pipe — match PVC/HDPE/RCP only in piping context; conduit must be excluded above
     (r"pvc.*pipe|pvc.*sch|pvc.*sewer|\bhdpe\b|\brcp\b|\bdip\b|storm pipe|storm sewer|culvert|sanitary sewer", "Storm Pipe", "LF"),
+    (r"water.*main|water.*line|domestic.*water", "Water Main", "LF"),
     (r"guard.*rail|guardrail|barrier.*rail|w.?beam", "Guard Rail", "LF"),
     (r"hand.*rail|handrail|stair.*rail|pipe.*rail", "Hand Rail", "LF"),
     (r"strip|pavement.*mark|lane.*mark", "Striping", "LF"),
@@ -28,6 +34,9 @@ ITEM_NAME_MAP = [
     (r"\basphalt\b|\bhma\b|blacktop", "Asphalt", "SF"),
     # Concrete pavement — match common abbreviations and context phrases
     (r"concrete.*pavement|\bpcc\b|\bflatwork\b|concrete.*drive|concrete.*walk|concrete.*sidewalk", "Concrete Pavement", "SF"),
+    (r"detention|retention.*pond|bioswale", "Stormwater Basin", "EA"),
+    (r"\bfence\b|chain.*link|ornamental.*fence", "Fence", "LF"),
+    (r"grading|cut.*fill|mass.*grade", "Grading", "CY"),
     (r"dumpster.*enclos", "Dumpster Enclosure", "EA"),
 
     # ── Structure ─────────────────────────────────────────────────────────────
@@ -50,30 +59,49 @@ ITEM_NAME_MAP = [
 
     # ── Architectural ─────────────────────────────────────────────────────────
     (r"flooring|floor tile|\blvt\b|\bvct\b|\bcarpet\b|luxury.*vinyl|ceramic.*tile|porcelain.*tile", "Flooring", "SF"),
+    # Drywall Ceiling BEFORE Ceiling Grid — suspended/gyp ceiling is distinct from ACT tile grid
+    (r"suspended.*ceil|gyp.*ceil|acoustical.*ceil.*grid", "Drywall Ceiling", "SF"),
     (r"ceiling.*tile|\bact\b|t.bar.*ceil|acoustic.*ceil|lay.in.*ceil", "Ceiling Grid", "SF"),
     (r"drywall|\bgwb\b|gypsum.*board|sheetrock|wallboard", "Drywall", "sheets"),
     (r"\bpaint\b|primer|finish.*coat|epoxy.*floor", "Paint", "gallons"),
     (r"\beifs\b|exterior.*insulation|dryvit|synthetic.*stucco", "EIFS", "SF"),
     (r"\bcanopy\b|metal.*canopy|entrance.*canopy|shade.*canopy", "Canopy", "SF"),
     (r"insulation|\bbatt\b|rigid.*insul|spray.*foam|r-\d+", "Insulation", "SF"),
+    # Dock doors/levelers BEFORE generic door catch-all
+    (r"dock.*door|overhead.*door|coiling.*door", "Dock Doors", "EA"),
+    (r"dock.*leveler|dock.*seal|dock.*bumper", "Dock Leveler", "EA"),
     # Door type separation — Frame-HM and specific types BEFORE generic door catch-all
     (r"hollow.?metal.*frame|frame.*hollow.?metal|frame.*\bhm\b|\bhm\b.*frame", "Frame-HM", "EA"),
     (r"door.*hollow.?metal|hollow.?metal.*door|hm.*door(?!.*frame)|door.*\bhm\b(?!.*frame)", "Doors-HM", "EA"),
     (r"door.*\bwood\b|\bwood\b.*door|\bwd\b.*door|door.*\bwd\b", "Doors-WD", "EA"),
     (r"door.*alum|alum.*door|\bal\b.*door|door.*\bal\b", "Doors-AL", "EA"),
+    # Glass door BEFORE generic catch-all
+    (r"glass.*door|aluminum.*storefront.*door", "Doors-GL", "EA"),
     # Generic door catch-all — must follow specific types above
     (r"door(?!.*frame)", "Doors", "EA"),
+    # Storefront/Curtain Wall AFTER all door patterns so door-bearing descriptions resolve to door types
+    (r"storefront|curtain.*wall|window.*wall", "Storefront/Curtain Wall", "SF"),
     (r"window|glazing|storefront.*glass", "Windows", "EA"),
     (r"gauge.*metal|metal.*gauge", "Gauge Metal", "EA"),
     (r"interior.*concrete.*wall", "Interior Concrete Walls", "SF"),
 
-    # ── MEP ───────────────────────────────────────────────────────────────────
+    # ── MEP / Fire Protection ─────────────────────────────────────────────────
+    # Fire suppression before generic MEP entries
+    (r"sprinkler.*head|fire.*sprinkler|pendent", "Sprinkler Heads", "EA"),
+    (r"smoke.*detector|fire.*alarm|horn.*strobe", "Fire Alarm", "EA"),
+    # HVAC subtypes — VAV/RTU/unit heater more specific than generic AHU
+    (r"\bvav\b|variable.*air.*volume", "VAV Boxes", "EA"),
+    (r"unit.*heater|cabinet.*heater", "Unit Heater", "EA"),
+    (r"refrigerant.*line|ref.*line|line.*set", "Refrigerant Piping", "LF"),
+    (r"thermostat|t-stat", "Thermostat", "EA"),
     (r"panel|mcc\b|switchboard|distribution.*board", "Electrical Panels", "EA"),
     (r"light.*fix|fixture.*light|\bled\b|luminaire", "Lighting Fixtures", "EA"),
     (r"receptacle|outlet\b", "Receptacles", "EA"),
     (r"exit sign", "Exit Signs", "EA"),
     (r"fan coil|\bfcu\b", "Fan Coil Units", "EA"),
     (r"air handler|\bahu\b", "Air Handling Units", "EA"),
+    # RTU AFTER Air Handling Units so "air handling unit" descriptions don't collapse to RTU
+    (r"\brtu\b|rooftop.*unit|packaged.*unit", "RTU", "EA"),
     (r"exhaust fan", "Exhaust Fans", "EA"),
 ]
 
