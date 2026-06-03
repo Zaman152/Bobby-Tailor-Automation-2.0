@@ -493,6 +493,38 @@ ESTIMATION_TABLES = {
 
 Every calculated row in `calculations.csv` has a `formula_applied` column showing the exact math.
 
+## Testing
+
+### Generalization suite — synthetic fixtures, no API needed, CI-safe
+
+```bash
+# All plan types (no API, CI-safe)
+pytest tests/test_takeoff_generalization.py -v
+```
+
+Covers all 8 sheet types (floor_plan, elevation, civil_site, schedule, detail, title_sheet, roof_plan, mep_plan) using
+synthetic extraction JSON. Zero API calls — runs in ~0.05 s. Required green before every merge.
+
+### Golden regression — client reference accuracy
+
+```bash
+# Client regression (requires golden PDFs)
+pytest tests/test_golden_takeoff.py -v -m golden
+```
+
+Runs end-to-end through `run_pdf_analysis` on the Crow Cass and Bob's Discount PDF fixtures and validates each
+canonical item against `tests/fixtures/{project}/golden.csv` using `GoldenValidator` (≥97% accuracy threshold).
+These tests auto-skip when PDF fixtures are absent; place PDFs at:
+
+- `tests/fixtures/crow_cass/crow_cass_plans.pdf`
+- `tests/fixtures/bobs_discount/bobs_discount_plans.pdf`
+
+### Run all tests
+
+```bash
+pytest -v
+```
+
 ## Cost
 
 With Haiku (default) + prompt caching, a 30-page project runs ~$0.05.
