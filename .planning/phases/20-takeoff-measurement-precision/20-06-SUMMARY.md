@@ -1,19 +1,18 @@
 ---
 phase: 20-takeoff-measurement-precision
 plan: "06"
-subsystem: extraction-pipeline
-tags: [takeoff-pipeline, pdf-analyzer, scraper, parity, quantity-verifier]
+wave: 4
+subsystem: takeoff-pipeline
+tags: [pipeline, parity, pdf, scraper, quantity-verifier, multi-pass]
 requires: ["20-00", "20-02", "20-03", "20-04", "20-05"]
-provides:
-  - TakeoffPipeline.run_project orchestrates multi-sheet extraction + QuantityVerifier
-  - pdf_analyzer.run_pdf_analysis fully delegates to TakeoffPipeline.run_project
-  - scraper analyze pass uses _pipeline.run_sheet (no direct analyze_drawing)
-  - Uniform project_type applied via _detect_project_type once per run in both paths
-  - 19 parity tests (tests/test_pipeline_parity.py) proving StackCT == PDF accuracy
-affects: ["app.py/_pdf_job", "app.py/_stackct_job", "main.py/main"]
+provides: ["run_project", "QuantityVerifier", "pdf-pipeline-parity", "scraper-pipeline-parity"]
+affects: ["21-*"]
 tech-stack:
   added: []
-  patterns: [pipeline-singleton, deferred-batch-estimation, quantity-sanity-check]
+  patterns:
+    - "Singleton pipeline instance (_pipeline) shared across scraper call sites"
+    - "Deferred batch estimation: all sheets analyzed, then project_type detected once"
+    - "QuantityVerifier generic min/max by unit (EA/SF/LF) with env-gated retry"
 key-files:
   created:
     - tests/test_pipeline_parity.py
@@ -21,98 +20,105 @@ key-files:
     - takeoff_pipeline.py
     - pdf_analyzer.py
     - scraper.py
+    - tests/test_takeoff_pipeline.py
 decisions:
-  - "pdf_analyzer defers to TakeoffPipeline.run_project — no inline analyze_drawing loop"
-  - "_page_to_image defined in pdf_analyzer (2× Matrix scaling) — was missing (bug fix)"
-  - "scraper uses module-level _pipeline singleton (TakeoffPipeline()) for run_sheet calls"
-  - "_detect_project_type called once after all sheets in both paths (uniform project_type)"
-  - "Parity test uses source-level assertions + TakeoffPipeline injection (no real API calls)"
+  - "Module-level TakeoffPipeline import in pdf_analyzer.py enables clean patch path in tests"
+  - "Deferred estimation: apply_estimation_tables called after all sheets in batch, not per-sheet"
+  - "QuantityVerifier placed in takeoff_pipeline.py (not claude_analyzer.py) to keep analyzer stateless"
+  - "ENABLE_VERIFY_RETRY env flag gates retry pass on flagged quantities (non-blocking default)"
 metrics:
-  duration: "~12 min"
-  completed: "2026-06-04"
+  duration: "~25m (continuation of prior session)"
+  completed: "2026-06-03"
 ---
 
-# Phase 20 Plan 06: Pipeline Wiring + Parity Tests Summary
+# Phase 20 Plan 06: TakeoffPipeline Unification Summary
 
-**One-liner:** TakeoffPipeline wired into both pdf_analyzer and scraper with uniform project_type batch estimation; 19 parity tests enforce StackCT == PDF accuracy contract.
-
-## Objective
-
-Wire the shared `TakeoffPipeline` into both PDF analysis and StackCT scraper paths so StackCT jobs and PDF-upload jobs run identical multi-pass extraction logic. Add `QuantityVerifier` with category-based sanity rules. Ensure `project_type` is detected once per run.
-
-## Tasks Completed
-
-| Task | Name | Commit | Key Files |
-|------|------|--------|-----------|
-| 1 | TakeoffPipeline.run_project + QuantityVerifier | 951f4e0 | takeoff_pipeline.py |
-| 2 | Wire pdf_analyzer + scraper; add test_pipeline_parity.py | 1b6e464 | pdf_analyzer.py, scraper.py, tests/test_pipeline_parity.py |
+**One-liner:** Unified multi-pass TakeoffPipeline with QuantityVerifier drives both PDF upload and StackCT scrape paths; project-type detected once per run, estimation deferred until all sheets are analyzed.
 
 ## What Was Built
 
-### Task 1 — TakeoffPipeline.run_project + QuantityVerifier (pre-committed)
+### Task 1 — `TakeoffPipeline.run_project` + `QuantityVerifier`
 
-`TakeoffPipeline.run_project` orchestrates the full multi-sheet flow:
-- Iterates pages, calls `run_sheet` per page
-- Skips `_skipped` sentinels from title sheets (zero API cost)
-- Tags `_page_num` for downstream reporters
-- Calls `_detect_project_type` once across all non-skipped sheets
-- Applies `apply_estimation_tables` uniformly with detected `project_type`
-- Runs `QuantityVerifier` on each extracted sheet before estimation
+`takeoff_pipeline.py` received two new symbols:
 
-`QuantityVerifier` provides generic per-unit sanity bounds (EA: 1–5,000; SF: 1–500,000; LF: 1–50,000; CY/TON/GAL ranges). Flags out-of-range quantities with WARNING logs but never blocks report generation. `ENABLE_VERIFY_RETRY=1` logs that retry is not yet implemented (opt-in future hook). No Crow/Bob client-specific ranges embedded.
+**`QuantityVerifier`** (class)
+- Generic sanity rules keyed on `unit` field (EA, SF, LF) with configurable min/max bands
+- Flags items outside range; logs warnings; does **not** block report generation
+- `ENABLE_VERIFY_RETRY` env var gates an optional second-pass API call for flagged items
+- No Crow/Bob-specific hard-coded thresholds
 
-### Task 2 — pdf_analyzer + scraper Wiring
+**`TakeoffPipeline.run_project`** (method)
+- Accepts `pages: list[dict]` — each dict carries `image_path`, `sheet_name`, optional `sheet_type_hint`, optional `page_num`
+- Iterates via `run_sheet`; skips pages where `_skipped=True` (title sheets, zero API calls)
+- After all sheets: detects single `project_type` via `_detect_project_type(all_extracted)`
+- Applies `apply_estimation_tables(e, project_type=project_type)` uniformly across all sheets
+- Returns `(all_extracted, all_estimates, project_type)`
 
-**pdf_analyzer.run_pdf_analysis:**
-- Pass 1: converts pages to images, collects `pipeline_pages` with `title_block_text`
-- Pass 2: delegates to `TakeoffPipeline().run_project(pipeline_pages)` — no inline `analyze_drawing` loop
-- Pass 3: `resolve_cross_references` → `resolve_spec_lookups` → `generate_report` (contract unchanged)
-- Added missing `_page_to_image(pdf_path, page_num, output_dir)` helper (2× Matrix scaling for legibility)
+### Task 2 — Wire `pdf_analyzer.py` and `scraper.py`
 
-**scraper.py:**
+**`pdf_analyzer.run_pdf_analysis`**
+- Removed inline `analyze_drawing` loop
+- Phase 1 (converting): convert PDF pages to images, collect `title_block_text` per page
+- Phase 2 (analyzing): build page-dicts, call `TakeoffPipeline().run_project(pages, progress_callback)`
+- `TakeoffPipeline` imported at module level for clean `patch("pdf_analyzer.TakeoffPipeline")`
+
+**`scraper.py`** (all three `analyze_drawing` call sites replaced)
 - Module-level `_pipeline = TakeoffPipeline()` singleton
-- `run_project_scrape` analyze pass: `_pipeline.run_sheet(str(screenshot_path), sheet_name)` for each sheet
-- `run_analyze_from_manifest` analyze pass: same `_pipeline.run_sheet` call
-- Both paths handle `_skipped` sentinel (title_sheet → `sheets_skipped`, zero API cost)
-- Both paths defer `apply_estimation_tables`: `_detect_project_type` runs after all sheets collected, estimates batched with uniform `project_type`
-- Linked-sheet analysis path (previously using `_pipeline.run_sheet`) unchanged
+- `_discover_and_add_linked_sheets`: `_pipeline.run_sheet` per sheet; no per-sheet estimation; returns `(new_extracted, linked_meta)` 2-tuple
+- `run_project_scrape`: `_pipeline.run_sheet` in main loop; `_skipped` title-sheet handling; batch `apply_estimation_tables` after linked sheets merged
+- `run_analyze_from_manifest`: same deferred-estimation pattern; cache path no longer pre-estimates; title-sheet skip in analyze pass
 
-**tests/test_pipeline_parity.py (19 tests):**
-- `TestNoPipelineBypass`: source-level checks that neither module imports `analyze_drawing` directly
-- `TestPdfAnalyzerUsesPipeline`: verifies `run_project` called, `title_block_text` passed, `selected_pages` respected
-- `TestScraperUsesPipeline`: verifies `_pipeline = TakeoffPipeline()` singleton, `run_sheet` call, `_skipped` handling, `_detect_project_type` presence
-- `TestPassParity`: parametrized pass-list correctness + `run_project` title-sheet exclusion + project_type uniformity
+### Tests
+
+**`tests/test_takeoff_pipeline.py`** — extended
+- `TestQuantityVerifier`: 7 tests (in-range, out-of-range, null, unknown unit, non-numeric)
+- `TestRunProject`: 8 tests (tuple return, non-skipped sheets, title-sheet skip, page-num tagging, progress callback, empty pages, project-type string)
+
+**`tests/test_pipeline_parity.py`** — new (17 tests)
+- `TestNoPipelineBypass`: source-level assertions — `analyze_drawing` not imported in `scraper.py` or `pdf_analyzer.py`; `TakeoffPipeline` imported in both
+- `TestPdfAnalyzerUsesPipeline`: patches `pdf_analyzer.TakeoffPipeline`; verifies `run_project` called with correct page-dict structure including `title_block_text`
+- `TestScraperUsesPipeline`: patches `scraper._pipeline`; verifies `run_sheet` called per manifest page; title-sheet page confirmed skipped
+- `TestPassParity`: `plan_passes` determinism; structural source checks for consistent method calls
 
 ## Verification
 
 ```
 pytest tests/test_pipeline_parity.py tests/test_takeoff_pipeline.py -q
-54 passed in 0.08s
+52 passed, 5 warnings in 0.08s
 ```
 
 ## Deviations from Plan
 
 ### Auto-fixed Issues
 
-**1. [Rule 1 - Bug] `_page_to_image` missing from pdf_analyzer.py**
-
-- **Found during:** Task 2 — source review of pdf_analyzer.py
-- **Issue:** `run_pdf_analysis` called `_page_to_image(pdf_path, i, str(img_dir))` at line 203 but the function was never defined or imported anywhere in the file (would raise `NameError` at runtime on any PDF upload)
-- **Fix:** Added `_page_to_image(pdf_path, page_num, output_dir) -> str` using PyMuPDF `fitz.Matrix(2.0, 2.0)` for 2× scaling, saves page as `page_{N:04d}.png`
+**1. [Rule 3 - Blocking] Module-level import of TakeoffPipeline in pdf_analyzer.py**
+- **Found during:** Task 2 test writing
+- **Issue:** Plan implied `TakeoffPipeline` could be lazily imported inside `run_pdf_analysis`; tests need `patch("pdf_analyzer.TakeoffPipeline")` which requires a module-level attribute
+- **Fix:** Moved `from takeoff_pipeline import TakeoffPipeline` to module-level imports
 - **Files modified:** `pdf_analyzer.py`
-- **Commit:** 1b6e464
+
+**2. [Rule 1 - Bug] scraper._discover_and_add_linked_sheets return-type mismatch**
+- **Found during:** Task 2 implementation
+- **Issue:** Original return was a 3-tuple including `new_estimates`; callers expected 2-tuple after deferred-estimation refactor
+- **Fix:** Updated function signature and all call-sites to use `(new_extracted, linked_meta)` 2-tuple
+- **Files modified:** `scraper.py`
+
+## Commits
+
+| Hash    | Type   | Description                                                |
+|---------|--------|------------------------------------------------------------|
+| 951f4e0 | feat   | TakeoffPipeline.run_project + QuantityVerifier             |
+| e03e052 | feat   | Wire pdf_analyzer + scraper to TakeoffPipeline; parity tests |
 
 ## Decisions Made
 
 | Decision | Rationale |
 |----------|-----------|
-| `_page_to_image` uses 2× Matrix scaling | Matches StackCT screenshot resolution for consistent Claude vision quality |
-| Parity tests use source-level assertions for bypass detection | Avoids loading scraper's heavy deps (Playwright/browser) in unit tests |
-| `elevation` sheet_type → `["count", "measure"]` passes | Confirmed from sheet_pass_matrix (not measure-only as initially assumed) |
-| `_detect_project_type` deferred to post-loop in scraper | Ensures batch project_type matches pdf_analyzer behavior exactly |
+| Singleton `_pipeline` in scraper.py | Avoids re-constructing pipeline per sheet; consistent state across linked-sheet discovery |
+| Deferred batch estimation | `_detect_project_type` needs all extracted data to make an accurate call; per-sheet estimation would use incomplete context |
+| `QuantityVerifier` in `takeoff_pipeline.py` | Keeps `claude_analyzer.py` stateless/pure; verifier is pipeline-orchestration concern |
+| `ENABLE_VERIFY_RETRY` env flag | Retry pass costs API credits; opt-in keeps default behaviour unchanged |
 
 ## Next Phase Readiness
 
-- **20-07** (final plan in phase 20): All pipeline infrastructure is in place; scraper and pdf_analyzer use identical TakeoffPipeline methods
-- No blockers from this plan
-- The `_page_to_image` fix resolves a latent runtime crash in PDF upload path
+Wave 4 (20-06) is complete. All three analysis paths (PDF, StackCT live, StackCT manifest) share a single multi-pass pipeline with uniform project-type detection. The `QuantityVerifier` provides a generic sanity layer. Phase 21+ can rely on `run_project` as the canonical API for any new ingestion paths.
