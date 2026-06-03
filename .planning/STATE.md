@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — Takeoff Measurement Precision (Plans 20-00 through 20-04 complete)
+**Current focus:** Phase 20 — Takeoff Measurement Precision (Plans 20-00 through 20-05 complete)
 
 ## Current Position
 
 Phase: 20 of 20+ (Takeoff Measurement Precision) — In progress  
-Plan: 5/7 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness + 20-03 prompts + 20-04 content-first profiles)  
-Status: Content-first room mapping live; 27 tests pass, 1 xfail (HM/WD door separation — 20-05)  
-Last activity: 2026-06-03 — Completed 20-04-PLAN.md (content-first room mapping + project type profiles)
+Plan: 6/7 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness + 20-03 prompts + 20-04 content-first profiles + 20-05 linear runs + ITEM_NAME_MAP)  
+Status: 61 tests pass (33 new aggregator tests), 0 xfail; full Masterv2 §C taxonomy mapped  
+Last activity: 2026-06-03 — Completed 20-05-PLAN.md (MEASURE_ADDENDUM + lintel/duct/conduit + ITEM_NAME_MAP)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -171,6 +171,17 @@ None yet.
 | `browser_closed` flag in `finally` prevents double-close after Pass 1 | 17-02 |
 | `phase="capturing"` in progress_callback during Pass 1 | 17-02 |
 
+### 20-05 Decisions
+
+| Decision | Source |
+|----------|--------|
+| MEASURE_ADDENDUM defined as named constant then concatenated to EXTRACTION_PROMPT | 20-05 |
+| lintel_runs[] as dedicated array (not merged into pipe_runs[]) — separate calculator path | 20-05 |
+| duct_lf and conduit_lf use 10% waste (vs 5% for gas/storm) — fittings add more equivalent LF | 20-05 |
+| CMU Paint placed BEFORE CMU Wall in ITEM_NAME_MAP — both match \bcmu\b; first-match wins | 20-05 |
+| Frame-HM placed BEFORE Doors-HM — "HM Door Frame" must not collapse to Doors-HM | 20-05 |
+| Conduit LF / Duct LF placed BEFORE Storm Pipe — prevents PVC conduit matching \bpvc\b storm pattern | 20-05 |
+
 ### 20-04 Decisions
 
 | Decision | Source |
@@ -190,6 +201,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-03 18:50 UTC  
-Stopped at: Completed 20-04-PLAN.md (content-first room mapping + PROJECT_TYPE_PROFILES + gas pipe fix)  
-Resume file: .planning/phases/20-takeoff-measurement-precision/20-05-PLAN.md
+Last session: 2026-06-03 19:05 UTC  
+Stopped at: Completed 20-05-PLAN.md (MEASURE_ADDENDUM + lintel/duct/conduit + full ITEM_NAME_MAP + 33 tests)  
+Resume file: .planning/phases/20-takeoff-measurement-precision/20-06-PLAN.md
