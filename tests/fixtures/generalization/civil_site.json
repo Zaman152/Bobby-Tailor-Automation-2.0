@@ -1,0 +1,26 @@
+{
+  "_source_sheet": "C-1",
+  "sheet_type": "civil_site",
+  "rooms": [],
+  "components": [],
+  "measurements": [],
+  "schedules": [],
+  "pipe_runs": [
+    {
+      "length_lf": 342.5,
+      "diameter_in": 18,
+      "material": "RCP",
+      "raw_text": "342.5 LF 18\" RCP storm sewer"
+    },
+    {
+      "length_lf": 156.0,
+      "diameter_in": 12,
+      "material": "PVC",
+      "raw_text": "156 LF 12\" PVC storm pipe"
+    }
+  ],
+  "civil_structures": [
+    {"type": "catch_basin", "quantity": 12, "id": "BB CI", "specification": "BB CI type"},
+    {"type": "manhole", "quantity": 8, "id": "storm MH", "specification": "48\" dia"}
+  ]
+}

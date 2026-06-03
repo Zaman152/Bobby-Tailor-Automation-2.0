@@ -1,0 +1,9 @@
+{
+  "description": "Retail floor plan with VCT rooms and bollard/door components",
+  "required_item_types": ["flooring", "ceiling_grid", "paint", "drywall", "bollard", "doors"],
+  "min_quantities": {
+    "flooring": 1.0,
+    "bollard": 6.0
+  },
+  "excluded_item_types": []
+}

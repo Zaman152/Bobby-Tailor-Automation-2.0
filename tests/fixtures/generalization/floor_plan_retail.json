@@ -1,0 +1,28 @@
+{
+  "_source_sheet": "A-201",
+  "sheet_type": "floor_plan_retail",
+  "rooms": [
+    {
+      "name": "Sales Floor",
+      "area": 12000,
+      "dimensions": "120' x 100'",
+      "material_notes": "VCT tile flooring per spec 09 65 00",
+      "ceiling": "acoustic tile"
+    },
+    {
+      "name": "Back-of-House",
+      "area": 2400,
+      "dimensions": "40' x 60'",
+      "material_notes": "sealed VCT",
+      "ceiling": "exposed structure"
+    }
+  ],
+  "components": [
+    {"name": "bollard", "quantity": 6, "unit": "EA", "location": "storefront entry"},
+    {"name": "door", "quantity": 4, "unit": "EA", "specification": "exterior HM"}
+  ],
+  "measurements": [],
+  "schedules": [],
+  "pipe_runs": [],
+  "civil_structures": []
+}

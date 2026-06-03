@@ -1,0 +1,9 @@
+{
+  "description": "Civil site plan with storm pipe runs and catch basins",
+  "required_item_types": ["storm_pipe", "catch_basin", "manhole"],
+  "min_quantities": {
+    "storm_pipe": 400.0,
+    "catch_basin": 12.0
+  },
+  "excluded_item_types": ["flooring", "ceiling_grid", "drywall"]
+}

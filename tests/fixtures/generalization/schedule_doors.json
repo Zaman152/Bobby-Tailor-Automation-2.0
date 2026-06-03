@@ -1,0 +1,21 @@
+{
+  "_source_sheet": "A8.1",
+  "sheet_type": "schedule_doors",
+  "rooms": [],
+  "components": [],
+  "measurements": [],
+  "schedules": [
+    {
+      "name": "Door Schedule",
+      "table_purpose": "takeoff_schedule",
+      "use_for_takeoff": true,
+      "rows": [
+        {"MARK": "D-101", "DESCRIPTION": "Hollow Metal Door", "TYPE": "HM", "QUANTITY": "5", "SIZE": "3'0\" x 7'0\""},
+        {"MARK": "D-201", "DESCRIPTION": "Wood Door solid core", "TYPE": "WD", "QUANTITY": "7", "SIZE": "3'0\" x 7'0\""},
+        {"MARK": "F-101", "DESCRIPTION": "HM Door Frame", "TYPE": "HM Frame", "QUANTITY": "12", "SIZE": "3'0\" x 7'0\""}
+      ]
+    }
+  ],
+  "pipe_runs": [],
+  "civil_structures": []
+}

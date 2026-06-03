@@ -1,0 +1,7 @@
+{
+  "description": "Specification reference schedule — produces zero takeoff rows",
+  "required_item_types": [],
+  "min_quantities": {},
+  "excluded_item_types": ["flooring", "storm_pipe", "catch_basin"],
+  "expected_item_count": 0
+}

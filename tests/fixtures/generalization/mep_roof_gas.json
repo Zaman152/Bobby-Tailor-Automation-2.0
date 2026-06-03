@@ -1,0 +1,20 @@
+{
+  "_source_sheet": "A3.0",
+  "sheet_type": "roof_plan",
+  "rooms": [],
+  "components": [
+    {"name": "roof drain", "quantity": 4, "unit": "EA", "specification": "4\" cast iron"},
+    {"name": "RTU", "quantity": 3, "unit": "EA", "specification": "rooftop unit"}
+  ],
+  "measurements": [],
+  "schedules": [],
+  "pipe_runs": [
+    {
+      "length_lf": 886.77,
+      "material": "black steel",
+      "diameter_in": 2,
+      "raw_text": "886.77 LF 2\" black steel gas piping"
+    }
+  ],
+  "civil_structures": []
+}

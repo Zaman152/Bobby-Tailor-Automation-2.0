@@ -1,0 +1,22 @@
+{
+  "_source_sheet": "C-2",
+  "sheet_type": "civil_site",
+  "rooms": [],
+  "components": [],
+  "measurements": [],
+  "schedules": [
+    {
+      "name": "Plastic Flared End Section Schedule",
+      "table_purpose": "specification_reference",
+      "use_for_takeoff": false,
+      "lookup_key": "PIPE SIZE",
+      "rows": [
+        {"PIPE SIZE": "12 in", "PART#": "1210NP", "MATERIAL": "PP", "WEIGHT_LB": "22"},
+        {"PIPE SIZE": "15 in", "PART#": "1510NP", "MATERIAL": "PP", "WEIGHT_LB": "36"},
+        {"PIPE SIZE": "18 in", "PART#": "1810NP", "MATERIAL": "PP", "WEIGHT_LB": "52"}
+      ]
+    }
+  ],
+  "pipe_runs": [],
+  "civil_structures": []
+}

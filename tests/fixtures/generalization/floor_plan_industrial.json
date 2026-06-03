@@ -1,0 +1,24 @@
+{
+  "_source_sheet": "A-101",
+  "sheet_type": "floor_plan_industrial",
+  "rooms": [
+    {
+      "name": "Warehouse Floor",
+      "area": 397556,
+      "dimensions": "630' x 631'",
+      "material_notes": "sealed concrete slab per spec 03 35 00 — NOT flooring finish",
+      "ceiling": "exposed structure"
+    }
+  ],
+  "components": [
+    {"name": "bollard", "quantity": 28, "unit": "EA", "location": "perimeter"},
+    {"name": "stairs", "quantity": 10, "unit": "EA", "specification": "concrete"},
+    {"name": "lift", "quantity": 1, "unit": "EA", "specification": "dock leveler"},
+    {"name": "mobilization", "quantity": 1, "unit": "EA", "specification": "general"},
+    {"name": "ladder", "quantity": null, "unit": "EA", "specification": "H-20' wall ladder — count from detail"}
+  ],
+  "measurements": [],
+  "schedules": [],
+  "pipe_runs": [],
+  "civil_structures": []
+}

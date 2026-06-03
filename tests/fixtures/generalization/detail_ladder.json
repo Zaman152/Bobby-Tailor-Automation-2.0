@@ -1,0 +1,32 @@
+{
+  "_source_sheet": "A8.3",
+  "sheet_type": "detail_sheet",
+  "rooms": [],
+  "components": [
+    {
+      "name": "Ladder-H-24'",
+      "quantity": null,
+      "unit": "EA",
+      "specification": "wall-mounted steel ladder H=24' — count from plan view",
+      "location": "mezzanine access"
+    },
+    {
+      "name": "Ladder-H-20'",
+      "quantity": 1,
+      "unit": "EA",
+      "specification": "wall-mounted steel ladder H=20'",
+      "location": "roof hatch"
+    },
+    {
+      "name": "bollard detail spacing dimension",
+      "quantity": 6,
+      "unit": "FT",
+      "specification": "6'-0\" TYP spacing between bollards — NOT a bollard count",
+      "location": "bollard detail"
+    }
+  ],
+  "measurements": [],
+  "schedules": [],
+  "pipe_runs": [],
+  "civil_structures": []
+}
