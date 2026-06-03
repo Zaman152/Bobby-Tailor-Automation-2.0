@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — Takeoff Measurement Precision (Plans 20-00 through 20-06 complete)
+**Current focus:** Phase 20 — Takeoff Measurement Precision (ALL 8 plans complete — awaiting human verification checkpoint)
 
 ## Current Position
 
-Phase: 20 of 20+ (Takeoff Measurement Precision) — In progress  
-Plan: 7/7 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness + 20-03 prompts + 20-04 content-first profiles + 20-05 linear runs + ITEM_NAME_MAP + 20-06 pipeline wiring + parity tests)  
-Status: 54 tests pass (19 new parity tests); pdf_analyzer + scraper wired to TakeoffPipeline; StackCT == PDF accuracy guaranteed  
-Last activity: 2026-06-04 — Completed 20-06-PLAN.md (TakeoffPipeline.run_project + QuantityVerifier + full pipeline wiring)
+Phase: 20 of 20+ (Takeoff Measurement Precision) — Awaiting human verification  
+Plan: 8/8 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness + 20-03 prompts + 20-04 content-first profiles + 20-05 linear runs + ITEM_NAME_MAP + 20-06 pipeline wiring + 20-07 convergence + UAT)  
+Status: 55/55 generalization tests pass; golden validator logic passes; 20-UAT.md created; README updated  
+Last activity: 2026-06-04 — Completed 20-07-PLAN.md (wave 5 final convergence, sheet_coverage.json, UAT doc)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -211,6 +211,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04 00:20 UTC  
-Stopped at: Completed 20-06-PLAN.md (TakeoffPipeline wiring + QuantityVerifier + parity tests + _page_to_image fix)  
-Resume file: .planning/phases/20-takeoff-measurement-precision/20-07-PLAN.md
+Last session: 2026-06-04 00:14 UTC  
+Stopped at: Completed 20-07-PLAN.md (wave 5 convergence) — awaiting checkpoint:human-verify  
+Resume file: None (checkpoint pause — type "approved" to sign off Phase 20)
