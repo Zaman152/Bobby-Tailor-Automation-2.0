@@ -1,0 +1,11 @@
+item_name,quantity,unit,tolerance_pct,match_mode
+Bollards,28,EA,0,exact_or_within_1
+CMU Wall,2204.33,SF,3,pct
+Columns-H-35',132,EA,0,exact_or_within_1
+Exposed Structure,395673.42,SF,3,pct
+Internal Tilt up walls,108442.66,SF,3,pct
+Ladder-H-20',1,EA,0,exact_or_within_1
+Lift,1,EA,0,exact_or_within_1
+Mobilization,1,EA,0,exact_or_within_1
+Sealed Concrete,395673.42,SF,3,pct
+Stairs,10,EA,0,exact_or_within_1

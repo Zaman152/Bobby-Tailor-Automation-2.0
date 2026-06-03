@@ -1,0 +1,13 @@
+item_name,quantity,unit,tolerance_pct,match_mode
+Bollards,11,EA,0,exact_or_within_1
+Canopy,79.44,SF,3,pct
+CMU Paint,16218.94,SF,3,pct
+Doors-HM,5,EA,0,exact_or_within_1
+Doors-WD,7,EA,0,exact_or_within_1
+EIFS,3053.04,SF,3,pct
+Frame-HM,12,EA,0,exact_or_within_1
+Gas Piping,886.77,LF,3,pct
+Ladder-H-24',1,EA,0,exact_or_within_1
+Lift,1,EA,0,exact_or_within_1
+Lintels,179.24,LF,3,pct
+Mobilization,1,EA,0,exact_or_within_1
