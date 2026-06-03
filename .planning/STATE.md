@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — Takeoff Measurement Precision (ALL 8 plans complete — awaiting human verification checkpoint)
+**Current focus:** Phase 20 — gap closure plan 20-08 complete; 20-09 and 20-10 remain
 
 ## Current Position
 
-Phase: 20 of 20+ (Takeoff Measurement Precision) — Awaiting human verification  
-Plan: 8/8 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness + 20-03 prompts + 20-04 content-first profiles + 20-05 linear runs + ITEM_NAME_MAP + 20-06 pipeline wiring + 20-07 convergence + UAT)  
-Status: 55/55 generalization tests pass; golden validator logic passes; 20-UAT.md created; README updated  
-Last activity: 2026-06-04 — Completed 20-07-PLAN.md (wave 5 final convergence, sheet_coverage.json, UAT doc)
+Phase: 20 of 20 (Takeoff Measurement Precision) — gap closure in progress  
+Plan: 8/8 core complete; gap plan 20-08 complete; 20-09, 20-10 pending  
+Status: 20-08 complete — ACCURACY-20-12 closed; run 20-09 and 20-10 next  
+Last activity: 2026-06-04 — Completed 20-08-PLAN.md (pytest isolation fix)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -211,6 +211,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04 00:14 UTC  
-Stopped at: Completed 20-07-PLAN.md (wave 5 convergence) — awaiting checkpoint:human-verify  
-Resume file: None (checkpoint pause — type "approved" to sign off Phase 20)
+Last session: 2026-06-04 19:58 UTC  
+Stopped at: Completed 20-08-PLAN.md — ACCURACY-20-12 closed, conftest.py pytest isolation fix  
+Resume file: None
