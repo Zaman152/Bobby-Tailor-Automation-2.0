@@ -1,0 +1,51 @@
+{
+  "_note": "Documents golden REGRESSION fixtures only. Product supports all sheet types per PASS_MATRIX.",
+  "supported_sheet_types": [
+    "floor_plan",
+    "elevation",
+    "civil_site",
+    "schedule",
+    "detail",
+    "title_sheet",
+    "roof_plan",
+    "mep_plan"
+  ],
+  "golden_regression_fixtures": {
+    "crow_cass": {
+      "pdf": "tests/fixtures/crow_cass/crow_cass_plans.pdf",
+      "golden_csv": "tests/fixtures/crow_cass/crow_cass_golden.csv",
+      "primary_sheet_types": ["floor_plan", "elevation", "detail"],
+      "items": [
+        {"item": "Bollards",             "qty": 28,        "unit": "EA", "source_sheet_type": "floor_plan"},
+        {"item": "CMU Wall",             "qty": 2204.33,   "unit": "SF", "source_sheet_type": "elevation"},
+        {"item": "Columns-H-35'",        "qty": 132,       "unit": "EA", "source_sheet_type": "floor_plan"},
+        {"item": "Exposed Structure",    "qty": 395673.42, "unit": "SF", "source_sheet_type": "floor_plan"},
+        {"item": "Internal Tilt up walls","qty": 108442.66,"unit": "SF", "source_sheet_type": "elevation"},
+        {"item": "Ladder-H-20'",         "qty": 1,         "unit": "EA", "source_sheet_type": "detail"},
+        {"item": "Lift",                 "qty": 1,         "unit": "EA", "source_sheet_type": "floor_plan"},
+        {"item": "Mobilization",         "qty": 1,         "unit": "EA", "source_sheet_type": "title_sheet"},
+        {"item": "Sealed Concrete",      "qty": 395673.42, "unit": "SF", "source_sheet_type": "floor_plan"},
+        {"item": "Stairs",               "qty": 10,        "unit": "EA", "source_sheet_type": "floor_plan"}
+      ]
+    },
+    "bobs_discount": {
+      "pdf": "tests/fixtures/bobs_discount/bobs_discount_plans.pdf",
+      "golden_csv": "tests/fixtures/bobs_discount/bobs_discount_golden.csv",
+      "primary_sheet_types": ["floor_plan", "elevation", "schedule", "roof_plan", "detail"],
+      "items": [
+        {"item": "Bollards",     "qty": 11,       "unit": "EA", "source_sheet_type": "floor_plan"},
+        {"item": "Canopy",       "qty": 79.44,    "unit": "SF", "source_sheet_type": "elevation"},
+        {"item": "CMU Paint",    "qty": 16218.94, "unit": "SF", "source_sheet_type": "elevation"},
+        {"item": "Doors-HM",     "qty": 5,        "unit": "EA", "source_sheet_type": "schedule"},
+        {"item": "Doors-WD",     "qty": 7,        "unit": "EA", "source_sheet_type": "schedule"},
+        {"item": "EIFS",         "qty": 3053.04,  "unit": "SF", "source_sheet_type": "elevation"},
+        {"item": "Frame-HM",     "qty": 12,       "unit": "EA", "source_sheet_type": "schedule"},
+        {"item": "Gas Piping",   "qty": 886.77,   "unit": "LF", "source_sheet_type": "roof_plan"},
+        {"item": "Ladder-H-24'", "qty": 1,        "unit": "EA", "source_sheet_type": "detail"},
+        {"item": "Lift",         "qty": 1,        "unit": "EA", "source_sheet_type": "floor_plan"},
+        {"item": "Lintels",      "qty": 179.24,   "unit": "LF", "source_sheet_type": "elevation"},
+        {"item": "Mobilization", "qty": 1,        "unit": "EA", "source_sheet_type": "title_sheet"}
+      ]
+    }
+  }
+}
