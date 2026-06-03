@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — gap closure plan 20-08 complete; 20-09 and 20-10 remain
+**Current focus:** Phase 20 — gap closure plans; 20-08 and 20-09 complete, 20-10 remaining
 
 ## Current Position
 
 Phase: 20 of 20 (Takeoff Measurement Precision) — gap closure in progress  
-Plan: 8/8 core complete; gap plan 20-08 complete; 20-09, 20-10 pending  
-Status: 20-08 complete — ACCURACY-20-12 closed; run 20-09 and 20-10 next  
-Last activity: 2026-06-04 — Completed 20-08-PLAN.md (pytest isolation fix)
+Plan: 8/8 core complete; gap plans 20-08 and 20-09 complete; 20-10 pending  
+Status: 20-09 complete — ACCURACY-20-11 closed; ITEM_NAME_MAP at 71 entries; run 20-10 next  
+Last activity: 2026-06-04 — Completed 20-09-PLAN.md (ITEM_NAME_MAP expansion to 71 entries)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -202,6 +202,16 @@ None yet.
 | _detect_project_type uses keyword scoring across sheet_title + notes; ties → mixed_use | 20-04 |
 | Gas pipe detected by material keyword (black steel/gas/csst); default → storm_pipe | 20-04 |
 
+### 20-09 Decisions
+
+| Decision | Source |
+|----------|--------|
+| Sanitary Pipe placed BEFORE Storm Pipe — sanitary.*sewer would otherwise collapse into Storm Pipe | 20-09 |
+| Storefront/Curtain Wall placed AFTER all door patterns — "aluminum storefront door" must resolve to Doors-AL | 20-09 |
+| RTU placed AFTER Air Handling Units — air handler pattern must win for explicit AHU descriptions | 20-09 |
+| Drywall Ceiling placed BEFORE Ceiling Grid — suspended/gyp ceiling is structurally distinct from ACT tile | 20-09 |
+| Dock Doors placed before Frame-HM/Door section — overhead/coiling doors resolve correctly | 20-09 |
+
 ### Blockers/Concerns
 
 - StackCT DOM brittleness (`#canvas-interaction`, `[data-page-id]`, Auth0) — mitigated in Phase 2
@@ -211,6 +221,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04 19:58 UTC  
-Stopped at: Completed 20-08-PLAN.md — ACCURACY-20-12 closed, conftest.py pytest isolation fix  
+Last session: 2026-06-04 19:59 UTC  
+Stopped at: Completed 20-09-PLAN.md — ACCURACY-20-11 closed; ITEM_NAME_MAP at 71 entries; 97 tests pass  
 Resume file: None
