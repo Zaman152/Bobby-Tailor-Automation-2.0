@@ -121,16 +121,11 @@ def test_floor_plan_industrial_null_qty_ladder_dropped():
 
 
 @pytest.mark.generalization
-@pytest.mark.xfail(
-    reason="RC-2: _calculate_from_room applies Flooring to ALL area types. "
-           "Content-first room mapping required (Phase 20-03).",
-    strict=False,
-)
 def test_floor_plan_industrial_no_flooring():
     """Industrial sealed-concrete room should NOT produce Flooring items.
 
-    Currently FAILS because _calculate_from_room hardcodes flooring for all areas.
-    Will pass after 20-03 content-first room mapping is implemented.
+    Fixed by 20-04: content-first room mapping reads material_notes and maps
+    'sealed concrete' → sealed_concrete, skipping the flooring default.
     """
     raw = apply_estimation_tables(_load_fixture("floor_plan_industrial.json"))
     flooring = [it for it in raw if it.get("item_type") == "flooring"]
@@ -267,16 +262,11 @@ def test_mep_roof_gas_produces_pipe_item():
 
 
 @pytest.mark.generalization
-@pytest.mark.xfail(
-    reason="RC-4: _calculate_from_pipe_runs hardcodes item_type='storm_pipe' for ALL runs. "
-           "Gas piping requires MEASURE_ADDENDUM fix (Phase 20-04).",
-    strict=False,
-)
 def test_mep_roof_gas_produces_gas_piping():
     """Gas pipe_run should produce 'Gas Piping' (not 'Storm Pipe') in the takeoff.
 
-    Currently FAILS because _calculate_from_pipe_runs hardcodes storm_pipe.
-    Will pass after RC-4 fix is applied in Phase 20-04.
+    Fixed by 20-04: _detect_pipe_item_type reads material/raw_text and maps
+    'black steel' / 'gas' keyword to gas_pipe; aggregator maps to 'Gas Piping'.
     """
     raw = apply_estimation_tables(_load_fixture("mep_roof_gas.json"))
     aggregated = aggregate_takeoff(raw)
@@ -307,3 +297,57 @@ def test_spec_reference_expected_constraints():
         assert len(raw) == exp["expected_item_count"], (
             f"Expected {exp['expected_item_count']} items, got {len(raw)}"
         )
+
+
+# ─── 8. Content-first overrides — added by 20-04 ────────────────────────────
+
+_INLINE_SEALED_CONCRETE = {
+    "_source_sheet": "T-01",
+    "sheet_type": "floor_plan",
+    "rooms": [
+        {"name": "Slab Area", "area": 10000, "material_notes": "sealed concrete floor per spec"},
+    ],
+    "components": [], "measurements": [], "schedules": [], "pipe_runs": [], "civil_structures": [],
+}
+
+_INLINE_VCT_ON_INDUSTRIAL = {
+    "_source_sheet": "T-02",
+    "sheet_type": "floor_plan",
+    "rooms": [
+        {"name": "Office Corner", "area": 5000, "material_notes": "VCT tile per spec 09 65 00"},
+    ],
+    "components": [], "measurements": [], "schedules": [], "pipe_runs": [], "civil_structures": [],
+}
+
+
+@pytest.mark.generalization
+def test_content_first_sealed_concrete_overrides_default():
+    """Room with 'sealed concrete' note → sealed_concrete, NOT flooring.
+
+    Verifies content-first logic: note parsing through MATERIAL_NOTE_MAP takes
+    priority over the auto-profile universal fallback.
+    """
+    raw = apply_estimation_tables(_INLINE_SEALED_CONCRETE)
+    types = _item_types(raw)
+    assert "sealed_concrete" in types, (
+        f"'sealed concrete' note must produce sealed_concrete item, got: {types}"
+    )
+    assert "flooring" not in types, (
+        f"'sealed concrete' note must not produce flooring item, got: {types}"
+    )
+
+
+@pytest.mark.generalization
+def test_content_first_vct_on_industrial_profile():
+    """Room with VCT note → flooring even when project_type='industrial'.
+
+    Verifies content-first priority: explicit note override beats profile skip_items.
+    """
+    raw = apply_estimation_tables(_INLINE_VCT_ON_INDUSTRIAL, project_type="industrial")
+    types = _item_types(raw)
+    assert "flooring" in types, (
+        f"VCT note must produce flooring even on industrial profile, got: {types}"
+    )
+    assert "sealed_concrete" not in types, (
+        f"VCT note must not produce sealed_concrete on industrial profile, got: {types}"
+    )

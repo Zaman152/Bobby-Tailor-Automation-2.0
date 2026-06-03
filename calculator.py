@@ -539,36 +539,117 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
         return None
 
 
-def _calculate_from_room(room: dict, sheet_name: str) -> List[dict]:
-    """A room can produce multiple takeoff items: flooring, paint, drywall, ceiling."""
-    results = []
+def _room_note_text(room: dict) -> str:
+    """Collect all textual fields from a room dict into a single string for pattern matching."""
+    parts: List[str] = []
+    for key in ("notes", "material_notes", "ceiling", "finish", "spec"):
+        val = room.get(key)
+        if isinstance(val, str):
+            parts.append(val)
+        elif isinstance(val, list):
+            parts.extend(str(v) for v in val if v)
+    materials = room.get("materials")
+    if isinstance(materials, list):
+        parts.extend(str(m) for m in materials if m)
+    elif isinstance(materials, str) and materials:
+        parts.append(materials)
+    return " ".join(parts)
+
+
+def _calculate_from_room(room: dict, sheet_name: str, project_type: str = "auto") -> List[dict]:
+    """Content-first room area calculation.
+
+    Priority chain:
+      1. Room notes/materials parsed through MATERIAL_NOTE_MAP (per category)
+      2. PROJECT_TYPE_PROFILES[project_type] defaults (floor/ceiling/wall)
+      3. Universal fallback for "auto" profile (flooring + ceiling_grid + paint + drywall)
+
+    Profile skip_items are respected at every level.
+    """
+    results: List[dict] = []
     room_name = room.get("name", "unknown")
     area_raw = room.get("area")
     dimensions = room.get("dimensions", "")
 
-    # If area not given but L x W is, compute it
     area = _parse_numeric(str(area_raw)) if area_raw else None
     if not area and dimensions:
         area = _area_from_dimensions(dimensions)
-
     if not area or area == 0:
         return results
 
-    # Default ceiling height for wall area
-    ceiling_ht = 9  # ft
-
-    # Flooring
-    results.append(_room_calc(room_name, "flooring", area, "sq_ft", sheet_name, dimensions or f"area={area_raw}"))
-    # Ceiling
-    results.append(_room_calc(room_name, "ceiling_grid", area, "sq_ft", sheet_name, dimensions or f"area={area_raw}"))
-
-    # For paint and drywall, estimate wall area: assume room is square: perimeter × height
+    ceiling_ht = 9  # ft — default wall height
     perimeter = 4 * (area ** 0.5)
     wall_area = perimeter * ceiling_ht
-    results.append(_room_calc(room_name, "paint", wall_area, "sq_ft", sheet_name,
-                              f"wall area ≈ perimeter ({perimeter:.0f}lf) × {ceiling_ht}ft ceiling"))
-    results.append(_room_calc(room_name, "drywall", wall_area, "sq_ft", sheet_name,
-                              f"wall area ≈ perimeter ({perimeter:.0f}lf) × {ceiling_ht}ft ceiling"))
+    src_area = dimensions or f"area={area_raw}"
+    src_wall = f"wall area ≈ perimeter ({perimeter:.0f}lf) × {ceiling_ht}ft ceiling"
+
+    profile = PROJECT_TYPE_PROFILES.get(project_type, PROJECT_TYPE_PROFILES["auto"])
+    skip = set(profile.get("skip_items", []))
+
+    # --- Step 1: content-first matching via MATERIAL_NOTE_MAP ---
+    note_text = _room_note_text(room)
+
+    _FLOOR_TYPES = {"sealed_concrete", "flooring", "concrete_pavement", "asphalt"}
+    _CEIL_TYPES = {"ceiling_grid", "exposed_structure", "exterior_soffit"}
+    _WALL_TYPES = {"paint", "drywall", "cmu_wall", "cmu_paint", "eifs", "tilt_up_wall", "insulation"}
+
+    content_floor: List[str] = []
+    content_ceil: List[str] = []
+    content_wall: List[str] = []
+
+    # Content matches are NOT filtered by skip_items — explicit drawing content always
+    # overrides the profile (e.g. VCT note on industrial project → flooring, not sealed_concrete).
+    # skip_items only prevents profile *defaults* from being applied when content is silent.
+    for pattern, matched_type in MATERIAL_NOTE_MAP:
+        if re.search(pattern, note_text, re.IGNORECASE):
+            if matched_type in _FLOOR_TYPES and matched_type not in content_floor:
+                content_floor.append(matched_type)
+            elif matched_type in _CEIL_TYPES and matched_type not in content_ceil:
+                content_ceil.append(matched_type)
+            elif matched_type in _WALL_TYPES and matched_type not in content_wall:
+                content_wall.append(matched_type)
+
+    # --- Step 2: produce floor items ---
+    if content_floor:
+        for item_type in content_floor:
+            results.append(_room_calc(room_name, item_type, area, "sq_ft", sheet_name, src_area))
+    else:
+        # Profile defaults, then universal fallback
+        floor_defaults = [i for i in profile.get("default_floor_items", []) if i not in skip]
+        if floor_defaults:
+            for item_type in floor_defaults:
+                results.append(_room_calc(room_name, item_type, area, "sq_ft", sheet_name, src_area))
+        elif "flooring" not in skip:
+            # Universal fallback (auto profile has empty defaults)
+            results.append(_room_calc(room_name, "flooring", area, "sq_ft", sheet_name, src_area))
+
+    # --- Step 3: produce ceiling items ---
+    if content_ceil:
+        for item_type in content_ceil:
+            results.append(_room_calc(room_name, item_type, area, "sq_ft", sheet_name, src_area))
+    else:
+        ceil_defaults = [i for i in profile.get("default_ceiling_items", []) if i not in skip]
+        if ceil_defaults:
+            for item_type in ceil_defaults:
+                results.append(_room_calc(room_name, item_type, area, "sq_ft", sheet_name, src_area))
+        elif "ceiling_grid" not in skip:
+            results.append(_room_calc(room_name, "ceiling_grid", area, "sq_ft", sheet_name, src_area))
+
+    # --- Step 4: produce wall items ---
+    if content_wall:
+        for item_type in content_wall:
+            results.append(_room_calc(room_name, item_type, wall_area, "sq_ft", sheet_name, src_wall))
+    else:
+        wall_defaults = [i for i in profile.get("default_wall_items", []) if i not in skip]
+        if wall_defaults:
+            for item_type in wall_defaults:
+                results.append(_room_calc(room_name, item_type, wall_area, "sq_ft", sheet_name, src_wall))
+        else:
+            # Universal fallback — paint + drywall (unless profile explicitly skips them)
+            if "paint" not in skip:
+                results.append(_room_calc(room_name, "paint", wall_area, "sq_ft", sheet_name, src_wall))
+            if "drywall" not in skip:
+                results.append(_room_calc(room_name, "drywall", wall_area, "sq_ft", sheet_name, src_wall))
 
     return [r for r in results if r]
 
@@ -582,8 +663,26 @@ def _schedule_is_takeoff(sched: dict) -> bool:
     return True
 
 
+def _detect_pipe_item_type(run: dict) -> str:
+    """Classify a pipe run as gas_pipe, trench_drain, or storm_pipe from material/raw_text."""
+    material = (run.get("material") or "").lower()
+    raw_text = (run.get("raw_text") or "").lower()
+    pipe_type = (run.get("type") or "").lower()
+    combined = f"{material} {raw_text} {pipe_type}"
+    if re.search(r"gas\b|gas\s*pip|black\s*steel|csst|yellow\s*pe|gas\s*line", combined):
+        return "gas_pipe"
+    if re.search(r"trench.*drain|channel.*drain|slot.*drain|linear.*drain", combined):
+        return "trench_drain"
+    return "storm_pipe"
+
+
 def _calculate_from_pipe_runs(pipe_runs: list, sheet_name: str) -> List[dict]:
     results = []
+    _TYPE_LABEL = {
+        "gas_pipe": "gas piping",
+        "trench_drain": "trench drain",
+        "storm_pipe": "storm pipe",
+    }
     for run in pipe_runs:
         if not isinstance(run, dict):
             continue
@@ -598,8 +697,9 @@ def _calculate_from_pipe_runs(pipe_runs: list, sheet_name: str) -> List[dict]:
             continue
         diam = run.get("diameter_in", "")
         material = run.get("material", "")
-        desc = f'{diam}" {material} storm pipe'.strip() if diam else "Storm pipe run"
-        item_type = "storm_pipe"
+        item_type = _detect_pipe_item_type(run)
+        label = _TYPE_LABEL.get(item_type, "pipe run")
+        desc = f'{diam}" {material} {label}'.strip() if diam else f"{label.title()} run"
         calc_qty, calc_unit, formula = _apply_formula(item_type, lf, "lf", str(lf))
         table = ESTIMATION_TABLES.get(item_type, {})
         results.append({
@@ -786,7 +886,7 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
         sheets = math.ceil(value * wf / sheet)
         return sheets, "sheets", f"ceil({value:.0f} × {wf} / {sheet}sf/sheet) = {sheets} sheets"
 
-    if item_type == "paint":
+    if item_type in ("paint", "cmu_paint"):
         cov = table["coverage_per_gallon"]
         coats = table["coats"]
         gallons = math.ceil(value * coats / cov)
@@ -819,14 +919,17 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
         wf = table["waste_factor"]
         return value * wf, "sq_ft", f"{value:.0f} sf × {wf} waste"
 
-    if item_type in ("storm_pipe", "trench_drain", "guard_rail", "hand_rail", "striping"):
+    if item_type in ("storm_pipe", "trench_drain", "guard_rail", "hand_rail", "striping",
+                      "gas_pipe", "lintel"):
         wf = table.get("waste_factor", 1.0)
         return value * wf, "lf", f"{value:.0f} lf × {wf} = {value * wf:.0f} lf"
 
     if item_type in ("catch_basin", "manhole", "headwall", "bollard"):
         return value, "ea", "count"
 
-    if item_type in ("concrete_pavement", "asphalt", "tilt_up_wall", "exposed_structure", "exterior_soffit"):
+    if item_type in ("concrete_pavement", "asphalt", "tilt_up_wall", "exposed_structure",
+                      "exterior_soffit", "sealed_concrete", "cmu_wall", "internal_tilt_up_wall",
+                      "canopy", "eifs"):
         wf = table.get("waste_factor", 1.0)
         return value * wf, "sq_ft", f"{value:.0f} sf × {wf} = {value * wf:.0f} sf"
 
@@ -989,3 +1092,58 @@ def _is_substring_match(needle: str, haystack: str) -> bool:
     before = haystack[idx - 1] if idx > 0 else " "
     after = haystack[idx + len(needle)] if idx + len(needle) < len(haystack) else " "
     return before.isalnum() or after.isalnum()
+
+
+def _detect_project_type(all_pages: List[dict]) -> str:
+    """Heuristic: infer building type from sheet titles and notes across all pages.
+
+    Uses keyword scoring per project category (RESEARCH §11.4 table).
+    Returns the winning type key, or "auto" when no category scores above zero.
+    """
+    _KEYWORD_SCORES: Dict[str, List[str]] = {
+        "industrial": [
+            "warehouse", "distribution", "industrial", "manufacturing",
+            "tilt-up", "tilt up", "sealed concrete", "dock door",
+        ],
+        "retail": [
+            "retail", "store", "showroom", "merchandise", "sales floor",
+            "storefront", "tenant", "shopping",
+        ],
+        "office": [
+            "office", "tenant improvement", r"\bti\b", "corporate",
+            "suites", "open plan",
+        ],
+        "civil": [
+            "site plan", "grading", "utility plan", "civil",
+            "storm sewer", "paving plan", "grading plan",
+        ],
+        "residential": [
+            "residence", "dwelling", "single family", "unit plan",
+            "townhouse", "apartment",
+        ],
+        "institutional": [
+            "school", "hospital", "clinic", "government",
+            "civic", "university", "library",
+        ],
+    }
+
+    scores: Dict[str, int] = {k: 0 for k in _KEYWORD_SCORES}
+    for page in all_pages:
+        title = (page.get("sheet_title") or page.get("_source_sheet") or "").lower()
+        notes = (page.get("notes") or "").lower()
+        sheet_type = (page.get("sheet_type") or "").lower()
+        combined = f"{title} {notes} {sheet_type}"
+        for ptype, keywords in _KEYWORD_SCORES.items():
+            for kw in keywords:
+                if re.search(kw, combined, re.IGNORECASE):
+                    scores[ptype] += 1
+
+    best_score = max(scores.values())
+    if best_score == 0:
+        return "auto"
+
+    winners = [k for k, v in scores.items() if v == best_score]
+    # Multiple categories tied → mixed_use
+    if len(winners) > 1:
+        return "mixed_use"
+    return winners[0]
