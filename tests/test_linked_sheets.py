@@ -316,7 +316,7 @@ class TestIntegrationLinkedSheets:
                     new=AsyncMock(return_value=(True, None)),
                 ),
                 patch(
-                    "scraper.analyze_drawing",
+                    "scraper._pipeline.run_sheet",
                     return_value={
                         "measurements": [],
                         "components": [],
@@ -327,7 +327,7 @@ class TestIntegrationLinkedSheets:
                 patch("scraper.AUTO_INCLUDE_LINKED_SHEETS", True),
                 patch("scraper.MAX_LINKED_SHEETS", 10),
             ):
-                new_extracted, new_estimates, linked_meta = asyncio.run(
+                new_extracted, linked_meta = asyncio.run(
                     _discover_and_add_linked_sheets(
                         browser=browser,
                         project_id=99,
@@ -391,14 +391,14 @@ class TestIntegrationLinkedSheets:
                     new=AsyncMock(return_value=(True, None)),
                 ),
                 patch(
-                    "scraper.analyze_drawing",
+                    "scraper._pipeline.run_sheet",
                     return_value={"measurements": [], "components": []},
                 ),
                 patch("scraper.apply_estimation_tables", return_value=[]),
                 patch("scraper.AUTO_INCLUDE_LINKED_SHEETS", True),
                 patch("scraper.MAX_LINKED_SHEETS", 1),
             ):
-                new_extracted, new_estimates, linked_meta = asyncio.run(
+                new_extracted, linked_meta = asyncio.run(
                     _discover_and_add_linked_sheets(
                         browser=browser,
                         project_id=99,
@@ -450,7 +450,7 @@ class TestIntegrationLinkedSheets:
                 patch("scraper.AUTO_INCLUDE_LINKED_SHEETS", False),
                 patch("scraper.MAX_LINKED_SHEETS", 10),
             ):
-                new_extracted, new_estimates, linked_meta = asyncio.run(
+                new_extracted, linked_meta = asyncio.run(
                     _discover_and_add_linked_sheets(
                         browser=browser,
                         project_id=99,
@@ -488,7 +488,7 @@ class TestIntegrationLinkedSheets:
             mpath = tmppath / "manifest.json"
 
             with patch("scraper.stackct_store.get_plans", return_value=[]):
-                new_extracted, new_estimates, linked_meta = asyncio.run(
+                new_extracted, linked_meta = asyncio.run(
                     _discover_and_add_linked_sheets(
                         browser=browser,
                         project_id=99,
@@ -506,5 +506,4 @@ class TestIntegrationLinkedSheets:
                 )
 
         assert new_extracted == []
-        assert new_estimates == []
         assert linked_meta == []

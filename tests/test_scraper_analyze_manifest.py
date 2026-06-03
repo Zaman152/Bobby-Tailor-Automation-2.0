@@ -88,7 +88,7 @@ def _make_manifest(
 def _common_patches():
     """Return context managers patching all external calls."""
     return [
-        patch("scraper.analyze_drawing", side_effect=_fake_analyze),
+        patch("scraper._pipeline.run_sheet", side_effect=_fake_analyze),
         patch("scraper.apply_estimation_tables", return_value=[]),
         patch("scraper.resolve_cross_references", return_value={}),
         patch("scraper.resolve_spec_lookups", return_value=[]),
@@ -124,7 +124,7 @@ class TestRunAnalyzeFromManifest:
         screenshots_dir, _ = _make_manifest(tmp_path, [{"page_id": 10}])
         mock_browser_cls = MagicMock()
         with patch("scraper.StackCTBrowser", mock_browser_cls), \
-             patch("scraper.analyze_drawing", side_effect=_fake_analyze), \
+             patch("scraper._pipeline.run_sheet", side_effect=_fake_analyze), \
              patch("scraper.apply_estimation_tables", return_value=[]), \
              patch("scraper.resolve_cross_references", return_value={}), \
              patch("scraper.resolve_spec_lookups", return_value=[]), \
@@ -181,7 +181,7 @@ class TestSkipAlreadyAnalyzed:
             return _fake_analyze(image_path, sheet_name)
 
         patches = _common_patches()
-        with patch("scraper.analyze_drawing", side_effect=counting_analyze), \
+        with patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
             from scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
@@ -201,7 +201,7 @@ class TestSkipAlreadyAnalyzed:
             return _fake_analyze(image_path, sheet_name)
 
         patches = _common_patches()
-        with patch("scraper.analyze_drawing", side_effect=counting_analyze), \
+        with patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
             from scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
@@ -223,7 +223,7 @@ class TestSkipAlreadyAnalyzed:
             return _fake_analyze(image_path, sheet_name)
 
         patches = _common_patches()
-        with patch("scraper.analyze_drawing", side_effect=counting_analyze), \
+        with patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
             from scraper import run_analyze_from_manifest
             asyncio.run(
@@ -244,7 +244,7 @@ class TestSkipAlreadyAnalyzed:
             return _fake_analyze(image_path, sheet_name)
 
         patches = _common_patches()
-        with patch("scraper.analyze_drawing", side_effect=counting_analyze), \
+        with patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
             from scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
@@ -263,7 +263,7 @@ class TestSkipAlreadyAnalyzed:
             return _fake_analyze(image_path, sheet_name)
 
         patches = _common_patches()
-        with patch("scraper.analyze_drawing", side_effect=counting_analyze), \
+        with patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
             from scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
@@ -296,7 +296,7 @@ class TestAnalysisCache:
         cache_file = screenshots_dir / "42_analysis.json"
 
         patches = _common_patches()
-        with patch("scraper.analyze_drawing", return_value={"error": "bad_response"}), \
+        with patch("scraper._pipeline.run_sheet", return_value={"error": "bad_response"}), \
              patches[1], patches[2], patches[3], \
              patch("scraper.generate_report", return_value={"sheets_processed": 0,
                                                             "total_line_items": 0,

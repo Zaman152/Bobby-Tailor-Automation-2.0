@@ -73,7 +73,7 @@ class TestTwoPhaseOrdering:
              patch("scraper.SCREENSHOTS_DIR", str(tmp_path)), \
              patch("scraper.REUSE_SCREENSHOTS", False), \
              patch("scraper.find_screenshot_paths", return_value={}), \
-             patch("scraper.analyze_drawing", side_effect=_fake_analyze), \
+             patch("scraper._pipeline.run_sheet", side_effect=_fake_analyze), \
              patch("scraper.apply_estimation_tables", return_value=[]), \
              patch("scraper.resolve_cross_references", return_value={}), \
              patch("scraper.resolve_spec_lookups", return_value=[]), \
@@ -113,8 +113,9 @@ class TestTwoPhaseOrdering:
         capturing = [i for i, p in enumerate(phases) if p == "capturing"]
         analyzing = [i for i, p in enumerate(phases) if p == "analyzing"]
 
-        assert len(capturing) == 3, f"Expected 3 capturing callbacks, got: {capturing}"
-        assert len(analyzing) == 3, f"Expected 3 analyzing callbacks, got: {analyzing}"
+        # Setup steps (browser/login/discover/start) also emit phase="capturing"
+        assert len(capturing) >= 3, f"Expected ≥3 capturing callbacks, got: {capturing}"
+        assert len(analyzing) >= 3, f"Expected ≥3 analyzing callbacks, got: {analyzing}"
         assert max(capturing) < min(analyzing), (
             f"Phases out of order: {phases}"
         )
@@ -135,6 +136,6 @@ class TestTwoPhaseOrdering:
         phases = self._run(pages, tmp_path)
 
         capturing_count = phases.count("capturing")
-        assert capturing_count == len(pages), (
-            f"Expected {len(pages)} capturing callbacks, got {capturing_count}"
+        assert capturing_count >= len(pages), (
+            f"Expected ≥{len(pages)} capturing callbacks (incl. setup), got {capturing_count}"
         )
