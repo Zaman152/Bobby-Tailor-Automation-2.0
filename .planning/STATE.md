@@ -11,9 +11,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 20 of 20+ (Takeoff Measurement Precision) — In progress  
-Plan: 2/7 complete (20-00 pipeline skeleton + 20-01 title-block fix done)  
-Status: TakeoffPipeline + PASS_MATRIX skeleton shipped; title-block sheet ID fix shipped; 89 tests pass  
-Last activity: 2026-06-03 — `gsd-execute-phase 20-00`
+Plan: 3/7 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness)  
+Status: GoldenValidator + generalization test harness live; 20 tests pass (17 pass, 3 xfail)  
+Last activity: 2026-06-03 — Completed 20-02-PLAN.md (accuracy test harness)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
