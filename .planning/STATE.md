@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — Takeoff Measurement Precision (Plans 20-00 through 20-05 complete)
+**Current focus:** Phase 20 — Takeoff Measurement Precision (Plans 20-00 through 20-06 complete)
 
 ## Current Position
 
 Phase: 20 of 20+ (Takeoff Measurement Precision) — In progress  
-Plan: 6/7 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness + 20-03 prompts + 20-04 content-first profiles + 20-05 linear runs + ITEM_NAME_MAP)  
-Status: 61 tests pass (33 new aggregator tests), 0 xfail; full Masterv2 §C taxonomy mapped  
-Last activity: 2026-06-03 — Completed 20-05-PLAN.md (MEASURE_ADDENDUM + lintel/duct/conduit + ITEM_NAME_MAP)
+Plan: 7/7 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness + 20-03 prompts + 20-04 content-first profiles + 20-05 linear runs + ITEM_NAME_MAP + 20-06 pipeline wiring + parity tests)  
+Status: 54 tests pass (19 new parity tests); pdf_analyzer + scraper wired to TakeoffPipeline; StackCT == PDF accuracy guaranteed  
+Last activity: 2026-06-04 — Completed 20-06-PLAN.md (TakeoffPipeline.run_project + QuantityVerifier + full pipeline wiring)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -171,6 +171,16 @@ None yet.
 | `browser_closed` flag in `finally` prevents double-close after Pass 1 | 17-02 |
 | `phase="capturing"` in progress_callback during Pass 1 | 17-02 |
 
+### 20-06 Decisions
+
+| Decision | Source |
+|----------|--------|
+| pdf_analyzer defers to TakeoffPipeline.run_project — no inline analyze_drawing loop | 20-06 |
+| _page_to_image defined in pdf_analyzer (2× Matrix scaling) — was missing (bug fix) | 20-06 |
+| scraper uses module-level _pipeline singleton (TakeoffPipeline()) for run_sheet calls | 20-06 |
+| _detect_project_type called once after all sheets in both paths (uniform project_type) | 20-06 |
+| Parity test uses source-level assertions + TakeoffPipeline injection (no real API calls) | 20-06 |
+
 ### 20-05 Decisions
 
 | Decision | Source |
@@ -201,6 +211,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-03 19:05 UTC  
-Stopped at: Completed 20-05-PLAN.md (MEASURE_ADDENDUM + lintel/duct/conduit + full ITEM_NAME_MAP + 33 tests)  
-Resume file: .planning/phases/20-takeoff-measurement-precision/20-06-PLAN.md
+Last session: 2026-06-04 00:20 UTC  
+Stopped at: Completed 20-06-PLAN.md (TakeoffPipeline wiring + QuantityVerifier + parity tests + _page_to_image fix)  
+Resume file: .planning/phases/20-takeoff-measurement-precision/20-07-PLAN.md
