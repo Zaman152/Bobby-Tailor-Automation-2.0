@@ -718,6 +718,11 @@ def _calculate_from_pipe_runs(pipe_runs: list, sheet_name: str) -> List[dict]:
     _TYPE_LABEL = {
         "gas_pipe": "gas piping",
         "trench_drain": "trench drain",
+        "guard_rail": "guard rail",
+        "hand_rail": "hand rail",
+        "striping": "striping",
+        "duct_lf": "duct",
+        "conduit_lf": "conduit",
         "storm_pipe": "storm pipe",
     }
     for run in pipe_runs:

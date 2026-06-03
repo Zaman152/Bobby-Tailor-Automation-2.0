@@ -201,16 +201,12 @@ def test_schedule_doors_produces_door_items():
 
 
 @pytest.mark.generalization
-@pytest.mark.xfail(
-    reason="ITEM_NAME_MAP maps all door types to 'Doors'. "
-           "HM/WD separation requires extended aggregator mapping (Phase 20-03).",
-    strict=False,
-)
 def test_schedule_doors_hm_wd_separate():
     """Door schedule should produce Doors-HM / Doors-WD as separate line items.
 
-    Currently FAILS: all door rows aggregate to 'Doors'. Will pass after
-    ITEM_NAME_MAP is extended with HM/WD patterns (Phase 20-03).
+    Fixed by 20-05: ITEM_NAME_MAP now has specific HM/WD patterns before the
+    generic door catch-all. Schedule rows with TYPE=HM / TYPE=WD aggregate
+    to separate canonical names.
     """
     raw = apply_estimation_tables(_load_fixture("schedule_doors.json"))
     aggregated = aggregate_takeoff(raw)
@@ -351,3 +347,265 @@ def test_content_first_vct_on_industrial_profile():
     assert "sealed_concrete" not in types, (
         f"VCT note must not produce sealed_concrete on industrial profile, got: {types}"
     )
+
+
+# ─── 9. Aggregator ITEM_NAME_MAP — Civil / Site labels ───────────────────────
+
+def _agg(description: str, item_type: str = "general", unit: str = "ea") -> str:
+    """Helper: run normalize_item_name and return canonical name."""
+    from aggregator import normalize_item_name
+    name, _ = normalize_item_name(description, item_type, unit)
+    return name
+
+
+@pytest.mark.generalization
+def test_aggregator_bollard_canonical():
+    assert _agg("Steel pipe bollard at parking entry") == "Bollards"
+
+
+@pytest.mark.generalization
+def test_aggregator_catch_basin_canonical():
+    assert _agg("BB CI#4 catch basin 24\" diameter") == "Catch Basins"
+    assert _agg("Drop inlet DI-3") == "Catch Basins"
+
+
+@pytest.mark.generalization
+def test_aggregator_manhole_canonical():
+    assert _agg("Sanitary manhole MH-7") == "Manholes"
+    assert _agg("Access structure MH") == "Manholes"
+
+
+@pytest.mark.generalization
+def test_aggregator_headwall_canonical():
+    assert _agg("24\" flared end section FES-1") == "Headwall"
+
+
+@pytest.mark.generalization
+def test_aggregator_trench_drain_canonical():
+    assert _agg("120 LF trench drain at loading dock") == "Trench Drain"
+    assert _agg("Channel drain along drive aisle") == "Trench Drain"
+
+
+@pytest.mark.generalization
+def test_aggregator_gas_piping_canonical():
+    assert _agg("Black steel pipe gas main") == "Gas Piping"
+    assert _agg("CSST gas line to rooftop units") == "Gas Piping"
+    assert _agg("Gas pipe 2\" black steel") == "Gas Piping"
+
+
+@pytest.mark.generalization
+def test_aggregator_storm_pipe_canonical():
+    # normalize_item_name appends pipe size via _extract_spec_for_name when diameter is present
+    name_12 = _agg("342.5 LF 12\" PVC storm sewer pipe")
+    assert name_12.startswith("Storm Pipe"), f"Expected 'Storm Pipe*', got {name_12!r}"
+    name_hdpe = _agg("HDPE pipe run 8 in")
+    assert name_hdpe.startswith("Storm Pipe"), f"Expected 'Storm Pipe*', got {name_hdpe!r}"
+    assert _agg("RCP storm pipe") == "Storm Pipe"
+
+
+@pytest.mark.generalization
+def test_aggregator_guard_rail_canonical():
+    assert _agg("W-beam guardrail along property line") == "Guard Rail"
+    assert _agg("Guard rail at truck dock") == "Guard Rail"
+
+
+@pytest.mark.generalization
+def test_aggregator_striping_canonical():
+    assert _agg("Pavement marking - double yellow stripe") == "Striping"
+    assert _agg("Lane marking 4\" white stripe") == "Striping"
+
+
+@pytest.mark.generalization
+def test_aggregator_asphalt_canonical():
+    assert _agg("Asphalt pavement HMA 4\" base") == "Asphalt"
+
+
+@pytest.mark.generalization
+def test_aggregator_concrete_pavement_canonical():
+    assert _agg("Concrete sidewalk flatwork 4\" thick") == "Concrete Pavement"
+    assert _agg("PCC concrete pavement approach") == "Concrete Pavement"
+    assert _agg("Concrete drive approach PCC") == "Concrete Pavement"
+
+
+# ─── 10. Aggregator ITEM_NAME_MAP — Structural labels ────────────────────────
+
+@pytest.mark.generalization
+def test_aggregator_sealed_concrete_canonical():
+    assert _agg("Sealed concrete floor 395,000 SF") == "Sealed Concrete"
+    assert _agg("Polished concrete slab-on-grade") == "Sealed Concrete"
+
+
+@pytest.mark.generalization
+def test_aggregator_exposed_structure_canonical():
+    assert _agg("Exposed structure open web joist") == "Exposed Structure"
+    assert _agg("Exposed deck above") == "Exposed Structure"
+
+
+@pytest.mark.generalization
+def test_aggregator_tilt_up_walls_canonical():
+    assert _agg("Exterior Tilt up wall panel") == "Exterior Tilt Up Wall"
+    assert _agg("Interior tilt up wall") == "Interior Tilt Up Walls"
+    assert _agg("Internal tilt-up panel") == "Interior Tilt Up Walls"
+
+
+@pytest.mark.generalization
+def test_aggregator_cmu_wall_canonical():
+    assert _agg("CMU block wall 8\" masonry") == "CMU Wall"
+    assert _agg("Masonry wall 12\" CMU") == "CMU Wall"
+
+
+@pytest.mark.generalization
+def test_aggregator_lintel_canonical():
+    assert _agg("Lintel L-4 6x4x5/16 A36") == "Lintels"
+    assert _agg("Steel lintel above storefront") == "Lintels"
+
+
+# ─── 11. Aggregator ITEM_NAME_MAP — Architectural labels ─────────────────────
+
+@pytest.mark.generalization
+def test_aggregator_canopy_canonical():
+    assert _agg("Metal entrance canopy 24x12 SF") == "Canopy"
+
+
+@pytest.mark.generalization
+def test_aggregator_eifs_canonical():
+    assert _agg("EIFS exterior finish system") == "EIFS"
+    assert _agg("Dryvit exterior insulation finish") == "EIFS"
+
+
+@pytest.mark.generalization
+def test_aggregator_cmu_paint_canonical():
+    assert _agg("CMU paint epoxy block coat") == "CMU Paint"
+    assert _agg("Masonry paint exterior CMU") == "CMU Paint"
+
+
+@pytest.mark.generalization
+def test_aggregator_door_hm_canonical():
+    """Hollow metal door description resolves to Doors-HM, not generic Doors."""
+    assert _agg("Hollow Metal Door 3x7 at entry") == "Doors-HM"
+    assert _agg("HM door D-101") == "Doors-HM"
+
+
+@pytest.mark.generalization
+def test_aggregator_door_wd_canonical():
+    """Wood door description resolves to Doors-WD, not generic Doors."""
+    assert _agg("Wood door solid core 3x7") == "Doors-WD"
+
+
+@pytest.mark.generalization
+def test_aggregator_door_al_canonical():
+    """Aluminum door resolves to Doors-AL."""
+    assert _agg("Aluminum storefront door") == "Doors-AL"
+
+
+@pytest.mark.generalization
+def test_aggregator_frame_hm_canonical():
+    """Hollow metal frame row resolves to Frame-HM."""
+    assert _agg("HM Door Frame 3x7") == "Frame-HM"
+    assert _agg("Hollow metal frame F-101") == "Frame-HM"
+
+
+@pytest.mark.generalization
+def test_aggregator_ladder_canonical():
+    assert _agg("Ladder H-20 to roof hatch") == "Ladder"
+
+
+@pytest.mark.generalization
+def test_aggregator_lift_canonical():
+    assert _agg("Personnel lift at mezzanine") == "Lift"
+    assert _agg("Elevator in core") == "Lift"
+
+
+# ─── 12. Aggregator ITEM_NAME_MAP — MEP labels ───────────────────────────────
+
+@pytest.mark.generalization
+def test_aggregator_fan_coil_canonical():
+    assert _agg("Fan coil unit FCU-3 at offices") == "Fan Coil Units"
+
+
+@pytest.mark.generalization
+def test_aggregator_ahu_canonical():
+    assert _agg("Air handling unit AHU-1 rooftop") == "Air Handling Units"
+
+
+@pytest.mark.generalization
+def test_aggregator_exhaust_fan_canonical():
+    assert _agg("Exhaust fan EF-2 toilet rooms") == "Exhaust Fans"
+
+
+@pytest.mark.generalization
+def test_aggregator_duct_lf_canonical():
+    assert _agg("Ductwork rectangular duct main trunk") == "Duct LF"
+    assert _agg("Spiral duct 10\" diameter run") == "Duct LF"
+
+
+@pytest.mark.generalization
+def test_aggregator_conduit_lf_canonical():
+    assert _agg("EMT conduit 1\" home runs") == "Conduit LF"
+    assert _agg("Conduit underground 2\" PVC") == "Conduit LF"
+    assert _agg("Cable tray 24\" wide") == "Conduit LF"
+
+
+# ─── 13. Aggregator — schedule to canonical name integration ─────────────────
+
+@pytest.mark.generalization
+def test_aggregator_door_schedule_hm_wd_via_full_pipeline():
+    """Full pipeline: schedule_doors fixture → aggregate → HM and WD separate items.
+
+    This test replaces the xfail from 20-02 now that ITEM_NAME_MAP has HM/WD
+    separation patterns (Phase 20-05).
+    """
+    raw = apply_estimation_tables(_load_fixture("schedule_doors.json"))
+    aggregated = aggregate_takeoff(raw)
+    names = {row["item"] for row in aggregated}
+    assert "Doors-HM" in names, f"Expected 'Doors-HM' in {names}"
+    assert "Doors-WD" in names, f"Expected 'Doors-WD' in {names}"
+
+
+@pytest.mark.generalization
+def test_aggregator_lintel_run_canonical():
+    """lintel_runs fixture produces 'Lintels' canonical name."""
+    data = {
+        "_source_sheet": "A4.0",
+        "sheet_type": "elevation",
+        "measurements": [], "components": [], "rooms": [],
+        "schedules": [], "pipe_runs": [], "civil_structures": [],
+        "lintel_runs": [
+            {"mark": "L-4", "size": "6×4×5/16 A36",
+             "individual_length_ft": 6.0, "count": 12,
+             "total_lf": 72.0, "raw_text": "L-4 @ 6'-0\" ea"},
+        ],
+    }
+    raw = apply_estimation_tables(data)
+    assert any(it.get("item_type") == "lintel" for it in raw), (
+        "lintel_runs must produce lintel item_type"
+    )
+    aggregated = aggregate_takeoff(raw)
+    names = {row["item"] for row in aggregated}
+    assert "Lintels" in names, f"Expected 'Lintels' canonical name, got: {names}"
+    qty = next(r["quantity"] for r in aggregated if r["item"] == "Lintels")
+    assert abs(qty - 72.0 * 1.05) < 0.1, f"Expected 75.6 LF (72 × 1.05 waste), got {qty}"
+
+
+@pytest.mark.generalization
+def test_aggregator_duct_lf_pipe_run_canonical():
+    """pipe_run with duct material → 'Duct LF' canonical name."""
+    data = {
+        "_source_sheet": "M2.0",
+        "sheet_type": "mep_plan",
+        "measurements": [], "components": [], "rooms": [],
+        "schedules": [], "civil_structures": [], "lintel_runs": [],
+        "pipe_runs": [
+            {"length_lf": 200.0, "diameter_in": 12, "material": "rectangular duct",
+             "raw_text": "200 LF 24x12 rect duct main trunk"},
+        ],
+    }
+    raw = apply_estimation_tables(data)
+    assert any(it.get("item_type") == "duct_lf" for it in raw), (
+        "Duct pipe_run must produce duct_lf item_type"
+    )
+    aggregated = aggregate_takeoff(raw)
+    names = {row["item"] for row in aggregated}
+    # The description will be '12" rectangular duct duct'; normalize_item_name
+    # matches \bduct\b and returns "Duct LF"
+    assert "Duct LF" in names, f"Expected 'Duct LF' canonical name, got: {names}"

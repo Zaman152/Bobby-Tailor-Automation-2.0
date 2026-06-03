@@ -9,41 +9,72 @@ from typing import Dict, List
 logger = logging.getLogger(__name__)
 
 ITEM_NAME_MAP = [
+    # ── Civil / Site ──────────────────────────────────────────────────────────
     (r"bollard", "Bollards", "EA"),
-    (r"column.*h.*\d+", "Columns", "EA"),
+    (r"catch basin|bb ci|drop inlet|curb inlet|storm inlet", "Catch Basins", "EA"),
+    (r"manhole|\bmh\b|access structure", "Manholes", "EA"),
+    (r"headwall|flared end|end section|\bfes\b|wingwall", "Headwall", "EA"),
+    (r"trench drain|channel drain|slot drain|linear drain", "Trench Drain", "LF"),
+    (r"gas.*pip|gas\s*pipe|black\s*steel.*pip|csst.*pip|gas\s*line", "Gas Piping", "LF"),
+    # Conduit/duct before storm pipe to prevent PVC conduit matching \bpvc\b
+    (r"\bconduit\b|\bemt\b|wireway|cable.*tray|raceway\b", "Conduit LF", "LF"),
+    (r"duct.*lf|ductwork|\bduct\b(?!.*liner)", "Duct LF", "LF"),
+    # Storm pipe — match PVC/HDPE/RCP only in piping context; conduit must be excluded above
+    (r"pvc.*pipe|pvc.*sch|pvc.*sewer|\bhdpe\b|\brcp\b|\bdip\b|storm pipe|storm sewer|culvert|sanitary sewer", "Storm Pipe", "LF"),
+    (r"guard.*rail|guardrail|barrier.*rail|w.?beam", "Guard Rail", "LF"),
+    (r"hand.*rail|handrail|stair.*rail|pipe.*rail", "Hand Rail", "LF"),
+    (r"strip|pavement.*mark|lane.*mark", "Striping", "LF"),
+    (r"curb.*gutter|curb.*and.*gutter|\bcurb\b", "Curb & Gutter", "LF"),
+    (r"\basphalt\b|\bhma\b|blacktop", "Asphalt", "SF"),
+    # Concrete pavement — match common abbreviations and context phrases
+    (r"concrete.*pavement|\bpcc\b|\bflatwork\b|concrete.*drive|concrete.*walk|concrete.*sidewalk", "Concrete Pavement", "SF"),
     (r"dumpster.*enclos", "Dumpster Enclosure", "EA"),
-    (r"guard.*rail", "Guard Rail", "LF"),
-    (r"hand.*rail", "Hand Rail", "LF"),
+
+    # ── Structure ─────────────────────────────────────────────────────────────
+    (r"column.*h.*\d+", "Columns", "EA"),
+    (r"\bcolumn\b(?!.*h.*\d)", "Columns", "EA"),
+    (r"sealed.*concrete|polished.*concrete|slab.on.grade|\bsog\b|concrete.*floor", "Sealed Concrete", "SF"),
+    (r"exposed.*struct|exposed.*deck|open.*web.*joist|bar.*joist", "Exposed Structure", "SF"),
+    (r"exterior.*soffit|canopy.*soffit", "Exterior Soffit", "SF"),
+    # Tilt-up: interior variants before exterior catch-all
+    (r"internal.*tilt|interior.*tilt|int.*tilt.*up", "Interior Tilt Up Walls", "SF"),
+    (r"tilt.*up.*wall|tiltup.*wall|precast.*panel|ext.*tilt", "Exterior Tilt Up Wall", "SF"),
+    # CMU paint BEFORE CMU Wall (both match \bcmu\b; paint is more specific)
+    (r"cmu.*paint|block.*paint|masonry.*paint|epoxy.*block", "CMU Paint", "gallons"),
+    (r"\bcmu\b|masonry.*wall|block.*wall|concrete.*masonry", "CMU Wall", "SF"),
+    (r"\blintel\b|steel.*lintel|angle.*lintel", "Lintels", "LF"),
     (r"stair", "Stairs", "EA"),
-    (r"strip", "Striping", "LF"),
+    (r"\bladder\b", "Ladder", "EA"),
+    (r"\blift\b|elevator", "Lift", "EA"),
     (r"mobiliz", "Mobilization", "EA"),
-    (r"lift|elevator", "Lift", "EA"),
-    (r"exposed.*struct", "Exposed Structure", "SF"),
-    (r"exterior.*soffit", "Exterior Soffit", "SF"),
-    (r"tilt.*up.*wall|ext.*wall", "Exterior Tilt Up Wall", "SF"),
-    (r"interior.*concrete.*wall", "Interior Concrete Walls", "SF"),
-    (r"gauge.*metal|metal.*gauge", "Gauge Metal", "EA"),
-    (r"catch basin|bb ci", "Catch Basins", "EA"),
-    (r"trench drain", "Trench Drain", "LF"),
-    (r"gas.*pip|gas\s*pipe|black\s*steel.*pip|csst.*pip", "Gas Piping", "LF"),
-    (r"(\d+).*lf.*pvc|pvc.*(\d+)|storm pipe|storm sewer", "Storm Pipe", "LF"),
-    (r"sealed.*concrete|polished.*concrete|slab.on.grade", "Sealed Concrete", "SF"),
-    (r"manhole", "Manholes", "EA"),
-    (r"flooring|floor tile|lvt|vct|carpet", "Flooring", "SF"),
-    (r"drywall|gwb|gypsum", "Drywall", "sheets"),
-    (r"paint", "Paint", "gallons"),
-    (r"ceiling.*tile|act|t-bar", "Ceiling Grid", "SF"),
+
+    # ── Architectural ─────────────────────────────────────────────────────────
+    (r"flooring|floor tile|\blvt\b|\bvct\b|\bcarpet\b|luxury.*vinyl|ceramic.*tile|porcelain.*tile", "Flooring", "SF"),
+    (r"ceiling.*tile|\bact\b|t.bar.*ceil|acoustic.*ceil|lay.in.*ceil", "Ceiling Grid", "SF"),
+    (r"drywall|\bgwb\b|gypsum.*board|sheetrock|wallboard", "Drywall", "sheets"),
+    (r"\bpaint\b|primer|finish.*coat|epoxy.*floor", "Paint", "gallons"),
+    (r"\beifs\b|exterior.*insulation|dryvit|synthetic.*stucco", "EIFS", "SF"),
+    (r"\bcanopy\b|metal.*canopy|entrance.*canopy|shade.*canopy", "Canopy", "SF"),
+    (r"insulation|\bbatt\b|rigid.*insul|spray.*foam|r-\d+", "Insulation", "SF"),
+    # Door type separation — Frame-HM and specific types BEFORE generic door catch-all
+    (r"hollow.?metal.*frame|frame.*hollow.?metal|frame.*\bhm\b|\bhm\b.*frame", "Frame-HM", "EA"),
+    (r"door.*hollow.?metal|hollow.?metal.*door|hm.*door(?!.*frame)|door.*\bhm\b(?!.*frame)", "Doors-HM", "EA"),
+    (r"door.*\bwood\b|\bwood\b.*door|\bwd\b.*door|door.*\bwd\b", "Doors-WD", "EA"),
+    (r"door.*alum|alum.*door|\bal\b.*door|door.*\bal\b", "Doors-AL", "EA"),
+    # Generic door catch-all — must follow specific types above
     (r"door(?!.*frame)", "Doors", "EA"),
-    (r"window|glazing", "Windows", "EA"),
-    (r"insulation|batt|r-\d+", "Insulation", "SF"),
-    (r"panel|mcc|switchboard", "Electrical Panels", "EA"),
-    (r"light.*fix|fixture.*light|led", "Lighting Fixtures", "EA"),
-    (r"receptacle|outlet", "Receptacles", "EA"),
+    (r"window|glazing|storefront.*glass", "Windows", "EA"),
+    (r"gauge.*metal|metal.*gauge", "Gauge Metal", "EA"),
+    (r"interior.*concrete.*wall", "Interior Concrete Walls", "SF"),
+
+    # ── MEP ───────────────────────────────────────────────────────────────────
+    (r"panel|mcc\b|switchboard|distribution.*board", "Electrical Panels", "EA"),
+    (r"light.*fix|fixture.*light|\bled\b|luminaire", "Lighting Fixtures", "EA"),
+    (r"receptacle|outlet\b", "Receptacles", "EA"),
     (r"exit sign", "Exit Signs", "EA"),
-    (r"fan coil|fcu", "Fan Coil Units", "EA"),
-    (r"air handler|ahu", "Air Handling Units", "EA"),
+    (r"fan coil|\bfcu\b", "Fan Coil Units", "EA"),
+    (r"air handler|\bahu\b", "Air Handling Units", "EA"),
     (r"exhaust fan", "Exhaust Fans", "EA"),
-    (r"headwall|flared end", "Headwall", "EA"),
 ]
 
 
