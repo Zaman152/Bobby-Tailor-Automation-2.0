@@ -37,78 +37,200 @@ def _pick_model(sheet_name: str) -> str:
         return CLAUDE_MODEL_SCHEDULES
     return CLAUDE_MODEL
 
-EXTRACTION_PROMPT = """You are a quantity surveyor analyzing a construction drawing for take-off estimation.
+EXTRACTION_PROMPT = """You are a professional quantity surveyor analyzing a construction drawing for take-off estimation.
 
-YOUR JOB: Extract EVERY numeric value, dimension annotation, and TABLE ROW on this drawing.
-Schedules and panel tables are the most important data — read EACH ROW with ALL its columns.
+YOUR PRIMARY MISSION: Extract EVERY quantity, dimension, count, and table that feeds into a bid estimate.
 
-Return ONLY valid JSON (no markdown, no commentary):
+Return ONLY valid JSON. No markdown, no commentary, no code fences.
+
 {
-  "sheet_type": "floor_plan | elevation | section | detail | schedule | panel_schedule | title_sheet | specification | other",
-  "sheet_title": "title shown on the drawing (e.g. 'RISER DIAGRAM AND PANEL SCHEDULES')",
-  "scale": "scale shown (e.g. 1/4\\" = 1'-0\\" or 'NTS')",
+  "sheet_type": "floor_plan | elevation | section | detail | civil_site | schedule | panel_schedule | specification_detail | title_sheet | other",
+  "sheet_title": "exact title from title block",
+  "scale": "scale shown or NTS",
+  "drawing_discipline": "architectural | civil | structural | mechanical | electrical | plumbing | landscape | survey",
   "measurements": [
     {
-      "description": "what this measures (e.g. 'north wall length', 'NEC equipment clearance', 'duct diameter')",
-      "value": "EXACT value as shown (e.g. '12-6', '42', '230')",
-      "unit": "ft | in | sq_ft | lf | cy | ea | kva | amps | mca | cfm",
-      "location": "where on the drawing (e.g. 'detail 4 NEC clearances', 'panel HM1')",
-      "raw_text": "exact text from drawing"
+      "description": "clear description",
+      "value": "EXACT numeric value only (strip ± but flag approximate)",
+      "unit": "lf | sf | cy | ea | in | ft | amps | kva | cfm | gal | ton",
+      "approximate": false,
+      "location": "where on drawing",
+      "raw_text": "exact text as shown"
     }
   ],
   "components": [
     {
-      "name": "component (e.g. 'PANEL HM1', 'FAN COIL UNIT FCU-1', 'TRANSFORMER T1')",
-      "quantity": "numeric count or null — NEVER use 1 as placeholder",
+      "name": "descriptive name including type and size",
+      "quantity": "numeric count or null — NEVER fabricate 1",
       "unit": "ea | lf | sf",
-      "specification": "spec details (e.g. '400 AMPS, 480Y/277V, 3 PHASE')",
+      "specification": "spec data; GL/INV elevations for structures go here as text",
       "location": "where on drawing"
     }
   ],
   "rooms": [
     {
-      "name": "room name/number (e.g. 'CONFERENCE 106', 'SECURITY RM')",
-      "area": "numeric area in sq ft if shown",
+      "name": "room name and number",
+      "area": "numeric sq ft or null",
       "dimensions": "L x W if shown",
       "notes": "callouts"
     }
   ],
   "schedules": [
     {
-      "name": "schedule name (e.g. 'PANEL HM1', 'DOOR SCHEDULE', 'FAN COIL UNIT SCHEDULE')",
-      "schedule_type": "panel_schedule | door | window | finish | equipment | room | other",
-      "header_info": "voltage/phase/wire/main/bus size/etc OR door type/size info",
-      "columns": ["CKT", "DESCRIPTION", "NOTE", "BKR", "A", "B", "C", "BKR", "NOTE", "DESCRIPTION", "CKT"],
-      "rows": [
-        {"CKT": "1", "DESCRIPTION": "PIU-2-3", "BKR": "20/1", "A": "4.0", "B": "8.0", "C": "8.0"},
-        {"CKT": "3", "DESCRIPTION": "EH ENTRANCE", "BKR": "30/1"}
-      ],
-      "totals": "connected loads, demand loads, total KVA if shown"
+      "name": "schedule name",
+      "table_purpose": "takeoff_schedule | specification_reference | general_notes | finish_schedule | room_schedule",
+      "schedule_type": "panel | door | window | equipment | finish | pipe_sizing | manufacturer_catalog | notes | other",
+      "use_for_takeoff": true,
+      "lookup_key": "column name for spec tables e.g. PIPE SIZE",
+      "description": "brief description",
+      "header_info": "header above table",
+      "columns": ["COL1", "COL2"],
+      "rows": [{"COL1": "val"}],
+      "totals": "footer totals if any"
     }
   ],
-  "materials": [
+  "cross_references": [
     {
-      "type": "material name",
-      "specification": "spec/grade",
-      "quantity": "numeric if shown",
-      "unit": "unit if shown"
+      "ref_number": "number/letter in bubble",
+      "ref_sheet": "sheet code in box e.g. C-4",
+      "ref_type": "detail | section | elevation | matchline",
+      "item_described": "what the bubble points to",
+      "context": "why it matters for takeoff",
+      "on_this_sheet_data": {}
     }
   ],
+  "pipe_runs": [
+    {
+      "length_lf": 25,
+      "diameter_in": 12,
+      "material": "PVC",
+      "schedule_or_class": "SCH 40",
+      "slope_pct": 4.81,
+      "from_structure": "upstream ID",
+      "to_structure": "downstream ID",
+      "raw_text": "full annotation"
+    }
+  ],
+  "civil_structures": [
+    {
+      "id": "BB CI#2",
+      "type": "catch_basin | manhole | headwall | junction_box | cleanout | other",
+      "quantity": 1,
+      "detail_ref_number": "17",
+      "detail_ref_sheet": "C-4",
+      "ground_level": null,
+      "invert_in": null,
+      "invert_out": null,
+      "specification": "construction notes"
+    }
+  ],
+  "materials": [{"type": "", "specification": "", "quantity": null, "unit": ""}],
   "confidence": "high | medium | low",
-  "notes": "key observations"
+  "notes": "observations"
+}
+
+RULES:
+1. TABLE CLASSIFICATION: takeoff_schedule = rows with real quantities to install. specification_reference = manufacturer catalogs, pipe sizing charts — set use_for_takeoff: false. general_notes = numbered notes only.
+2. CROSS-REFERENCES: Every detail bubble (circle number + sheet box) goes in cross_references[].
+3. PIPE RUNS: "25 LF - 12\\"Ø SCH 40 PVC @ 4.81%" → pipe_runs[] with length_lf, diameter_in, slope_pct — NOT in measurements[].
+4. CIVIL STRUCTURES: Catch basins/manholes with GL/INV → civil_structures[], NOT measurements[].
+5. APPROXIMATE: ± prefix → set approximate: true on measurement.
+6. EXCLUDE from measurements[]: scale, temperatures, GL/INV/EL/ELEV values, slope % alone, SEE SHEET refs without qty.
+7. NEVER fabricate quantities. Read EVERY schedule row including spares."""
+
+
+COUNT_PROMPT = """You are a professional quantity surveyor counting discrete construction items on this drawing.
+
+YOUR MISSION: Count every physical object that exists as an individual unit (EA) to be installed or constructed.
+
+Return ONLY valid JSON. No markdown, no commentary, no code fences.
+
+{
+  "sheet_type": "floor_plan | elevation | section | detail | civil_site | schedule | roof_plan | mep_plan | other",
+  "has_schedules": false,
+  "components": [
+    {
+      "name": "descriptive name including type and size",
+      "quantity": null,
+      "unit": "ea",
+      "method": "direct | grid | note",
+      "confidence": "high | medium | low",
+      "location": "where on drawing",
+      "notes": "any relevant observation"
+    }
+  ]
+}
+
+COUNTING RULES (apply to ALL symbol types):
+1. COUNT physical objects depicted as icons or symbols on the plan: bollards, columns, catch
+   basins, manholes, drains, luminaires, fixtures, trees, fire hydrants, parking stalls,
+   hangers, ladders, lifts, equipment tags, doors, windows, vents, RTUs, VAV boxes, and
+   any other discrete installed element.
+2. DIMENSION LINE RULE: Any number adjacent to a dimension line (with arrows or extension
+   lines) is a DIMENSION, not a count. "6'-0\" TYP", "24\" O.C.", "3'-6\" CLEAR" are
+   spacing annotations — never EA quantities.
+3. SPACING ANNOTATION RULE: Labels containing "TYP", "O.C.", "MAX", "MIN", or "EQ" after a
+   number describe spacing or clearance. They are not object counts.
+4. GRID LABEL RULE: Grid axis labels (1, 2, 3 / A, B, C) are reference coordinates.
+   They are not counts of anything.
+5. DETAIL SHEET RULE: When a detail sheet shows a TYPICAL symbol with spacing dimensions,
+   count ZERO instances of that symbol — detail sheets show geometry, not project quantity.
+6. TYPICAL NOTE RULE: If an item appears only with a note like "TYP @ ALL COLUMNS" or
+   "SEE SCHEDULE", set quantity=null and confidence=low. Do not guess a total count.
+7. GRID COUNT METHOD: For regularly gridded objects (structural columns, parking stalls),
+   count all visible grid intersections with the symbol. Use method="grid" and record
+   the grid axis description (e.g., "A-G x 1-14, 6x4=24").
+8. UNCERTAINTY RULE: When you cannot reliably count an item, set quantity=null and
+   confidence=low. NEVER fabricate a quantity.
+
+EXCLUSIONS — do NOT extract in this pass:
+- Dimension callout numbers (feet, inches, angles, slopes)
+- Elevation labels (EL. 100'-0", GL, INV, RIM)
+- Schedule row numbers (1, 2, 3 in a table)
+- Linear or area quantities (LF, SF, CY)
+- Text keynotes or note numbers standing alone"""
+
+
+SCHEDULE_PROMPT = """You are a professional quantity surveyor extracting schedule and table data from a construction drawing.
+
+YOUR MISSION: Extract ONLY the schedules and tables visible on this drawing.
+Ignore plan elements, dimensions, notes paragraphs, and non-tabular content entirely.
+
+Return ONLY valid JSON. No markdown, no commentary, no code fences.
+
+{
+  "schedules": [
+    {
+      "name": "schedule name as shown on drawing",
+      "table_purpose": "takeoff_schedule | specification_reference | general_notes | finish_schedule | room_schedule",
+      "schedule_type": "door | window | equipment | finish | panel | pipe_sizing | plumbing_fixture | hardware | other",
+      "use_for_takeoff": true,
+      "description": "brief description of what this table contains",
+      "columns": ["MARK", "QTY", "TYPE", "MATERIAL", "SIZE", "NOTES"],
+      "rows": [
+        {"MARK": "D-1", "QTY": "4", "TYPE": "HM", "MATERIAL": "Hollow Metal", "SIZE": "3'-0\" x 7'-0\""}
+      ],
+      "totals": "footer totals row if present, else null"
+    }
+  ]
 }
 
 EXTRACTION RULES:
-1. TABLES/SCHEDULES are top priority. For EVERY schedule visible (panel schedules, door schedules, equipment schedules, fan coil schedules, etc.):
-   - Capture the schedule NAME (e.g. "PANEL HM1", "PANEL HI", "PANEL L2B", "PANEL ITI")
-   - Capture the COLUMN HEADERS as an array
-   - Capture EVERY ROW as an object keyed by column name — do not skip rows even if they look empty
-   - Capture totals/footers (CONNECTED LOADS, DEMAND, TOTAL KVA, etc.)
-2. PANEL SCHEDULES: For electrical panels, extract each circuit row with: CKT number, DESCRIPTION, BKR (breaker), A/B/C phase loads, NOTE.
-3. NUMERIC MEASUREMENTS: capture every dimension annotation — 12'-6", 42", 230 KVA, 24 AMPS, 1250 SF, 36" MIN clearance, etc.
-4. NEVER fabricate a value. If a cell is blank, omit it from the row object.
-5. For details: extract every dimension callout (e.g. "42 MIN", "36 MIN", "24") with its label.
-6. Read CAREFULLY — the text is small. Look at every row of every table."""
+1. QTY COLUMN: Read QTY values exactly as printed. Do not calculate, infer, or sum quantities.
+   Set use_for_takeoff=true ONLY when a QTY or COUNT column exists with numeric values.
+2. ROW READING: Read every visible row completely. Do NOT skip rows, invent rows, or merge rows.
+   Stop at the last visible row — do not extrapolate rows that extend off-page.
+3. MATERIAL CLASSIFICATION: Classify rows using the material or type column values:
+   - Door materials: HM (hollow metal), WD (wood), AL (aluminum), GL (glass), FRP
+   - Window materials: AL (aluminum), VL (vinyl), WD (wood), FIX (fixed)
+   - Pipe materials: PVC, HDPE, DIP, CU (copper), SS (stainless), GS (galvanized steel)
+4. TABLE PURPOSE RULES:
+   - takeoff_schedule: rows with quantities of items to install (doors, windows, equipment)
+   - specification_reference: manufacturer catalogs, pipe sizing charts, performance tables
+     → always set use_for_takeoff=false
+   - general_notes: numbered notes list with no quantity column → use_for_takeoff=false
+5. FOCUS: Return only the schedules[] array. Do NOT extract measurements[], components[],
+   rooms[], or pipe_runs[] in this pass. If no table is visible, return {"schedules": []}."""
 
 
 def encode_image(filepath: str) -> Tuple[str, str]:
