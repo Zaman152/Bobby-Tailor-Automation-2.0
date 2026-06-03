@@ -94,14 +94,261 @@ ESTIMATION_TABLES = {
         "description": "Light fixture / device count",
         "keywords": ["light fixture", "led", "exit sign", "receptacle", "switch", "panel"],
     },
+    "storm_pipe": {
+        "unit_out": "lf",
+        "waste_factor": 1.05,
+        "formula": "length × 1.05",
+        "description": "Storm sewer pipe LF",
+        "keywords": ["pvc", "hdpe", "rcp", "storm pipe", "culvert", "sch 40", "storm sewer"],
+    },
+    "trench_drain": {
+        "unit_out": "lf",
+        "waste_factor": 1.05,
+        "formula": "length × 1.05",
+        "description": "Trench/channel drain LF",
+        "keywords": ["trench drain", "channel drain", "slot drain", "linear drain"],
+    },
+    "catch_basin": {
+        "unit_out": "ea",
+        "formula": "count",
+        "description": "Catch basin / drop inlet",
+        "keywords": ["catch basin", "bb ci", "drop inlet", "curb inlet", "storm inlet"],
+    },
+    "manhole": {
+        "unit_out": "ea",
+        "formula": "count",
+        "description": "Manhole structures",
+        "keywords": ["manhole", "mh", "access structure"],
+    },
+    "headwall": {
+        "unit_out": "ea",
+        "formula": "count",
+        "description": "Pipe headwall / flared end section",
+        "keywords": ["headwall", "flared end", "end section", "fes", "wingwall"],
+    },
+    "bollard": {
+        "unit_out": "ea",
+        "formula": "count",
+        "description": "Bollards",
+        "keywords": ["bollard", "pipe bollard"],
+    },
+    "guard_rail": {
+        "unit_out": "lf",
+        "waste_factor": 1.03,
+        "formula": "length × 1.03",
+        "description": "Guard rail LF",
+        "keywords": ["guard rail", "guardrail", "barrier rail", "w-beam"],
+    },
+    "hand_rail": {
+        "unit_out": "lf",
+        "waste_factor": 1.05,
+        "formula": "length × 1.05",
+        "description": "Handrail LF",
+        "keywords": ["hand rail", "handrail", "stair rail"],
+    },
+    "striping": {
+        "unit_out": "lf",
+        "formula": "length",
+        "description": "Pavement striping LF",
+        "keywords": ["striping", "stripe", "pavement marking", "lane marking"],
+    },
+    "concrete_pavement": {
+        "unit_out": "sq_ft",
+        "waste_factor": 1.03,
+        "formula": "area × 1.03",
+        "description": "Concrete pavement SF",
+        "keywords": ["concrete pavement", "pcc", "flatwork", "sidewalk"],
+    },
+    "asphalt": {
+        "unit_out": "sq_ft",
+        "waste_factor": 1.03,
+        "formula": "area × 1.03",
+        "description": "Asphalt pavement SF",
+        "keywords": ["asphalt", "hma", "blacktop"],
+    },
+    "tilt_up_wall": {
+        "unit_out": "sq_ft",
+        "formula": "area",
+        "description": "Tilt-up wall panels SF",
+        "keywords": ["tilt up", "tilt-up", "tiltup", "precast panel"],
+    },
+    "exposed_structure": {
+        "unit_out": "sq_ft",
+        "formula": "area",
+        "description": "Exposed structure SF",
+        "keywords": ["exposed structure", "exposed concrete", "exposed steel"],
+    },
+    "exterior_soffit": {
+        "unit_out": "sq_ft",
+        "formula": "area",
+        "description": "Exterior soffit SF",
+        "keywords": ["soffit", "exterior soffit", "canopy soffit"],
+    },
+    "sealed_concrete": {
+        "unit_out": "sq_ft",
+        "waste_factor": 1.0,
+        "formula": "area",
+        "description": "Sealed/polished concrete floor SF",
+        "keywords": ["sealed concrete", "polished concrete", "concrete floor", "slab on grade", "sog"],
+    },
+    "cmu_wall": {
+        "unit_out": "sq_ft",
+        "waste_factor": 1.0,
+        "formula": "area",
+        "description": "CMU masonry wall SF",
+        "keywords": ["cmu", "masonry", "block wall", "concrete masonry"],
+    },
+    "internal_tilt_up_wall": {
+        "unit_out": "sq_ft",
+        "waste_factor": 1.0,
+        "formula": "area",
+        "description": "Internal tilt-up wall panel SF",
+        "keywords": ["internal tilt", "interior tilt", "interior concrete wall"],
+    },
+    "canopy": {
+        "unit_out": "sq_ft",
+        "waste_factor": 1.0,
+        "formula": "area",
+        "description": "Metal/shade canopy SF",
+        "keywords": ["canopy", "metal canopy", "entrance canopy", "shade canopy"],
+    },
+    "eifs": {
+        "unit_out": "sq_ft",
+        "waste_factor": 1.05,
+        "formula": "area × 1.05",
+        "description": "Exterior Insulation and Finish System (EIFS/Dryvit) SF",
+        "keywords": ["eifs", "exterior insulation", "dryvit", "synthetic stucco"],
+    },
+    "cmu_paint": {
+        "unit_out": "gallons",
+        "coverage_per_gallon": 200,   # CMU block paint covers less — 200 sf/gal
+        "coats": 2,
+        "formula": "ceil(area × coats / 200)",
+        "description": "CMU/masonry block paint gallons (2 coats)",
+        "keywords": ["cmu paint", "block paint", "masonry paint", "epoxy block"],
+    },
+    "gas_pipe": {
+        "unit_out": "lf",
+        "waste_factor": 1.05,
+        "formula": "length × 1.05",
+        "description": "Gas piping LF (black steel / CSST)",
+        "keywords": ["gas pipe", "gas piping", "black steel pipe", "csst", "gas line"],
+    },
+    "lintel": {
+        "unit_out": "lf",
+        "waste_factor": 1.05,
+        "formula": "length × 1.05",
+        "description": "Steel lintel LF over openings",
+        "keywords": ["lintel", "steel lintel", "angle lintel", "l-4", "lintel run"],
+    },
 }
+
+
+# ─── Project-type profiles ────────────────────────────────────────────────────
+# Each profile defines how to calculate room areas when drawing content is silent.
+# Priority: room content (notes/materials) > profile defaults > auto fallback.
+PROJECT_TYPE_PROFILES: Dict[str, Dict] = {
+    "industrial": {
+        "default_floor_items": ["sealed_concrete"],
+        "default_ceiling_items": ["exposed_structure"],
+        "default_wall_items": [],
+        "skip_items": ["flooring", "ceiling_grid", "drywall"],
+        "expect_items": ["tilt_up_wall", "bollard", "columns"],
+        "area_tolerance": 0.05,
+    },
+    "retail": {
+        "default_floor_items": ["flooring"],
+        "default_ceiling_items": ["ceiling_grid"],
+        "default_wall_items": ["paint", "drywall"],
+        "skip_items": ["sealed_concrete"],
+        "expect_items": ["storefront", "bollard", "canopy"],
+        "area_tolerance": 0.03,
+    },
+    "office": {
+        "default_floor_items": ["flooring"],
+        "default_ceiling_items": ["ceiling_grid"],
+        "default_wall_items": ["paint", "drywall"],
+        "skip_items": ["sealed_concrete", "tilt_up_wall"],
+        "expect_items": ["drywall", "doors", "windows"],
+        "area_tolerance": 0.03,
+    },
+    "civil": {
+        "default_floor_items": [],
+        "default_ceiling_items": [],
+        "default_wall_items": [],
+        "skip_items": ["flooring", "ceiling_grid", "drywall"],
+        "expect_items": ["storm_pipe", "manhole", "catch_basin", "striping"],
+        "area_tolerance": 0.05,
+    },
+    "residential": {
+        "default_floor_items": ["flooring"],
+        "default_ceiling_items": [],
+        "default_wall_items": ["paint", "drywall", "insulation"],
+        "skip_items": ["exposed_structure", "tilt_up_wall"],
+        "expect_items": ["drywall", "insulation", "windows", "doors"],
+        "area_tolerance": 0.03,
+    },
+    "institutional": {
+        "default_floor_items": ["flooring"],
+        "default_ceiling_items": ["ceiling_grid"],
+        "default_wall_items": ["paint", "drywall"],
+        "skip_items": ["sealed_concrete"],
+        "expect_items": ["drywall", "doors", "windows"],
+        "area_tolerance": 0.03,
+    },
+    "mixed_use": {
+        "default_floor_items": ["flooring"],
+        "default_ceiling_items": [],
+        "default_wall_items": ["paint", "drywall"],
+        "skip_items": [],
+        "expect_items": ["storefront", "parking"],
+        "area_tolerance": 0.05,
+    },
+    # Determined by content-first logic; profile keys are empty (no-op defaults).
+    "auto": {
+        "default_floor_items": [],
+        "default_ceiling_items": [],
+        "default_wall_items": [],
+        "skip_items": [],
+        "expect_items": [],
+        "area_tolerance": 0.05,
+    },
+}
+
+
+# ─── Material/note → item-type map ───────────────────────────────────────────
+# Ordered list: first match wins within the same category.
+# (regex_pattern, item_type)
+MATERIAL_NOTE_MAP = [
+    # Floor surface types — explicitly override generic "flooring"
+    (r"sealed\s*concrete|polished\s*concrete|sog\b|slab[- ]on[- ]grade", "sealed_concrete"),
+    # Generic flooring (avoid plain "tile" to prevent matching acoustic tile)
+    (r"\bvct\b|lvt\b|lvp\b|\bcarpet\b|\bhardwood\b|\blaminate\b"
+     r"|vinyl\s*floor|floor\s*tile|ceramic\s*tile|porcelain\s*tile", "flooring"),
+    # Ceiling types
+    (r"acoustic\s*tile|ceiling\s*tile|ceiling\s*grid|\bact\b|lay.?in\s*ceil|t.?bar\s*ceil", "ceiling_grid"),
+    (r"exposed\s*structure|exposed\s*deck|open\s*web\s*joist|bar\s*joist", "exposed_structure"),
+    # Wall types
+    (r"tilt[- ]?up\s*panel?|precast\s*panel", "tilt_up_wall"),
+    (r"\bcmu\b|block\s*wall|concrete\s*masonry\s*unit", "cmu_wall"),
+    (r"\beifs\b|exterior\s*insulation|dryvit|synthetic\s*stucco", "eifs"),
+    (r"\bcanopy\b|metal\s*canopy|entrance\s*canopy", "canopy"),
+    # Wall finishes
+    (r"cmu\s*paint|block\s*paint|masonry\s*paint|epoxy\s*block", "cmu_paint"),
+]
 
 
 # ─── Public entry point ──────────────────────────────────────────────────────
 
-def apply_estimation_tables(extracted_data: dict) -> List[dict]:
+def apply_estimation_tables(extracted_data: dict, project_type: str = "auto") -> List[dict]:
     """
     Apply estimation tables to extracted drawing data.
+
+    Args:
+        extracted_data: Dict produced by Claude extraction for a single sheet.
+        project_type: Building type key from PROJECT_TYPE_PROFILES. Defaults to
+            "auto", which uses content-first note matching with a universal fallback.
+
     Returns list of calculated takeoff items with source traceability.
     """
     estimates = []
@@ -120,16 +367,60 @@ def apply_estimation_tables(extracted_data: dict) -> List[dict]:
         if e:
             estimates.append(e)
 
-    # 3) Process rooms — area-based calculations across multiple item types
+    # 3) Process rooms — content-first area calculations
     for room in extracted_data.get("rooms", []):
-        estimates.extend(_calculate_from_room(room, sheet_name))
+        estimates.extend(_calculate_from_room(room, sheet_name, project_type))
 
-    # 4) Process schedules — every row becomes counted takeoff items
+    # 4) Process schedules — takeoff schedules only
     for sched in extracted_data.get("schedules", []):
         estimates.extend(_calculate_from_schedule(sched, sheet_name))
 
+    # 5) Pipe runs and civil structures (v2.1)
+    estimates.extend(_calculate_from_pipe_runs(extracted_data.get("pipe_runs", []), sheet_name))
+    estimates.extend(_calculate_from_civil_structures(extracted_data.get("civil_structures", []), sheet_name))
+
     logger.info(f"  Calculated {len(estimates)} estimates from {sheet_name}")
     return estimates
+
+
+def resolve_spec_lookups(all_extracted: List[dict], estimates: List[dict]) -> List[dict]:
+    """Enrich estimates with matching specification reference table rows."""
+    spec_refs: Dict[str, Dict] = {}
+    for d in all_extracted:
+        for sched in d.get("schedules", []):
+            if sched.get("table_purpose") != "specification_reference":
+                continue
+            key_col = sched.get("lookup_key") or "PIPE SIZE"
+            table_rows = {}
+            for row in sched.get("rows", []):
+                if not isinstance(row, dict):
+                    continue
+                k = row.get(key_col) or row.get("PIPE SIZE") or row.get("Pipe Size")
+                if k:
+                    table_rows[str(k).strip()] = row
+            if table_rows:
+                spec_refs[sched.get("name", "spec")] = {"rows": table_rows, "columns": sched.get("columns", [])}
+
+    if not spec_refs:
+        return estimates
+
+    enriched = []
+    for est in estimates:
+        desc = (est.get("description") or "").lower()
+        size_match = re.search(r'(\d+)\s*(?:in|inch|")', desc)
+        if size_match:
+            size_str = f'{size_match.group(1)} in'
+            for table_name, table_data in spec_refs.items():
+                if size_str in table_data["rows"]:
+                    est = dict(est)
+                    est["spec_reference"] = {
+                        "table": table_name,
+                        "matched_size": size_str,
+                        "spec": table_data["rows"][size_str],
+                    }
+                    break
+        enriched.append(est)
+    return enriched
 
 
 # ─── Per-source-type calculators ─────────────────────────────────────────────
@@ -181,6 +472,11 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
             return None
 
         table = ESTIMATION_TABLES.get(item_type, {})
+        is_approx = bool(m.get("approximate", False))
+        formula_out = formula_used
+        if is_approx:
+            formula_out = f"{formula_used} [FIELD VERIFY ±]"
+
         return {
             "item_type": item_type,
             "description": description,
@@ -189,7 +485,8 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
             "quantity": round(calc_qty, 2) if isinstance(calc_qty, (int, float)) else calc_qty,
             "unit": calc_unit,
             "waste_factor_applied": table.get("waste_factor", 1.0),
-            "formula": formula_used,
+            "formula": formula_out,
+            "approximate": is_approx,
             "source_sheet": sheet_name,
             "source_location": location,
             "source_raw": raw_text or description,
@@ -276,10 +573,106 @@ def _calculate_from_room(room: dict, sheet_name: str) -> List[dict]:
     return [r for r in results if r]
 
 
+def _schedule_is_takeoff(sched: dict) -> bool:
+    purpose = sched.get("table_purpose", "takeoff_schedule")
+    if purpose in ("specification_reference", "general_notes"):
+        return False
+    if sched.get("use_for_takeoff") is False:
+        return False
+    return True
+
+
+def _calculate_from_pipe_runs(pipe_runs: list, sheet_name: str) -> List[dict]:
+    results = []
+    for run in pipe_runs:
+        if not isinstance(run, dict):
+            continue
+        length = run.get("length_lf")
+        if length is None:
+            continue
+        try:
+            lf = float(length)
+        except (TypeError, ValueError):
+            continue
+        if lf <= 0:
+            continue
+        diam = run.get("diameter_in", "")
+        material = run.get("material", "")
+        desc = f'{diam}" {material} storm pipe'.strip() if diam else "Storm pipe run"
+        item_type = "storm_pipe"
+        calc_qty, calc_unit, formula = _apply_formula(item_type, lf, "lf", str(lf))
+        table = ESTIMATION_TABLES.get(item_type, {})
+        results.append({
+            "item_type": item_type,
+            "description": desc,
+            "raw_value": lf,
+            "raw_unit": "lf",
+            "quantity": round(calc_qty, 2),
+            "unit": calc_unit,
+            "waste_factor_applied": table.get("waste_factor", 1.0),
+            "formula": formula,
+            "source_sheet": sheet_name,
+            "source_location": run.get("raw_text", "")[:80],
+            "source_raw": run.get("raw_text", ""),
+            "table_used": item_type,
+            "specification": f"slope {run.get('slope_pct')}%" if run.get("slope_pct") else "",
+        })
+    return results
+
+
+def _calculate_from_civil_structures(structures: list, sheet_name: str) -> List[dict]:
+    results = []
+    type_map = {
+        "catch_basin": "catch_basin",
+        "manhole": "manhole",
+        "headwall": "headwall",
+        "junction_box": "catch_basin",
+        "cleanout": "catch_basin",
+    }
+    for s in structures:
+        if not isinstance(s, dict):
+            continue
+        stype = (s.get("type") or "other").lower()
+        item_type = type_map.get(stype, "catch_basin" if "basin" in stype or "bb" in stype else "general")
+        if item_type == "general":
+            continue
+        qty = s.get("quantity", 1)
+        try:
+            n = float(qty)
+        except (TypeError, ValueError):
+            n = 1.0
+        sid = s.get("id", "structure")
+        spec = s.get("specification", "")
+        if s.get("ground_level") is not None:
+            spec = f"{spec} GL={s.get('ground_level')}".strip()
+        calc_qty, calc_unit, formula = _apply_formula(item_type, n, "ea", str(n))
+        table = ESTIMATION_TABLES.get(item_type, {})
+        results.append({
+            "item_type": item_type,
+            "description": sid,
+            "raw_value": n,
+            "raw_unit": "ea",
+            "quantity": round(calc_qty, 2),
+            "unit": calc_unit,
+            "waste_factor_applied": table.get("waste_factor", 1.0),
+            "formula": formula,
+            "source_sheet": sheet_name,
+            "source_location": sid,
+            "source_raw": spec,
+            "table_used": item_type,
+            "specification": spec,
+        })
+    return results
+
+
 def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
     """Each row of a schedule becomes a counted item ONLY when there's a real quantity.
     Skip rows that just define a type/spec without a count — those belong in raw_items.csv,
     not calculations.csv (no math to do)."""
+    if not _schedule_is_takeoff(sched):
+        logger.info(f"  Skipping non-takeoff table: {sched.get('name')} ({sched.get('table_purpose')})")
+        return []
+
     results = []
     sched_name = sched.get("name", "Schedule")
     rows = sched.get("rows", [])
@@ -426,6 +819,17 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
         wf = table["waste_factor"]
         return value * wf, "sq_ft", f"{value:.0f} sf × {wf} waste"
 
+    if item_type in ("storm_pipe", "trench_drain", "guard_rail", "hand_rail", "striping"):
+        wf = table.get("waste_factor", 1.0)
+        return value * wf, "lf", f"{value:.0f} lf × {wf} = {value * wf:.0f} lf"
+
+    if item_type in ("catch_basin", "manhole", "headwall", "bollard"):
+        return value, "ea", "count"
+
+    if item_type in ("concrete_pavement", "asphalt", "tilt_up_wall", "exposed_structure", "exterior_soffit"):
+        wf = table.get("waste_factor", 1.0)
+        return value * wf, "sq_ft", f"{value:.0f} sf × {wf} = {value * wf:.0f} sf"
+
     # Default: pass-through
     return value, unit, "no formula"
 
@@ -441,6 +845,13 @@ def _parse_numeric(value) -> Optional[float]:
         return None
     s = str(value).strip()
     if not s:
+        return None
+
+    # Reject elevation/invert survey data (not takeoff quantities)
+    if re.search(r'(?:GL|INV|EL|ELEV|INV\s*IN|INV\s*OUT)\s*[=:]\s*\d', s, re.IGNORECASE):
+        return None
+    # Reject pure percentage (pipe slope)
+    if re.match(r'^\d+\.?\d*\s*%$', s.strip()):
         return None
 
     # Reject catalog/system identifiers like "W-L-2546" or "WL-1297" or "FCU-1"
