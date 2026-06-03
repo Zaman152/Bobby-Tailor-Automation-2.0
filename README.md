@@ -519,6 +519,34 @@ These tests auto-skip when PDF fixtures are absent; place PDFs at:
 - `tests/fixtures/crow_cass/crow_cass_plans.pdf`
 - `tests/fixtures/bobs_discount/bobs_discount_plans.pdf`
 
+#### Golden regression fixtures
+
+The golden PDFs are client files — they are not committed to the repository. An operator must supply them
+before the golden tests can produce scores (tests auto-skip when absent).
+
+**Automated setup (from `uploads/` drop folder):**
+
+```bash
+bash scripts/setup_golden_fixtures.sh
+```
+
+The script copies source files from `uploads/` when they exist and exits cleanly when they are absent.
+
+**Manual copy commands:**
+
+```bash
+# Crow Cass
+cp "uploads/Crow - Cass White Road-Plans.pdf" \
+   tests/fixtures/crow_cass/crow_cass_plans.pdf
+
+# Bob's Discount Furniture
+cp "uploads/Bob's Discount Furniture - Kennesaw, GA-plans.pdf" \
+   tests/fixtures/bobs_discount/bobs_discount_plans.pdf
+```
+
+After copying, re-run `pytest tests/test_golden_takeoff.py -v -m golden` to score both projects.
+The acceptance threshold is **≥97%** on both fixtures.
+
 ### Run all tests
 
 ```bash
