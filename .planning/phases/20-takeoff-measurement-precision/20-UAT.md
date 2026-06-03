@@ -68,7 +68,7 @@ Run: `pytest tests/test_golden_takeoff.py -v -m golden`
 ### Crow Cass (Industrial Distribution Center)
 
 **PDF required:** `tests/fixtures/crow_cass/crow_cass_plans.pdf`  
-**Status:** SKIPPED — PDF not present in this environment
+**Status:** RUN 2026-06-04 — **20.0% score (2/10 PASS)** — below 97% threshold
 
 Golden items (10 items across floor_plan, elevation, detail sheet types):
 
@@ -85,12 +85,14 @@ Golden items (10 items across floor_plan, elevation, detail sheet types):
 | Sealed Concrete | 395,673.42 | SF | ±3% |
 | Stairs | 10 | EA | exact_or_within_1 |
 
-To run: place PDF, then `pytest tests/test_golden_takeoff.py -v -m golden -k crow`
+**Measured (2026-06-04):** PASS — Sealed Concrete, Exposed Structure. FAIL/MISSING — all other golden rows.
+
+To run: `pytest tests/test_golden_takeoff.py -v -m golden -k crow`
 
 ### Bob's Discount (Retail Furniture Store)
 
 **PDF required:** `tests/fixtures/bobs_discount/bobs_discount_plans.pdf`  
-**Status:** SKIPPED — PDF not present in this environment
+**Status:** PDF present — full golden run **not completed** this session (requires ~15 min API)
 
 Golden items (12 items across floor_plan, elevation, schedule, roof_plan, detail sheet types):
 
@@ -141,7 +143,8 @@ Run: `pytest tests/ -v -k parity`
 ### Human Verification (required for sign-off)
 
 - [ ] `pytest tests/test_takeoff_generalization.py -v` — run locally and confirm all green
-- [ ] `pytest tests/test_golden_takeoff.py -v -m golden` — run with PDFs present and confirm ≥97%
+- [x] `pytest tests/test_golden_takeoff.py -v -m golden -k crow` — ran; **20%** (needs iteration)
+- [ ] `pytest tests/test_golden_takeoff.py -v -m golden -k bobs` — PDF present; run and confirm ≥97%
 - [ ] Upload a **new** plan (not Crow/Bob) and verify `takeoff_summary` produces sensible trade items
 - [ ] Confirm industrial PDF → `Sealed Concrete` (not flooring)
 - [ ] Confirm retail PDF → `Flooring` (not sealed concrete)

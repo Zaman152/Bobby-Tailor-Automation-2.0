@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — gap closure plans; 20-08 and 20-09 complete, 20-10 remaining
+**Current focus:** Phase 20 — gap closure 20-10 awaiting human sign-off (golden &lt;97%)
 
 ## Current Position
 
-Phase: 20 of 20 (Takeoff Measurement Precision) — gap closure in progress  
-Plan: 8/8 core complete; gap plans 20-08 and 20-09 complete; 20-10 pending  
-Status: 20-09 complete — ACCURACY-20-11 closed; ITEM_NAME_MAP at 71 entries; run 20-10 next  
-Last activity: 2026-06-04 — Completed 20-09-PLAN.md (ITEM_NAME_MAP expansion to 71 entries)
+Phase: 20 of 20 (Takeoff Measurement Precision) — human_needed on golden regression  
+Plan: 8/8 core + 20-08 + 20-09 complete; 20-10 code/docs complete, golden threshold not met  
+Status: Crow Cass golden **20%** (2/10); generalization 97/97; ITEM_NAME_MAP 71; scraper tests green  
+Last activity: 2026-06-04 — Completed 20-10 golden run + UAT update (checkpoint pending)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
