@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 19 — UAT sign-off (Job History shipped, 22 tests pass)
+**Current focus:** Phase 20 — Takeoff Measurement Precision (Plan 20-01 complete)
 
 ## Current Position
 
-Phase: 19 of 19 (Job History & Run Archive) — AWAITING UAT  
-Plan: 5/5 code complete (19-05 UAT pending)  
-Status: Job History tab live; history persists in SQLite  
-Last activity: 2026-06-02 — `/gsd-execute-phase 19`
+Phase: 20 of 20+ (Takeoff Measurement Precision) — In progress  
+Plan: 1/7 complete (20-01 done)  
+Status: Title-block sheet ID extraction shipped; 22 tests pass  
+Last activity: 2026-06-03 — `gsd-execute-phase 20-01`
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -116,6 +116,14 @@ From 14-04 (Two-Step Plan Selection UI):
 
 None yet.
 
+### 20-01 Decisions
+
+| Decision | Source |
+|----------|--------|
+| Noise filter applied in BOTH title-block and full-page passes | 20-01 |
+| `_is_noise_sheet_candidate` checks candidate within matched phrase context (not fullmatch on candidate alone) | 20-01 |
+| `sheet_type_hint` in `get_pdf_metadata` is conditional on `sheet_pass_matrix` import (backward-compatible) | 20-01 |
+
 ### 17-01 Decisions
 
 | Decision | Source |
@@ -152,6 +160,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-02  
-Stopped at: Completed 18-05-PLAN.md (integration tests + README + UAT checklist) — awaiting human UAT sign-off  
-Resume file: .planning/phases/18-linked-sheet-resolution/18-UAT.md
+Last session: 2026-06-03  
+Stopped at: Completed 20-01-PLAN.md (title-block extraction + noise filter + 22 tests)  
+Resume file: .planning/phases/20-takeoff-measurement-precision/20-02-PLAN.md
