@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — gap closure 20-10 awaiting human sign-off (golden &lt;97%)
+**Current focus:** Phase 20 — gap closure plans complete; 20-10 human sign-off pending (golden: Crow 20%, Bob 0% — Haiku ceiling reached)
 
 ## Current Position
 
-Phase: 20 of 20 (Takeoff Measurement Precision) — human_needed on golden regression  
-Plan: 8/8 core + 20-08 + 20-09 complete; 20-10 code/docs complete, golden threshold not met  
-Status: Crow Cass golden **20%** (2/10); generalization 97/97; ITEM_NAME_MAP 71; scraper tests green  
-Last activity: 2026-06-04 — Completed 20-10 golden run + UAT update (checkpoint pending)
+Phase: 20 of 20 (Takeoff Measurement Precision) — human sign-off pending  
+Plan: 8/8 core + 20-08 + 20-09 + 20-10 complete; awaiting human verification checkpoint  
+Status: Golden 20% Crow / 0% Bob (Haiku extraction ceiling); generalization 99/99; ITEM_NAME_MAP 71  
+Last activity: 2026-06-04 — Completed 20-10 golden fixtures, general fixes, UAT update, SUMMARY
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -221,6 +221,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-04 19:59 UTC  
-Stopped at: Completed 20-09-PLAN.md — ACCURACY-20-11 closed; ITEM_NAME_MAP at 71 entries; 97 tests pass  
+Last session: 2026-06-04 20:44 UTC  
+Stopped at: Completed 20-10-PLAN.md — golden fixtures copied, 6 general fixes, 3 API runs, UAT updated; at checkpoint awaiting human verify  
 Resume file: None
