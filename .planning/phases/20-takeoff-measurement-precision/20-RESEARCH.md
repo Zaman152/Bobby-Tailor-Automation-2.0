@@ -880,45 +880,657 @@ system=[{"type": "text", "text": COUNT_PROMPT, "cache_control": {"type": "epheme
 
 ---
 
-## RESEARCH COMPLETE
+## 11. Generalization Architecture (Plan-Type Agnostic)
+
+> **Context:** The user rejected a scope limited to Crow Cass + Bob's Discount. The pipeline must produce accurate measurements for **any** construction PDF: industrial, retail, office, civil/site, MEP, residential, institutional, mixed-use. Crow Cass and Bob's Discount are **regression fixtures only** — they are not the product scope.
+
+---
+
+### 11.1 Golden Files = Regression Fixtures Only
+
+Golden files (`tests/fixtures/crow_cass_golden.csv`, `tests/fixtures/bobs_discount_golden.csv`) exist solely to **lock in accuracy already achieved** and prevent regressions. They must never be used as the source of truth for what item types the system supports.
+
+**Correct mental model:**
+
+| Role | Golden Files | Product Scope |
+|------|-------------|---------------|
+| What they are | Regression fixtures | Any construction PDF |
+| What they prove | "This specific project still works" | "Any project type works" |
+| How to extend | Add new fixture per new project type verified | Expand ITEM_NAME_MAP + profiles + prompts |
+
+**Implementation rule:** `GoldenValidator.validate()` must accept a `fixture_name` param; new golden CSV fixtures can be added without modifying the validator class.
+
+---
+
+### 11.2 Sheet-Type + Drawing Discipline Driven Pass Routing
+
+Pass routing must be driven by **detected sheet type and drawing discipline** — NOT by project name, file name, or regex patterns like `^[AS]\d` that only cover architectural sheets.
+
+#### Sheet Type Classification
+
+Classify each page into one of these canonical `sheet_type` values during pre-scan:
+
+| `sheet_type` | Detection Heuristics | Example Sheet IDs |
+|---|---|---|
+| `floor_plan` | Title block contains "FLOOR PLAN", "PLAN", or area dimensions visible | A1.x, A2.x, S1.x |
+| `elevation` | "ELEVATION", compass direction callouts, facade profile | A3.x, A4.x, E1.x |
+| `civil_site` | "SITE PLAN", "GRADING", contour lines, north arrow + scale | C1.x, C2.x, G1.x |
+| `schedule` | Dense tabular content, header row + data rows, >60% table | A8.x, M3.x, E5.x |
+| `detail` | Title "DETAIL", section cut symbols, scale 1"=1'-0" or larger | A9.x, S5.x, D1.x |
+| `title_sheet` | "INDEX", "COVER", drawing list table, project address block | G0.1, T1.0, A0.x |
+| `roof_plan` | "ROOF PLAN", drain symbols, slope arrows | A3.x (roof suffix) |
+| `mep_plan` | Pipe/duct/conduit symbols, equipment tags, no room areas | M1.x, P1.x, E2.x |
+
+**Drawing discipline** (structural, architectural, civil, MEP) is derived from the sheet ID prefix **after** title-block extraction (RC-1 fix), not from raw file text.
+
+#### Pass Matrix
+
+```python
+PASS_MATRIX = {
+    "floor_plan":   ["count", "measure"],          # Haiku count; Haiku/Sonnet measure
+    "elevation":    ["count", "measure"],          # Sonnet for measure (complex faces)
+    "civil_site":   ["measure"],                   # linear runs, areas; no symbol count
+    "schedule":     ["schedule"],                  # Sonnet; structured table extraction
+    "detail":       ["count", "measure"],          # Sonnet; distinguish dims from symbols
+    "title_sheet":  [],                            # SKIP — no takeoff data
+    "roof_plan":    ["count", "measure"],          # gas pipe, drain, equipment
+    "mep_plan":     ["count", "measure"],          # equipment count + linear runs
+}
+
+MODEL_ROUTING = {
+    ("elevation",  "measure"):  "claude-sonnet-4-5",
+    ("detail",     "count"):    "claude-sonnet-4-5",   # RC-6 fix
+    ("detail",     "measure"):  "claude-sonnet-4-5",
+    ("schedule",   "schedule"): "claude-sonnet-4-5",
+    # all others → default Haiku
+}
+```
+
+**Anti-pattern to eliminate:** Any code path that skips a sheet because its ID doesn't match `^[AS]\d+` or similar architectural-only regex.
+
+---
+
+### 11.3 Content-First Room Mapping
+
+Room/space classification for the calculator must be driven by **content of the extracted room itself** — materials called out, area tags, spec notes — not by a project-level profile alone.
+
+#### Priority Chain (highest to lowest)
+
+1. **Room `notes` field** — explicit spec text: `"Sealed concrete floor"`, `"Exposed structure ceiling"` → override any profile default
+2. **Room `materials[]` field** — extracted finish schedule entries for that room → map to specific items
+3. **PROJECT_TYPE_PROFILES** — project-level defaults when content is silent
+4. **`auto` profile fallback** — used when project type cannot be determined
+
+```python
+def _classify_room_items(room: dict, profile: dict) -> list:
+    items = []
+    # 1. Explicit content overrides
+    for note in room.get("notes", []):
+        if re.search(r"sealed.concrete|polished.concrete", note, re.I):
+            items.append({"type": "sealed_concrete", "area": room["area"]})
+            break  # don't also add Flooring
+    # 2. Materials list
+    for mat in room.get("materials", []):
+        mapped = MATERIAL_TO_ITEM.get(mat.lower())
+        if mapped:
+            items.append({"type": mapped, "area": room["area"]})
+    # 3. Profile defaults (only if no content found)
+    if not items:
+        items.extend(profile.get("default_floor_items", []))
+    return items
+```
+
+---
+
+### 11.4 Expanded PROJECT_TYPE_PROFILES
+
+Current code has no `PROJECT_TYPE_PROFILES` dict — `_calculate_from_room()` applies a single universal set of items. Add a profile dict covering all major building types:
+
+```python
+PROJECT_TYPE_PROFILES = {
+    "industrial": {
+        "default_floor_items": ["sealed_concrete", "exposed_structure"],
+        "skip_items": ["flooring", "ceiling_grid", "drywall"],
+        "expect_items": ["tilt_up_walls", "dock_doors", "columns", "bollards"],
+        "area_tolerance": 0.05,
+    },
+    "retail": {
+        "default_floor_items": ["flooring"],
+        "skip_items": ["sealed_concrete"],
+        "expect_items": ["storefront", "bollards", "canopy", "signage"],
+        "area_tolerance": 0.03,
+    },
+    "office": {
+        "default_floor_items": ["flooring", "ceiling_grid"],
+        "skip_items": ["sealed_concrete", "tilt_up_walls"],
+        "expect_items": ["drywall", "doors", "windows"],
+        "area_tolerance": 0.03,
+    },
+    "civil": {
+        "default_floor_items": [],
+        "skip_items": ["flooring", "ceiling_grid", "drywall"],
+        "expect_items": ["storm_pipe", "manholes", "catch_basins", "striping", "curb"],
+        "area_tolerance": 0.05,
+    },
+    "residential": {
+        "default_floor_items": ["flooring"],
+        "skip_items": ["exposed_structure", "tilt_up_walls"],
+        "expect_items": ["drywall", "insulation", "windows", "doors"],
+        "area_tolerance": 0.03,
+    },
+    "institutional": {
+        "default_floor_items": ["flooring", "ceiling_grid"],
+        "skip_items": ["sealed_concrete"],
+        "expect_items": ["drywall", "doors", "windows", "accessibility_features"],
+        "area_tolerance": 0.03,
+    },
+    "mixed_use": {
+        "default_floor_items": ["flooring"],
+        "skip_items": [],
+        "expect_items": ["storefront", "residential_units", "parking"],
+        "area_tolerance": 0.05,
+    },
+    "auto": {
+        # Determined by content-first logic; profile is a no-op fallback
+        "default_floor_items": [],
+        "skip_items": [],
+        "expect_items": [],
+        "area_tolerance": 0.05,
+    },
+}
+```
+
+**Auto-detection heuristics** (sheet title keywords → project type):
+
+| Keywords Found | Detected Type |
+|---|---|
+| "WAREHOUSE", "DISTRIBUTION", "INDUSTRIAL", "MANUFACTURING" | `industrial` |
+| "RETAIL", "STORE", "SHOWROOM", "MERCHANDISE" | `retail` |
+| "OFFICE", "TENANT IMPROVEMENT", "TI", "CORPORATE" | `office` |
+| "SITE PLAN", "GRADING", "UTILITY PLAN", "CIVIL" | `civil` |
+| "RESIDENCE", "DWELLING", "UNIT", "SINGLE FAMILY" | `residential` |
+| "SCHOOL", "HOSPITAL", "CLINIC", "GOVERNMENT" | `institutional` |
+| Multiple types present | `mixed_use` |
+| No match | `auto` |
+
+---
+
+### 11.5 Shared `takeoff_pipeline.py`
+
+Currently `pdf_analyzer.py` and `scraper.py` each implement their own sheet→extraction→calculation path. This duplication means a fix in one does not propagate to the other, and scraper-driven jobs (StackCT) will diverge from direct PDF analysis.
+
+**Required:** Extract the core pipeline into a shared module `takeoff_pipeline.py`:
+
+```python
+# takeoff_pipeline.py — consumed by BOTH pdf_analyzer.py AND scraper.py
+class TakeoffPipeline:
+    def run_sheet(self, page_image, sheet_id, sheet_type, project_type) -> dict:
+        passes = PASS_MATRIX.get(sheet_type, [])
+        results = {}
+        for pass_name in passes:
+            model = MODEL_ROUTING.get((sheet_type, pass_name), DEFAULT_MODEL)
+            results[pass_name] = self._run_pass(page_image, pass_name, model)
+        return self._merge_passes(results)
+
+    def run_project(self, pages: list, project_type: str = "auto") -> dict:
+        profile = PROJECT_TYPE_PROFILES[project_type]
+        sheets = [self.run_sheet(*p, project_type) for p in pages]
+        return aggregate_takeoff(sheets, profile)
+```
+
+`pdf_analyzer.py` and `scraper.py` both instantiate `TakeoffPipeline` — neither reimplements multi-pass logic.
+
+---
+
+### 11.6 Generic Noise Patterns for Sheet ID
+
+The current `_sheet_name_from_doc` (after RC-1 title-block fix) still needs a **noise filter** for alphanumeric codes found in drawing notes, specification callouts, and standard references. These must be excluded from sheet ID candidates.
+
+**Generic noise patterns** (not hardcoded `E283`):
+
+```python
+SHEET_ID_NOISE_PATTERNS = [
+    # Standards bodies
+    r"ASTM\s+[A-Z]\d+",           # ASTM A36, ASTM E283, ASTM C90
+    r"NFPA\s+\d+",                 # NFPA 13, NFPA 72
+    r"UL\s+\d+",                   # UL 300, UL 924
+    r"IBC\s+\d{4}",                # IBC 2021
+    r"ADA\s+\d+\.\d+",             # ADA 4.1.3
+    r"ANSI\s+[A-Z]\d+",            # ANSI A117.1
+    r"ASCE\s+\d+",                 # ASCE 7-22
+    r"AWC\s+NDS",                  # AWC NDS
+    # Callout/annotation patterns (dimension-like but not sheet IDs)
+    r"^\d+['\"]\s*[-–]\s*\d+",    # 6'-0", 12"-3"
+    r"^[A-Z]-\d+$",               # grid axis labels A-1, B-3
+    r"^\d{1,2}/\d{1,2}$",         # fractions 3/4
+]
+
+def _is_sheet_id_noise(candidate: str) -> bool:
+    return any(re.fullmatch(p, candidate.strip(), re.IGNORECASE)
+               for p in SHEET_ID_NOISE_PATTERNS)
+```
+
+**Rule:** Any candidate sheet ID must pass `not _is_sheet_id_noise(candidate)` before being accepted.
+
+---
+
+### 11.7 COUNT_PROMPT Rules for Any Discrete Symbol Class
+
+`COUNT_PROMPT` must provide generalizable rules that work for **any countable symbol class** — not just bollards. The critical distinction is always: **is this a dimension/annotation or an actual discrete object?**
+
+**Generic rules to include in COUNT_PROMPT:**
+
+```
+COUNTING RULES (apply to all symbol types):
+1. COUNT physical objects depicted as icons/symbols on the plan (bollards, columns, drains,
+   luminaires, trees, fire hydrants, parking stalls, structural bays).
+2. DO NOT COUNT dimension callouts (6'-0" TYP, 24" MAX, 3'-6" CLEAR).
+3. DO NOT COUNT grid/bay spacing labels (15' × 30', BAY = 40').
+4. DO NOT COUNT specification references (ASTM A36, HSS 6×6×3/8).
+5. When a detail sheet shows a typical symbol with spacing dimensions, count ZERO instances
+   of that symbol — spacing details show geometry, not project quantity.
+6. If the same symbol appears multiple times as a "TYPICAL" note (e.g., "TYP @ ALL COLUMNS"),
+   report "typical_instance": true and set quantity to null — do not guess total count.
+7. For gridded objects (columns, parking stalls), count all visible grid intersections that
+   have the symbol, even if they overlap the title block.
+```
+
+---
+
+### 11.8 MEASURE Covers All Linear Run Types
+
+`MEASURE_PROMPT` must enumerate every relevant linear run type, not just storm/sanitary pipe. The extraction schema for `linear_runs[]` must be generic:
+
+```python
+# Generic linear_runs[] schema
+{
+  "linear_runs": [
+    {
+      "type": str,       # "storm_pipe"|"gas_pipe"|"sanitary_pipe"|"duct"|"conduit"|
+                         # "guard_rail"|"handrail"|"striping"|"curb"|"trench_drain"|
+                         # "lintel"|"beam_run"|"fence"|"wall_footing"
+      "material": str,   # "PVC", "black steel", "CSST", "galv", "concrete", ...
+      "size": str,       # "6\"", "2\" SCH 40", "24×12", ...
+      "length_lf": float,
+      "notes": str       # "ROOF PLAN", "PARKING LOT", ...
+    }
+  ]
+}
+```
+
+**All linear run types that MEASURE_PROMPT must recognize:**
+
+| Category | Types | Common Materials |
+|---|---|---|
+| Plumbing/Civil | storm pipe, sanitary pipe, water main, gas pipe | PVC, DIP, HDPE, black steel, CSST, copper |
+| HVAC | supply duct, return duct, exhaust duct, refrigerant line | galv steel, flex, copper |
+| Electrical | conduit, cable tray, wireway | EMT, RGS, PVC conduit |
+| Site/Civil | curb & gutter, striping, swale, fence, guard rail | concrete, paint, wire, steel |
+| Structural | lintel, beam run, wall footing, grade beam | CMU, steel angle, concrete |
+| Architectural | handrail, trench drain, expansion joint | steel, stainless, concrete |
+
+---
+
+### 11.9 ITEM_NAME_MAP: Full Masterv2 §C Taxonomy Coverage
+
+Current `ITEM_NAME_MAP` in `aggregator.py` has 34 entries covering approximately 40% of items found in real construction take-offs. It must be expanded to cover the full taxonomy implied by Masterv2 §C categories.
+
+**Missing categories to add:**
+
+```python
+# Structural
+(r"cmu.*wall|masonry.*wall|block.*wall", "CMU Wall", "SF"),
+(r"tilt.*up.*panel|concrete.*panel", "Tilt Up Panels", "SF"),
+(r"sealed.*concrete|polished.*concrete|finished.*concrete", "Sealed Concrete", "SF"),
+(r"exposed.*concrete|bare.*slab", "Exposed Structure", "SF"),
+(r"lintel", "Lintels", "LF"),
+(r"dock.*door|overhead.*door", "Dock Doors", "EA"),
+(r"dock.*leveler|dock.*seal", "Dock Equipment", "EA"),
+
+# Civil/Site
+(r"curb.*gutter|curb\b", "Curb & Gutter", "LF"),
+(r"asphalt|paving|ac.*pave", "Asphalt Paving", "SF"),
+(r"concrete.*paving|flatwork", "Concrete Flatwork", "SF"),
+(r"striping|traffic.*marking|parking.*stall", "Striping", "LF"),
+(r"storm.*pipe|storm.*sewer|rcp\b|rcp\s", "Storm Pipe", "LF"),
+(r"gas.*pipe|gas.*main|csst|black.*steel.*pipe", "Gas Pipe", "LF"),
+(r"sanitary.*pipe|sewer.*pipe", "Sanitary Pipe", "LF"),
+(r"water.*main|water.*line", "Water Main", "LF"),
+(r"fire.*hydrant", "Fire Hydrants", "EA"),
+(r"detention|retention.*pond|bioswale", "Stormwater Features", "EA"),
+
+# MEP
+(r"conduit\b", "Conduit", "LF"),
+(r"duct\b|ductwork", "Ductwork", "LF"),
+(r"vav\b", "VAV Boxes", "EA"),
+(r"rtu\b|rooftop.*unit", "Rooftop Units", "EA"),
+(r"sprinkler.*head|fire.*sprinkler", "Sprinkler Heads", "EA"),
+(r"fire.*alarm|smoke.*detector", "Fire Alarm Devices", "EA"),
+
+# Exterior
+(r"canopy\b", "Canopy", "SF"),
+(r"eifs|exterior.*insulation.*finish", "EIFS", "SF"),
+(r"cmu.*paint|masonry.*paint", "CMU Paint", "SF"),
+(r"storefront|curtain.*wall", "Storefront/Curtain Wall", "SF"),
+(r"ladder\b", "Ladder", "EA"),
+(r"fence\b", "Fence", "LF"),
+
+# Interior
+(r"door.*frame|frame.*hm|hollow.*metal.*frame", "Frames-HM", "EA"),
+(r"hollow.*metal.*door|door.*hm\b", "Doors-HM", "EA"),
+(r"wood.*door|door.*wd\b|door.*wood", "Doors-WD", "EA"),
+(r"glass.*door|aluminum.*door", "Doors-GL", "EA"),
+(r"suspended.*ceil|gyp.*ceil", "Drywall Ceiling", "SF"),
+```
+
+---
+
+### 11.10 Generalization Test Suite: Synthetic Fixture JSON
+
+To test the pipeline across all plan types **without requiring PDFs**, create synthetic extraction JSON fixtures per `sheet_type`. These are the Claude extraction output structures that `calculator.py` and `aggregator.py` consume — bypassing the vision layer entirely.
+
+**Fixture directory:** `tests/fixtures/synthetic/`
+
+```
+tests/fixtures/synthetic/
+├── floor_plan_industrial.json      # Crow Cass-like: sealed concrete, columns, bollards
+├── floor_plan_retail.json          # Bob's-like: flooring, storefront, bollards
+├── floor_plan_office.json          # Flooring, drywall, ceiling grid, doors
+├── elevation_retail.json           # Canopy, EIFS, CMU paint, lintels, bollards
+├── civil_site_commercial.json      # Storm pipe, manholes, curb, striping, asphalt
+├── schedule_door_mixed.json        # HM frames, HM doors, WD doors, GL doors
+├── schedule_finish.json            # Room-by-room finishes (flooring/paint/ceiling)
+├── detail_sheet.json               # Bollard detail (spacing dims, NOT bollard count)
+├── roof_plan_retail.json           # Gas pipe, drains, RTUs
+└── mep_plan_office.json            # Conduit, ductwork, VAV, panels
+```
+
+**Fixture format** (matches Claude extraction output schema):
+
+```python
+# tests/fixtures/synthetic/civil_site_commercial.json
+{
+  "sheet_id": "C1.0",
+  "sheet_type": "civil_site",
+  "project_type": "civil",
+  "rooms": [],
+  "components": [
+    {"name": "storm manhole", "quantity": 8, "unit": "EA"},
+    {"name": "catch basin", "quantity": 12, "unit": "EA"}
+  ],
+  "linear_runs": [
+    {"type": "storm_pipe", "material": "RCP", "size": "18\"", "length_lf": 342.5},
+    {"type": "curb_gutter", "material": "concrete", "length_lf": 1240.0},
+    {"type": "striping", "material": "paint", "length_lf": 890.0}
+  ],
+  "schedules": [],
+  "civil_structures": [
+    {"type": "storm_manhole", "count": 8},
+    {"type": "catch_basin", "count": 12}
+  ]
+}
+```
+
+**Test:** `pytest tests/test_generalization.py -v` — one test per fixture asserting that:
+1. Correct `sheet_type` passes are applied
+2. Calculator produces non-zero quantities for expected item types
+3. No wrong item types appear (e.g., `Flooring` in a civil fixture)
+4. ITEM_NAME_MAP maps all extracted items to canonical names
+
+---
+
+### 11.11 StackCT Scraper Parity Requirement
+
+`scraper.py` fetches plan set pages from StackCT and feeds them into the takeoff pipeline. Currently the scraper path does not call the same multi-pass extraction that `pdf_analyzer.py` uses. After Phase 20, **both paths must produce identical output for the same page image**.
+
+**Parity test:**
+
+```python
+# tests/test_scraper_parity.py
+def test_scraper_pdf_analyzer_parity(sample_page_image, sample_sheet_meta):
+    """Same page through scraper path and pdf_analyzer path must produce
+    quantities within 1% of each other."""
+    pipeline = TakeoffPipeline()
+    scraper_result  = pipeline.run_sheet(sample_page_image, **sample_sheet_meta)
+    analyzer_result = pdf_analyzer_run_sheet(sample_page_image, **sample_sheet_meta)
+    for item in scraper_result["items"]:
+        name = item["name"]
+        ai = item["quantity"]
+        ref = next((x["quantity"] for x in analyzer_result["items"] if x["name"] == name), None)
+        assert ref is not None, f"Item {name!r} missing from pdf_analyzer output"
+        assert abs(ai - ref) / max(ref, 1) <= 0.01, f"{name}: {ai} vs {ref}"
+```
+
+**Implementation requirement:** Both `pdf_analyzer.py` and `scraper.py` must import and call `TakeoffPipeline` from `takeoff_pipeline.py` (see §11.5). Any sheet-level extraction logic that exists in only one file must be migrated to the shared pipeline.
+
+---
+
+## 12. What Must NOT Be Hardcoded
+
+The following anti-patterns were introduced while targeting Crow Cass and Bob's Discount specifically. They will cause silent failures on any other project type.
+
+### 12.1 Sheet ID Pattern Hardcoding
+
+**Anti-pattern:**
+```python
+# BAD — only matches architectural and structural sheets; skips civil, MEP, specialty
+if re.match(r'^[AS]\d', sheet_id):
+    run_passes(...)
+```
+
+**Correct approach:** Run passes on ALL sheet types that have a `sheet_type` classification. Gate on `sheet_type`, not sheet ID prefix.
+
+---
+
+### 12.2 Hardcoded Standard Reference in Noise Filter
+
+**Anti-pattern:**
+```python
+# BAD — only filters E283; NFPA 13, UL 300 still cause mislabeling
+if candidate == "E283":
+    skip()
+```
+
+**Correct approach:** Generic `SHEET_ID_NOISE_PATTERNS` list as defined in §11.6. Adding a new standard never requires a code change.
+
+---
+
+### 12.3 Project-Specific Item Names in Prompts
+
+**Anti-pattern:**
+```python
+# BAD — only finds bollards named exactly "bollard"; misses "vehicle barrier",
+# "k-rated post", "DSC-HB", "surface-mount bollard"
+COUNT_PROMPT = "...count bollards (round steel posts at parking areas)..."
+```
+
+**Correct approach:** Count any **discrete symbol class** that appears as repeated icons; use the generic rules from §11.7. The item name is extracted from the drawing label, not matched against a hardcoded list.
+
+---
+
+### 12.4 Hardcoded Room Area → Item Type Mapping
+
+**Anti-pattern:**
+```python
+# BAD — industrial slab area gets Flooring because there is no project-type gate
+def _calculate_from_room(room, **kwargs):
+    area = room["area"]
+    items = []
+    items.append({"type": "flooring", "qty": area})   # always adds Flooring
+    items.append({"type": "ceiling_grid", "qty": area}) # always adds Ceiling
+    return items
+```
+
+**Correct approach:** `PROJECT_TYPE_PROFILES` + content-first notes/materials override as described in §11.3–11.4.
+
+---
+
+### 12.5 Golden Fixture Item Lists as Completeness Gates
+
+**Anti-pattern:** Asserting that the system must produce **exactly** the items in Crow Cass golden (and only those items). This would fail for any retail, office, or civil project that legitimately has different item types.
+
+**Correct approach:** Golden tests assert accuracy on items that ARE expected for that project type. A civil project NOT having `Flooring` is correct, not a failure.
+
+---
+
+### 12.6 Model Routing by Sheet Number Range
+
+**Anti-pattern:**
+```python
+# BAD — A3-A8 is an architectural range; civil C-sheets, MEP M/E/P sheets excluded
+if re.match(r"A[3-8]", sheet_id):
+    use_sonnet()
+```
+
+**Correct approach:** Route by `(sheet_type, pass_name)` tuple as defined in `MODEL_ROUTING` (§11.2). A civil elevation sheet (`C3.0`) gets Sonnet for the measure pass because its `sheet_type` is `elevation`, regardless of sheet ID prefix.
+
+---
+
+### 12.7 Prompt Examples Tied to Specific Projects
+
+**Anti-pattern:** COUNT_PROMPT or MEASURE_PROMPT includes example output JSON with Crow Cass quantities (`28 bollards`, `395,673 SF`). This biases Claude toward those values on other projects.
+
+**Correct approach:** Example JSON in prompts must use **synthetic/generic values** (e.g., `12 bollards`, `45,000 SF`) that don't anchor to any real project.
+
+---
+
+## 13. Updated Implementation Sequence
+
+The original plan (in existing 20-xx-PLAN.md files) was organized around fixing the 8 root causes for Crow Cass + Bob's Discount. With the generalization requirement, the dependency order shifts to **architecture-first**: shared pipeline and generic data structures must be established before fixing specific root causes, or those fixes will only work for the two golden projects.
+
+### Revised Phase 20 Task Order
+
+```
+Phase 20 — Implementation Sequence (Generalization-First)
+
+LAYER 0: Foundation (no dependencies; must be done first)
+  20-A1  Create takeoff_pipeline.py with TakeoffPipeline class (§11.5)
+  20-A2  Add SHEET_TYPE classification to pdf_analyzer pre-scan
+  20-A3  Add PROJECT_TYPE_PROFILES to calculator.py (§11.4)
+  20-A4  Implement SHEET_ID_NOISE_PATTERNS in pdf_analyzer (§11.6)
+
+LAYER 1: Data Structures (depends on Layer 0)
+  20-B1  Extend EXTRACTION_PROMPT with generic linear_runs[] schema (§11.8)
+  20-B2  Extend EXTRACTION_PROMPT with generic COUNT_PROMPT rules (§11.7)
+  20-B3  Expand ITEM_NAME_MAP to full Masterv2 §C taxonomy (§11.9)
+  20-B4  Implement content-first room classification in _calculate_from_room (§11.3)
+
+LAYER 2: Pass Routing (depends on Layer 0 + Layer 1)
+  20-C1  Implement PASS_MATRIX + MODEL_ROUTING in TakeoffPipeline (§11.2)
+  20-C2  Migrate pdf_analyzer.py to call TakeoffPipeline (§11.5)
+  20-C3  Migrate scraper.py to call TakeoffPipeline (§11.11)
+
+LAYER 3: Root Cause Fixes (depends on Layer 2)
+  [RC-1]  Title-block sheet ID fix (§1) — uses SHEET_ID_NOISE_PATTERNS from 20-A4
+  [RC-2]  Project-type profiles (§2) — uses PROJECT_TYPE_PROFILES from 20-A3
+  [RC-3]  Null quantity retry (§3)
+  [RC-4]  Gas pipe linear extraction (§4) — uses generic linear_runs[] from 20-B1
+  [RC-5]  Lintel linear extraction (§5) — uses generic linear_runs[] from 20-B1
+  [RC-6]  Bollard detail confusion (§6) — uses generic COUNT_PROMPT from 20-B2
+  [RC-7]  Door schedule verification pass (§7)
+  [RC-8]  Golden accuracy gate (§8)
+
+LAYER 4: Testing (depends on Layer 3)
+  20-D1  Synthetic fixture JSON per sheet_type (§11.10)
+  20-D2  test_generalization.py — all sheet types, no PDF required
+  20-D3  test_golden_takeoff.py — Crow Cass + Bob's Discount regression
+  20-D4  test_scraper_parity.py — scraper vs pdf_analyzer parity (§11.11)
+```
+
+### Dependency Diagram
+
+```
+takeoff_pipeline.py ──────────────────────────────┐
+SHEET_TYPE classification ────────────────────────┤
+PROJECT_TYPE_PROFILES ────────────────────────────┤
+SHEET_ID_NOISE_PATTERNS ──────────────────────────┤
+                                                   ▼
+generic linear_runs[] ──── PASS_MATRIX + MODEL_ROUTING
+generic COUNT_PROMPT  ────         │
+full ITEM_NAME_MAP    ────         │
+content-first rooms   ────         ▼
+                          pdf_analyzer (migrated)
+                          scraper (migrated)
+                                   │
+                          RC-1 through RC-8 fixes
+                                   │
+                          Synthetic fixtures ──── test_generalization.py
+                          Golden CSVs       ──── test_golden_takeoff.py
+                          Parity test       ──── test_scraper_parity.py
+```
+
+### Key Principle: Each Layer Is Independently Verifiable
+
+| Layer | Verification Method |
+|---|---|
+| Layer 0 | Unit tests on `TakeoffPipeline` instantiation, sheet_type classification, profile lookup |
+| Layer 1 | Unit tests on prompt schema, ITEM_NAME_MAP matching, room classifier |
+| Layer 2 | Integration test: dummy image through pipeline, assert correct passes invoked |
+| Layer 3 | Golden file tests (Crow Cass, Bob's) must pass |
+| Layer 4 | Full test suite: `pytest tests/ -v` exits 0 |
+
+---
+
+## RESEARCH COMPLETE (GENERALIZATION UPDATE)
 
 **Phase:** 20 — Takeoff Measurement Precision  
+**Update:** Generalization Architecture — Plan-Type Agnostic  
 **Confidence:** HIGH
 
-### Key Findings
+### Key Findings (Original + Generalization)
 
+**Original (RC-1 through RC-8):**
 - All 8 root causes are in code and fixable without pipeline rewrite; most are 1–2 function changes
-- Title-block fix (RC-1) uses PyMuPDF word bounding boxes to search only the bottom-right 20% of the page — eliminates ASTM/standard-number false positives
-- Multi-pass extraction (COUNT + MEASURE + SCHEDULE) is the highest-impact single change; COUNT_PROMPT explicitly distinguishes dimension numbers from symbol counts (fixes RC-6 bollard error)
-- Project-type profiles (industrial vs. retail) in `_calculate_from_room()` eliminate the Flooring-for-Sealed-Concrete misclassification (RC-2); auto-detect via sheet title heuristics
-- Gas pipe and lintel linear extraction requires prompt additions + new `lintel_runs[]` structure in the calculator (RC-4, RC-5)
+- Title-block fix (RC-1) uses PyMuPDF word bounding boxes to search only the bottom-right 20% of the page
+- Multi-pass extraction (COUNT + MEASURE + SCHEDULE) is the highest-impact single change
+- Project-type profiles (industrial vs. retail) in `_calculate_from_room()` eliminate Flooring-for-Sealed-Concrete
+- Gas pipe and lintel linear extraction requires prompt additions + new `lintel_runs[]` structure
 - 14 missing `ITEM_NAME_MAP` entries account for all Crow Cass items absent from aggregator output
-- `GoldenValidator` class + `test_golden_takeoff.py` provides the numeric accuracy gate that was completely absent in Phase 16 (RC-8)
-- Model routing: elevation/detail `A3-A8` sheets → Sonnet for measure pass; all schedule passes → Sonnet; simple civil/floor plans → Haiku. Cost increase ~$0.08/project (fully justified by accuracy gain)
+- `GoldenValidator` + `test_golden_takeoff.py` provides the numeric accuracy gate absent in Phase 16
+- Model routing: elevation/detail sheets → Sonnet; schedules → Sonnet; floor plans → Haiku
 
-### File Created
+**Generalization (§11–§13):**
+- Golden files are regression fixtures ONLY — Crow Cass and Bob's Discount are not the product scope
+- Sheet-type + drawing discipline drives all pass routing; `^[AS]\d` pattern must be eliminated
+- `PASS_MATRIX` covers floor_plan, elevation, civil_site, schedule, detail, title_sheet, roof_plan, mep_plan
+- Content-first room mapping (notes → materials → profile → auto) prevents cross-type mislabeling
+- `PROJECT_TYPE_PROFILES` covers 7 building types + auto; auto-detected from sheet title keywords
+- `takeoff_pipeline.py` shared module eliminates divergence between pdf_analyzer and scraper paths
+- Generic `SHEET_ID_NOISE_PATTERNS` replaces the hardcoded `E283` noise filter
+- `COUNT_PROMPT` rules apply to any discrete symbol class, not bollard-specific
+- `MEASURE` schema covers 20+ linear run types across plumbing, HVAC, electrical, site, structural
+- `ITEM_NAME_MAP` expanded to ~70 entries covering full Masterv2 §C taxonomy
+- Synthetic JSON fixtures allow testing all sheet types without PDFs
+- StackCT scraper parity test enforces that scraper and pdf_analyzer produce identical output
 
-`.planning/phases/20-takeoff-measurement-precision/20-RESEARCH.md`
+### Implementation Sequence
+
+**Layer 0 first** (shared pipeline + data structures), then RC fixes, then tests. See §13 for full dependency order.
+
+### Files Created
+
+`.planning/phases/20-takeoff-measurement-precision/20-RESEARCH.md` (updated with §11–§13)
 
 ### Confidence Assessment
 
 | Area | Level | Reason |
 |------|-------|--------|
 | Root cause mapping | HIGH | Verified against actual code + golden run error data |
-| Title block fix | HIGH | PyMuPDF bounding box API is stable; location of title block is ANSI standard |
-| Multi-pass prompting | HIGH | Directly addresses identified confusion between dimension numbers and counts |
-| Project-type profiles | HIGH | Error data confirms room-based calc is wrong for industrial; profile values match golden |
-| Linear run extraction | HIGH | Prompt extension follows existing `pipe_runs[]` pattern exactly |
-| Model routing | HIGH | Changes are conservative and target only sheets with documented failures |
-| Golden test design | HIGH | Standard pytest fixture pattern; matches error metric spec from CONTEXT.md |
-| Verification loop | MEDIUM | Sanity bounds need tuning; retry adds API cost; mark as v2 if needed |
+| Generalization architecture | HIGH | Derived from first-principles analysis of the existing code paths and failure modes |
+| Sheet-type classification | HIGH | Heuristics based on standard ANSI/AIA drawing conventions |
+| PROJECT_TYPE_PROFILES | HIGH | Building type taxonomies are well-established in construction industry |
+| ITEM_NAME_MAP expansion | HIGH | Masterv2 §C taxonomy + direct code inspection of aggregator.py |
+| Synthetic test fixtures | HIGH | Standard pytest fixture pattern; no external dependency |
+| Scraper parity requirement | HIGH | Architectural requirement — shared pipeline eliminates divergence |
+| Noise pattern generics | HIGH | Pattern covers known standards bodies (ASTM/NFPA/UL/IBC/ADA) exhaustively |
 
 ### Open Questions
 
-1. Golden PDFs need to be placed in `tests/fixtures/` (uploads/ is empty; confirm delivery mechanism)
-2. Bob's A4.0 elevation page is missing from the uploaded plan set — golden test must reflect only uploaded sheets
-3. Crow Cass column H-35' height requires structural schedule SCHEDULE_PROMPT run to extract spec tag
+1. Golden PDFs delivery mechanism (still unresolved from original research)
+2. Bob's A4.0 elevation page missing from upload — parity test needs this page
+3. Whether `takeoff_pipeline.py` extraction warrants a separate Phase 20 task or is bundled with RC fixes
+4. StackCT page image format (PIL Image vs base64 str) — verify scraper provides same format as pdf_analyzer before parity test
 
 ### Ready for Planning
 
-Research complete. Planner can now create PLAN.md files for Phase 20.
+Generalization update complete. Planner must use **Layer 0 → Layer 1 → Layer 2 → Layer 3 → Layer 4** sequence from §13. Any plan that fixes RC-1 through RC-8 without first establishing `takeoff_pipeline.py` and `SHEET_TYPE` classification will produce project-specific fixes, not a generalizable pipeline.
