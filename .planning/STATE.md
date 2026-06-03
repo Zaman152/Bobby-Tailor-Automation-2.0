@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — Takeoff Measurement Precision (Plans 20-00 through 20-03 complete)
+**Current focus:** Phase 20 — Takeoff Measurement Precision (Plans 20-00 through 20-04 complete)
 
 ## Current Position
 
 Phase: 20 of 20+ (Takeoff Measurement Precision) — In progress  
-Plan: 4/7 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness + 20-03 prompts)  
-Status: COUNT_PROMPT + SCHEDULE_PROMPT + merge_passes + analyze_drawing pass_type/model_override live  
-Last activity: 2026-06-03 — Completed 20-03-PLAN.md (generalized prompts + multi-pass infrastructure)
+Plan: 5/7 complete (20-00 pipeline skeleton + 20-01 title-block fix + 20-02 test harness + 20-03 prompts + 20-04 content-first profiles)  
+Status: Content-first room mapping live; 27 tests pass, 1 xfail (HM/WD door separation — 20-05)  
+Last activity: 2026-06-03 — Completed 20-04-PLAN.md (content-first room mapping + project type profiles)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -171,6 +171,16 @@ None yet.
 | `browser_closed` flag in `finally` prevents double-close after Pass 1 | 17-02 |
 | `phase="capturing"` in progress_callback during Pass 1 | 17-02 |
 
+### 20-04 Decisions
+
+| Decision | Source |
+|----------|--------|
+| Content notes override profile skip_items — explicit drawing content always wins (VCT on industrial → flooring) | 20-04 |
+| Floor/ceiling/wall handled as independent priority chains in _calculate_from_room | 20-04 |
+| auto profile has empty default lists → universal fallback preserves pre-20-04 behavior | 20-04 |
+| _detect_project_type uses keyword scoring across sheet_title + notes; ties → mixed_use | 20-04 |
+| Gas pipe detected by material keyword (black steel/gas/csst); default → storm_pipe | 20-04 |
+
 ### Blockers/Concerns
 
 - StackCT DOM brittleness (`#canvas-interaction`, `[data-page-id]`, Auth0) — mitigated in Phase 2
@@ -180,6 +190,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-03 18:46 UTC  
-Stopped at: Completed 20-03-PLAN.md (COUNT_PROMPT + SCHEDULE_PROMPT + analyze_drawing pass_type + merge_passes)  
-Resume file: .planning/phases/20-takeoff-measurement-precision/20-04-PLAN.md
+Last session: 2026-06-03 18:50 UTC  
+Stopped at: Completed 20-04-PLAN.md (content-first room mapping + PROJECT_TYPE_PROFILES + gas pipe fix)  
+Resume file: .planning/phases/20-takeoff-measurement-precision/20-05-PLAN.md
