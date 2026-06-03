@@ -10,28 +10,95 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 from claude_analyzer import analyze_drawing
-from calculator import apply_estimation_tables
+from calculator import apply_estimation_tables, resolve_spec_lookups
+from cross_references import resolve_cross_references
 from reporter import generate_report
 from config import SCREENSHOTS_DIR
 
 logger = logging.getLogger(__name__)
 
+# Generic noise patterns for building-code / standard references that can
+# produce alphanumeric tokens matching sheet-ID regexes.  Adding a new
+# standards body never requires touching _sheet_name_from_doc.
+SHEET_ID_NOISE_PATTERNS: list[str] = [
+    r"ASTM\s+[A-Z]\d+[\.\d]*",   # ASTM A36, ASTM E283, ASTM C90
+    r"NFPA\s+\d+",                # NFPA 13, NFPA 72
+    r"UL\s+\d+",                  # UL 300, UL 924
+    r"IBC\s+\d{4}",               # IBC 2021
+    r"ADA\s+\d+\.\d+",            # ADA 4.1.3
+    r"ANSI\s+[A-Z]\d+",           # ANSI A117.1
+    r"ASCE\s+\d+",                # ASCE 7-22
+    r"AWC\s+NDS",                 # AWC NDS
+    r"\d{1,2}/\d{1,2}",           # fractional annotations: 3/4, 1/2
+]
 
-def _page_to_image(pdf_path: str, page_num: int, out_dir: str, zoom: float = 2.0) -> str:
-    doc = fitz.open(pdf_path)
-    pix = doc[page_num].get_pixmap(matrix=fitz.Matrix(zoom, zoom))
-    out = os.path.join(out_dir, f"page_{page_num+1:03d}.png")
-    pix.save(out)
-    doc.close()
-    return out
+# Sheet-ID candidate patterns in priority order (most-specific first).
+# Covers: A4.0, S1.2, M3.1, G0.1, C-4, A-101, A101
+_SHEET_ID_CANDIDATE_PATTERNS: list[str] = [
+    r"[A-Z]\d+\.\d+",   # decimal form: A4.0, S1.2, M3.1
+    r"[A-Z]-\d+",        # hyphenated form: A-101, C-4
+    r"[A-Z]\d{3}",       # three-digit form: A101, S120
+]
+
+
+def _is_noise_sheet_candidate(candidate: str, page_text: str) -> bool:
+    """Return True if *candidate* is part of a standards/code reference in *page_text*.
+
+    Searches page_text for every noise pattern; if the candidate string appears
+    inside any matched phrase it is classified as noise (e.g. "E283" inside
+    "ASTM E283").
+    """
+    for pat in SHEET_ID_NOISE_PATTERNS:
+        for match in re.finditer(pat, page_text, re.IGNORECASE):
+            if candidate in match.group(0):
+                return True
+    return False
+
+
+def get_title_block_text(doc: fitz.Document, page_num: int) -> str:
+    """Return the raw text of the title-block region (bottom-right quadrant).
+
+    Construction drawings per ANSI/ASME Y14.1 place the title block in the
+    bottom-right ~20 % (height) × 45 % (width) of the sheet.  Using
+    word-level bounding boxes avoids merging text from unrelated regions.
+    """
+    page = doc[page_num]
+    words = page.get_text("words")   # (x0, y0, x1, y1, word, ...)
+    height = page.rect.height
+    width = page.rect.width
+    title_block_words = [
+        w[4] for w in words
+        if w[1] > height * 0.80 and w[0] > width * 0.55
+    ]
+    return " ".join(title_block_words)
 
 
 def _sheet_name_from_doc(doc: fitz.Document, page_num: int) -> str:
-    text = doc[page_num].get_text()
-    for pat in [r'\b([A-Z]\d{3})\b', r'\b([A-Z]\d+\.\d+)\b']:
-        m = re.search(pat, text)
-        if m:
-            return m.group(1)
+    """Extract sheet ID from title-block region; fall back to full-page scan.
+
+    Priority search order: decimal (A4.0) → hyphenated (A-101, C-4) →
+    three-digit (A101).  Noise rejection via SHEET_ID_NOISE_PATTERNS is
+    applied in both the title-block pass and the full-page fallback so that
+    standards references like "ASTM E283" are never returned as a sheet ID
+    regardless of where they appear on the page.
+    """
+    title_block_text = get_title_block_text(doc, page_num)
+
+    # Primary: title-block region — apply noise filter using title-block context
+    for pat in _SHEET_ID_CANDIDATE_PATTERNS:
+        for m in re.finditer(r"\b(" + pat + r")\b", title_block_text):
+            candidate = m.group(1)
+            if not _is_noise_sheet_candidate(candidate, title_block_text):
+                return candidate
+
+    # Fallback: full-page scan with noise rejection against full-page context
+    full_text = doc[page_num].get_text()
+    for pat in _SHEET_ID_CANDIDATE_PATTERNS:
+        for m in re.finditer(r"\b(" + pat + r")\b", full_text):
+            candidate = m.group(1)
+            if not _is_noise_sheet_candidate(candidate, full_text):
+                return candidate
+
     return f"Page_{page_num + 1}"
 
 
@@ -44,15 +111,27 @@ def _sheet_name(pdf_path: str, page_num: int) -> str:
 
 
 def get_pdf_metadata(pdf_path: str) -> dict:
-    """Extract page count, file size, and sheet names without rendering."""
+    """Extract page count, file size, sheet names, and optional type hints."""
+    # Optional sheet-type classifier from Phase 20-00; skip gracefully if absent
+    try:
+        from sheet_pass_matrix import classify_sheet_type_from_text  # type: ignore
+        _classify = classify_sheet_type_from_text
+    except ImportError:
+        _classify = None
+
     doc = fitz.open(pdf_path)
     try:
         pages = []
         for i in range(len(doc)):
-            pages.append({
+            sheet_name = _sheet_name_from_doc(doc, i)
+            entry: dict = {
                 "page_num": i + 1,
-                "sheet_name": _sheet_name_from_doc(doc, i),
-            })
+                "sheet_name": sheet_name,
+            }
+            if _classify is not None:
+                tb_text = get_title_block_text(doc, i)
+                entry["sheet_type_hint"] = _classify(tb_text or doc[i].get_text())
+            pages.append(entry)
         return {
             "page_count": len(doc),
             "file_size_bytes": os.path.getsize(pdf_path),
@@ -124,4 +203,6 @@ def run_pdf_analysis(
                 )
             all_estimates.extend(apply_estimation_tables(extracted))
 
-    return generate_report(project_name, all_extracted, all_estimates)
+    cross_refs = resolve_cross_references(all_extracted)
+    all_estimates = resolve_spec_lookups(all_extracted, all_estimates)
+    return generate_report(project_name, all_extracted, all_estimates, cross_references=cross_refs)
