@@ -10,6 +10,7 @@ Tests verify:
   - Merge logic: count-pass components added; high-confidence upgrades null qty
   - Pipeline metadata (_source_sheet, _sheet_type, _passes_run) attached
   - schedule_result populates schedules[] in merged output
+  - run_project orchestrates multi-sheet flow with project_type detection
 """
 
 from __future__ import annotations
@@ -26,15 +27,10 @@ import pytest
 _CONFIG_MOCK = MagicMock()
 _CONFIG_MOCK.CLAUDE_MODEL = "claude-haiku-4-5"
 _CONFIG_MOCK.CLAUDE_MODEL_SCHEDULES = "claude-sonnet-4-5"
-
-_CA_MOCK = MagicMock()
-_CA_MOCK._pick_model.return_value = "claude-haiku-4-5"
-
-# Provide a default analyze_drawing stub (tests override via analyzer= arg)
-_CA_MOCK.analyze_drawing.return_value = {"components": [], "measurements": []}
+_CONFIG_MOCK.ANTHROPIC_API_KEY = "test-key"
 
 sys.modules.setdefault("config", _CONFIG_MOCK)
-sys.modules.setdefault("claude_analyzer", _CA_MOCK)
+sys.modules.setdefault("anthropic", MagicMock())
 
 import importlib.util, pathlib
 
@@ -45,11 +41,24 @@ def _load(name: str):
     spec.loader.exec_module(mod)
     return mod
 
+# Load the real claude_analyzer to get the canonical merge_passes implementation.
+# merge_passes does no API calls so it's safe to load with mocked anthropic/config.
+_real_ca = _load("claude_analyzer")
+
+# Replace the claude_analyzer module in sys.modules with a mock that keeps the
+# real merge_passes but stubs out analyze_drawing (avoid real API calls).
+_CA_MOCK = MagicMock()
+_CA_MOCK._pick_model.return_value = "claude-haiku-4-5"
+_CA_MOCK.analyze_drawing.return_value = {"components": [], "measurements": []}
+_CA_MOCK.merge_passes = _real_ca.merge_passes  # real implementation; not a MagicMock
+
+sys.modules["claude_analyzer"] = _CA_MOCK
+
 _spm = _load("sheet_pass_matrix")
 _tp  = _load("takeoff_pipeline")
 
 TakeoffPipeline = _tp.TakeoffPipeline
-merge_passes    = _tp.merge_passes
+merge_passes    = _real_ca.merge_passes  # test the canonical implementation directly
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +166,7 @@ class TestFloorPlanPasses:
         """Count pass must be executed before measure pass."""
         call_order = []
 
-        def mock_analyzer(image_path, sheet_name):
+        def mock_analyzer(image_path, sheet_name, **kwargs):
             call_order.append(len(call_order))
             return _make_count_result() if len(call_order) == 1 else _make_measure_result()
 
@@ -315,3 +324,155 @@ class TestAutoClassify:
 
         assert result["_sheet_type"] == "civil_site"
         assert mock_analyzer.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# QuantityVerifier
+# ---------------------------------------------------------------------------
+
+class TestQuantityVerifier:
+    """QuantityVerifier flags out-of-range quantities but does not raise."""
+
+    def _verifier(self):
+        from takeoff_pipeline import QuantityVerifier  # type: ignore[attr-defined]
+        return _tp.QuantityVerifier()
+
+    def test_in_range_ea_returns_no_flags(self):
+        v = self._verifier()
+        extracted = {
+            "components": [{"name": "Door", "quantity": 10, "unit": "ea"}],
+            "measurements": [],
+        }
+        assert v.verify(extracted, "A2.1") == []
+
+    def test_out_of_range_ea_flagged(self):
+        v = self._verifier()
+        extracted = {
+            "components": [{"name": "Door", "quantity": 99999, "unit": "ea"}],
+            "measurements": [],
+        }
+        flags = v.verify(extracted, "A2.1")
+        assert len(flags) == 1
+        assert flags[0]["item"] == "Door"
+        assert flags[0]["unit"] == "ea"
+
+    def test_out_of_range_sf_flagged(self):
+        v = self._verifier()
+        extracted = {
+            "components": [],
+            "measurements": [{"description": "Flooring", "value": 999999, "unit": "sf"}],
+        }
+        flags = v.verify(extracted)
+        assert len(flags) == 1
+        assert flags[0]["unit"] == "sf"
+
+    def test_null_quantity_not_flagged(self):
+        v = self._verifier()
+        extracted = {
+            "components": [{"name": "Column", "quantity": None, "unit": "ea"}],
+            "measurements": [],
+        }
+        assert v.verify(extracted) == []
+
+    def test_unknown_unit_not_flagged(self):
+        v = self._verifier()
+        extracted = {
+            "components": [{"name": "Beam", "quantity": 9999999, "unit": "unknown"}],
+            "measurements": [],
+        }
+        assert v.verify(extracted) == []
+
+    def test_non_numeric_quantity_not_flagged(self):
+        v = self._verifier()
+        extracted = {
+            "components": [{"name": "Duct", "quantity": "TBD", "unit": "lf"}],
+            "measurements": [],
+        }
+        assert v.verify(extracted) == []
+
+
+# ---------------------------------------------------------------------------
+# run_project
+# ---------------------------------------------------------------------------
+
+def _make_floor_plan_responses():
+    """Two responses: count pass then measure pass for a floor_plan."""
+    return [_make_count_result(), _make_measure_result()]
+
+
+class TestRunProject:
+    """TakeoffPipeline.run_project orchestrates a multi-sheet project run."""
+
+    def _pipeline(self, responses: list[dict]) -> TakeoffPipeline:
+        return TakeoffPipeline(analyzer=_make_analyzer(responses))
+
+    def test_run_project_returns_three_tuple(self):
+        pipeline = self._pipeline(_make_floor_plan_responses())
+        result = pipeline.run_project(
+            [{"image_path": "A2.1.png", "sheet_name": "A2.1", "sheet_type_hint": "floor_plan"}]
+        )
+        assert isinstance(result, tuple) and len(result) == 3
+
+    def test_run_project_extracts_non_skipped_sheets(self):
+        """Non-title sheets are collected in all_extracted."""
+        pipeline = self._pipeline(_make_floor_plan_responses())
+        all_extracted, _, _ = pipeline.run_project(
+            [{"image_path": "A2.1.png", "sheet_name": "A2.1", "sheet_type_hint": "floor_plan"}]
+        )
+        assert len(all_extracted) == 1
+
+    def test_run_project_skips_title_sheet(self):
+        """Title sheets must be excluded from all_extracted."""
+        pipeline = self._pipeline([])  # no analyzer calls expected
+        all_extracted, all_estimates, project_type = pipeline.run_project(
+            [{"image_path": "G0.1.png", "sheet_name": "G0.1", "sheet_type_hint": "title_sheet"}]
+        )
+        assert all_extracted == []
+        assert all_estimates == []
+
+    def test_run_project_mixed_sheets_skips_title(self):
+        """Only non-title sheets end up in all_extracted."""
+        # floor_plan needs 2 responses; title_sheet needs 0
+        pipeline = self._pipeline(_make_floor_plan_responses())
+        pages = [
+            {"image_path": "G0.1.png", "sheet_name": "G0.1", "sheet_type_hint": "title_sheet"},
+            {"image_path": "A2.1.png", "sheet_name": "A2.1", "sheet_type_hint": "floor_plan"},
+        ]
+        all_extracted, _, _ = pipeline.run_project(pages)
+        assert len(all_extracted) == 1
+        assert all_extracted[0]["_sheet_name"] == "A2.1"
+
+    def test_run_project_tags_page_num(self):
+        pipeline = self._pipeline(_make_floor_plan_responses())
+        all_extracted, _, _ = pipeline.run_project(
+            [{"image_path": "A2.1.png", "sheet_name": "A2.1",
+              "sheet_type_hint": "floor_plan", "page_num": 3}]
+        )
+        assert all_extracted[0]["_page_num"] == 3
+
+    def test_run_project_progress_callback_called_per_page(self):
+        calls = []
+        pipeline = self._pipeline(
+            _make_floor_plan_responses() + _make_floor_plan_responses()
+        )
+        pages = [
+            {"image_path": "A2.1.png", "sheet_name": "A2.1", "sheet_type_hint": "floor_plan"},
+            {"image_path": "A3.1.png", "sheet_name": "A3.1", "sheet_type_hint": "floor_plan"},
+        ]
+        pipeline.run_project(pages, progress_callback=lambda c, t, n: calls.append((c, t, n)))
+        assert len(calls) == 2
+        assert calls[0] == (1, 2, "A2.1")
+        assert calls[1] == (2, 2, "A3.1")
+
+    def test_run_project_empty_pages_returns_auto_type(self):
+        pipeline = self._pipeline([])
+        _, _, project_type = pipeline.run_project([])
+        assert project_type == "auto"
+
+    def test_run_project_project_type_string(self):
+        """project_type must be a string (not None or MagicMock)."""
+        pipeline = self._pipeline(_make_floor_plan_responses())
+        _, _, project_type = pipeline.run_project(
+            [{"image_path": "A2.1.png", "sheet_name": "A2.1", "sheet_type_hint": "floor_plan"}]
+        )
+        assert isinstance(project_type, str)
