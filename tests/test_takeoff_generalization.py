@@ -609,3 +609,151 @@ def test_aggregator_duct_lf_pipe_run_canonical():
     # The description will be '12" rectangular duct duct'; normalize_item_name
     # matches \bduct\b and returns "Duct LF"
     assert "Duct LF" in names, f"Expected 'Duct LF' canonical name, got: {names}"
+
+
+# ─── 14. Aggregator — new civil/site entries from gap closure 20-09 ──────────
+
+@pytest.mark.generalization
+@pytest.mark.parametrize("description,expected", [
+    ("fire hydrant type B at parking entry", "Fire Hydrants"),
+    ("FH-7 fire hydrant assembly", "Fire Hydrants"),
+    ("area drain AD-3 at grade", "Area Drain / Cleanout"),
+    ("cleanout CO-2 at building perimeter", "Area Drain / Cleanout"),
+    ("PVC sanitary pipe lateral", "Sanitary Pipe"),
+    ("sanitary sewer run SS-3 lateral", "Sanitary Pipe"),
+    ('6" water main domestic service', "Water Main"),
+    ("domestic water line to building entry", "Water Main"),
+    ("detention basin at NE corner of site", "Stormwater Basin"),
+    ("bioswale along parking perimeter", "Stormwater Basin"),
+    ("chain link fence 6' height at property line", "Fence"),
+    ("ornamental fence at entry drive", "Fence"),
+    ("mass grading and cut-fill earthwork", "Grading"),
+])
+def test_aggregator_new_civil_site_entries(description, expected):
+    """New civil/site ITEM_NAME_MAP entries from 20-09 gap closure."""
+    assert _agg(description) == expected, (
+        f"{description!r} → expected {expected!r}, got {_agg(description)!r}"
+    )
+
+
+# ─── 15. Aggregator — MEP fire suppression entries from 20-09 ────────────────
+
+@pytest.mark.generalization
+@pytest.mark.parametrize("description,expected", [
+    ("sprinkler head pendent type SP-1", "Sprinkler Heads"),
+    ("fire sprinkler system wet pipe", "Sprinkler Heads"),
+    ("pendent sprinkler head at grid", "Sprinkler Heads"),
+    ("smoke detector SD-12 ceiling mount", "Fire Alarm"),
+    ("fire alarm pull station FA-1", "Fire Alarm"),
+    ("horn strobe HS-3 at corridor exit", "Fire Alarm"),
+])
+def test_aggregator_mep_fire_suppression(description, expected):
+    """Sprinkler heads and fire alarm ITEM_NAME_MAP entries from 20-09."""
+    assert _agg(description) == expected, (
+        f"{description!r} → expected {expected!r}, got {_agg(description)!r}"
+    )
+
+
+# ─── 16. Aggregator — HVAC subtypes from 20-09 ───────────────────────────────
+
+@pytest.mark.generalization
+@pytest.mark.parametrize("description,expected", [
+    ("VAV box size 6 VAV-101", "VAV Boxes"),
+    ("variable air volume terminal unit VAV-3", "VAV Boxes"),
+    ("RTU-3 rooftop unit 5-ton", "RTU"),
+    ("packaged unit PU-2 on roof deck", "RTU"),
+    ("unit heater UH-1 at loading dock", "Unit Heater"),
+    ("cabinet heater at entry vestibule", "Unit Heater"),
+])
+def test_aggregator_hvac_subtypes(description, expected):
+    """HVAC subtype ITEM_NAME_MAP entries (VAV, RTU, unit heater) from 20-09."""
+    assert _agg(description) == expected, (
+        f"{description!r} → expected {expected!r}, got {_agg(description)!r}"
+    )
+
+
+@pytest.mark.generalization
+def test_aggregator_rtu_does_not_override_ahu():
+    """Air handling unit descriptions must resolve to AHU, not RTU.
+
+    RTU is placed after AHU in ITEM_NAME_MAP so 'air handler' pattern wins
+    for explicit AHU descriptions; 'rooftop unit' still resolves to RTU.
+    """
+    assert _agg("Air handling unit AHU-2 rooftop") == "Air Handling Units"
+    assert _agg("RTU-5 rooftop unit packaged") == "RTU"
+
+
+# ─── 17. Aggregator — refrigerant, thermostat from 20-09 ─────────────────────
+
+@pytest.mark.generalization
+@pytest.mark.parametrize("description,expected", [
+    ("refrigerant line set to condensing unit", "Refrigerant Piping"),
+    ("ref line 3/4\" copper to RTU", "Refrigerant Piping"),
+    ("thermostat T-1 programmable digital", "Thermostat"),
+    ("t-stat zone controller at office", "Thermostat"),
+])
+def test_aggregator_refrigerant_thermostat(description, expected):
+    """Refrigerant piping and thermostat ITEM_NAME_MAP entries from 20-09."""
+    assert _agg(description) == expected, (
+        f"{description!r} → expected {expected!r}, got {_agg(description)!r}"
+    )
+
+
+# ─── 18. Aggregator — storefront/curtain wall from 20-09 ─────────────────────
+
+@pytest.mark.generalization
+@pytest.mark.parametrize("description,expected", [
+    ("storefront glazing system at main entry", "Storefront/Curtain Wall"),
+    ("curtain wall system 5'x10' grid modules", "Storefront/Curtain Wall"),
+    ("window wall aluminum framed system", "Storefront/Curtain Wall"),
+])
+def test_aggregator_storefront_and_curtain_wall(description, expected):
+    """Storefront/Curtain Wall ITEM_NAME_MAP entries from 20-09."""
+    assert _agg(description) == expected, (
+        f"{description!r} → expected {expected!r}, got {_agg(description)!r}"
+    )
+
+
+@pytest.mark.generalization
+def test_aggregator_storefront_does_not_override_doors():
+    """Storefront appears in door descriptions but door patterns must win.
+
+    Storefront/Curtain Wall is placed AFTER all door patterns in ITEM_NAME_MAP
+    so 'aluminum storefront door' still resolves to Doors-AL.
+    """
+    assert _agg("Aluminum storefront door at entry") == "Doors-AL"
+    assert _agg("storefront curtain wall system") == "Storefront/Curtain Wall"
+
+
+# ─── 19. Aggregator — dock equipment from 20-09 ──────────────────────────────
+
+@pytest.mark.generalization
+@pytest.mark.parametrize("description,expected", [
+    ("dock door overhead coiling steel", "Dock Doors"),
+    ("coiling door at shipping dock", "Dock Doors"),
+    ("overhead door OHD-3 at warehouse", "Dock Doors"),
+    ("dock leveler DL-1 hydraulic 6-ton", "Dock Leveler"),
+    ("dock seal DS-2 at loading berth", "Dock Leveler"),
+    ("dock bumper DB-4 foam fill", "Dock Leveler"),
+])
+def test_aggregator_dock_equipment(description, expected):
+    """Dock door and dock leveler ITEM_NAME_MAP entries from 20-09."""
+    assert _agg(description) == expected, (
+        f"{description!r} → expected {expected!r}, got {_agg(description)!r}"
+    )
+
+
+# ─── 20. Aggregator — drywall ceiling and glass doors from 20-09 ─────────────
+
+@pytest.mark.generalization
+def test_aggregator_drywall_ceiling():
+    """Suspended gyp board ceiling resolves to Drywall Ceiling (not Ceiling Grid)."""
+    assert _agg("suspended gyp board ceiling system") == "Drywall Ceiling"
+    assert _agg("gyp ceiling over private offices") == "Drywall Ceiling"
+
+
+@pytest.mark.generalization
+def test_aggregator_glass_doors():
+    """Glass door descriptions resolve to Doors-GL (not generic Doors or Windows)."""
+    assert _agg("Glass door D-102 at reception entry") == "Doors-GL"
+    assert _agg("frameless glass door at lobby") == "Doors-GL"
