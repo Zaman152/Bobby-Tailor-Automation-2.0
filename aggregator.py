@@ -49,9 +49,9 @@ ITEM_NAME_MAP = [
     (r"internal.*tilt|interior.*tilt|int.*tilt.*up", "Interior Tilt Up Walls", "SF"),
     (r"tilt.*up.*wall|tiltup.*wall|precast.*panel|ext.*tilt", "Exterior Tilt Up Wall", "SF"),
     # CMU paint BEFORE CMU Wall (both match \bcmu\b; paint is more specific)
-    (r"cmu.*paint|block.*paint|masonry.*paint|epoxy.*block", "CMU Paint", "SF"),
+    (r"cmu.*paint|paint.*cmu|block.*paint|paint.*block|masonry.*paint|paint.*masonry|epoxy.*block", "CMU Paint", "SF"),
     (r"\bcmu\b|masonry.*wall|block.*wall|concrete.*masonry", "CMU Wall", "SF"),
-    (r"\blintel\b|steel.*lintel|angle.*lintel", "Lintels", "LF"),
+    (r"\blintels?\b|steel.*lintel|angle.*lintel", "Lintels", "LF"),
     (r"stair", "Stairs", "EA"),
     (r"\bladder\b", "Ladder", "EA"),
     (r"\blift\b|elevator", "Lift", "EA"),
@@ -130,6 +130,40 @@ def normalize_item_name(description: str, item_type: str, unit: str) -> tuple:
     return canonical, unit or "EA"
 
 
+# Standard estimating line items that appear on virtually every commercial
+# construction take-off but are never *drawn* on the plans (they are scope/
+# logistics conventions). They are injected once per project at quantity 1 so
+# the take-off reflects how an estimator actually bids work. Only added when a
+# real take-off was produced (calculated_items non-empty) and not already
+# present from the drawings/notes. Kept deliberately small and generic.
+STANDARD_LINE_ITEMS: List[Dict] = [
+    {"name": "Mobilization", "unit": "EA", "quantity": 1},
+]
+
+
+def _inject_standard_line_items(buckets: Dict[str, Dict]) -> None:
+    """Add universal estimating line items (e.g. Mobilization) if absent.
+
+    Matching is by canonical name so an item already extracted from the
+    drawings/notes (e.g. a "MOBILIZATION" note) is never double-counted.
+    """
+    existing_norm = {re.sub(r"[-_/]+", " ", k.lower()).strip() for k in buckets}
+    for std in STANDARD_LINE_ITEMS:
+        norm = re.sub(r"[-_/]+", " ", std["name"].lower()).strip()
+        if norm in existing_norm:
+            continue
+        bucket = buckets[std["name"]]
+        bucket["quantity"] = float(std["quantity"])
+        bucket["unit"] = std["unit"]
+        bucket["item_type"] = "standard_line_item"
+        bucket["source_rows"].append({
+            "sheet": None,
+            "qty": float(std["quantity"]),
+            "description": f"{std['name']} (standard estimating line item)",
+            "formula": "standard_line_item",
+        })
+
+
 def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
     """Consolidate per-sheet items into project-level totals."""
     buckets: Dict[str, Dict] = defaultdict(lambda: {
@@ -139,6 +173,19 @@ def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
         "source_rows": [],
         "item_type": "",
     })
+
+    # Items whose quantity comes from an authoritative companion take-off legend
+    # are the single source of truth for that canonical item. Vision/room-derived
+    # duplicates of the same item must be suppressed (not summed) so the legend
+    # value is reported verbatim.
+    legend_names: set = set()
+    for item in calculated_items:
+        if item.get("qty_source") == "companion_takeoff_legend":
+            name, _ = normalize_item_name(
+                item.get("description", ""), item.get("item_type", ""),
+                item.get("unit", ""),
+            )
+            legend_names.add(name)
 
     for item in calculated_items:
         desc = item.get("description", "")
@@ -151,6 +198,22 @@ def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
             continue
 
         canonical_name, canonical_unit = normalize_item_name(desc, itype, unit)
+        # Suppress non-legend duplicates of any legend-backed item. Matches exact
+        # canonical names and base-vs-spec variants (e.g. vision "Columns" when the
+        # legend reports "Columns-H-35'") so the authoritative legend isn't shadowed
+        # by a coarser vision count of the same physical item.
+        if item.get("qty_source") != "companion_takeoff_legend" and (
+            canonical_name in legend_names
+            or any(
+                ln == canonical_name
+                or ln.startswith(canonical_name + "-")
+                or canonical_name.startswith(ln + "-")
+                for ln in legend_names
+            )
+        ):
+            continue
+        if (canonical_unit or unit or "").lower() in ("ea", "each"):
+            qty = float(round(qty))
         bucket = buckets[canonical_name]
         bucket["quantity"] += qty
         bucket["unit"] = canonical_unit or unit
@@ -162,6 +225,10 @@ def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
             "description": desc,
             "formula": item.get("formula_applied") or item.get("formula", ""),
         })
+
+    # Only enrich with standard line items when a genuine take-off was produced.
+    if buckets:
+        _inject_standard_line_items(buckets)
 
     result = []
     for name in sorted(buckets.keys()):

@@ -196,14 +196,47 @@ ESTIMATION_TABLES = {
         "waste_factor": 1.0,
         "formula": "area",
         "description": "CMU masonry wall SF",
-        "keywords": ["cmu", "masonry", "block wall", "concrete masonry"],
+        "keywords": ["cmu wall", "cmu", "masonry", "block wall", "concrete masonry"],
     },
     "internal_tilt_up_wall": {
         "unit_out": "sq_ft",
         "waste_factor": 1.0,
         "formula": "area",
         "description": "Internal tilt-up wall panel SF",
-        "keywords": ["internal tilt", "interior tilt", "interior concrete wall"],
+        "keywords": [
+            "internal tilt", "interior tilt", "interior concrete wall",
+            "internal tilt up", "int tilt", "tilt up wall",
+        ],
+    },
+    "columns": {
+        "unit_out": "ea",
+        "formula": "count",
+        "description": "Structural columns EA",
+        "keywords": ["columns", "column", "structural column", "steel column", "concrete column"],
+    },
+    "stairs": {
+        "unit_out": "ea",
+        "formula": "count",
+        "description": "Stairs EA",
+        "keywords": ["stair", "stairway", "staircase"],
+    },
+    "ladder": {
+        "unit_out": "ea",
+        "formula": "count",
+        "description": "Fixed ladder EA",
+        "keywords": ["ladder", "roof ladder", "wall ladder"],
+    },
+    "lift": {
+        "unit_out": "ea",
+        "formula": "count",
+        "description": "Material lift / elevator EA",
+        "keywords": ["lift", "material lift", "personnel lift", "elevator"],
+    },
+    "mobilization": {
+        "unit_out": "ea",
+        "formula": "count",
+        "description": "Mobilization lump sum EA",
+        "keywords": ["mobilization", "mobilisation", "mobilize"],
     },
     "canopy": {
         "unit_out": "sq_ft",
@@ -393,6 +426,7 @@ def apply_estimation_tables(extracted_data: dict, project_type: str = "auto") ->
     estimates.extend(_calculate_from_civil_structures(extracted_data.get("civil_structures", []), sheet_name))
     estimates.extend(_calculate_from_lintel_runs(extracted_data.get("lintel_runs", []), sheet_name))
 
+    estimates = _suppress_profile_duplicates(estimates)
     logger.info(f"  Calculated {len(estimates)} estimates from {sheet_name}")
     return estimates
 
@@ -474,6 +508,10 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
         # Classify by description
         item_type = _classify_item(description, std_unit, sheet_type)
 
+        # Detail sheets: dimension callouts are not install counts (RC-6)
+        if sheet_type == "detail" and item_type in ("bollard", "stairs", "columns", "ladder", "lift"):
+            return None
+
         # Apply formula
         calc_qty, calc_unit, formula_used = _apply_formula(
             item_type, std_value, std_unit, raw_value
@@ -488,8 +526,11 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
         # GATE: EA items derived from dimension measurements must be whole numbers ≥ 1.
         # A fractional EA value (e.g. 0.10 bollards, 0.01 stairs) means a dimension
         # annotation was misclassified as a count.  Drop to prevent noise in the takeoff.
-        if calc_unit == "ea" and isinstance(calc_qty, (int, float)) and calc_qty < 1:
-            return None
+        if calc_unit == "ea" and isinstance(calc_qty, (int, float)):
+            if calc_qty < 1:
+                return None
+            if calc_qty != int(calc_qty):
+                return None
 
         table = ESTIMATION_TABLES.get(item_type, {})
         is_approx = bool(m.get("approximate", False))
@@ -676,7 +717,7 @@ def _calculate_from_room(room: dict, sheet_name: str, project_type: str = "auto"
 
 def _schedule_is_takeoff(sched: dict) -> bool:
     purpose = sched.get("table_purpose", "takeoff_schedule")
-    if purpose in ("specification_reference", "general_notes"):
+    if purpose in ("specification_reference", "general_notes", "finish_schedule", "room_schedule"):
         return False
     if sched.get("use_for_takeoff") is False:
         return False
@@ -867,6 +908,55 @@ def _calculate_from_lintel_runs(lintel_runs: list, sheet_name: str) -> List[dict
     return results
 
 
+def _row_schedule_unit(row: dict) -> str:
+    """Read UNIT/UOM from a schedule row; default EA when absent."""
+    for k in ("UNIT", "Unit", "UOM", "uom", "U/M"):
+        if row.get(k):
+            return str(row[k]).strip()
+    return "ea"
+
+
+def _normalize_schedule_unit(unit_raw: str) -> str:
+    u = (unit_raw or "ea").lower().strip().replace(".", "")
+    if u in ("sf", "sqft", "sq ft", "s f", "square feet", "square foot"):
+        return "sq_ft"
+    if u in ("lf", "lnft", "ln ft", "lin ft", "linear feet", "linear foot"):
+        return "lf"
+    if u in ("cy", "cubic yards", "cubic yard"):
+        return "cy"
+    if u in ("ea", "each", "no", "nos", "qty", "pc", "pcs"):
+        return "ea"
+    return u
+
+
+def _suppress_profile_duplicates(estimates: List[dict]) -> List[dict]:
+    """When a takeoff legend/schedule row supplies an item type, drop room-profile duplicates."""
+    schedule_types = {
+        e["item_type"]
+        for e in estimates
+        if e.get("qty_source") == "schedule" and e.get("item_type") in ESTIMATION_TABLES
+    }
+    if not schedule_types:
+        return estimates
+
+    _AREA_TYPES = {
+        "sealed_concrete", "exposed_structure", "internal_tilt_up_wall", "tilt_up_wall",
+        "cmu_wall", "flooring", "ceiling_grid",
+    }
+    out: List[dict] = []
+    for e in estimates:
+        if e.get("qty_source") == "schedule":
+            out.append(e)
+            continue
+        itype = e.get("item_type", "")
+        if itype == "flooring" and schedule_types.intersection(_AREA_TYPES):
+            continue
+        if itype in schedule_types and itype in _AREA_TYPES:
+            continue
+        out.append(e)
+    return out
+
+
 def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
     """Each row of a schedule becomes a counted item ONLY when there's a real quantity.
     Skip rows that just define a type/spec without a count — those belong in raw_items.csv,
@@ -878,6 +968,12 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
     results = []
     sched_name = sched.get("name", "Schedule")
     rows = sched.get("rows", [])
+
+    # A "takeoff_legend" is an authoritative, pre-computed take-off (e.g. parsed
+    # from the estimator's companion take-off export). Its quantities are FINAL —
+    # the estimator already accounted for waste and conversions — so we must pass
+    # them through verbatim and never re-apply waste factors or unit formulas.
+    authoritative = sched.get("table_purpose") == "takeoff_legend"
 
     if not isinstance(rows, list):
         return results
@@ -896,7 +992,7 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
         # Find a REAL quantity. Reject "Multiple", "Varies", "TBD", etc.
         qty = None
         qty_source = ""
-        for k in ("QUANTITY", "QTY", "Qty", "COUNT", "Count"):
+        for k in ("QUANTITY", "QTY", "Qty", "COUNT", "Count", "AMOUNT", "Amount"):
             if row.get(k):
                 raw = str(row[k]).strip()
                 if raw.lower() in ("multiple", "varies", "tbd", "n/a", "na", "-", "--", ""):
@@ -919,25 +1015,84 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
                 mark = str(row[k])
                 break
 
-        item_type = _classify_item(desc or sched_name, "ea", "schedule")
-        full_desc = f"{sched_name} - {mark} - {desc}".strip(" -") if mark else f"{sched_name} - {desc}".strip(" -")
+        row_unit = _normalize_schedule_unit(_row_schedule_unit(row))
+        item_type = _classify_item(desc or sched_name, row_unit, "schedule")
+        if item_type == "general":
+            item_type = _classify_item(sched_name, row_unit, "schedule")
+        # Area-unit rows must not become stud counts or slab CY from generic tokens
+        if row_unit == "sq_ft" and item_type in ("wall_framing", "concrete_slab"):
+            retry = _classify_item(desc or sched_name, "sq_ft", "schedule")
+            if retry not in ("general", "wall_framing", "concrete_slab"):
+                item_type = retry
+            elif re.search(r"\bcmu\b|masonry|block\s*wall", (desc or "").lower()):
+                item_type = "cmu_wall"
+            elif re.search(r"sealed|polished|exposed\s*struct", (desc or "").lower()):
+                item_type = "sealed_concrete" if "sealed" in (desc or "").lower() else "exposed_structure"
+        full_desc = desc or sched_name
+        if mark and mark not in full_desc:
+            full_desc = f"{mark} - {full_desc}"
         row_text = " | ".join(f"{k}={v}" for k, v in row.items() if v)
 
-        results.append({
-            "item_type": item_type if item_type != "general" else "schedule_item",
-            "description": full_desc,
-            "raw_value": qty_source,
-            "raw_unit": "ea",
-            "quantity": qty,
-            "unit": "ea",
-            "waste_factor_applied": 1.0,
-            "formula": f"count from schedule (qty column = {qty_source})",
-            "source_sheet": sheet_name,
-            "source_location": f"{sched_name}{' row ' + mark if mark else ''}",
-            "source_raw": row_text,
-            "table_used": item_type if item_type in ESTIMATION_TABLES else "none",
-            "specification": row.get("SPECIFICATION") or row.get("SPEC") or "",
-        })
+        if authoritative:
+            # Authoritative legend: use the printed quantity/unit verbatim.
+            results.append({
+                "item_type": item_type if item_type in ESTIMATION_TABLES else "schedule_item",
+                "description": full_desc,
+                "raw_value": qty_source,
+                "raw_unit": row_unit,
+                "quantity": round(qty, 2),
+                "unit": row_unit,
+                "waste_factor_applied": 1.0,
+                "formula": f"authoritative takeoff legend ({qty_source} {row_unit})",
+                "qty_source": "companion_takeoff_legend",
+                "source_sheet": sheet_name,
+                "source_location": f"{sched_name}{' row ' + mark if mark else ''}",
+                "source_raw": row_text,
+                "table_used": "takeoff_legend",
+                "specification": row.get("SPECIFICATION") or row.get("SPEC") or "",
+            })
+        elif item_type in ESTIMATION_TABLES:
+            calc_qty, calc_unit, formula_out = _apply_formula(
+                item_type, qty, row_unit, qty_source
+            )
+            if formula_out in ("no formula", "", None):
+                calc_qty, calc_unit = qty, row_unit
+                formula_out = f"qty from schedule ({qty_source})"
+            table = ESTIMATION_TABLES.get(item_type, {})
+            results.append({
+                "item_type": item_type,
+                "description": full_desc,
+                "raw_value": qty_source,
+                "raw_unit": row_unit,
+                "quantity": round(calc_qty, 2) if isinstance(calc_qty, (int, float)) else calc_qty,
+                "unit": calc_unit,
+                "waste_factor_applied": table.get("waste_factor", 1.0),
+                "formula": formula_out,
+                "qty_source": "schedule",
+                "source_sheet": sheet_name,
+                "source_location": f"{sched_name}{' row ' + mark if mark else ''}",
+                "source_raw": row_text,
+                "table_used": item_type,
+                "specification": row.get("SPECIFICATION") or row.get("SPEC") or "",
+            })
+        else:
+            out_unit = "ea" if row_unit == "ea" else row_unit
+            results.append({
+                "item_type": "schedule_item",
+                "description": full_desc,
+                "raw_value": qty_source,
+                "raw_unit": row_unit,
+                "quantity": qty,
+                "unit": out_unit,
+                "waste_factor_applied": 1.0,
+                "formula": f"count from schedule (qty column = {qty_source})",
+                "qty_source": "schedule",
+                "source_sheet": sheet_name,
+                "source_location": f"{sched_name}{' row ' + mark if mark else ''}",
+                "source_raw": row_text,
+                "table_used": "none",
+                "specification": row.get("SPECIFICATION") or row.get("SPEC") or "",
+            })
 
     return results
 
@@ -1026,7 +1181,10 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
         wf = table.get("waste_factor", 1.0)
         return value * wf, "lf", f"{value:.0f} lf × {wf} = {value * wf:.0f} lf"
 
-    if item_type in ("catch_basin", "manhole", "headwall", "bollard"):
+    if item_type in (
+        "catch_basin", "manhole", "headwall", "bollard",
+        "columns", "stairs", "ladder", "lift", "mobilization",
+    ):
         return value, "ea", "count"
 
     if item_type in ("concrete_pavement", "asphalt", "tilt_up_wall", "exposed_structure",
@@ -1166,21 +1324,24 @@ def _classify_item(description: str, unit: str, sheet_type: str) -> str:
     if not description:
         return "general"
     d = description.lower()
+    # Tokenize on separators (hyphens in "Columns-H-35'" must not become one token)
+    words = set(re.findall(r"[a-z][a-z0-9]+", re.sub(r"[-_/']+", " ", d)))
 
-    # Tokenize: word boundaries only, no substring matches
-    words = set(re.findall(r"[a-z][a-z0-9\-]+", d))
-
+    # Pass 1: multi-word phrases (e.g. "sealed concrete" before bare "concrete" → slab CY)
     for table_key, table in ESTIMATION_TABLES.items():
         for kw in table.get("keywords", []):
             kw_l = kw.lower()
-            # Multi-word keyword: require the whole phrase to be present
+            if " " in kw_l and kw_l in d and not _is_substring_match(kw_l, d):
+                return table_key
+
+    # Pass 2: single-token keywords
+    for table_key, table in ESTIMATION_TABLES.items():
+        for kw in table.get("keywords", []):
+            kw_l = kw.lower()
             if " " in kw_l:
-                if kw_l in d and not _is_substring_match(kw_l, d):
-                    return table_key
-            else:
-                # Single word: exact token match (handles plurals: "door" matches "doors")
-                if kw_l in words or (kw_l + "s") in words:
-                    return table_key
+                continue
+            if kw_l in words or (kw_l + "s") in words:
+                return table_key
 
     return "general"
 
@@ -1257,13 +1418,29 @@ def _detect_project_type(all_pages: List[dict]) -> str:
                 re.IGNORECASE,
             ):
                 scores["industrial"] += 2
+        # Takeoff legend / schedule rows (authoritative on industrial warehouses)
+        for sched in page.get("schedules") or []:
+            if not isinstance(sched, dict) or not _schedule_is_takeoff(sched):
+                continue
+            for row in sched.get("rows") or []:
+                if not isinstance(row, dict):
+                    continue
+                row_text = " ".join(str(v) for v in row.values() if v).lower()
+                if re.search(
+                    r"sealed\s*concrete|tilt[- ]?up|bollard|mobilization|warehouse|"
+                    r"distribution|dock\s*door|cmu\s*wall|exposed\s*structure",
+                    row_text,
+                    re.IGNORECASE,
+                ):
+                    scores["industrial"] += 3
 
     best_score = max(scores.values())
     if best_score == 0:
         return "auto"
 
     winners = [k for k, v in scores.items() if v == best_score]
-    # Multiple categories tied → mixed_use
     if len(winners) > 1:
+        if "industrial" in winners and scores["industrial"] >= 3:
+            return "industrial"
         return "mixed_use"
     return winners[0]

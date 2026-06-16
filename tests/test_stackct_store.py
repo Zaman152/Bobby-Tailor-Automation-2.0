@@ -38,16 +38,17 @@ class StackctStoreTests(unittest.TestCase):
         store.upsert_projects([{"id": 1, "name": "Test Project"}], synced)
         store.upsert_plans(
             1,
+            10,
             [{"page_id": 100, "sheet_name": "A1.01"}],
             synced,
         )
         projects = store.list_projects()
         self.assertEqual(len(projects), 1)
-        self.assertEqual(projects[0]["sheet_count"], 1)
-        plans = store.get_plans(1)
+        self.assertEqual(projects[0]["name"], "Test Project")
+        # v2 schema is folder-aware: query plans scoped to the folder we wrote.
+        plans = store.get_plans(1, folder_id=10)
         self.assertEqual(len(plans), 1)
-        counts = store.get_sheet_counts()
-        self.assertEqual(counts[1], 1)
+        self.assertEqual(plans[0]["page_id"], 100)
 
 
 if __name__ == "__main__":

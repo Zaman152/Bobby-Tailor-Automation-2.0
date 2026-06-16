@@ -362,6 +362,9 @@ def _normalize_calculated(estimates: list) -> List[Dict[str, Any]]:
             "source_location": e.get("source_location", ""),
             "source_text": e.get("source_raw", ""),
             "specification": e.get("specification", ""),
+            # Preserve provenance so aggregation can treat authoritative companion
+            # take-off legend items as the single source of truth for their item.
+            "qty_source": e.get("qty_source", ""),
         })
     return normalized
 
@@ -466,12 +469,6 @@ def _write_summary(report: dict, path: Path):
     lines.append(f"Cost per sheet:   ${usage.get('cost_per_sheet', 0):.4f} USD")
     lines.append("")
 
-    lines += [
-        "─" * 70,
-        "SHEET-BY-SHEET LOG (source traceability)",
-        "─" * 70,
-    ]
-
     def _s(val, default=""):
         """Coerce None / non-string values to a safe string for formatting."""
         if val is None:
@@ -486,6 +483,67 @@ def _write_summary(report: dict, path: Path):
             return int(val)
         except (ValueError, TypeError):
             return default
+
+    linked_added = report.get("linked_sheets_added") or []
+    linked_suggested = report.get("linked_sheets_suggested") or []
+    cross_refs = report.get("cross_references") or []
+
+    if linked_added or linked_suggested or cross_refs:
+        lines += ["─" * 70, "LINKED SHEETS & CROSS-REFERENCES", "─" * 70]
+
+        if linked_added:
+            lines.append(f"Auto-included linked detail sheets: {len(linked_added)}")
+            for entry in linked_added:
+                sheet = _s(entry.get("sheet_name"), "?")
+                ref_from = _s(entry.get("ref_from"))
+                suffix = f"  (referenced from {ref_from})" if ref_from else ""
+                lines.append(f"  • {sheet}{suffix}")
+            lines.append("")
+
+        if linked_suggested:
+            lines.append(
+                f"Linked sheets discovered but not captured "
+                f"(AUTO_INCLUDE_LINKED_SHEETS=false): {len(linked_suggested)}"
+            )
+            for entry in linked_suggested:
+                sheet = _s(entry.get("sheet_name"), "?")
+                ref_from = _s(entry.get("ref_from"))
+                suffix = f"  (referenced from {ref_from})" if ref_from else ""
+                lines.append(f"  • {sheet}{suffix}")
+            lines.append("")
+
+        if cross_refs:
+            resolved_n = sum(
+                1 for r in cross_refs if r.get("resolution_status") == "resolved"
+            )
+            lines.append(
+                f"Drawing cross-references: {len(cross_refs)} total, "
+                f"{resolved_n} resolved"
+            )
+            for ref in cross_refs:
+                from_sheet = _s(ref.get("from_sheet"), "?")
+                ref_sheet = _s(ref.get("ref_sheet"), "?")
+                ref_num = _s(ref.get("ref_number"), "?")
+                item = _s(ref.get("item_described"))
+                status = _s(ref.get("resolution_status"), "unknown").replace("_", " ")
+                detail = f" — {item}" if item else ""
+                lines.append(
+                    f"  • {from_sheet} → detail {ref_num} on {ref_sheet}{detail}  "
+                    f"[{status.upper()}]"
+                )
+                if ref.get("resolution_status") == "resolved" and ref.get("resolved_spec"):
+                    spec = ref["resolved_spec"]
+                    if spec.get("schedule_name"):
+                        lines.append(
+                            f"      resolved via schedule: {_s(spec.get('schedule_name'))}"
+                        )
+            lines.append("")
+
+    lines += [
+        "─" * 70,
+        "SHEET-BY-SHEET LOG (source traceability)",
+        "─" * 70,
+    ]
 
     for s in report.get("sheet_log", []):
         lines.append(
