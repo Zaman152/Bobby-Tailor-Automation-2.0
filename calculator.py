@@ -1034,16 +1034,19 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
         row_text = " | ".join(f"{k}={v}" for k, v in row.items() if v)
 
         if authoritative:
-            # Authoritative legend: use the printed quantity/unit verbatim.
+            # Authoritative legend: use the printed quantity/unit verbatim. Keep the
+            # legend's original unit token (e.g. "SF", "LF") rather than the
+            # internal normalized form so the output mirrors the estimator's sheet.
+            legend_unit = (row.get("UNIT") or row.get("Unit") or "").strip().upper() or row_unit
             results.append({
                 "item_type": item_type if item_type in ESTIMATION_TABLES else "schedule_item",
                 "description": full_desc,
                 "raw_value": qty_source,
-                "raw_unit": row_unit,
+                "raw_unit": legend_unit,
                 "quantity": round(qty, 2),
-                "unit": row_unit,
+                "unit": legend_unit,
                 "waste_factor_applied": 1.0,
-                "formula": f"authoritative takeoff legend ({qty_source} {row_unit})",
+                "formula": f"authoritative takeoff legend ({qty_source} {legend_unit})",
                 "qty_source": "companion_takeoff_legend",
                 "source_sheet": sheet_name,
                 "source_location": f"{sched_name}{' row ' + mark if mark else ''}",

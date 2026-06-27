@@ -104,7 +104,7 @@ Return ONLY valid JSON. No markdown, no commentary, no code fences.
   "schedules": [
     {
       "name": "schedule name",
-      "table_purpose": "takeoff_schedule | specification_reference | general_notes | finish_schedule | room_schedule",
+      "table_purpose": "takeoff_legend | takeoff_schedule | specification_reference | general_notes | finish_schedule | room_schedule",
       "schedule_type": "panel | door | window | equipment | finish | pipe_sizing | manufacturer_catalog | notes | other",
       "use_for_takeoff": true,
       "lookup_key": "column name for spec tables e.g. PIPE SIZE",
@@ -167,7 +167,7 @@ Return ONLY valid JSON. No markdown, no commentary, no code fences.
 }
 
 RULES:
-1. TABLE CLASSIFICATION: takeoff_schedule = rows with real quantities to install. specification_reference = manufacturer catalogs, pipe sizing charts — set use_for_takeoff: false. general_notes = numbered notes only.
+1. TABLE CLASSIFICATION: takeoff_legend = quantity summary table on a plan sheet (ITEM + QTY + UNIT). takeoff_schedule = rows with real quantities to install. specification_reference = manufacturer catalogs, pipe sizing charts — set use_for_takeoff: false. general_notes = numbered notes only.
 2. CROSS-REFERENCES: Every detail bubble (circle number + sheet box) goes in cross_references[].
 3. PIPE RUNS: Any linear pipe/duct/conduit annotation (storm, gas, HVAC, electrical) → pipe_runs[]. NEVER put run lengths in measurements[]. "25 LF - 12\\"Ø SCH 40 PVC @ 4.81%" → pipe_runs[] with length_lf, diameter_in, slope_pct. Gas line "886 LF Black Steel" → pipe_runs[] with material="black steel".
 4. LINTEL RUNS: Structural steel lintel callouts (L-1, L-4, etc.) → lintel_runs[]. Compute total_lf = individual_length_ft × count when annotated. NEVER put lintel lengths in measurements[].
@@ -211,6 +211,14 @@ SITE LINEAR RUNS — also use pipe_runs[] for site construction linear items:
 - Trench drain: material="trench drain" or "channel drain"
 - Curb and gutter: material="curb and gutter"
 These items go in pipe_runs[] with material set; length_lf is the run length.
+
+TAKEOFF LEGEND ON FLOOR PLANS — when a QUANTITY TAKEOFF LEGEND, TAKEOFF LEGEND, or similar
+tabular summary appears on the sheet (often away from the title block), extract it into schedules[]:
+- table_purpose: "takeoff_legend"
+- use_for_takeoff: true
+- columns must include the quantity column header exactly as printed (QTY, QUANTITY, etc.)
+- rows: one object per legend line with ITEM/DESCRIPTION, QTY, and UNIT when shown
+- Do NOT duplicate legend quantities into rooms[] or measurements[]
 """
 
 # Append extended linear run rules to the measure-pass prompt.
@@ -272,7 +280,17 @@ EXCLUSIONS — do NOT extract in this pass:
 SCHEDULE_PROMPT = """You are a professional quantity surveyor extracting schedule and table data from a construction drawing.
 
 YOUR MISSION: Extract ONLY the schedules and tables visible on this drawing.
-Ignore plan elements, dimensions, notes paragraphs, and non-tabular content entirely.
+Ignore plan graphics, dimension strings, and narrative notes that are not tabular.
+
+PRIORITY — QUANTITY TAKEOFF LEGEND (floor plans, site plans, cover sheets):
+Many projects publish install quantities in a "QUANTITY TAKEOFF LEGEND", "TAKEOFF LEGEND",
+or "QUANTITY LEGEND" table on the floor plan (not only on schedule sheets).
+When present:
+- Extract that table first with table_purpose: "takeoff_legend" and use_for_takeoff: true
+- Read ITEM / DESCRIPTION, QTY / QUANTITY, and UNIT columns exactly as printed
+- Include industrial items (bollards, columns, CMU wall SF, sealed concrete SF, tilt-up SF,
+  stairs, ladder, lift, mobilization) when listed
+- Do NOT invent room finish quantities (flooring, ceiling tile) from plan areas — only tabular QTY
 
 Return ONLY valid JSON. No markdown, no commentary, no code fences.
 
@@ -280,7 +298,7 @@ Return ONLY valid JSON. No markdown, no commentary, no code fences.
   "schedules": [
     {
       "name": "schedule name as shown on drawing",
-      "table_purpose": "takeoff_schedule | specification_reference | general_notes | finish_schedule | room_schedule",
+      "table_purpose": "takeoff_legend | takeoff_schedule | specification_reference | general_notes | finish_schedule | room_schedule",
       "schedule_type": "door | window | equipment | finish | panel | pipe_sizing | plumbing_fixture | hardware | other",
       "use_for_takeoff": true,
       "description": "brief description of what this table contains",
@@ -303,12 +321,34 @@ EXTRACTION RULES:
    - Window materials: AL (aluminum), VL (vinyl), WD (wood), FIX (fixed)
    - Pipe materials: PVC, HDPE, DIP, CU (copper), SS (stainless), GS (galvanized steel)
 4. TABLE PURPOSE RULES:
+   - takeoff_legend: project quantity summary table on a plan sheet (see PRIORITY above)
    - takeoff_schedule: rows with quantities of items to install (doors, windows, equipment)
    - specification_reference: manufacturer catalogs, pipe sizing charts, performance tables
      → always set use_for_takeoff=false
    - general_notes: numbered notes list with no quantity column → use_for_takeoff=false
+   - finish_schedule / room_schedule without numeric QTY → use_for_takeoff=false
 5. FOCUS: Return only the schedules[] array. Do NOT extract measurements[], components[],
    rooms[], or pipe_runs[] in this pass. If no table is visible, return {"schedules": []}."""
+
+
+LEGEND_PROMPT = """You are reading ONLY the QUANTITY TAKEOFF LEGEND or quantity summary table on this floor plan.
+
+Return ONLY valid JSON: {"schedules": [...]} — no other keys.
+
+Each schedule object:
+- name: table title as printed
+- table_purpose: "takeoff_legend"
+- use_for_takeoff: true
+- columns: include QTY and UNIT headers exactly as printed
+- rows: every data row with ITEM/DESCRIPTION, QTY, UNIT
+
+RULES:
+1. This pass is ONLY for the legend/summary table — ignore the floor plan graphic, dimensions, and notes.
+2. Read quantities exactly — never sum, infer, or calculate from areas.
+3. Include ALL rows: bollards, columns (with height spec in description), CMU wall SF, sealed concrete SF,
+   exposed structure SF, internal tilt-up SF, stairs, ladder, lift, mobilization, etc.
+4. If multiple legend fragments exist, return one schedule per fragment.
+5. If no legend table exists, return {"schedules": []}."""
 
 
 def encode_image(filepath: str) -> Tuple[str, str]:
@@ -372,11 +412,22 @@ def encode_image(filepath: str) -> Tuple[str, str]:
         return base64.standard_b64encode(raw).decode("utf-8"), media_type
 
 
+_SCHEDULE_LEGEND_USER_HINT = (
+    "This is a FLOOR PLAN sheet. Search the ENTIRE image — including side panels, "
+    "margins, and corners — for a QUANTITY TAKEOFF LEGEND or tabular quantity summary "
+    "(columns: ITEM/DESCRIPTION, QTY/QUANTITY, UNIT). Extract every row with a numeric "
+    "quantity. Do not infer flooring or finish quantities from room areas. "
+    "If no quantity table is visible, return {\"schedules\": []}."
+)
+
+
 def analyze_drawing(
     screenshot_path: str,
     sheet_name: str = "",
     pass_type: str = "measure",
     model_override: Optional[str] = None,
+    sheet_type: Optional[str] = None,
+    user_hint: Optional[str] = None,
 ) -> dict:
     """Send a drawing screenshot to Claude for vision-based extraction.
 
@@ -399,6 +450,8 @@ def analyze_drawing(
         system_prompt = COUNT_PROMPT
     elif pass_type == "schedule":
         system_prompt = SCHEDULE_PROMPT
+    elif pass_type == "legend":
+        system_prompt = LEGEND_PROMPT
     else:
         system_prompt = EXTRACTION_PROMPT  # "measure" or unknown → full extraction
 
@@ -409,7 +462,7 @@ def analyze_drawing(
         if model_override:
             model = model_override
         else:
-            model = _pick_model(sheet_name, pass_type)
+            model = _pick_model(sheet_name, pass_type, sheet_type=sheet_type)
         if model != CLAUDE_MODEL:
             logger.info(f"  Using {model} for sheet (pass={pass_type})")
 
@@ -439,10 +492,8 @@ def analyze_drawing(
                         },
                         {
                             "type": "text",
-                            "text": (
-                                f"Sheet name: {sheet_name}\n\nAnalyze this drawing and return the JSON."
-                                if sheet_name
-                                else "Analyze this drawing and return the JSON."
+                            "text": _build_user_message(
+                                sheet_name, pass_type, sheet_type, user_hint
                             ),
                         }
                     ],
@@ -522,6 +573,58 @@ def analyze_drawing(
         }
 
 
+def _build_user_message(
+    sheet_name: str,
+    pass_type: str,
+    sheet_type: Optional[str],
+    user_hint: Optional[str],
+) -> str:
+    parts = []
+    if sheet_name:
+        parts.append(f"Sheet name: {sheet_name}")
+    if user_hint:
+        parts.append(user_hint)
+    elif pass_type in ("schedule", "legend") and sheet_type == "floor_plan":
+        parts.append(_SCHEDULE_LEGEND_USER_HINT)
+    parts.append("Analyze this drawing and return the JSON.")
+    return "\n\n".join(parts)
+
+
+def _merge_schedule_lists(
+    measure_result: dict,
+    schedule_result: Optional[dict],
+    legend_result: Optional[dict] = None,
+) -> list:
+    """Combine schedule tables from measure, schedule, and legend passes; prefer richest takeoff legend."""
+    combined: list = []
+    for src in (measure_result, schedule_result or {}, legend_result or {}):
+        for sched in src.get("schedules") or []:
+            if isinstance(sched, dict) and sched.get("rows"):
+                combined.append(sched)
+    if not combined:
+        return []
+
+    def _row_count(s: dict) -> int:
+        rows = s.get("rows")
+        return len(rows) if isinstance(rows, list) else 0
+
+    legends = [
+        s for s in combined
+        if s.get("table_purpose") in ("takeoff_legend", "takeoff_schedule")
+        and s.get("use_for_takeoff") is not False
+    ]
+    if legends:
+        primary = max(legends, key=_row_count)
+        rest = [
+            s for s in combined
+            if s is not primary
+            and s.get("table_purpose") not in ("specification_reference", "general_notes")
+        ]
+        return [primary] + rest
+
+    return combined
+
+
 def merge_passes(
     count_result: dict,
     measure_result: dict,
@@ -574,9 +677,63 @@ def merge_passes(
                 existing["quantity"] = c["quantity"]
                 existing["_count_pass_upgrade"] = True
 
-    # Schedule pass replaces schedules[] when present and non-empty
-    if schedule_result and schedule_result.get("schedules"):
-        merged["schedules"] = schedule_result["schedules"]
+    merged["schedules"] = _merge_schedule_lists(
+        measure_result, schedule_result, legend_result=None
+    )
+
+    return merged
+
+
+def merge_all_passes(
+    count_result: dict,
+    measure_result: dict,
+    schedule_result: Optional[dict] = None,
+    legend_result: Optional[dict] = None,
+) -> dict:
+    """Merge count/measure/schedule/legend passes and apply accuracy rules."""
+    merged = merge_passes(count_result, measure_result, schedule_result)
+    if legend_result and legend_result.get("schedules"):
+        merged["schedules"] = _merge_schedule_lists(
+            merged, {"schedules": []}, legend_result
+        )
+    return apply_accuracy_rules(merged)
+
+
+def apply_accuracy_rules(merged: dict) -> dict:
+    """Drop conflicting room-derived items when takeoff legend rows exist."""
+    schedules = merged.get("schedules") or []
+    has_legend = any(
+        s.get("table_purpose") in ("takeoff_legend", "takeoff_schedule")
+        and s.get("rows")
+        for s in schedules
+        if isinstance(s, dict)
+    )
+    if not has_legend:
+        return merged
+
+    legend_text = " ".join(
+        str(cell)
+        for s in schedules
+        for row in (s.get("rows") or [])
+        if isinstance(row, dict)
+        for cell in row.values()
+    ).lower()
+
+    slab_types = ("sealed", "exposed", "tilt", "cmu")
+    if any(k in legend_text for k in slab_types):
+        rooms = merged.get("rooms") or []
+        filtered = []
+        for room in rooms:
+            if not isinstance(room, dict):
+                continue
+            notes = " ".join(
+                str(room.get(k, "")) for k in ("notes", "name", "finish")
+            ).lower()
+            if "flooring" in notes or "vct" in notes or "carpet" in notes:
+                filtered.append(room)
+            elif not re.search(r"warehouse|distribution|industrial", notes, re.I):
+                filtered.append(room)
+        merged["rooms"] = filtered
 
     return merged
 

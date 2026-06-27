@@ -51,6 +51,8 @@ _CA_MOCK = MagicMock()
 _CA_MOCK._pick_model.return_value = "claude-haiku-4-5"
 _CA_MOCK.analyze_drawing.return_value = {"components": [], "measurements": []}
 _CA_MOCK.merge_passes = _real_ca.merge_passes  # real implementation; not a MagicMock
+_CA_MOCK._merge_schedule_lists = _real_ca._merge_schedule_lists
+_CA_MOCK.apply_accuracy_rules = _real_ca.apply_accuracy_rules
 
 sys.modules["claude_analyzer"] = _CA_MOCK
 
@@ -125,14 +127,12 @@ class TestTitleSheetSkip:
 
 
 # ---------------------------------------------------------------------------
-# floor_plan — count then measure (two passes)
+# floor_plan — count, measure, schedule (three passes)
 # ---------------------------------------------------------------------------
 
 class TestFloorPlanPasses:
-    def test_floor_plan_calls_analyzer_twice(self):
-        count_r   = _make_count_result()
-        measure_r = _make_measure_result()
-        mock_analyzer = _make_analyzer([count_r, measure_r])
+    def test_floor_plan_calls_analyzer_three_times(self):
+        mock_analyzer = _make_analyzer(_make_floor_plan_responses())
         pipeline = TakeoffPipeline(analyzer=mock_analyzer)
 
         pipeline.run_sheet(
@@ -141,19 +141,20 @@ class TestFloorPlanPasses:
             sheet_type="floor_plan",
         )
 
-        assert mock_analyzer.call_count == 2
+        assert mock_analyzer.call_count == 3
 
     def test_floor_plan_passes_run_metadata(self):
-        mock_analyzer = _make_analyzer([_make_count_result(), _make_measure_result()])
+        mock_analyzer = _make_analyzer(_make_floor_plan_responses())
         pipeline = TakeoffPipeline(analyzer=mock_analyzer)
 
         result = pipeline.run_sheet("A2.1.png", "A2.1", sheet_type="floor_plan")
 
         assert "count" in result["_passes_run"]
         assert "measure" in result["_passes_run"]
+        assert "schedule" in result["_passes_run"]
 
     def test_floor_plan_pipeline_metadata(self):
-        mock_analyzer = _make_analyzer([_make_count_result(), _make_measure_result()])
+        mock_analyzer = _make_analyzer(_make_floor_plan_responses())
         pipeline = TakeoffPipeline(analyzer=mock_analyzer)
 
         result = pipeline.run_sheet("A2.1.png", "A2.1", sheet_type="floor_plan")
@@ -168,12 +169,17 @@ class TestFloorPlanPasses:
 
         def mock_analyzer(image_path, sheet_name, **kwargs):
             call_order.append(kwargs.get("pass_type"))
-            return _make_count_result() if kwargs.get("pass_type") == "count" else _make_measure_result()
+            pt = kwargs.get("pass_type")
+            if pt == "count":
+                return _make_count_result()
+            if pt == "schedule":
+                return {"schedules": []}
+            return _make_measure_result()
 
         pipeline = TakeoffPipeline(analyzer=mock_analyzer)
         pipeline.run_sheet("A2.1.png", "A2.1", sheet_type="floor_plan")
 
-        assert call_order == ["count", "measure"]
+        assert call_order == ["count", "measure", "schedule"]
 
 
 # ---------------------------------------------------------------------------
@@ -259,15 +265,28 @@ class TestMergePasses:
         assert "Storefront" in names
 
     def test_schedule_result_applied(self):
-        sched_result = {"schedules": [{"name": "WINDOW SCHEDULE", "rows": []}]}
+        sched_result = {
+            "schedules": [{
+                "name": "WINDOW SCHEDULE",
+                "table_purpose": "takeoff_schedule",
+                "rows": [{"MARK": "W-1", "QTY": "4"}],
+            }],
+        }
         merged = merge_passes({}, {}, sched_result)
 
         assert "schedules" in merged
         assert merged["schedules"][0]["name"] == "WINDOW SCHEDULE"
 
     def test_no_schedule_result_leaves_measure_schedules(self):
-        measure = {"schedules": [{"name": "Existing", "rows": []}], "components": []}
-        merged  = merge_passes({}, measure, None)
+        measure = {
+            "schedules": [{
+                "name": "Existing",
+                "table_purpose": "takeoff_schedule",
+                "rows": [{"ITEM": "Door", "QTY": "2"}],
+            }],
+            "components": [],
+        }
+        merged = merge_passes({}, measure, None)
 
         assert merged["schedules"][0]["name"] == "Existing"
 
@@ -310,7 +329,7 @@ class TestAutoClassify:
         )
 
         assert result["_sheet_type"] == "floor_plan"
-        assert mock_analyzer.call_count == 2
+        assert mock_analyzer.call_count == 3
 
     def test_auto_classify_civil_site_from_title_block(self):
         mock_analyzer = _make_analyzer([_make_measure_result()])
@@ -396,8 +415,8 @@ class TestQuantityVerifier:
 # ---------------------------------------------------------------------------
 
 def _make_floor_plan_responses():
-    """Two responses: count pass then measure pass for a floor_plan."""
-    return [_make_count_result(), _make_measure_result()]
+    """Three responses: count, measure, schedule passes for a floor_plan."""
+    return [_make_count_result(), _make_measure_result(), {"schedules": []}]
 
 
 class TestRunProject:
@@ -476,3 +495,34 @@ class TestRunProject:
             [{"image_path": "A2.1.png", "sheet_name": "A2.1", "sheet_type_hint": "floor_plan"}]
         )
         assert isinstance(project_type, str)
+
+    def _legend(self):
+        return [{
+            "name": "Quantity Takeoff (companion document)",
+            "table_purpose": "takeoff_legend",
+            "use_for_takeoff": True,
+            "rows": [{"ITEM": "Fiber Cement Panel", "QTY": "123231.03", "UNIT": "SF"}],
+        }]
+
+    def test_companion_legend_injected_into_floor_plan(self):
+        pipeline = self._pipeline(_make_floor_plan_responses())
+        all_extracted, _, _ = pipeline.run_project(
+            [{"image_path": "A2.1.png", "sheet_name": "A2.1", "sheet_type_hint": "floor_plan"}],
+            project_legend_schedules=self._legend(),
+        )
+        assert any(e.get("_companion_legend_injected") for e in all_extracted)
+
+    def test_companion_legend_fallback_when_no_floor_plan(self):
+        """A project with no floor_plan sheet must still ingest the companion
+        take-off (fallback into the first non-skipped sheet)."""
+        pipeline = self._pipeline(_make_floor_plan_responses())
+        all_extracted, all_estimates, _ = pipeline.run_project(
+            [{"image_path": "A4.1.png", "sheet_name": "A4.1", "sheet_type_hint": "elevation"}],
+            project_legend_schedules=self._legend(),
+        )
+        assert any(e.get("_companion_legend_injected") for e in all_extracted)
+        # The authoritative legend value flows through to the estimates verbatim.
+        fcp = [e for e in all_estimates
+               if "Fiber Cement Panel" in e.get("description", "")]
+        assert fcp and abs(fcp[0]["quantity"] - 123231.03) < 0.01
+        assert fcp[0]["unit"] == "SF"

@@ -1,0 +1,20 @@
+item_name,quantity,unit,tolerance_pct,match_mode
+Accent Wall,2505.41,SF,3,pct
+Base,104336.49,LF,3,pct
+Door - HM,236,EA,0,exact_or_within_1
+Door - WD,2378,EA,0,exact_or_within_1
+Door Frame - HM,2687,EA,0,exact_or_within_1
+Exposed Structure,7461.14,SF,3,pct
+Fascia,5160.82,SF,3,pct
+Fiber Cement Panel,123231.03,SF,3,pct
+Gyp Ceiling,304046.57,SF,3,pct
+Gyp Wall,947811.46,SF,3,pct
+Hand Rails,2095.76,LF,3,pct
+Lift,1,EA,0,exact_or_within_1
+Mobilization,1,EA,0,exact_or_within_1
+Sealed Concrete,423.54,SF,3,pct
+Stairs,32,EA,0,exact_or_within_1
+Trash Enclosure,1,EA,0,exact_or_within_1
+Trim,63132.12,LF,3,pct
+WC - 1,318.25,SF,3,pct
+WC - 2,244.40,SF,3,pct

@@ -8,6 +8,13 @@ from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
+
+def _clean_legend_label(label: str) -> str:
+    """Normalise whitespace in a companion take-off legend label, preserving it
+    otherwise verbatim so the app reports the estimator's own item names."""
+    return re.sub(r"\s+", " ", (label or "").strip())
+
+
 ITEM_NAME_MAP = [
     # ── Civil / Site ──────────────────────────────────────────────────────────
     (r"bollard", "Bollards", "EA"),
@@ -175,9 +182,15 @@ def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
     })
 
     # Items whose quantity comes from an authoritative companion take-off legend
-    # are the single source of truth for that canonical item. Vision/room-derived
-    # duplicates of the same item must be suppressed (not summed) so the legend
-    # value is reported verbatim.
+    # are the single source of truth for that item. The legend's printed label and
+    # unit are preserved VERBATIM — we deliberately do NOT route them through the
+    # rule-based name map, which is built for messy vision text and can mangle
+    # unseen object types (e.g. "Fiber Cement Panel" SF -> "Electrical Panels" EA).
+    # This lets the app reproduce any estimator's take-off faithfully and handle
+    # brand-new object types at runtime with zero hardcoding.
+    #
+    # `legend_names` holds the NORMALISED legend labels; it is used only to suppress
+    # vision/room-derived duplicates of items the legend already covers.
     legend_names: set = set()
     for item in calculated_items:
         if item.get("qty_source") == "companion_takeoff_legend":
@@ -197,21 +210,27 @@ def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
         except (TypeError, ValueError):
             continue
 
-        canonical_name, canonical_unit = normalize_item_name(desc, itype, unit)
-        # Suppress non-legend duplicates of any legend-backed item. Matches exact
-        # canonical names and base-vs-spec variants (e.g. vision "Columns" when the
-        # legend reports "Columns-H-35'") so the authoritative legend isn't shadowed
-        # by a coarser vision count of the same physical item.
-        if item.get("qty_source") != "companion_takeoff_legend" and (
-            canonical_name in legend_names
-            or any(
-                ln == canonical_name
-                or ln.startswith(canonical_name + "-")
-                or canonical_name.startswith(ln + "-")
-                for ln in legend_names
-            )
-        ):
-            continue
+        is_legend = item.get("qty_source") == "companion_takeoff_legend"
+        if is_legend:
+            # Trust the take-off: keep its label and unit exactly as printed.
+            canonical_name = _clean_legend_label(desc)
+            canonical_unit = (unit or "").strip().upper()
+        else:
+            canonical_name, canonical_unit = normalize_item_name(desc, itype, unit)
+            # Suppress non-legend duplicates of any legend-backed item. Matches exact
+            # canonical names and base-vs-spec variants (e.g. vision "Columns" when
+            # the legend reports "Columns-H-35'") so the authoritative legend isn't
+            # shadowed by a coarser vision count of the same physical item.
+            if (
+                canonical_name in legend_names
+                or any(
+                    ln == canonical_name
+                    or ln.startswith(canonical_name + "-")
+                    or canonical_name.startswith(ln + "-")
+                    for ln in legend_names
+                )
+            ):
+                continue
         if (canonical_unit or unit or "").lower() in ("ea", "each"):
             qty = float(round(qty))
         bucket = buckets[canonical_name]

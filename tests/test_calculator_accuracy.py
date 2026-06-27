@@ -39,9 +39,10 @@ def test_takeoff_legend_sf_and_ea_rows():
     est = _calculate_from_schedule(sched, "A-101")
     by_type = {e["item_type"]: e for e in est}
     assert by_type["bollard"]["quantity"] == 28
-    assert by_type["bollard"]["unit"] == "ea"
+    # Authoritative legend preserves the printed unit token verbatim (EA, SF...).
+    assert by_type["bollard"]["unit"] == "EA"
     assert abs(by_type["sealed_concrete"]["quantity"] - 395673.42) < 1
-    assert by_type["sealed_concrete"]["unit"] == "sq_ft"
+    assert by_type["sealed_concrete"]["unit"] == "SF"
     assert abs(by_type["cmu_wall"]["quantity"] - 2204.33) < 1
     assert by_type["columns"]["quantity"] == 132
     # Authoritative legend rows are tagged so aggregation can dedupe vision items.

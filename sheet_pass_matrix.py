@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # Maps canonical sheet_type → ordered list of extraction pass names.
 # ---------------------------------------------------------------------------
 PASS_MATRIX: dict[str, list[str]] = {
-    "floor_plan":  ["count", "measure"],   # symbol count + area/linear runs
+    "floor_plan":  ["count", "measure", "schedule"],  # + takeoff legend tables on plan body
     "elevation":   ["count", "measure"],   # facade items + linear dimensions
     "civil_site":  ["measure"],            # linear runs and areas; no symbol grid
     "schedule":    ["schedule"],           # dense table → Sonnet unconditionally
@@ -63,6 +63,9 @@ MODEL_ROUTING: dict[tuple[str, str], str] = {
     ("roof_plan",  "measure"):   CLAUDE_MODEL_SCHEDULES,
     ("mep_plan",   "measure"):   CLAUDE_MODEL_SCHEDULES,
     ("floor_plan", "schedule"):  CLAUDE_MODEL_SCHEDULES,
+    ("floor_plan", "count"):     CLAUDE_MODEL_SCHEDULES,
+    ("floor_plan", "measure"):   CLAUDE_MODEL_SCHEDULES,
+    ("floor_plan", "legend"):    CLAUDE_MODEL_SCHEDULES,
 }
 
 # ---------------------------------------------------------------------------
@@ -162,11 +165,13 @@ def plan_passes(sheet_type: str, title_block_text: str = "") -> list[str]:
         logger.warning("plan_passes: unknown sheet_type %r — using measure-only fallback", sheet_type)
         return ["measure"]
     passes = list(PASS_MATRIX[sheet_type])
-    if sheet_type == "floor_plan" and title_block_text:
-        tb = title_block_text.upper()
-        if re.search(r"TAKE\s*-?\s*OFF|QUANTITY\s+LEGEND|LEGEND\s+TABLE|TAKEOFF\s+LEGEND", tb):
-            if "schedule" not in passes:
-                passes.append("schedule")
+    if sheet_type == "floor_plan":
+        try:
+            from accuracy_config import is_high_accuracy_mode
+            if is_high_accuracy_mode() and "legend" not in passes:
+                passes.append("legend")
+        except ImportError:
+            pass
     return passes
 
 

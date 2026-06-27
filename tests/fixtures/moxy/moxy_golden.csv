@@ -1,0 +1,25 @@
+item_name,quantity,unit,tolerance_pct,match_mode
+Base,3541.01,LF,3,pct
+CMU Wall,6916.47,SF,3,pct
+Door Frame-HM,215,EA,0,exact_or_within_1
+Doors-HM,10,EA,0,exact_or_within_1
+Doors-WD,213,EA,0,exact_or_within_1
+Exposed Structure,3770.94,SF,3,pct
+Guard Rail,188.58,LF,3,pct
+Guestroom-Wall Covering,27013.93,SF,3,pct
+Gyp Ceiling,58680.40,SF,3,pct
+Gyp Soffit,260.07,SF,3,pct
+Gyp Wall,129521.23,SF,3,pct
+Hand Rail,64.61,LF,3,pct
+Lift,1,EA,0,exact_or_within_1
+Lintels,1530.39,LF,3,pct
+Mobilization,1,EA,0,exact_or_within_1
+Stairs,28,EA,0,exact_or_within_1
+WC-1,2880.64,SF,3,pct
+WC-10,148.77,SF,3,pct
+WC-2,649.47,SF,3,pct
+WC-4,169.28,SF,3,pct
+WC-6,1136.62,SF,3,pct
+WC-7,1571.00,SF,3,pct
+WC-8,352.43,SF,3,pct
+WC-9,523.84,SF,3,pct

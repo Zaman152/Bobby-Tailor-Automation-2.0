@@ -18,7 +18,19 @@ ensures the real class is in sys.modules before parity stubs can displace it.
 from __future__ import annotations
 
 import importlib
+import os
 import sys
+
+# Keep unit tests on 3-pass floor_plan unless explicitly testing high-accuracy mode.
+os.environ.setdefault("TAKEOFF_ACCURACY_MODE", "standard")
+
+# Make model routing deterministic regardless of test import order. Some test
+# modules mock `config` via sys.modules.setdefault(); if the real config is
+# imported first (by any earlier test), those mocks become no-ops. Setting the
+# env here ensures the REAL config yields the same distinct Haiku/Sonnet values
+# the mocks expect, so model-routing assertions pass under any collection order.
+os.environ.setdefault("CLAUDE_MODEL", "claude-haiku-4-5")
+os.environ.setdefault("CLAUDE_MODEL_SCHEDULES", "claude-sonnet-4-5")
 
 
 def _ensure_real(name: str) -> None:

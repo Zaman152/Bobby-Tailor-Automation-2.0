@@ -13,9 +13,22 @@ from calculator import resolve_spec_lookups
 from cross_references import resolve_cross_references
 from reporter import generate_report
 from takeoff_pipeline import TakeoffPipeline
+from page_text_enrichment import enrich_components_from_page_text
+from companion_takeoff import find_companion_takeoff_pdf, extract_legend_schedules
 from config import SCREENSHOTS_DIR
 
 logger = logging.getLogger(__name__)
+
+# Anthropic vision limit: longest image side must be ≤ 8000 px
+_MAX_IMAGE_LONG_SIDE_PX = 7900
+
+
+def _effective_render_scale(page: fitz.Page, scale: float) -> float:
+    """Clamp *scale* so rendered PNG longest side stays within API limits."""
+    longest = max(page.rect.width, page.rect.height)
+    if longest <= 0:
+        return scale
+    return min(scale, _MAX_IMAGE_LONG_SIDE_PX / longest)
 
 # Generic noise patterns for building-code / standard references that can
 # produce alphanumeric tokens matching sheet-ID regexes.  Adding a new
@@ -55,8 +68,8 @@ def _is_noise_sheet_candidate(candidate: str, page_text: str) -> bool:
     return False
 
 
-def _page_to_image(pdf_path: str, page_num: int, output_dir: str) -> str:
-    """Render a single PDF page to a PNG image at 2× scale.
+def _page_to_image(pdf_path: str, page_num: int, output_dir: str, scale: float = 2.5) -> str:
+    """Render a single PDF page to a PNG (default 2.5×, clamped to API max dimensions).
 
     Args:
         pdf_path:   Path to the PDF file.
@@ -69,7 +82,8 @@ def _page_to_image(pdf_path: str, page_num: int, output_dir: str) -> str:
     doc = fitz.open(pdf_path)
     try:
         page = doc[page_num]
-        mat = fitz.Matrix(2.0, 2.0)  # 2× scaling for legibility
+        scale = _effective_render_scale(page, scale)
+        mat = fitz.Matrix(scale, scale)
         pix = page.get_pixmap(matrix=mat)
         img_path = str(Path(output_dir) / f"page_{page_num + 1:04d}.png")
         pix.save(img_path)
@@ -233,7 +247,10 @@ def run_pdf_analysis(
                 "sheet_name": sheet,
                 "sheet_type_hint": sheet_type_hint,
                 "title_block_text": title_block_text,
+                "full_page_text": doc[i].get_text(),
                 "page_num": i + 1,
+                "pdf_path": pdf_path,
+                "page_index": i,
             })
     finally:
         doc.close()
@@ -245,9 +262,16 @@ def run_pdf_analysis(
         if progress_callback:
             progress_callback(current, total_, sheet_name, phase="analyzing")
 
+    project_legends: list = []
+    companion = find_companion_takeoff_pdf(pdf_path)
+    if companion:
+        project_legends = extract_legend_schedules(companion)
+
     pipeline = TakeoffPipeline()
     all_extracted, all_estimates, _project_type = pipeline.run_project(
-        pipeline_pages, progress_callback=_progress
+        pipeline_pages,
+        progress_callback=_progress,
+        project_legend_schedules=project_legends or None,
     )
 
     # Emit "complete" progress for each successfully analyzed sheet

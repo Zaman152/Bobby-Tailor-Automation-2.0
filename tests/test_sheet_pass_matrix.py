@@ -72,12 +72,12 @@ class TestPassMatrix:
     def test_schedule_is_schedule_only(self):
         assert PASS_MATRIX["schedule"] == ["schedule"]
 
-    def test_floor_plan_has_count_and_measure(self):
+    def test_floor_plan_has_count_measure_and_schedule(self):
         passes = PASS_MATRIX["floor_plan"]
-        assert passes == ["count", "measure"]
+        assert passes == ["count", "measure", "schedule"]
 
-    def test_floor_plan_adds_schedule_when_legend_in_title_block(self):
-        passes = plan_passes("floor_plan", title_block_text="QUANTITY LEGEND TABLE")
+    def test_floor_plan_schedule_pass_without_title_block_keywords(self):
+        passes = plan_passes("floor_plan", title_block_text="OVERALL FLOOR PLAN")
         assert passes == ["count", "measure", "schedule"]
 
     def test_elevation_has_count_and_measure(self):
@@ -212,8 +212,12 @@ class TestClassifySheetType:
 # ---------------------------------------------------------------------------
 
 class TestPickModelForPass:
-    SONNET = "claude-sonnet-4-5"   # matches _CONFIG_MOCK.CLAUDE_MODEL_SCHEDULES
-    HAIKU  = "claude-haiku-4-5"    # matches _CONFIG_MOCK.CLAUDE_MODEL
+    # Read the model slugs straight from the module under test so the routing
+    # invariants ("schedules model" vs "default model") hold regardless of
+    # whether the mock or the real `config` won the import-order race. conftest
+    # guarantees the two values are distinct (Sonnet vs Haiku).
+    SONNET = _spm.CLAUDE_MODEL_SCHEDULES   # the "needs a stronger model" slug
+    HAIKU  = _spm.CLAUDE_MODEL             # the default slug
 
     def test_elevation_measure_returns_sonnet(self):
         model = pick_model_for_pass("elevation", "measure")
@@ -239,14 +243,14 @@ class TestPickModelForPass:
         model = pick_model_for_pass("mep_plan", "measure")
         assert model == self.SONNET
 
-    def test_floor_plan_count_returns_none(self):
-        """floor_plan count uses default Haiku — should return None."""
+    def test_floor_plan_count_uses_sonnet(self):
+        """floor_plan count routes to Sonnet for grid/symbol accuracy."""
         model = pick_model_for_pass("floor_plan", "count")
-        assert model is None
+        assert model == self.SONNET
 
-    def test_floor_plan_measure_returns_none(self):
+    def test_floor_plan_measure_uses_sonnet(self):
         model = pick_model_for_pass("floor_plan", "measure")
-        assert model is None
+        assert model == self.SONNET
 
     def test_elevation_count_returns_none(self):
         """elevation count is not in MODEL_ROUTING — should be None (Haiku)."""
@@ -263,8 +267,7 @@ class TestPickModelForPass:
         finally:
             _CA_MOCK._pick_model.return_value = self.HAIKU
 
-    def test_no_sheet_name_returns_none_when_no_routing(self):
-        """Without a sheet name and no routing entry, return None."""
-        _CA_MOCK._pick_model.return_value = self.HAIKU
+    def test_floor_plan_count_routed_without_sheet_name(self):
+        """MODEL_ROUTING applies even when sheet_name is empty."""
         model = pick_model_for_pass("floor_plan", "count", sheet_name="")
-        assert model is None
+        assert model == self.SONNET

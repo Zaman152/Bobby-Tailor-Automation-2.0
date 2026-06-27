@@ -23,6 +23,18 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+
+def _fresh_loop() -> asyncio.AbstractEventLoop:
+    """Return a brand-new event loop and install it as current.
+
+    Avoids cross-test pollution: on Python 3.9 ``asyncio.get_event_loop()``
+    raises ``RuntimeError`` once an earlier test has closed the default loop,
+    making these tests order-dependent. Creating a fresh loop is deterministic.
+    """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop
+
 # ---------------------------------------------------------------------------
 # Minimal stubs (set up before any project imports)
 # ---------------------------------------------------------------------------
@@ -56,9 +68,13 @@ def _load(name: str):
 # Load real claude_analyzer (merge_passes, no API calls)
 _real_ca = _load("claude_analyzer")
 
-# Mock for analyze_drawing; real merge_passes preserved
+# Mock for analyze_drawing; real merge/accuracy helpers preserved so the
+# pipeline's module-level `from claude_analyzer import (...)` binds real impls.
 _CA_MOCK = MagicMock()
 _CA_MOCK.merge_passes = _real_ca.merge_passes
+_CA_MOCK._merge_schedule_lists = _real_ca._merge_schedule_lists
+_CA_MOCK.apply_accuracy_rules = _real_ca.apply_accuracy_rules
+_CA_MOCK._SCHEDULE_LEGEND_USER_HINT = _real_ca._SCHEDULE_LEGEND_USER_HINT
 _CA_MOCK.analyze_drawing.return_value = {"components": [], "measurements": []}
 _CA_MOCK.make_navigation_decision.return_value = {"action": "wait"}
 sys.modules["claude_analyzer"] = _CA_MOCK
@@ -281,7 +297,7 @@ class TestScraperUsesPipeline:
         ):
             mock_rm.load.return_value = fake_manifest
             import scraper
-            asyncio.get_event_loop().run_until_complete(
+            _fresh_loop().run_until_complete(
                 scraper.run_analyze_from_manifest(manifest_path_override=mpath)
             )
 
@@ -312,7 +328,7 @@ class TestScraperUsesPipeline:
         ):
             mock_rm.load.return_value = fake_manifest
             import scraper
-            asyncio.get_event_loop().run_until_complete(
+            _fresh_loop().run_until_complete(
                 scraper.run_analyze_from_manifest(manifest_path_override=mpath)
             )
 
@@ -350,7 +366,7 @@ class TestScraperUsesPipeline:
         ):
             mock_rm.load.return_value = fake_manifest
             import scraper
-            asyncio.get_event_loop().run_until_complete(
+            _fresh_loop().run_until_complete(
                 scraper.run_analyze_from_manifest(manifest_path_override=mpath)
             )
 
@@ -369,7 +385,9 @@ class TestPassParity:
     """
 
     @pytest.mark.parametrize("sheet_type,expected_passes", [
-        ("floor_plan",  ["count", "measure"]),
+        # floor_plan always includes a schedule pass to capture takeoff legends
+        # on the plan body (high-accuracy mode also appends a "legend" pass).
+        ("floor_plan",  ["count", "measure", "schedule"]),
         ("civil_site",  ["measure"]),
         ("title_sheet", []),
         ("schedule",    ["schedule"]),
@@ -381,16 +399,17 @@ class TestPassParity:
             f"sheet_type={sheet_type!r}: expected {expected_passes}, got {result}"
         )
 
-    def test_floor_plan_runs_count_and_measure(self):
-        """floor_plan sheets get count+measure passes via pipeline."""
+    def test_floor_plan_runs_count_measure_schedule(self):
+        """floor_plan sheets get count+measure+schedule passes via pipeline."""
         count_r = {"components": [], "measurements": []}
         measure_r = {"components": [], "measurements": [], "rooms": [], "pipe_runs": []}
-        mock_analyzer = MagicMock(side_effect=[count_r, measure_r])
+        schedule_r = {"components": [], "measurements": [], "schedules": []}
+        mock_analyzer = MagicMock(side_effect=[count_r, measure_r, schedule_r])
         pipeline = TakeoffPipeline(analyzer=mock_analyzer)
         result = pipeline.run_sheet("A2.1.png", "A2.1", sheet_type="floor_plan")
 
-        assert result["_passes_run"] == ["count", "measure"]
-        assert mock_analyzer.call_count == 2
+        assert result["_passes_run"] == ["count", "measure", "schedule"]
+        assert mock_analyzer.call_count == 3
 
     def test_title_sheet_zero_api_calls(self):
         """Title sheets produce zero analyze_drawing calls in any entry point."""

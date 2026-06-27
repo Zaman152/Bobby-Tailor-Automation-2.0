@@ -22,7 +22,10 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 from typing import Callable, Optional
+
+import fitz
 
 from sheet_pass_matrix import (
     classify_sheet_type_from_text,
@@ -32,8 +35,13 @@ from sheet_pass_matrix import (
 
 # Module-level imports make these symbols patchable in tests:
 #   unittest.mock.patch("takeoff_pipeline.analyze_drawing", ...)
-from claude_analyzer import analyze_drawing  # noqa: F401 (re-exported for patching)
-from claude_analyzer import merge_passes  # noqa: F401 (canonical; stub below removed)
+from claude_analyzer import (  # noqa: F401 (re-exported for patching)
+    _SCHEDULE_LEGEND_USER_HINT,
+    _merge_schedule_lists,
+    analyze_drawing,
+    apply_accuracy_rules,
+    merge_passes,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +187,8 @@ class TakeoffPipeline:
         sheet_type: Optional[str] = None,
         title_block_text: str = "",
         full_page_text: str = "",
+        pdf_path: Optional[str] = None,
+        page_index: Optional[int] = None,
     ) -> dict:
         """Run all applicable extraction passes for a single sheet image.
 
@@ -220,10 +230,29 @@ class TakeoffPipeline:
         count_result: dict    = {}
         measure_result: dict  = {}
         schedule_result: Optional[dict] = None
+        legend_result: Optional[dict] = None
 
         for pass_type in passes:
             model_override = pick_model_for_pass(resolved_type, pass_type, sheet_name)
-            result = self._run_pass(image_path, sheet_name, pass_type, model_override)
+            render_scale = None
+            legend_region = None
+            if (
+                pass_type in ("schedule", "legend")
+                and resolved_type == "floor_plan"
+                and pdf_path is not None
+                and page_index is not None
+            ):
+                render_scale = 2.5
+            result = self._run_pass(
+                image_path,
+                sheet_name,
+                pass_type,
+                model_override,
+                sheet_type=resolved_type,
+                pdf_path=pdf_path,
+                page_index=page_index,
+                render_scale=render_scale,
+            )
 
             if pass_type == "count":
                 count_result = result
@@ -231,11 +260,52 @@ class TakeoffPipeline:
                 measure_result = result
             elif pass_type == "schedule":
                 schedule_result = result
+                if (
+                    resolved_type == "floor_plan"
+                    and not (schedule_result or {}).get("schedules")
+                    and pdf_path is not None
+                    and page_index is not None
+                ):
+                    logger.info(
+                        "run_sheet: schedule pass empty on floor_plan %r — multi-region legend retry",
+                        sheet_name,
+                    )
+                    combined_scheds: list = []
+                    for region in ("bottom", "left", "right"):
+                        retry = self._run_pass(
+                            image_path,
+                            sheet_name,
+                            "schedule",
+                            model_override,
+                            sheet_type=resolved_type,
+                            pdf_path=pdf_path,
+                            page_index=page_index,
+                            render_scale=2.5,
+                            user_hint=_SCHEDULE_LEGEND_USER_HINT,
+                            legend_region=region,
+                        )
+                        combined_scheds.extend(retry.get("schedules") or [])
+                    if combined_scheds:
+                        schedule_result = {"schedules": combined_scheds}
+            elif pass_type == "legend":
+                legend_result = result
             else:
                 logger.warning("run_sheet: unknown pass_type %r — result discarded", pass_type)
 
         # Step 4 — merge
         merged = merge_passes(count_result, measure_result, schedule_result)
+        if legend_result and legend_result.get("schedules"):
+            merged["schedules"] = _merge_schedule_lists(
+                merged, {"schedules": []}, legend_result
+            )
+        merged = apply_accuracy_rules(merged)
+
+        if full_page_text:
+            try:
+                from page_text_enrichment import enrich_components_from_page_text
+                merged = enrich_components_from_page_text(merged, full_page_text)
+            except ImportError:
+                pass
 
         # Attach pipeline metadata
         merged["_source_sheet"] = image_path
@@ -253,6 +323,7 @@ class TakeoffPipeline:
         self,
         pages: list[dict],
         progress_callback=None,
+        project_legend_schedules: Optional[list] = None,
     ) -> "tuple[list[dict], list[dict], str]":
         """Run the full pipeline for every page in a project.
 
@@ -304,6 +375,9 @@ class TakeoffPipeline:
                 sheet_name=sheet_name,
                 sheet_type=sheet_type,
                 title_block_text=title_block_text,
+                full_page_text=page.get("full_page_text", ""),
+                pdf_path=page.get("pdf_path"),
+                page_index=page.get("page_index"),
             )
 
             # Tag original page number for downstream reporters.
@@ -316,7 +390,42 @@ class TakeoffPipeline:
                 )
                 continue
 
+            # Prefer to attach the authoritative companion take-off legend to a
+            # floor_plan sheet (most natural home), but only once per project.
+            if project_legend_schedules and extracted.get("_sheet_type") == "floor_plan":
+                if not any(
+                    e.get("_companion_legend_injected")
+                    for e in all_extracted
+                ):
+                    existing = list(extracted.get("schedules") or [])
+                    extracted["schedules"] = existing + list(project_legend_schedules)
+                    extracted["_companion_legend_injected"] = True
+                    logger.info(
+                        "Injected %d companion legend rows into %r",
+                        sum(len(s.get("rows") or []) for s in project_legend_schedules),
+                        sheet_name,
+                    )
+
             all_extracted.append(extracted)
+
+        # Fallback: a companion take-off is a PROJECT-level authoritative source.
+        # If no floor_plan sheet existed to host it (e.g. an all-elevation/detail
+        # set), attach it to the first non-skipped sheet so the take-off is never
+        # silently dropped. Without this, plan sets lacking a "floor_plan" sheet
+        # would fall back to vision-only and lose accuracy.
+        if project_legend_schedules and not any(
+            e.get("_companion_legend_injected") for e in all_extracted
+        ):
+            for extracted in all_extracted:
+                existing = list(extracted.get("schedules") or [])
+                extracted["schedules"] = existing + list(project_legend_schedules)
+                extracted["_companion_legend_injected"] = True
+                logger.info(
+                    "Injected %d companion legend rows into %r (fallback — no floor_plan sheet)",
+                    sum(len(s.get("rows") or []) for s in project_legend_schedules),
+                    extracted.get("_sheet_name", extracted.get("_source_sheet", "?")),
+                )
+                break
 
         # Project-type detection runs ONCE across all non-skipped sheets so
         # apply_estimation_tables uses a consistent type for the whole set.
@@ -349,6 +458,12 @@ class TakeoffPipeline:
         sheet_name: str,
         pass_type: str,
         model_override: Optional[str],
+        sheet_type: Optional[str] = None,
+        pdf_path: Optional[str] = None,
+        page_index: Optional[int] = None,
+        render_scale: Optional[float] = None,
+        user_hint: Optional[str] = None,
+        legend_region: Optional[str] = None,
     ) -> dict:
         """Execute a single extraction pass via analyze_drawing.
 
@@ -368,12 +483,36 @@ class TakeoffPipeline:
         else:
             logger.info("  pass=%r sheet=%r (default model)", pass_type, sheet_name)
 
-        result = self._analyzer(
-            image_path,
-            sheet_name,
-            pass_type=pass_type,
-            model_override=model_override,
-        )
+        pass_image = image_path
+        if render_scale and pdf_path is not None and page_index is not None:
+            if (
+                pass_type == "schedule"
+                and sheet_type == "floor_plan"
+                and legend_region
+            ):
+                pass_image = self._render_legend_crop(
+                    pdf_path, page_index, render_scale, region=legend_region
+                )
+            elif pass_type == "legend" and pdf_path is not None and page_index is not None:
+                pass_image = self._render_pdf_page(pdf_path, page_index, render_scale)
+            elif render_scale and pdf_path is not None and page_index is not None:
+                pass_image = self._render_pdf_page(pdf_path, page_index, render_scale)
+
+        try:
+            result = self._analyzer(
+                pass_image,
+                sheet_name,
+                pass_type=pass_type,
+                model_override=model_override,
+                sheet_type=sheet_type,
+                user_hint=user_hint,
+            )
+        finally:
+            if pass_image != image_path and os.path.isfile(pass_image):
+                try:
+                    os.unlink(pass_image)
+                except OSError:
+                    pass
 
         if not isinstance(result, dict):
             logger.warning(
@@ -383,3 +522,49 @@ class TakeoffPipeline:
             return {}
 
         return result
+
+    @staticmethod
+    def _render_legend_crop(
+        pdf_path: str,
+        page_index: int,
+        scale: float,
+        region: str = "right",
+    ) -> str:
+        """Render a plan margin band where quantity takeoff legends often appear."""
+        from pdf_analyzer import _effective_render_scale
+
+        doc = fitz.open(pdf_path)
+        try:
+            page = doc[page_index]
+            scale = _effective_render_scale(page, scale * 1.5)
+            r = page.rect
+            clips = {
+                "right": fitz.Rect(r.width * 0.52, r.height * 0.02, r.width * 0.99, r.height * 0.48),
+                "left": fitz.Rect(r.width * 0.01, r.height * 0.02, r.width * 0.48, r.height * 0.48),
+                "bottom": fitz.Rect(r.width * 0.05, r.height * 0.50, r.width * 0.95, r.height * 0.95),
+            }
+            clip = clips.get(region, clips["right"])
+            pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip)
+            fd, path = tempfile.mkstemp(suffix=".png")
+            os.close(fd)
+            pix.save(path)
+            return path
+        finally:
+            doc.close()
+
+    @staticmethod
+    def _render_pdf_page(pdf_path: str, page_index: int, scale: float) -> str:
+        """Render one PDF page to a temporary PNG at *scale* for hi-res schedule reads."""
+        from pdf_analyzer import _effective_render_scale  # avoid duplicating API limit logic
+
+        doc = fitz.open(pdf_path)
+        try:
+            page = doc[page_index]
+            scale = _effective_render_scale(page, scale)
+            pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale))
+            fd, path = tempfile.mkstemp(suffix=".png")
+            os.close(fd)
+            pix.save(path)
+            return path
+        finally:
+            doc.close()
