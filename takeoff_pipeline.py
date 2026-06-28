@@ -32,6 +32,7 @@ from sheet_pass_matrix import (
     plan_passes,
     pick_model_for_pass,
 )
+from accuracy_config import count_tiling_enabled, count_tiling_grid
 
 # Module-level imports make these symbols patchable in tests:
 #   unittest.mock.patch("takeoff_pipeline.analyze_drawing", ...)
@@ -44,6 +45,100 @@ from claude_analyzer import (  # noqa: F401 (re-exported for patching)
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _build_count_hint(manifest) -> Optional[str]:
+    """Build a targeted-count user hint from the object manifest's EA/count items.
+
+    Tells the count pass exactly which discrete objects to locate and tally, using
+    the user's own names + aliases. Returns None when no manifest / no count items.
+    """
+    if not manifest:
+        return None
+    lines = []
+    for e in manifest.entries:
+        if e.measure not in ("count", "each"):
+            continue
+        names = [e.name, *[a for a in e.aliases if a]]
+        lines.append("  - " + " / ".join(dict.fromkeys(names)))
+    if not lines:
+        return None
+    return (
+        "TARGETED COUNT — the estimator expects these discrete (EA) objects in this "
+        "project. Scan the ENTIRE sheet carefully and report your best total count for "
+        "each one you can see, with a confidence. If an object is not on this sheet, "
+        "omit it (do not guess). Objects to look for:\n" + "\n".join(lines)
+    )
+
+
+def _build_measure_hint(manifest) -> Optional[str]:
+    """Build a measure-pass hint from the manifest's area/length objects.
+
+    Encourages the measure pass to estimate SF/LF totals for the expected objects
+    using the drawing scale and any supplied assumptions (wall height, thickness),
+    marking estimates ``approximate`` so they surface as needs_review downstream.
+    """
+    if not manifest:
+        return None
+    lines = []
+    for e in manifest.entries:
+        if e.measure not in ("area", "length", "volume"):
+            continue
+        names = " / ".join(dict.fromkeys([e.name, *[a for a in e.aliases if a]]))
+        assume = ""
+        if e.assumptions:
+            parts = [f"{k}={v}" for k, v in e.assumptions.items()]
+            assume = f" (assume {', '.join(parts)})"
+        lines.append(f"  - {names} [{e.unit or e.measure}]{assume}")
+    if not lines:
+        return None
+    return (
+        "EXPECTED MEASURED QUANTITIES — the estimator expects these area/length "
+        "objects. Where a total is printed on the sheet, report it. Where it is not "
+        "printed but can be reasoned from the drawing using the stated SCALE and the "
+        "assumptions below, provide your best estimate and set \"approximate\": true. "
+        "Do not fabricate precise numbers — approximate is expected for unprinted "
+        "quantities. Objects:\n" + "\n".join(lines)
+    )
+
+
+def _manifest_scale_fpi(manifest) -> Optional[float]:
+    """Project drawing scale (feet per inch) from a manifest assumption, if any.
+
+    A manifest entry may carry ``assumptions.scale_ft_per_in`` (e.g. 20 for
+    1"=20'); the first such value is used as the reliable scale for geometry
+    measurement. Returns None when absent.
+    """
+    if not manifest:
+        return None
+    for e in manifest.entries:
+        v = e.assumptions.get("scale_ft_per_in") or e.assumptions.get("scale_feet_per_inch")
+        if v:
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                pass
+    return None
+
+
+def _manifest_wall_height(manifest) -> float:
+    """Project wall height for derived wall areas, sourced from the manifest.
+
+    Uses the largest ``height_ft`` assumption among wall-like area entries (or any
+    entry that supplies one). Falls back to the conventional 9ft when absent.
+    """
+    default = 9.0
+    if not manifest:
+        return default
+    heights = []
+    for e in manifest.entries:
+        h = e.assumptions.get("height_ft")
+        if h:
+            try:
+                heights.append(float(h))
+            except (TypeError, ValueError):
+                pass
+    return max(heights) if heights else default
 
 
 # merge_passes is imported from claude_analyzer (canonical implementation, plan 20-03).
@@ -175,6 +270,10 @@ class TakeoffPipeline:
             # Use the module-level name so it can be patched by tests
             import takeoff_pipeline as _self_module
             self._analyzer = _self_module.analyze_drawing
+        # Optional object manifest, set by run_project; drives targeted counting.
+        self._manifest = None
+        # Optional reliable drawing scale (feet per inch) for geometry measurement.
+        self._scale_fpi = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -232,10 +331,19 @@ class TakeoffPipeline:
         schedule_result: Optional[dict] = None
         legend_result: Optional[dict] = None
 
+        # Build a manifest-driven targeted-count hint once (focuses the count pass
+        # on the exact EA objects the user expects — big recall win for Bollards,
+        # Columns, Stairs, etc.).
+        count_hint = _build_count_hint(getattr(self, "_manifest", None))
+        measure_hint = _build_measure_hint(getattr(self, "_manifest", None))
+        # Dense symbol sheets benefit from a higher-resolution count render so
+        # small repeated symbols stay legible.
+        count_hires = resolved_type in ("floor_plan", "civil_site", "roof_plan")
+
         for pass_type in passes:
             model_override = pick_model_for_pass(resolved_type, pass_type, sheet_name)
             render_scale = None
-            legend_region = None
+            pass_hint = None
             if (
                 pass_type in ("schedule", "legend")
                 and resolved_type == "floor_plan"
@@ -243,6 +351,18 @@ class TakeoffPipeline:
                 and page_index is not None
             ):
                 render_scale = 2.5
+            elif (
+                pass_type == "count"
+                and count_hires
+                and pdf_path is not None
+                and page_index is not None
+            ):
+                render_scale = 2.5
+                pass_hint = count_hint
+            elif pass_type == "count":
+                pass_hint = count_hint
+            elif pass_type == "measure":
+                pass_hint = measure_hint
             result = self._run_pass(
                 image_path,
                 sheet_name,
@@ -252,10 +372,23 @@ class TakeoffPipeline:
                 pdf_path=pdf_path,
                 page_index=page_index,
                 render_scale=render_scale,
+                user_hint=pass_hint,
             )
 
             if pass_type == "count":
                 count_result = result
+                # Optional, gated: tiled recount to recover manifest count-objects
+                # the full-sheet pass missed (quantity null/0).
+                if (
+                    count_tiling_enabled()
+                    and getattr(self, "_manifest", None)
+                    and pdf_path is not None
+                    and page_index is not None
+                ):
+                    count_result = self._tiled_recount(
+                        count_result, pdf_path, page_index,
+                        sheet_name, resolved_type, model_override,
+                    )
             elif pass_type == "measure":
                 measure_result = result
             elif pass_type == "schedule":
@@ -307,6 +440,20 @@ class TakeoffPipeline:
             except ImportError:
                 pass
 
+        # Vector-geometry measurement assist (floor/site/roof sheets only).
+        # Provides scale + measured linework/footprint as a verification reference
+        # — accurate when a reliable scale is supplied, flagged otherwise.
+        if (
+            resolved_type in ("floor_plan", "civil_site", "roof_plan")
+            and pdf_path is not None
+            and page_index is not None
+        ):
+            geom = self._measure_geometry_safe(
+                pdf_path, page_index, merged.get("scale"),
+            )
+            if geom is not None:
+                merged["_geometry"] = geom
+
         # Attach pipeline metadata
         merged["_source_sheet"] = image_path
         merged["_sheet_type"]   = resolved_type
@@ -314,6 +461,24 @@ class TakeoffPipeline:
         merged["_passes_run"]   = passes
 
         return merged
+
+    def _measure_geometry_safe(self, pdf_path, page_index, scale_text):
+        """Run the vector-geometry measurement for a sheet; never fatal."""
+        try:
+            from geometry_takeoff import measure_geometry
+            doc = fitz.open(pdf_path)
+            try:
+                page = doc[page_index]
+                m = measure_geometry(
+                    page, scale_text=scale_text,
+                    override_feet_per_inch=getattr(self, "_scale_fpi", None),
+                )
+                return m.to_dict()
+            finally:
+                doc.close()
+        except Exception as exc:  # noqa: BLE001 - measurement assist is best-effort
+            logger.debug("geometry measurement skipped: %s", exc)
+            return None
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -324,6 +489,8 @@ class TakeoffPipeline:
         pages: list[dict],
         progress_callback=None,
         project_legend_schedules: Optional[list] = None,
+        manifest=None,
+        scale_feet_per_inch: Optional[float] = None,
     ) -> "tuple[list[dict], list[dict], str]":
         """Run the full pipeline for every page in a project.
 
@@ -356,6 +523,12 @@ class TakeoffPipeline:
         """
         # Lazy import — calculator does not import takeoff_pipeline.
         from calculator import apply_estimation_tables, _detect_project_type  # noqa: PLC0415
+
+        # Optional object manifest — used by targeted counting/measurement passes.
+        self._manifest = manifest
+        # Reliable scale (feet per inch): explicit arg wins, else a manifest
+        # project-level assumption `scale_ft_per_in` if present.
+        self._scale_fpi = scale_feet_per_inch or _manifest_scale_fpi(manifest)
 
         total = len(pages)
         all_extracted: list[dict] = []
@@ -435,6 +608,10 @@ class TakeoffPipeline:
             project_type, len(all_extracted),
         )
 
+        # Manifest-driven wall height for derived wall-area estimates (replaces the
+        # blanket 9ft assumption when the manifest supplies a wall height_ft).
+        wall_height_ft = _manifest_wall_height(getattr(self, "_manifest", None))
+
         all_estimates: list[dict] = []
         for extracted in all_extracted:
             if "error" not in extracted:
@@ -443,7 +620,10 @@ class TakeoffPipeline:
                     sheet_name=extracted.get("_sheet_name", extracted.get("_source_sheet", "")),
                 )
                 all_estimates.extend(
-                    apply_estimation_tables(extracted, project_type=project_type)
+                    apply_estimation_tables(
+                        extracted, project_type=project_type,
+                        wall_height_ft=wall_height_ft,
+                    )
                 )
 
         return all_extracted, all_estimates, project_type
@@ -544,6 +724,121 @@ class TakeoffPipeline:
                 "bottom": fitz.Rect(r.width * 0.05, r.height * 0.50, r.width * 0.95, r.height * 0.95),
             }
             clip = clips.get(region, clips["right"])
+            pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip)
+            fd, path = tempfile.mkstemp(suffix=".png")
+            os.close(fd)
+            pix.save(path)
+            return path
+        finally:
+            doc.close()
+
+    def _tiled_recount(
+        self,
+        count_result: dict,
+        pdf_path: str,
+        page_index: int,
+        sheet_name: str,
+        sheet_type: str,
+        model_override: Optional[str],
+    ) -> dict:
+        """Recover manifest count-objects missed by the full-sheet count pass.
+
+        For each manifest EA object that came back null/0 on the whole sheet, tile
+        the page (no overlap), count that object per tile, and sum. Adopt the tiled
+        sum only when it beats the full-sheet count (``max``), so this can only
+        ADD recall, never silently lower an already-found count. Tiled counts are
+        flagged low-confidence because boundary symbols are imperfectly handled.
+        """
+        manifest = getattr(self, "_manifest", None)
+        if not manifest:
+            return count_result
+
+        components = list(count_result.get("components") or [])
+
+        def _found_qty(entry) -> float:
+            total = 0.0
+            for c in components:
+                if manifest.resolve(c.get("name", ""), c.get("unit", "")) is entry:
+                    try:
+                        total += float(c.get("quantity") or 0)
+                    except (TypeError, ValueError):
+                        pass
+            return total
+
+        missing = [
+            e for e in manifest.entries
+            if e.measure in ("count", "each") and _found_qty(e) <= 0
+        ]
+        if not missing:
+            return count_result
+
+        cols, rows = count_tiling_grid()
+        hint = (
+            "TARGETED COUNT (cropped region). Count ONLY these objects visible in "
+            "this crop; report your best count with confidence. Omit objects not "
+            "present:\n" + "\n".join(
+                "  - " + " / ".join(dict.fromkeys([e.name, *e.aliases])) for e in missing
+            )
+        )
+
+        tile_totals: dict = {e.name: 0.0 for e in missing}
+        for cx in range(cols):
+            for ry in range(rows):
+                tile_path = self._render_tile(pdf_path, page_index, 2.5, cols, rows, cx, ry)
+                try:
+                    res = self._analyzer(
+                        tile_path, sheet_name, pass_type="count",
+                        model_override=model_override, sheet_type=sheet_type,
+                        user_hint=hint,
+                    )
+                finally:
+                    if os.path.isfile(tile_path):
+                        try:
+                            os.unlink(tile_path)
+                        except OSError:
+                            pass
+                for c in (res or {}).get("components") or []:
+                    entry = manifest.resolve(c.get("name", ""), c.get("unit", ""))
+                    if entry is None or entry.name not in tile_totals:
+                        continue
+                    try:
+                        tile_totals[entry.name] += float(c.get("quantity") or 0)
+                    except (TypeError, ValueError):
+                        pass
+
+        for e in missing:
+            tiled = tile_totals.get(e.name, 0.0)
+            if tiled > 0:
+                components.append({
+                    "name": e.name,
+                    "quantity": round(tiled),
+                    "unit": e.unit or "ea",
+                    "method": "tile-sum",
+                    "confidence": "low",
+                    "location": f"tiled recount {cols}x{rows}",
+                    "notes": "recovered via region tiling; verify count",
+                })
+                logger.info("Tiled recount recovered %s = %s", e.name, round(tiled))
+
+        count_result = dict(count_result)
+        count_result["components"] = components
+        return count_result
+
+    @staticmethod
+    def _render_tile(
+        pdf_path: str, page_index: int, scale: float,
+        cols: int, rows: int, cx: int, ry: int,
+    ) -> str:
+        """Render one (cx, ry) tile of a grid over the page to a temp PNG."""
+        from pdf_analyzer import _effective_render_scale
+
+        doc = fitz.open(pdf_path)
+        try:
+            page = doc[page_index]
+            scale = _effective_render_scale(page, scale)
+            r = page.rect
+            tw, th = r.width / cols, r.height / rows
+            clip = fitz.Rect(cx * tw, ry * th, (cx + 1) * tw, (ry + 1) * th)
             pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), clip=clip)
             fd, path = tempfile.mkstemp(suffix=".png")
             os.close(fd)

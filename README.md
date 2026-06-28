@@ -547,6 +547,22 @@ cp "uploads/Bob's Discount Furniture - Kennesaw, GA-plans.pdf" \
 After copying, re-run `pytest tests/test_golden_takeoff.py -v -m golden` to score both projects.
 The acceptance threshold is **≥97%** on both fixtures.
 
+**Companion take-off PDF (recommended for any project):** When estimators upload a paired quantity
+take-off document in the same folder as the plans PDF, the pipeline parses its tables automatically.
+Name it with `takeoff`, `take-off`, or `quantity` in the filename (e.g. `warehouse_takeoff.pdf` next to
+`warehouse_plans.pdf`). For golden fixtures, optional:
+
+```bash
+cp "uploads/Crow - Cass White Road-Take offs.pdf" tests/fixtures/crow_cass/crow_cass_takeoff.pdf
+```
+
+**High-accuracy mode (default):** `export TAKEOFF_ACCURACY_MODE=high` runs Sonnet on floor-plan
+count/measure/schedule/legend passes. One-command convergence gate:
+
+```bash
+python3 scripts/golden_convergence.py
+```
+
 ### Run all tests
 
 ```bash

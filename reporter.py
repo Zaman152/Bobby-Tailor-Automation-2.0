@@ -23,7 +23,8 @@ def generate_report(project_name: str,
                     all_estimates: Optional[list] = None,
                     folder_id: Optional[int] = None,
                     cross_references: Optional[list] = None,
-                    linked_sheets: Optional[list] = None) -> dict:
+                    linked_sheets: Optional[list] = None,
+                    manifest=None) -> dict:
     """
     Build the final takeoff report.
 
@@ -62,7 +63,7 @@ def generate_report(project_name: str,
 
     specification_tables = _collect_specification_tables(all_extracted)
     from aggregator import aggregate_takeoff
-    takeoff_summary = aggregate_takeoff(calculated_items)
+    takeoff_summary = aggregate_takeoff(calculated_items, manifest=manifest)
 
     # Aggregate API usage across all sheets
     total_cost = sum(d.get("_cost_usd", 0) for d in all_extracted)
@@ -91,6 +92,9 @@ def generate_report(project_name: str,
         },
         "calculated_takeoff": calculated_items,         # Section 5 deliverable
         "takeoff_summary": takeoff_summary,
+        # Pristine vision aggregate — preserved so the verification worksheet can
+        # idempotently rebuild (base + measurements + manual overrides).
+        "takeoff_summary_base": [dict(r) for r in takeoff_summary],
         "specification_tables": specification_tables,
         "cross_references": cross_references or [],
         "linked_sheets_added": linked_added,
@@ -108,6 +112,8 @@ def generate_report(project_name: str,
                 "type": d.get("sheet_type"),
                 "title": d.get("sheet_title"),
                 "scale": d.get("scale"),
+                "scale_parsed": _parsed_scale(d.get("scale")),
+                "geometry": d.get("_geometry"),
                 "measurements": len(d.get("measurements", [])),
                 "components": len(d.get("components", [])),
                 "rooms": len(d.get("rooms", [])),
@@ -124,6 +130,14 @@ def generate_report(project_name: str,
         ],
     }
 
+    # Scale calibration — per-sheet drawing scale + scale-independent raw geometry
+    # so the Results "Scale & Verify" module can recompute measured quantities
+    # exactly when a human corrects a scale (no vision re-run).
+    scale_calibration = _build_scale_calibration(
+        project_name, run_dir.name, all_extracted,
+    )
+    report["scale_calibration"] = scale_calibration
+
     # All files for this run live inside the run's folder with clean names
     json_path = run_dir / "takeoff.json"
     csv_raw   = run_dir / "raw_items.csv"
@@ -131,9 +145,16 @@ def generate_report(project_name: str,
     csv_summary = run_dir / "takeoff_summary.csv"
     txt_path  = run_dir / "summary.txt"
     spec_json = run_dir / "spec_tables.json"
+    calib_json = run_dir / "scale_calibration.json"
 
     with open(json_path, "w") as f:
         json.dump(report, f, indent=2)
+
+    try:
+        with open(calib_json, "w") as f:
+            json.dump(scale_calibration, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to write scale_calibration.json: {e}")
 
     # Save each output file independently so one failure doesn't kill the others
     try:
@@ -185,6 +206,7 @@ def generate_report(project_name: str,
         "takeoff_summary_csv": str(csv_summary),
         "summary_txt":    str(txt_path),
         "spec_tables_json": str(spec_json) if specification_tables else None,
+        "scale_calibration_json": str(calib_json),
     }
     report["_run_folder_name"] = run_dir.name
     return report
@@ -343,6 +365,86 @@ def _flatten_raw_extractions(all_extracted: list) -> List[Dict[str, Any]]:
     return items
 
 
+def _parsed_scale(scale_text):
+    """Parse a sheet's printed scale notation into a usable ratio (or None)."""
+    try:
+        from scale_utils import parse_scale
+        s = parse_scale(scale_text)
+        return s.to_dict() if s else None
+    except Exception:  # noqa: BLE001 - scale parsing is best-effort metadata
+        return None
+
+
+def _image_rel_to_output(img_path) -> str:
+    """Make a sheet image path relative to OUTPUT_DIR for safe serving.
+
+    The sheet-image endpoint resolves links under OUTPUT_DIR, so we store a
+    relative path (e.g. ``screenshots/Proj_ts/page_0003.png``). Returns "" when
+    the path is outside OUTPUT_DIR (e.g. a temp file) so the UI omits the link.
+    """
+    if not img_path:
+        return ""
+    try:
+        out_root = Path(OUTPUT_DIR).resolve()
+        p = Path(img_path).resolve()
+        return str(p.relative_to(out_root))
+    except Exception:
+        return ""
+
+
+def _build_scale_calibration(project_name: str, run_folder: str,
+                             all_extracted: list) -> Dict[str, Any]:
+    """Per-sheet scale + scale-independent raw geometry for the Verify module.
+
+    Only sheets that produced vector geometry (floor/site/roof plans) are
+    scale-dependent and therefore recomputable. Each entry carries the detected
+    scale, its confidence/source, the raw point measures, and the currently
+    computed measured quantities, plus a link to the sheet image for tracing.
+    """
+    sheets: List[Dict[str, Any]] = []
+    for d in all_extracted:
+        geom = d.get("_geometry")
+        if not geom:
+            continue
+        raw = geom.get("raw")
+        scale_meta = geom.get("scale") or {}
+        fpp = scale_meta.get("feet_per_point")
+        fpi = round(fpp * 72.0, 4) if fpp else None
+        confidence = geom.get("confidence") or scale_meta.get("confidence") or "none"
+        # AUTO-VERIFIED: scale read cleanly from the sheet (ladder-snapped, high
+        # confidence) — accepted automatically; the user only confirms if desired.
+        auto_verified = bool(fpi and confidence == "high"
+                             and not geom.get("needs_review", True))
+        sheets.append({
+            "sheet": d.get("_sheet_name") or d.get("_source_sheet") or "unknown",
+            "page_id": d.get("_page_id"),
+            "type": d.get("_sheet_type") or d.get("sheet_type") or "",
+            "image": _image_rel_to_output(d.get("_source_sheet")),
+            "scale_text": d.get("scale") or "",
+            "feet_per_inch": fpi,
+            "scale_confidence": confidence,
+            "auto_verified": auto_verified,
+            "scale_source": scale_meta.get("method") or "none",
+            "page_width_pt": geom.get("page_width_pt"),
+            "page_height_pt": geom.get("page_height_pt"),
+            "raw": raw,
+            "measured": {
+                "footprint_sf": geom.get("footprint_sf"),
+                "total_linework_lf": geom.get("total_linework_lf"),
+                "long_run_lf": geom.get("long_run_lf"),
+            },
+            # Per-viewport breakdown for multi-scale sheets — each detail measured
+            # with its own scale; the Verify tab can show one row per viewport.
+            "viewports": geom.get("viewports") or [],
+        })
+    return {
+        "project_name": project_name,
+        "run_folder": run_folder,
+        "generated_at": datetime.now().isoformat(),
+        "sheets": sheets,
+    }
+
+
 def _normalize_calculated(estimates: list) -> List[Dict[str, Any]]:
     """Calculator output already has source tracing — just ensure consistent keys."""
     normalized = []
@@ -365,6 +467,11 @@ def _normalize_calculated(estimates: list) -> List[Dict[str, Any]]:
             # Preserve provenance so aggregation can treat authoritative companion
             # take-off legend items as the single source of truth for their item.
             "qty_source": e.get("qty_source", ""),
+            # Uncertainty signals — rolled up per item in aggregate_takeoff so the
+            # summary can highlight shaky rows for human review.
+            "confidence": e.get("confidence"),
+            "needs_review": bool(e.get("needs_review", False)),
+            "review_reason": e.get("review_reason", ""),
         })
     return normalized
 
@@ -414,7 +521,8 @@ def _write_raw_csv(items: list, path: Path):
 
 def _write_takeoff_summary_csv(aggregated: list, path: Path):
     """StackCT-style consolidated takeoff summary."""
-    fields = ["item", "quantity", "unit", "source_sheets", "line_count"]
+    fields = ["item", "quantity", "unit", "confidence", "needs_review",
+              "source", "review_notes", "source_sheets", "line_count"]
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
@@ -423,6 +531,10 @@ def _write_takeoff_summary_csv(aggregated: list, path: Path):
                 "item": row.get("item"),
                 "quantity": row.get("quantity_fmt") or row.get("quantity"),
                 "unit": row.get("unit"),
+                "confidence": row.get("confidence") or "",
+                "needs_review": "yes" if row.get("needs_review") else "",
+                "source": row.get("source") or "vision",
+                "review_notes": "; ".join(row.get("review_reasons", [])),
                 "source_sheets": ", ".join(row.get("source_sheets", [])),
                 "line_count": row.get("line_count", 0),
             })
@@ -435,6 +547,7 @@ def _write_calculated_csv(items: list, path: Path):
         "raw_value", "raw_unit",
         "calculated_quantity", "calculated_unit",
         "waste_factor", "formula_applied", "approximate", "estimation_table",
+        "confidence", "needs_review", "review_reason",
         "source_sheet", "source_location", "source_text", "specification"
     ]
     with open(path, "w", newline="") as f:

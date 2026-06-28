@@ -4,9 +4,22 @@ Consolidate per-sheet takeoff items into project-level totals (StackCT summary f
 import logging
 import re
 from collections import defaultdict
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+# Confidence ordering, worst -> best. Used to roll a bucket's confidence up to
+# the lowest (most cautious) confidence among the rows that built it.
+_CONF_ORDER = {"low": 0, "medium": 1, "high": 2}
+
+
+def _worse_conf(a: Optional[str], b: Optional[str]) -> Optional[str]:
+    """Return the lower-confidence of two values (None means 'unknown/ignore')."""
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return a if _CONF_ORDER.get(a, 1) <= _CONF_ORDER.get(b, 1) else b
 
 
 def _clean_legend_label(label: str) -> str:
@@ -171,14 +184,27 @@ def _inject_standard_line_items(buckets: Dict[str, Dict]) -> None:
         })
 
 
-def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
-    """Consolidate per-sheet items into project-level totals."""
+def aggregate_takeoff(calculated_items: List[Dict], manifest=None) -> List[Dict]:
+    """Consolidate per-sheet items into project-level totals.
+
+    When ``manifest`` (an :class:`object_manifest.Manifest`) is supplied, detected
+    items are resolved to the user's canonical name + unit VERBATIM (data-driven,
+    no hardcoded map), and every manifest object is guaranteed to appear in the
+    output — anything not found in the plans is emitted flagged ``needs_review``
+    so nothing is ever silently missed.
+    """
     buckets: Dict[str, Dict] = defaultdict(lambda: {
         "quantity": 0.0,
         "unit": "",
         "source_sheets": set(),
         "source_rows": [],
         "item_type": "",
+        "needs_review": False,
+        "confidence": None,
+        "review_reasons": set(),
+        "source": "",
+        "auto_verified": True,   # AND of contributing rows; only meaningful with rows
+        "has_rows": False,
     })
 
     # Items whose quantity comes from an authoritative companion take-off legend
@@ -194,11 +220,21 @@ def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
     legend_names: set = set()
     for item in calculated_items:
         if item.get("qty_source") == "companion_takeoff_legend":
+            desc = item.get("description", "")
             name, _ = normalize_item_name(
-                item.get("description", ""), item.get("item_type", ""),
-                item.get("unit", ""),
+                desc, item.get("item_type", ""), item.get("unit", ""),
             )
             legend_names.add(name)
+            # A legend bucket is keyed by its cleaned label, and a vision row binds
+            # to its manifest name. Add BOTH so a vision/measured duplicate of a
+            # legend item is suppressed regardless of which naming path it took
+            # (otherwise the two same-named buckets silently SUM — e.g. a measured
+            # footprint area doubling on top of a vision-read area).
+            legend_names.add(_clean_legend_label(desc))
+            if manifest:
+                entry = manifest.resolve(desc, item.get("unit", ""))
+                if entry:
+                    legend_names.add(entry.name)
 
     for item in calculated_items:
         desc = item.get("description", "")
@@ -211,12 +247,23 @@ def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
             continue
 
         is_legend = item.get("qty_source") == "companion_takeoff_legend"
+        bucket_source = ""
         if is_legend:
             # Trust the take-off: keep its label and unit exactly as printed.
             canonical_name = _clean_legend_label(desc)
             canonical_unit = (unit or "").strip().upper()
+            bucket_source = "companion_takeoff_legend"
         else:
-            canonical_name, canonical_unit = normalize_item_name(desc, itype, unit)
+            # Manifest takes priority over the hardcoded map: when the user told us
+            # what objects exist and what to call them, use that name + unit VERBATIM.
+            entry = manifest.resolve(desc, unit) if manifest else None
+            if entry is not None:
+                canonical_name = entry.name
+                canonical_unit = (entry.unit or unit or "").strip().upper()
+                bucket_source = "manifest"
+            else:
+                canonical_name, canonical_unit = normalize_item_name(desc, itype, unit)
+                bucket_source = "vision"
             # Suppress non-legend duplicates of any legend-backed item. Matches exact
             # canonical names and base-vs-spec variants (e.g. vision "Columns" when
             # the legend reports "Columns-H-35'") so the authoritative legend isn't
@@ -238,6 +285,19 @@ def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
         bucket["unit"] = canonical_unit or unit
         bucket["source_sheets"].add(item.get("source_sheet", ""))
         bucket["item_type"] = itype
+        if bucket_source and not bucket["source"]:
+            bucket["source"] = bucket_source
+        # Roll up uncertainty signals so the summary can highlight shaky rows.
+        if item.get("needs_review"):
+            bucket["needs_review"] = True
+        reason = item.get("review_reason")
+        if reason:
+            bucket["review_reasons"].add(reason)
+        bucket["confidence"] = _worse_conf(bucket["confidence"], item.get("confidence"))
+        # A bucket is auto-verified only if EVERY contributing row was auto-accepted.
+        bucket["has_rows"] = True
+        if not item.get("auto_verified"):
+            bucket["auto_verified"] = False
         bucket["source_rows"].append({
             "sheet": item.get("source_sheet"),
             "qty": qty,
@@ -249,11 +309,36 @@ def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
     if buckets:
         _inject_standard_line_items(buckets)
 
+    # Completeness guarantee: every manifest object must appear in the take-off.
+    # Anything we never found in the plans is emitted with qty unknown and flagged
+    # needs_review so it is reviewed by a human rather than silently dropped.
+    if manifest:
+        for entry in manifest.missing(list(buckets.keys())):
+            bucket = buckets[entry.name]
+            bucket["unit"] = entry.unit
+            bucket["item_type"] = entry.measure or "manifest_object"
+            bucket["needs_review"] = True
+            bucket["confidence"] = "low"
+            bucket["source"] = "manifest_missing"
+            bucket["review_reasons"].add("manifest object not found in plans")
+            bucket["source_rows"].append({
+                "sheet": None,
+                "qty": None,
+                "description": f"{entry.name} (expected from manifest, not located on plans)",
+                "formula": "manifest_object_not_found",
+            })
+
     result = []
     for name in sorted(buckets.keys()):
         b = buckets[name]
         qty = b["quantity"]
-        qty_fmt = f"{qty:,.0f}" if qty == int(qty) else f"{qty:,.1f}"
+        is_unknown = b.get("source") == "manifest_missing"
+        if is_unknown:
+            qty_fmt = "—"
+        elif qty == int(qty):
+            qty_fmt = f"{qty:,.0f}"
+        else:
+            qty_fmt = f"{qty:,.1f}"
         result.append({
             "item": name,
             "quantity": qty,
@@ -261,7 +346,13 @@ def aggregate_takeoff(calculated_items: List[Dict]) -> List[Dict]:
             "unit": (b["unit"] or "").upper(),
             "source_sheets": sorted(b["source_sheets"] - {""}),
             "item_type": b["item_type"],
-            "line_count": len(b["source_rows"]),
+            "line_count": len([r for r in b["source_rows"] if r.get("qty") is not None]),
+            "needs_review": bool(b.get("needs_review")),
+            "confidence": b.get("confidence"),
+            "auto_verified": bool(b.get("has_rows") and b.get("auto_verified")
+                                  and not b.get("needs_review") and not is_unknown),
+            "review_reasons": sorted(b.get("review_reasons") or []),
+            "source": b.get("source", ""),
             "detail": b["source_rows"],
         })
     return result

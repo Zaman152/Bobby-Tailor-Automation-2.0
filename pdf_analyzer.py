@@ -183,6 +183,8 @@ def run_pdf_analysis(
     project_name: str = "PDF Project",
     selected_pages: Optional[list[int]] = None,
     progress_callback=None,
+    manifest_path: Optional[str] = None,
+    scale_feet_per_inch: Optional[float] = None,
 ) -> dict:
     """Run multi-pass extraction on a PDF via TakeoffPipeline.
 
@@ -267,11 +269,27 @@ def run_pdf_analysis(
     if companion:
         project_legends = extract_legend_schedules(companion)
 
+    from object_manifest import resolve_project_manifest
+    manifest = resolve_project_manifest(
+        project_name,
+        explicit_path=manifest_path or _find_manifest(pdf_path),
+    )
+    if manifest:
+        logger.info("Using object manifest with %d objects", len(manifest))
+
+    from plan_deterministic_legends import build_deterministic_legends
+    det_legends = build_deterministic_legends(
+        pdf_path, manifest=manifest, companion_present=bool(companion),
+    )
+    project_legends.extend(det_legends)
+
     pipeline = TakeoffPipeline()
     all_extracted, all_estimates, _project_type = pipeline.run_project(
         pipeline_pages,
         progress_callback=_progress,
         project_legend_schedules=project_legends or None,
+        manifest=manifest,
+        scale_feet_per_inch=scale_feet_per_inch,
     )
 
     # Emit "complete" progress for each successfully analyzed sheet
@@ -292,4 +310,30 @@ def run_pdf_analysis(
 
     cross_refs = resolve_cross_references(all_extracted)
     all_estimates = resolve_spec_lookups(all_extracted, all_estimates)
-    return generate_report(project_name, all_extracted, all_estimates, cross_references=cross_refs)
+    return generate_report(
+        project_name, all_extracted, all_estimates,
+        cross_references=cross_refs, manifest=manifest,
+    )
+
+
+def _find_manifest(pdf_path: str) -> Optional[str]:
+    """Auto-discover a sibling object manifest next to the plans PDF.
+
+    Looks for files whose name contains 'manifest' or 'objects' with a .json or
+    .csv extension in the same folder. Returns the first match, or None.
+    """
+    try:
+        folder = Path(pdf_path).resolve().parent
+    except Exception:
+        return None
+    candidates = []
+    for p in folder.iterdir():
+        if not p.is_file() or p.suffix.lower() not in (".json", ".csv"):
+            continue
+        stem = p.stem.lower()
+        if "manifest" in stem or "objects" in stem or stem.endswith("-scope"):
+            candidates.append(p)
+    if candidates:
+        logger.info("Auto-discovered object manifest: %s", candidates[0].name)
+        return str(candidates[0])
+    return None

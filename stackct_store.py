@@ -284,7 +284,9 @@ def upsert_plan_sets(
     now = _now()
     with _write_lock:
         with get_connection() as conn:
-            # Ensure project row exists FIRST (for foreign key)
+            # Ensure project row exists FIRST (for foreign key).
+            # Use DO NOTHING so a real project name from a prior sync is never
+            # overwritten with the fallback "Project_{id}" placeholder.
             conn.execute(
                 """
                 INSERT INTO projects (
@@ -294,7 +296,7 @@ def upsert_plan_sets(
                 """,
                 (
                     stackct_id,
-                    f"Project_{stackct_id}",
+                    f"Project_{stackct_id}",   # placeholder only; real name preserved
                     0,
                     now,
                     now,

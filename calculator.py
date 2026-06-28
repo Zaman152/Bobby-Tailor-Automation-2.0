@@ -386,7 +386,8 @@ MATERIAL_NOTE_MAP = [
 
 # ─── Public entry point ──────────────────────────────────────────────────────
 
-def apply_estimation_tables(extracted_data: dict, project_type: str = "auto") -> List[dict]:
+def apply_estimation_tables(extracted_data: dict, project_type: str = "auto",
+                            wall_height_ft: float = 9.0) -> List[dict]:
     """
     Apply estimation tables to extracted drawing data.
 
@@ -394,6 +395,9 @@ def apply_estimation_tables(extracted_data: dict, project_type: str = "auto") ->
         extracted_data: Dict produced by Claude extraction for a single sheet.
         project_type: Building type key from PROJECT_TYPE_PROFILES. Defaults to
             "auto", which uses content-first note matching with a universal fallback.
+        wall_height_ft: Assumed wall/ceiling height for derived wall-area estimates.
+            Sourced from the object manifest when available; otherwise the 9ft
+            default. Derived wall areas are always flagged ``needs_review``.
 
     Returns list of calculated takeoff items with source traceability.
     """
@@ -415,7 +419,7 @@ def apply_estimation_tables(extracted_data: dict, project_type: str = "auto") ->
 
     # 3) Process rooms — content-first area calculations
     for room in extracted_data.get("rooms", []):
-        estimates.extend(_calculate_from_room(room, sheet_name, project_type))
+        estimates.extend(_calculate_from_room(room, sheet_name, project_type, wall_height_ft))
 
     # 4) Process schedules — takeoff schedules only
     for sched in extracted_data.get("schedules", []):
@@ -538,6 +542,14 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
         if is_approx:
             formula_out = f"{formula_used} [FIELD VERIFY ±]"
 
+        # AUTO-ACCEPT: a measurement computed against a high-confidence (cleanly
+        # read, ladder-snapped) scale is an exact conversion — accept it without
+        # forcing manual review. Approximate dimensions are never auto-accepted.
+        scale_conf = (m.get("scale_confidence") or m.get("geometry_confidence")
+                      or "").lower()
+        auto_verified = bool(not is_approx and scale_conf == "high")
+        confidence_out = "high" if auto_verified else ("low" if is_approx else "medium")
+
         return {
             "item_type": item_type,
             "description": description,
@@ -553,6 +565,10 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
             "source_raw": raw_text or description,
             "table_used": item_type if item_type in ESTIMATION_TABLES else "none",
             "specification": "",
+            "confidence": confidence_out,
+            "needs_review": is_approx,
+            "auto_verified": auto_verified,
+            "review_reason": "approximate dimension (field verify)" if is_approx else "",
         }
     except Exception as e:
         logger.warning(f"Calc from measurement failed: {e}")
@@ -580,6 +596,19 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
         wf = table.get("waste_factor", 1.0)
         final = numeric * wf
 
+        # Propagate the count pass's own confidence; flag low-confidence or
+        # unclassified ("general") counts for human review rather than presenting
+        # them as certain.
+        conf = (c.get("confidence") or "").strip().lower() or None
+        is_unclassified = item_type == "general"
+        needs_review = (conf == "low") or is_unclassified
+        if is_unclassified:
+            reason = "unclassified item (no estimation table matched)"
+        elif conf == "low":
+            reason = "low-confidence count"
+        else:
+            reason = ""
+
         return {
             "item_type": item_type if item_type != "general" else "component",
             "description": name,
@@ -594,6 +623,9 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
             "source_location": location,
             "source_raw": f"{name} — {spec}" if spec else name,
             "table_used": item_type if item_type in ESTIMATION_TABLES else "none",
+            "confidence": conf or ("low" if is_unclassified else "medium"),
+            "needs_review": needs_review,
+            "review_reason": reason,
         }
     except Exception as e:
         logger.warning(f"Calc from component failed: {e}")
@@ -617,7 +649,8 @@ def _room_note_text(room: dict) -> str:
     return " ".join(parts)
 
 
-def _calculate_from_room(room: dict, sheet_name: str, project_type: str = "auto") -> List[dict]:
+def _calculate_from_room(room: dict, sheet_name: str, project_type: str = "auto",
+                         wall_height_ft: float = 9.0) -> List[dict]:
     """Content-first room area calculation.
 
     Priority chain:
@@ -638,11 +671,11 @@ def _calculate_from_room(room: dict, sheet_name: str, project_type: str = "auto"
     if not area or area == 0:
         return results
 
-    ceiling_ht = 9  # ft — default wall height
+    ceiling_ht = wall_height_ft or 9  # ft — manifest-driven, else default
     perimeter = 4 * (area ** 0.5)
     wall_area = perimeter * ceiling_ht
     src_area = dimensions or f"area={area_raw}"
-    src_wall = f"wall area ≈ perimeter ({perimeter:.0f}lf) × {ceiling_ht}ft ceiling"
+    src_wall = f"wall area ≈ perimeter ({perimeter:.0f}lf) × {ceiling_ht:g}ft ceiling"
 
     profile = PROJECT_TYPE_PROFILES.get(project_type, PROJECT_TYPE_PROFILES["auto"])
     skip = set(profile.get("skip_items", []))
@@ -1053,6 +1086,8 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
                 "source_raw": row_text,
                 "table_used": "takeoff_legend",
                 "specification": row.get("SPECIFICATION") or row.get("SPEC") or "",
+                "confidence": "high",
+                "needs_review": False,
             })
         elif item_type in ESTIMATION_TABLES:
             calc_qty, calc_unit, formula_out = _apply_formula(
@@ -1106,6 +1141,9 @@ def _room_calc(room_name: str, item_type: str, area: float, unit_in: str,
     try:
         calc_qty, calc_unit, formula = _apply_formula(item_type, area, unit_in, str(area))
         table = ESTIMATION_TABLES.get(item_type, {})
+        # Wall quantities derived from the perimeter≈4·√area × default-height proxy
+        # are rough estimates, not measured geometry — flag them for human review.
+        is_estimated = "≈" in (source_note or "")
         return {
             "item_type": item_type,
             "description": f"{item_type.replace('_', ' ').title()} for {room_name}",
@@ -1120,6 +1158,9 @@ def _room_calc(room_name: str, item_type: str, area: float, unit_in: str,
             "source_raw": source_note,
             "table_used": item_type,
             "specification": "",
+            "confidence": "low" if is_estimated else "medium",
+            "needs_review": bool(is_estimated),
+            "review_reason": "estimated wall area (perimeter/height assumption, not measured)" if is_estimated else "",
         }
     except Exception as e:
         logger.warning(f"Room calc failed for {room_name}/{item_type}: {e}")

@@ -32,10 +32,24 @@ def _ensure_db():
     store.init_db()
 
 
+def _mostly_placeholder_names(projects: list[dict]) -> bool:
+    """True when > 50% of project names are still Project_{id} placeholders."""
+    if not projects:
+        return False
+    placeholders = sum(
+        1 for p in projects
+        if (p.get("name") or "").startswith("Project_")
+    )
+    return placeholders / len(projects) > 0.5
+
+
 def get_projects(force_refresh: bool = False) -> dict:
     """
     Return projects list (DB-first).
     Shape: {projects, fetched_at, from_cache, stale?, syncing?, error?}
+
+    Auto-triggers a background refresh when > 50% of stored names are
+    Project_{id} placeholders (indicates the name-collection pass failed).
     """
     _ensure_db()
     global _projects_bg_started
@@ -44,14 +58,16 @@ def get_projects(force_refresh: bool = False) -> dict:
         return sync_projects(force=True)
 
     projects = store.list_projects()
-    if projects and store.is_projects_fresh():
+    names_need_fix = _mostly_placeholder_names(projects)
+
+    if projects and store.is_projects_fresh() and not names_need_fix:
         return {
             "projects": [{"id": p["id"], "name": p["name"]} for p in projects],
             "fetched_at": store.get_metadata("projects_synced_at"),
             "from_cache": True,
         }
 
-    if projects and not store.is_projects_fresh():
+    if projects and (not store.is_projects_fresh() or names_need_fix):
         if not _projects_bg_started:
             _projects_bg_started = True
             threading.Thread(
@@ -63,6 +79,7 @@ def get_projects(force_refresh: bool = False) -> dict:
             "from_cache": True,
             "stale": True,
             "syncing": True,
+            "names_refreshing": names_need_fix,
         }
 
     return sync_projects(force=False)
@@ -110,7 +127,7 @@ def _start_plan_sets_background_sync(project_id: int):
 
     def _run():
         try:
-            sync_project_plan_sets(project_id, force=True)
+            sync_project_plan_sets(project_id, force=True, count_sheets=False)
         finally:
             with _plan_sets_bg_lock:
                 _plan_sets_syncing.discard(project_id)
@@ -121,12 +138,17 @@ def _start_plan_sets_background_sync(project_id: int):
 def get_project_plan_sets(
     project_id: int,
     force_refresh: bool = False,
+    wait: bool = False,
 ) -> dict:
-    """Return plan sets for a project (DB-first, stale-while-revalidate)."""
+    """Return plan sets for a project (DB-first, stale-while-revalidate).
+
+    wait: when True and cache is empty, run a fast names-only StackCT sync
+    inline (folder list only — no per-sheet scrape). Used by Preview Plans.
+    """
     _ensure_db()
 
     if force_refresh:
-        return sync_project_plan_sets(project_id, force=True)
+        return sync_project_plan_sets(project_id, force=True, count_sheets=True)
 
     plan_sets = store.get_plan_sets(project_id)
     fetched_at = store.get_plan_sets_synced_at(project_id)
@@ -149,6 +171,10 @@ def get_project_plan_sets(
             "stale": True,
             "syncing": True,
         }
+
+    # First visit: Preview waits for fast folder discovery (no sheet list)
+    if wait:
+        return sync_project_plan_sets(project_id, force=False, count_sheets=False)
 
     _start_plan_sets_background_sync(project_id)
     return {

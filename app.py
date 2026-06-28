@@ -83,6 +83,9 @@ jobs: dict = {}
 # PDF uploads awaiting page selection (upload_id -> metadata)
 uploads: dict = {}
 
+# Uploaded object manifests awaiting a run (manifest_id -> {path, count, objects})
+object_manifests: dict = {}
+
 
 # ── Error Handlers ───────────────────────────────────────────────────────────
 
@@ -387,7 +390,8 @@ def _resolve_manifest_dir(
 
 def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name: str,
                  page_ids: Optional[list] = None, folder_id: Optional[int] = None,
-                 analyze_only: bool = False, manifest_dir: Optional[str] = None):
+                 analyze_only: bool = False, manifest_dir: Optional[str] = None,
+                 object_manifest_path: Optional[str] = None):
     """Background thread for StackCT scraping."""
     from scraper import run_all_projects, run_project_scrape, run_analyze_from_manifest
 
@@ -423,6 +427,8 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
         pct = _weighted_pct(current, total, phase)
         jobs[job_id]["progress"] = pct
         jobs[job_id]["current_phase"] = phase
+        if total > 0:
+            jobs[job_id]["total_sheets"] = total
         jobs[job_id]["current_sheet"] = {
             "index": current,
             "total": total,
@@ -437,6 +443,13 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
 
     def cancel_check() -> bool:
         return bool(jobs[job_id].get("_cancel"))
+
+    if jobs[job_id].get("_cancel"):
+        jobs[job_id]["status"] = "cancelled"
+        jobs[job_id]["current_phase"] = "cancelled"
+        log("Job cancelled before start.")
+        _persist_job_history(job_id, "stackct")
+        return
 
     jobs[job_id]["status"] = "running"
     jobs[job_id]["started_at"] = datetime.now().isoformat()
@@ -460,12 +473,17 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
                 log_callback=log,
                 progress_callback=progress,
                 cancel_check=cancel_check,
+                object_manifest_path=object_manifest_path,
             ))
         else:
             log("Logging into StackCT...")
             if mode == "all":
                 result = _run_async(
-                    run_all_projects(log_callback=log, progress_callback=progress)
+                    run_all_projects(
+                        log_callback=log,
+                        progress_callback=progress,
+                        cancel_check=cancel_check,
+                    )
                 )
             else:
                 result = _run_async(run_project_scrape(
@@ -476,6 +494,7 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
                     log_callback=log,
                     progress_callback=progress,
                     cancel_check=cancel_check,
+                    object_manifest_path=object_manifest_path,
                 ))
         _finalize_stackct_job(job_id, result, log)
     except Exception:
@@ -488,7 +507,8 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
 
 
 def _pdf_job(job_id: str, pdf_path: str, project_name: str,
-             selected_pages: Optional[list] = None):
+             selected_pages: Optional[list] = None,
+             manifest_path: Optional[str] = None):
     """Background thread for PDF analysis."""
     from pdf_analyzer import run_pdf_analysis
 
@@ -532,6 +552,7 @@ def _pdf_job(job_id: str, pdf_path: str, project_name: str,
             pdf_path, project_name,
             selected_pages=selected_pages,
             progress_callback=progress,
+            manifest_path=manifest_path,
         )
         jobs[job_id]["status"] = "done"
         jobs[job_id]["finished_at"] = datetime.now().isoformat()
@@ -737,6 +758,17 @@ def run_stackct():
     analyze_only: bool = bool(data.get("analyze_only", False))
     manifest_dir: Optional[str] = data.get("manifest_dir") or None
 
+    # Optional object manifest (canonical names + completeness). If none is
+    # explicitly attached, run_project_scrape auto-discovers one from the
+    # `manifests/` dir by project name.
+    object_manifest_path: Optional[str] = None
+    object_manifest_id = data.get("object_manifest_id")
+    if object_manifest_id:
+        man = object_manifests.get(object_manifest_id)
+        if not man or not os.path.isfile(man.get("path", "")):
+            return jsonify({"error": "Object manifest not found or expired"}), 404
+        object_manifest_path = man["path"]
+
     # Validate page_ids belong to folder when both provided
     if not analyze_only and mode == "specific" and project_id and page_ids and folder_id is not None:
         import stackct_store as _store
@@ -772,7 +804,8 @@ def run_stackct():
     t = threading.Thread(
         target=_stackct_job,
         args=(job_id, mode, project_id, project_name, page_ids, folder_id),
-        kwargs={"analyze_only": analyze_only, "manifest_dir": manifest_dir},
+        kwargs={"analyze_only": analyze_only, "manifest_dir": manifest_dir,
+                "object_manifest_path": object_manifest_path},
         daemon=True
     )
     t.start()
@@ -818,6 +851,7 @@ def run_pdf_from_upload():
     upload_id = data.get("upload_id")
     project_name = data.get("project_name")
     selected_pages = data.get("selected_pages")
+    manifest_id = data.get("object_manifest_id")
 
     if not upload_id:
         return jsonify({"error": "upload_id required"}), 400
@@ -833,6 +867,15 @@ def run_pdf_from_upload():
     if not project_name:
         project_name = Path(upload.get("filename", "PDF Project")).stem
 
+    manifest_path = None
+    manifest_count = 0
+    if manifest_id:
+        man = object_manifests.get(manifest_id)
+        if not man or not os.path.isfile(man.get("path", "")):
+            return jsonify({"error": "Object manifest not found or expired"}), 404
+        manifest_path = man["path"]
+        manifest_count = man.get("count", 0)
+
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
         "id": job_id, "type": "pdf", "status": "queued",
@@ -843,15 +886,84 @@ def run_pdf_from_upload():
         "current_sheet": {"index": 0, "total": 0, "name": None, "phase": None},
         "sheets_completed": [],
         "selected_pages": selected_pages,
+        "object_manifest_count": manifest_count,
     }
 
     t = threading.Thread(
         target=_pdf_job,
-        args=(job_id, pdf_path, project_name, selected_pages),
+        args=(job_id, pdf_path, project_name, selected_pages, manifest_path),
         daemon=True,
     )
     t.start()
     return jsonify({"job_id": job_id})
+
+
+@app.route("/api/pdf/manifest/template", methods=["GET"])
+def object_manifest_template():
+    """Download a CSV template the user can fill in and upload as an object manifest."""
+    from object_manifest import template_csv
+    from flask import Response
+    return Response(
+        template_csv(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=object_manifest_template.csv"},
+    )
+
+
+@app.route("/api/pdf/manifest/upload", methods=["POST"])
+def upload_object_manifest():
+    """Accept an object manifest as a file (CSV/JSON) OR an inline JSON list.
+
+    The manifest lists the objects expected in the project with their canonical
+    name + unit (no quantities). Returns a manifest_id to pass to /api/pdf/run.
+    """
+    from object_manifest import load_manifest
+
+    manifest_id = str(uuid.uuid4())[:8]
+    save_path = os.path.join("uploads", f"manifest_{manifest_id}")
+
+    try:
+        if "file" in request.files:
+            f = request.files["file"]
+            if not f.filename:
+                return jsonify({"error": "No file uploaded"}), 400
+            ext = Path(f.filename).suffix.lower() or ".csv"
+            if ext not in (".csv", ".json"):
+                return jsonify({"error": "Object manifest must be .csv or .json"}), 400
+            save_path += ext
+            f.save(save_path)
+        else:
+            data = request.json or {}
+            objects = data.get("objects") or data.get("manifest")
+            if not isinstance(objects, list) or not objects:
+                return jsonify({"error": "Provide a file or a non-empty 'objects' list"}), 400
+            save_path += ".json"
+            with open(save_path, "w", encoding="utf-8") as out:
+                json.dump(objects, out)
+
+        manifest = load_manifest(save_path)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Object manifest upload failed: %s", exc)
+        return jsonify({"error": f"Could not parse object manifest: {exc}"}), 400
+
+    if not manifest:
+        return jsonify({"error": "Object manifest has no usable rows"}), 400
+
+    preview = [
+        {"name": e.name, "unit": e.unit, "measure": e.measure,
+         "aliases": e.aliases}
+        for e in manifest.entries[:50]
+    ]
+    object_manifests[manifest_id] = {
+        "path": save_path,
+        "count": len(manifest),
+        "objects": preview,
+    }
+    return jsonify({
+        "manifest_id": manifest_id,
+        "count": len(manifest),
+        "objects": preview,
+    })
 
 
 @app.route("/api/run/pdf", methods=["POST"])
@@ -902,7 +1014,8 @@ def job_status(job_id):
         "current_sheet": cs,
         "current_phase": job.get("current_phase") or (cs.get("phase") if cs else None),
         "sheets_completed": len(completed),
-        "total_sheets": cs.get("total", 0),
+        "total_sheets": cs.get("total") or job.get("total_sheets") or 0,
+        "cancelling": bool(job.get("_cancel") and job["status"] in ("running", "queued")),
         "sheet_log": completed[-10:],
         "sheet_log_full": completed,
         "log": job["log"][-50:],
@@ -917,18 +1030,20 @@ def job_status(job_id):
 
 @app.route("/api/cancel/<job_id>", methods=["POST"])
 def cancel_job(job_id):
-    """Request cancellation of a running or queued job."""
+    """Request cooperative cancellation of a running or queued job."""
     job = jobs.get(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
+    if job.get("_cancel"):
+        return jsonify({"success": True, "message": "Cancellation already requested"})
     if job["status"] not in ("running", "queued"):
         return jsonify({"error": "Job is not running"}), 400
-    job["status"] = "cancelled"
     job["_cancel"] = True
+    job["current_phase"] = "cancelling"
     job["log"].append({
         "timestamp": datetime.now().isoformat(),
         "type": "info",
-        "message": "Job cancelled by user",
+        "message": "Cancellation requested — stopping after current step…",
     })
     return jsonify({"success": True})
 
@@ -1161,6 +1276,490 @@ def preview_report(run_folder: str, filename: str):
     except Exception as e:
         logger.error(f"Preview failed for {path.name}", exc_info=True)
         raise
+
+
+def _load_scale_calibration(run_folder: str) -> Optional[dict]:
+    """Load a run's scale_calibration.json, falling back to takeoff.json.
+
+    Older runs (before the scale module) only have the calibration embedded in
+    takeoff.json; newer runs have a dedicated file. Returns None if neither.
+    """
+    sub = Path(OUTPUT_DIR) / run_folder
+    calib_path = sub / "scale_calibration.json"
+    if calib_path.is_file():
+        try:
+            return json.loads(calib_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    tk = sub / "takeoff.json"
+    if tk.is_file():
+        try:
+            data = json.loads(tk.read_text(encoding="utf-8"))
+            return data.get("scale_calibration")
+        except (json.JSONDecodeError, OSError):
+            pass
+    return None
+
+
+@app.route("/api/reports/<run_folder>/scale", methods=["GET"])
+@login_required
+def get_scale_calibration(run_folder: str):
+    """Return the per-sheet scale calibration table for the Verify module."""
+    if "/" in run_folder or ".." in run_folder:
+        return jsonify({"error": "Invalid path"}), 400
+    if not (Path(OUTPUT_DIR) / run_folder).is_dir():
+        return jsonify({"error": "Not found"}), 404
+    calib = _load_scale_calibration(run_folder)
+    if calib is None:
+        return jsonify({"run_folder": run_folder, "sheets": [],
+                        "supported": False})
+    calib["supported"] = bool(calib.get("sheets"))
+    return jsonify(calib)
+
+
+@app.route("/api/reports/<run_folder>/scale", methods=["POST"])
+@login_required
+def update_scale_calibration(run_folder: str):
+    """Apply user-verified per-sheet scales and recompute measured quantities.
+
+    Body: ``{"overrides": {"<sheet>": <feet_per_inch>, ...}}``. Recompute is
+    pure deterministic math on stored raw point geometry — no vision re-run.
+    Persists the updated calibration so corrections survive a reload.
+    """
+    if "/" in run_folder or ".." in run_folder:
+        return jsonify({"error": "Invalid path"}), 400
+    sub = Path(OUTPUT_DIR) / run_folder
+    if not sub.is_dir():
+        return jsonify({"error": "Not found"}), 404
+
+    calib = _load_scale_calibration(run_folder)
+    if calib is None or not calib.get("sheets"):
+        return jsonify({"error": "No scale-dependent geometry for this run"}), 400
+
+    data = request.json or {}
+    overrides = data.get("overrides") or {}
+    if not isinstance(overrides, dict):
+        return jsonify({"error": "overrides must be an object"}), 400
+
+    from scale_recalc import apply_overrides
+    calib = apply_overrides(calib, overrides)
+
+    try:
+        (sub / "scale_calibration.json").write_text(
+            json.dumps(calib, indent=2), encoding="utf-8")
+    except OSError as e:
+        logger.error(f"Failed to persist scale calibration: {e}")
+        return jsonify({"error": "Failed to save"}), 500
+
+    calib["supported"] = True
+    return jsonify(calib)
+
+
+@app.route("/api/reports/<run_folder>/sheet-image/<path:relpath>")
+@login_required
+def serve_sheet_image(run_folder: str, relpath: str):
+    """Serve a sheet PNG for traceability (path is relative to OUTPUT_DIR)."""
+    if ".." in run_folder or ".." in relpath:
+        return jsonify({"error": "Invalid path"}), 400
+    output_root = Path(OUTPUT_DIR).resolve()
+    target = (output_root / relpath).resolve()
+    try:
+        target.relative_to(output_root)
+    except ValueError:
+        logger.warning(f"Sheet-image path escaped output dir: {relpath}")
+        return jsonify({"error": "Invalid path"}), 400
+    if not target.is_file() or target.suffix.lower() not in (".png", ".jpg", ".jpeg"):
+        return jsonify({"error": "Not found"}), 404
+    mime = "image/png" if target.suffix.lower() == ".png" else "image/jpeg"
+    return send_file(str(target), mimetype=mime, max_age=3600)
+
+
+def _measurements_path(run_folder: str) -> Path:
+    return Path(OUTPUT_DIR) / run_folder / "takeoff_measurements.json"
+
+
+def _load_measurements(run_folder: str) -> list:
+    p = _measurements_path(run_folder)
+    if p.is_file():
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            return data.get("measurements", []) if isinstance(data, dict) else []
+        except (json.JSONDecodeError, OSError):
+            return []
+    return []
+
+
+def _verify_path(run_folder: str) -> Path:
+    return Path(OUTPUT_DIR) / run_folder / "verification_overrides.json"
+
+
+def _load_verify_overrides(run_folder: str) -> dict:
+    p = _verify_path(run_folder)
+    if p.is_file():
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+            return data.get("overrides", {}) if isinstance(data, dict) else {}
+        except (json.JSONDecodeError, OSError):
+            return {}
+    return {}
+
+
+def _qty_fmt(qty) -> str:
+    try:
+        q = float(qty)
+    except (TypeError, ValueError):
+        return "—"
+    return f"{q:,.0f}" if q == int(q) else f"{q:,.1f}"
+
+
+def _rebuild_summary(run_folder: str) -> dict:
+    """Recompute takeoff_summary from base vision + measurements + manual overrides.
+
+    Idempotent and layered (each layer wins over the previous):
+      1. ``takeoff_summary_base`` — pristine vision aggregate (captured once).
+      2. scale-bound measurements (exact geometry × verified scale).
+      3. manual verified overrides (human-entered/confirmed) — always win.
+
+    Rewrites takeoff.json's ``takeoff_summary`` + takeoff_summary.csv. Returns the
+    rebuilt summary list.
+    """
+    import takeoff_measurements as tm
+    from reporter import _write_takeoff_summary_csv
+    import copy
+
+    sub = Path(OUTPUT_DIR) / run_folder
+    tk_path = sub / "takeoff.json"
+    if not tk_path.is_file():
+        return []
+    try:
+        report = json.loads(tk_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+
+    if "takeoff_summary_base" not in report:
+        report["takeoff_summary_base"] = copy.deepcopy(report.get("takeoff_summary") or [])
+    summary = copy.deepcopy(report["takeoff_summary_base"])
+    by_name = {str(r.get("item", "")).strip().lower(): r for r in summary}
+
+    def _row_for(item_name):
+        key = str(item_name).strip().lower()
+        row = by_name.get(key)
+        if row is None:
+            row = {"item": item_name, "detail": [], "source_sheets": []}
+            summary.append(row)
+            by_name[key] = row
+        return row
+
+    # Layer 2 — measurements
+    agg = tm.aggregate_measurements(_load_measurements(run_folder))
+    for entry in agg.values():
+        row = _row_for(entry["item"])
+        is_auto = bool(entry.get("auto"))
+        row.update({
+            "quantity": entry["quantity"],
+            "quantity_fmt": _qty_fmt(entry["quantity"]),
+            "unit": (entry["unit"] or row.get("unit") or "").upper(),
+            "confidence": "high", "needs_review": False, "review_reasons": [],
+            "source": "measured_auto" if is_auto else "measured_verified",
+            "auto_verified": is_auto,
+            "line_count": entry["line_count"],
+            "measured_sheets": entry.get("sheets", []),
+        })
+
+    # Layer 3 — manual verified overrides (win over everything)
+    overrides = _load_verify_overrides(run_folder)
+    for key, ov in overrides.items():
+        if not ov.get("verified"):
+            continue
+        row = _row_for(ov.get("item") or key)
+        if ov.get("quantity") is not None:
+            row["quantity"] = ov["quantity"]
+            row["quantity_fmt"] = _qty_fmt(ov["quantity"])
+        if ov.get("unit"):
+            row["unit"] = ov["unit"].upper()
+        row["confidence"] = "high"
+        row["needs_review"] = False
+        row["review_reasons"] = []
+        row["source"] = "user_verified"
+        row["auto_verified"] = False  # explicit human confirmation, not auto
+        if ov.get("note"):
+            row["verify_note"] = ov["note"]
+
+    report["takeoff_summary"] = summary
+    try:
+        tk_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        _write_takeoff_summary_csv(summary, sub / "takeoff_summary.csv")
+    except OSError as e:
+        logger.error(f"Failed to rewrite summary: {e}")
+    return summary
+
+
+@app.route("/api/reports/<run_folder>/measurements", methods=["GET"])
+@login_required
+def get_measurements(run_folder: str):
+    """Return saved scale-bound takeoff measurements for a run."""
+    if "/" in run_folder or ".." in run_folder:
+        return jsonify({"error": "Invalid path"}), 400
+    if not (Path(OUTPUT_DIR) / run_folder).is_dir():
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({"run_folder": run_folder,
+                    "measurements": _load_measurements(run_folder)})
+
+
+@app.route("/api/reports/<run_folder>/measurements", methods=["POST"])
+@login_required
+def save_measurements(run_folder: str):
+    """Persist measurements, recompute each exactly, and merge into the summary.
+
+    Body: ``{"measurements": [ {item, unit, measure_type, sheet, points_pt,
+    feet_per_inch, height_ft?, count?, verified?}, ... ]}``.
+    """
+    if "/" in run_folder or ".." in run_folder:
+        return jsonify({"error": "Invalid path"}), 400
+    sub = Path(OUTPUT_DIR) / run_folder
+    if not sub.is_dir():
+        return jsonify({"error": "Not found"}), 404
+
+    import takeoff_measurements as tm
+    data = request.json or {}
+    incoming = data.get("measurements")
+    if not isinstance(incoming, list):
+        return jsonify({"error": "measurements must be a list"}), 400
+
+    cleaned = []
+    for m in incoming:
+        if not isinstance(m, dict) or m.get("measure_type") not in tm.VALID_TYPES:
+            continue
+        try:
+            cleaned.append(tm.recompute_measurement(m))
+        except Exception as e:  # noqa: BLE001 - skip malformed rows, keep the rest
+            logger.warning(f"Skipping bad measurement: {e}")
+
+    payload = {"run_folder": run_folder, "measurements": cleaned}
+    try:
+        _measurements_path(run_folder).write_text(
+            json.dumps(payload, indent=2), encoding="utf-8")
+    except OSError as e:
+        logger.error(f"Failed to persist measurements: {e}")
+        return jsonify({"error": "Failed to save"}), 500
+
+    _rebuild_summary(run_folder)
+    return jsonify({"run_folder": run_folder, "measurements": cleaned,
+                    "aggregate": tm.aggregate_measurements(cleaned)})
+
+
+@app.route("/api/reports/<run_folder>/verify", methods=["POST"])
+@login_required
+def verify_item(run_folder: str):
+    """Set/clear a human verified-override for a takeoff item → exact + locked.
+
+    Body: ``{"item": str, "quantity"?: number|null, "unit"?: str,
+    "verified"?: bool (default true), "note"?: str, "clear"?: bool}``.
+    The override wins over vision + measurements, marking the line verified
+    (confidence high, no review). This is the universal path to 100%.
+    """
+    if "/" in run_folder or ".." in run_folder:
+        return jsonify({"error": "Invalid path"}), 400
+    sub = Path(OUTPUT_DIR) / run_folder
+    if not sub.is_dir():
+        return jsonify({"error": "Not found"}), 404
+
+    data = request.json or {}
+    item = (data.get("item") or "").strip()
+    if not item:
+        return jsonify({"error": "item required"}), 400
+    key = item.lower()
+
+    p = _verify_path(run_folder)
+    store = {}
+    if p.is_file():
+        try:
+            store = json.loads(p.read_text(encoding="utf-8")).get("overrides", {})
+        except (json.JSONDecodeError, OSError):
+            store = {}
+
+    if data.get("clear"):
+        store.pop(key, None)
+    else:
+        qty = data.get("quantity", None)
+        if qty is not None:
+            try:
+                qty = float(qty)
+            except (TypeError, ValueError):
+                return jsonify({"error": "quantity must be numeric"}), 400
+        store[key] = {
+            "item": item,
+            "quantity": qty,
+            "unit": data.get("unit") or "",
+            "verified": bool(data.get("verified", True)),
+            "note": data.get("note") or "",
+        }
+
+    try:
+        p.write_text(json.dumps({"run_folder": run_folder, "overrides": store},
+                                indent=2), encoding="utf-8")
+    except OSError as e:
+        logger.error(f"Failed to persist verify overrides: {e}")
+        return jsonify({"error": "Failed to save"}), 500
+
+    summary = _rebuild_summary(run_folder)
+    verified = sum(1 for r in summary
+                   if not r.get("needs_review") and r.get("quantity") not in (None, "—"))
+    total = len(summary)
+    return jsonify({"run_folder": run_folder, "takeoff_summary": summary,
+                    "verified_count": verified, "total": total})
+
+
+def _row_qty_num(row: dict):
+    """Numeric quantity of a summary row, or None when missing/non-numeric."""
+    q = row.get("quantity")
+    if q in (None, "—", ""):
+        return None
+    try:
+        return float(str(q).replace(",", ""))
+    except (TypeError, ValueError):
+        return None
+
+
+def _row_needs_verification(row: dict) -> bool:
+    """A line is unproven if flagged for review or it has no usable quantity."""
+    if _row_qty_num(row) is None:
+        return True
+    return bool(row.get("needs_review"))
+
+
+def _summary_counts(summary: list) -> dict:
+    total = len(summary)
+    needs = [r for r in summary if _row_needs_verification(r)]
+    no_value = [r for r in needs if _row_qty_num(r) is None]
+    return {
+        "total": total,
+        "verified_count": total - len(needs),
+        "needs_review": len(needs),
+        "needs_value": len(no_value),
+        "pct": round((total - len(needs)) / total * 100) if total else 100,
+    }
+
+
+@app.route("/api/reports/<run_folder>/verify-batch", methods=["POST"])
+@login_required
+def verify_batch(run_folder: str):
+    """Confirm many takeoff lines at once — the fast, robust path to 100%.
+
+    Body (choose one selector):
+      {"items": ["Doors", "Stairs"]}                 verify these at current value
+      {"items": [{"item","quantity"?,"unit"?,"note"?}]}  verify with explicit values
+      {"accept_all_estimates": true}                 verify every unproven line that
+                                                     already has a numeric estimate
+      {"clear_all": true}                            drop ALL human overrides (reset)
+    Optional: "verified": bool (default true), "note": str (applied to all).
+
+    Lines with NO usable quantity are never silently confirmed — they are returned
+    in ``skipped_no_value`` so the UI can ask the user to enter a number.
+    """
+    if "/" in run_folder or ".." in run_folder:
+        return jsonify({"error": "Invalid path"}), 400
+    sub = Path(OUTPUT_DIR) / run_folder
+    if not sub.is_dir():
+        return jsonify({"error": "Not found"}), 404
+
+    data = request.json or {}
+    verified = bool(data.get("verified", True))
+    note = data.get("note") or ""
+
+    p = _verify_path(run_folder)
+    store = {}
+    if p.is_file():
+        try:
+            store = json.loads(p.read_text(encoding="utf-8")).get("overrides", {})
+        except (json.JSONDecodeError, OSError):
+            store = {}
+
+    if data.get("clear_all"):
+        store = {}
+        try:
+            p.write_text(json.dumps({"run_folder": run_folder, "overrides": store},
+                                    indent=2), encoding="utf-8")
+        except OSError as e:
+            logger.error(f"Failed to clear verify overrides: {e}")
+            return jsonify({"error": "Failed to save"}), 500
+        summary = _rebuild_summary(run_folder)
+        return jsonify({"run_folder": run_folder, "takeoff_summary": summary,
+                        "cleared": True, **_summary_counts(summary)})
+
+    # Need the current state to resolve "current value" / "all estimates".
+    current = _rebuild_summary(run_folder)
+    by_name = {str(r.get("item", "")).strip().lower(): r for r in current}
+
+    targets: list = []
+    if data.get("accept_all_estimates"):
+        for r in current:
+            if _row_needs_verification(r) and _row_qty_num(r) is not None:
+                targets.append({"item": r.get("item")})
+    else:
+        for it in (data.get("items") or []):
+            targets.append({"item": it} if isinstance(it, str) else dict(it))
+
+    applied, skipped_no_value = [], []
+    for t in targets:
+        item = (t.get("item") or "").strip()
+        if not item:
+            continue
+        key = item.lower()
+        row = by_name.get(key, {})
+        qty = t.get("quantity", None)
+        if qty is not None:
+            try:
+                qty = float(qty)
+            except (TypeError, ValueError):
+                continue
+        else:
+            qty = _row_qty_num(row)  # pin the current best estimate
+        if verified and qty is None:
+            skipped_no_value.append(item)
+            continue
+        store[key] = {
+            "item": item,
+            "quantity": qty,
+            "unit": t.get("unit") or (row.get("unit") or ""),
+            "verified": verified,
+            "note": t.get("note") or note,
+        }
+        applied.append(item)
+
+    try:
+        p.write_text(json.dumps({"run_folder": run_folder, "overrides": store},
+                                indent=2), encoding="utf-8")
+    except OSError as e:
+        logger.error(f"Failed to persist verify overrides: {e}")
+        return jsonify({"error": "Failed to save"}), 500
+
+    summary = _rebuild_summary(run_folder)
+    return jsonify({"run_folder": run_folder, "takeoff_summary": summary,
+                    "applied": applied, "skipped_no_value": skipped_no_value,
+                    **_summary_counts(summary)})
+
+
+@app.route("/api/reports/<run_folder>/calibrate", methods=["POST"])
+@login_required
+def calibrate_scale(run_folder: str):
+    """Two-point scale calibration → feet_per_inch from a known real distance.
+
+    Body: ``{"p1": [x,y], "p2": [x,y], "real_feet": <float>}`` (points in PDF
+    point space). Returns ``{"feet_per_inch": <float>}`` or 400 if degenerate.
+    """
+    if "/" in run_folder or ".." in run_folder:
+        return jsonify({"error": "Invalid path"}), 400
+    import takeoff_measurements as tm
+    data = request.json or {}
+    try:
+        p1 = data["p1"]; p2 = data["p2"]; real_feet = float(data["real_feet"])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({"error": "p1, p2, real_feet required"}), 400
+    fpi = tm.calibrate_two_point(p1, p2, real_feet)
+    if fpi is None:
+        return jsonify({"error": "Degenerate calibration"}), 400
+    return jsonify({"feet_per_inch": fpi})
 
 
 @app.route("/api/reports/<filename>")

@@ -32,14 +32,16 @@ async def _fetch_projects_from_browser() -> list[dict]:
         await b.close()
 
 
-async def _fetch_plan_sets_from_browser(project_id: int) -> list[dict]:
+async def _fetch_plan_sets_from_browser(
+    project_id: int, *, count_sheets: bool = False
+) -> list[dict]:
     from browser import StackCTBrowser
 
     b = StackCTBrowser()
     await b.start()
     try:
         await b.login()
-        return await b.get_plan_sets(project_id)
+        return await b.get_plan_sets(project_id, count_sheets=count_sheets)
     finally:
         await b.close()
 
@@ -125,10 +127,15 @@ def sync_projects(force: bool = False) -> dict:
         }
 
 
-def sync_project_plan_sets(project_id: int, force: bool = False) -> dict:
+def sync_project_plan_sets(
+    project_id: int, force: bool = False, *, count_sheets: bool = False
+) -> dict:
     """
     Sync plan-set (folder) index for one project into SQLite.
     Returns: {plan_sets, project_id, fetched_at, from_cache, stale?, error?}
+
+    count_sheets: when True, opens each folder in StackCT to count sheets (slow).
+    Default False — folder names only; sheet lists load on "Load sheets".
     """
     store.init_db()
 
@@ -157,8 +164,13 @@ def sync_project_plan_sets(project_id: int, force: bool = False) -> dict:
                     "from_cache": True,
                     "fetched_at": store.get_plan_sets_synced_at(project_id),
                 }
-            logger.info(f"Fetching plan sets from StackCT for project {project_id}...")
-            sets = _run_async(_fetch_plan_sets_from_browser(project_id))
+            logger.info(
+                f"Fetching plan sets from StackCT for project {project_id} "
+                f"(count_sheets={count_sheets})..."
+            )
+            sets = _run_async(
+                _fetch_plan_sets_from_browser(project_id, count_sheets=count_sheets)
+            )
 
         synced_at = datetime.now().isoformat()
         store.upsert_plan_sets(project_id, sets, synced_at)

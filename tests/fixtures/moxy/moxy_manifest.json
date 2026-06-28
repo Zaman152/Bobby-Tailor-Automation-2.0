@@ -1,0 +1,146 @@
+[
+ {
+  "name": "Base",
+  "unit": "LF",
+  "measure": "length",
+  "aliases": []
+ },
+ {
+  "name": "CMU Wall",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "Door Frame-HM",
+  "unit": "EA",
+  "measure": "count",
+  "aliases": []
+ },
+ {
+  "name": "Doors-HM",
+  "unit": "EA",
+  "measure": "count",
+  "aliases": []
+ },
+ {
+  "name": "Doors-WD",
+  "unit": "EA",
+  "measure": "count",
+  "aliases": []
+ },
+ {
+  "name": "Exposed Structure",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "Guard Rail",
+  "unit": "LF",
+  "measure": "length",
+  "aliases": []
+ },
+ {
+  "name": "Guestroom-Wall Covering",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "Gyp Ceiling",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "Gyp Soffit",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "Gyp Wall",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "Hand Rail",
+  "unit": "LF",
+  "measure": "length",
+  "aliases": []
+ },
+ {
+  "name": "Lift",
+  "unit": "EA",
+  "measure": "count",
+  "aliases": []
+ },
+ {
+  "name": "Lintels",
+  "unit": "LF",
+  "measure": "length",
+  "aliases": []
+ },
+ {
+  "name": "Mobilization",
+  "unit": "EA",
+  "measure": "count",
+  "aliases": []
+ },
+ {
+  "name": "Stairs",
+  "unit": "EA",
+  "measure": "count",
+  "aliases": []
+ },
+ {
+  "name": "WC-1",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "WC-10",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "WC-2",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "WC-4",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "WC-6",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "WC-7",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "WC-8",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ },
+ {
+  "name": "WC-9",
+  "unit": "SF",
+  "measure": "area",
+  "aliases": []
+ }
+]

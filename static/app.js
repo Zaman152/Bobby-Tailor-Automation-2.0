@@ -73,6 +73,20 @@ let currentPdfUpload = null;
 let _historyOffset = 0;
 const _historyLimit = 50;
 let _historyActiveOutcome = '';
+let _historyPendingJobId = null;
+
+function syncUrlForPage(pageName) {
+  const url = new URL(window.location);
+  url.searchParams.set('page', pageName);
+  if (pageName !== 'reports') {
+    url.searchParams.delete('run');
+    url.searchParams.delete('tab');
+  }
+  if (pageName !== 'job-monitor') {
+    url.searchParams.delete('job');
+  }
+  window.history.replaceState({}, '', url);
+}
 
 function navigateTo(pageName) {
   const target = document.getElementById('page-' + pageName);
@@ -91,6 +105,8 @@ function navigateTo(pageName) {
 
   const titleEl = document.getElementById('pageTitle');
   if (titleEl) titleEl.textContent = PAGE_TITLES[pageName] || pageName;
+
+  syncUrlForPage(pageName);
 
   if (pageName === 'reports') loadReports();
   if (pageName === 'projects' && !projectsLoaded) loadProjects();
@@ -394,6 +410,38 @@ function onFileSelected(input) {
   uploadPdfFile(file);
 }
 
+// ── Object Manifest (optional) ──────────────────────────────────────────────
+let currentObjectManifest = null;
+
+async function uploadObjectManifest(file, statusId = 'manifestStatus') {
+  const statusEl = document.getElementById(statusId);
+  if (statusEl) statusEl.textContent = 'Uploading manifest…';
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    const res = await apiFetch('/api/pdf/manifest/upload', { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.error) {
+      currentObjectManifest = null;
+      if (statusEl) statusEl.textContent = 'Error: ' + data.error;
+      return;
+    }
+    currentObjectManifest = data;
+    if (statusEl) {
+      statusEl.textContent = '✓ ' + data.count + ' object' + (data.count === 1 ? '' : 's') + ' loaded';
+      statusEl.classList.add('ok');
+    }
+  } catch (e) {
+    currentObjectManifest = null;
+    if (statusEl) statusEl.textContent = 'Manifest upload failed: ' + e.message;
+  }
+}
+
+function onManifestFileSelected(input) {
+  const file = input.files[0];
+  if (file) uploadObjectManifest(file);
+}
+
 function renderPdfPageList(pages) {
   const list = document.getElementById('pdfPageList');
   list.innerHTML = pages.map(p =>
@@ -449,6 +497,7 @@ async function runPDF() {
         upload_id: currentPdfUpload.upload_id,
         project_name: name,
         selected_pages: selectedPages,
+        object_manifest_id: currentObjectManifest ? currentObjectManifest.manifest_id : null,
       }),
     });
     const data = await res.json();
@@ -496,27 +545,66 @@ function bindPdfEvents() {
 
   document.getElementById('pdfSelectAllBtn')?.addEventListener('click', () => selectAllPdfPages(true));
   document.getElementById('pdfSelectNoneBtn')?.addEventListener('click', () => selectAllPdfPages(false));
+
+  // Optional object manifest controls
+  const manInp = document.getElementById('manifestFileInput');
+  const manBtn = document.getElementById('manifestUploadBtn');
+  if (manInp) manInp.addEventListener('change', () => onManifestFileSelected(manInp));
+  if (manBtn) manBtn.addEventListener('click', () => manInp?.click());
+  const tmplLink = document.getElementById('manifestTemplateLink');
+  if (tmplLink) tmplLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    window.location.href = '/api/pdf/manifest/template';
+  });
+
+  const stackctManBtn = document.getElementById('stackctManifestUploadBtn');
+  if (stackctManBtn) stackctManBtn.addEventListener('click', () => {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = '.csv,.json';
+    inp.addEventListener('change', () => {
+      const f = inp.files[0];
+      if (f) uploadObjectManifest(f, 'stackctManifestStatus');
+    });
+    inp.click();
+  });
 }
 
 // ── Job polling & monitor (Master §8.4) ────────────────────────────────────
-function startPolling(jobId, projectName) {
+function showJobMonitorNav() {
+  const navMonitor = document.getElementById('navJobMonitor');
+  if (navMonitor) navMonitor.style.display = 'flex';
+}
+
+function resumeJobMonitor(jobId, projectName) {
   currentJobId = jobId;
   if (pollInterval) clearInterval(pollInterval);
   if (monitorPollInterval) clearInterval(monitorPollInterval);
 
-  const navMonitor = document.getElementById('navJobMonitor');
-  if (navMonitor) navMonitor.style.display = 'flex';
+  showJobMonitorNav();
 
-  navigateTo('job-monitor');
-  document.getElementById('monitorProjectName').textContent = projectName;
-  document.getElementById('monitorJobId').textContent = 'Job: ' + jobId;
-  document.getElementById('cancelJobBtn').style.display = 'inline-block';
+  const url = new URL(window.location);
+  url.searchParams.set('job', jobId);
+  url.searchParams.set('page', 'job-monitor');
+  window.history.replaceState({}, '', url);
+
+  const nameEl = document.getElementById('monitorProjectName');
+  const idEl = document.getElementById('monitorJobId');
+  const cancelBtn = document.getElementById('cancelJobBtn');
+  if (nameEl) nameEl.textContent = projectName || '—';
+  if (idEl) idEl.textContent = 'Job: ' + jobId;
+  if (cancelBtn) cancelBtn.style.display = 'inline-block';
 
   const card = document.getElementById('progressCard');
   if (card) card.classList.remove('visible');
 
   pollJobMonitor(jobId);
   monitorPollInterval = setInterval(() => pollJobMonitor(jobId), 1500);
+}
+
+function startPolling(jobId, projectName) {
+  navigateTo('job-monitor');
+  resumeJobMonitor(jobId, projectName);
 }
 
 function stopJobPolling() {
@@ -532,7 +620,7 @@ function stopJobPolling() {
 
 async function pollJobMonitor(jobId) {
   try {
-    const res = await fetch('/api/status/' + jobId, { credentials: 'same-origin' });
+    const res = await apiFetch('/api/status/' + jobId);
     if (!res.ok) return;
     const job = await res.json();
 
@@ -554,8 +642,13 @@ function updateMonitorUI(job) {
     error: '✗ ERROR',
     cancelled: '⊘ CANCELLED'
   };
-  statusEl.textContent = statusLabels[job.status] || job.status;
-  statusEl.className = 'status-badge badge-' + (job.status === 'cancelled' ? 'cancelled' : job.status);
+  if (job.cancelling && job.status === 'running') {
+    statusEl.textContent = '⊘ CANCELLING…';
+    statusEl.className = 'status-badge badge-cancelled';
+  } else {
+    statusEl.textContent = statusLabels[job.status] || job.status;
+    statusEl.className = 'status-badge badge-' + (job.status === 'cancelled' ? 'cancelled' : job.status);
+  }
 
   // Phase badge — shows current operation phase during a run
   const phaseBadge = document.getElementById('monitorPhaseBadge');
@@ -568,7 +661,7 @@ function updateMonitorUI(job) {
       reporting:  'Reporting',
       complete:   'Analyzing',
     };
-    const phaseLabel = phase && phaseLabels[phase];
+    const phaseLabel = job.cancelling ? 'Cancelling' : (phase && phaseLabels[phase]);
     if (phaseLabel && job.status === 'running') {
       phaseBadge.textContent = phaseLabel;
       phaseBadge.className = 'phase-badge phase-' + phase;
@@ -584,9 +677,20 @@ function updateMonitorUI(job) {
 
   const cs = job.current_sheet || {};
   const total = cs.total || job.total_sheets || 0;
-  const completed = job.sheets_completed || 0;
-  document.getElementById('monitorSheetCount').textContent =
-    '[' + completed + ' / ' + (total || '?') + ' sheets]';
+  const phase = job.current_phase || cs.phase;
+  const countEl = document.getElementById('monitorSheetCount');
+  if (job.status === 'running' && !total) {
+    const prepLabel = phase === 'capturing' && cs.name ? escHtml(cs.name) : 'Preparing…';
+    countEl.textContent = '[' + prepLabel + ']';
+  } else {
+    let sheetPosition = job.sheets_completed || 0;
+    if (job.status === 'running' && cs.index && total) {
+      if (phase === 'capturing' || phase === 'analyzing' || phase === 'linking' || phase === 'reporting') {
+        sheetPosition = cs.index;
+      }
+    }
+    countEl.textContent = '[' + sheetPosition + ' / ' + total + ' sheets]';
+  }
 
   if (job.started_at) {
     const t = new Date(job.started_at);
@@ -596,7 +700,13 @@ function updateMonitorUI(job) {
 
   const sheetEl = document.getElementById('monitorCurrentSheet');
   if (cs.name && job.status === 'running') {
-    const phaseVerb = cs.phase === 'capturing' ? 'Capturing' : 'Analyzing';
+    const phaseVerbs = {
+      capturing: 'Capturing',
+      analyzing: 'Analyzing',
+      linking: 'Linking',
+      reporting: 'Reporting',
+    };
+    const phaseVerb = phaseVerbs[cs.phase] || 'Analyzing';
     sheetEl.innerHTML =
       phaseVerb + ': <strong>' + escHtml(cs.name) + '</strong>';
     sheetEl.className = 'monitor-current-sheet';
@@ -638,8 +748,14 @@ function renderMonitorSheetLog(job) {
   });
 
   const cs = job.current_sheet || {};
-  if (cs.name && cs.phase && cs.phase !== 'complete') {
-    rows.push({ status: 'analyzing', name: cs.name, metrics: 'analyzing…' });
+  if (job.cancelling) {
+    rows.push({ status: 'analyzing', name: 'Stopping…', metrics: 'cancelling' });
+  } else if (cs.name && cs.phase && cs.phase !== 'complete') {
+    if (cs.phase === 'capturing') {
+      rows.push({ status: 'capturing', name: cs.name, metrics: 'capturing…' });
+    } else {
+      rows.push({ status: 'analyzing', name: cs.name, metrics: 'analyzing…' });
+    }
   }
 
   if (!rows.length) {
@@ -647,7 +763,7 @@ function renderMonitorSheetLog(job) {
     return;
   }
 
-  const icons = { done: '✓', analyzing: '⟳', pending: '○' };
+  const icons = { done: '✓', analyzing: '⟳', capturing: '⟳', pending: '○' };
   container.innerHTML = rows.map(r =>
     '<div class="sheet-row ' + r.status + '">' +
       '<span class="sheet-status">' + (icons[r.status] || '○') + '</span>' +
@@ -712,21 +828,38 @@ function handleJobCompletion(job) {
 
 async function cancelJob() {
   if (!currentJobId) return;
-  if (!confirm('Cancel this job?')) return;
+  if (!confirm('Cancel this job? The scraper will stop after the current step.')) return;
+
+  const cancelBtn = document.getElementById('cancelJobBtn');
+  if (cancelBtn) {
+    cancelBtn.disabled = true;
+    cancelBtn.textContent = 'Cancelling…';
+  }
 
   try {
     const res = await apiFetch('/api/cancel/' + currentJobId, { method: 'POST' });
     const data = await res.json();
     if (data.success) {
-      stopJobPolling();
-      document.getElementById('monitorStatus').textContent = '⊘ CANCELLED';
+      document.getElementById('monitorStatus').textContent = '⊘ CANCELLING…';
       document.getElementById('monitorStatus').className = 'status-badge badge-cancelled';
-      document.getElementById('cancelJobBtn').style.display = 'none';
+      const sheetEl = document.getElementById('monitorCurrentSheet');
+      if (sheetEl) {
+        sheetEl.innerHTML = '<span class="monitor-warning-banner">Stopping job — please wait…</span>';
+      }
+      pollJobMonitor(currentJobId);
     } else if (data.error) {
       alert(data.error);
+      if (cancelBtn) {
+        cancelBtn.disabled = false;
+        cancelBtn.textContent = 'Cancel Job';
+      }
     }
   } catch (e) {
     alert('Cancel failed: ' + e.message);
+    if (cancelBtn) {
+      cancelBtn.disabled = false;
+      cancelBtn.textContent = 'Cancel Job';
+    }
   }
 }
 
@@ -1078,6 +1211,8 @@ async function pollActiveJob() {
     if (!el) return;
 
     if (data.active && data.job) {
+      currentJobId = data.job.id;
+      showJobMonitorNav();
       el.style.display = 'block';
       document.getElementById('miniProjectName').textContent = data.job.project || '—';
       document.getElementById('miniProgressBar').style.width = (data.job.progress || 0) + '%';
@@ -1106,8 +1241,22 @@ function stopActiveJobPolling() {
   }
 }
 
-function scrollToJobStatus() {
-  if (currentJobId) navigateTo('job-monitor');
+async function scrollToJobStatus() {
+  if (currentJobId) {
+    navigateTo('job-monitor');
+    if (!monitorPollInterval) {
+      resumeJobMonitor(currentJobId, document.getElementById('monitorProjectName')?.textContent);
+    }
+    return;
+  }
+  try {
+    const resp = await apiFetch('/api/jobs/active');
+    const data = await resp.json();
+    if (data.active && data.job) {
+      navigateTo('job-monitor');
+      resumeJobMonitor(data.job.id, data.job.project);
+    }
+  } catch (e) { /* ignore */ }
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -1597,6 +1746,10 @@ async function runSelectedPlans() {
     body.page_ids = pageIds;
   }
 
+  if (currentObjectManifest) {
+    body.object_manifest_id = currentObjectManifest.manifest_id;
+  }
+
   try {
     const res = await apiFetch('/api/run/stackct', {
       method: 'POST',
@@ -1697,22 +1850,52 @@ function renderTakeoffSummaryTable(rows) {
   if (!rows.length) {
     return '<p class="empty">No consolidated takeoff summary for this run.</p>';
   }
-  const headers = ['item', 'quantity', 'unit', 'source_sheets', 'line_count'];
-  const labels = { item: 'Item', quantity: 'Qty', unit: 'Unit', source_sheets: 'Sheets', line_count: 'Lines' };
-  let html = '<div class="takeoff-summary-wrap"><table class="data-table takeoff-summary-table"><thead><tr>';
+  // Only show the confidence/review columns when the data actually carries them
+  // (older runs won't have them).
+  const hasConfidence = rows.some(r => r.confidence != null && r.confidence !== '');
+  const hasReview = rows.some(r => isReviewRow(r));
+  const headers = ['item', 'quantity', 'unit'];
+  if (hasConfidence) headers.push('confidence');
+  headers.push('source_sheets', 'line_count');
+  const labels = {
+    item: 'Item', quantity: 'Qty', unit: 'Unit', confidence: 'Confidence',
+    source_sheets: 'Sheets', line_count: 'Lines',
+  };
+  const reviewCount = rows.filter(isReviewRow).length;
+  let html = '<div class="takeoff-summary-wrap">';
+  if (hasReview) {
+    html += '<p class="review-summary-note">⚠ ' + reviewCount +
+      ' item' + (reviewCount === 1 ? '' : 's') +
+      ' flagged for review (highlighted) — verify these against the drawings.</p>';
+  }
+  html += '<table class="data-table takeoff-summary-table"><thead><tr>';
   headers.forEach(h => { html += '<th>' + escHtml(labels[h] || h) + '</th>'; });
   html += '</tr></thead><tbody>';
   rows.forEach(row => {
-    html += '<tr>';
+    const review = isReviewRow(row);
+    html += '<tr' + (review ? ' class="needs-review"' : '') + '>';
     headers.forEach(h => {
       const cls = h === 'quantity' ? ' class="num"' : '';
-      html += '<td' + cls + '>' + escHtml(row[h] != null ? String(row[h]) : '') + '</td>';
+      let val = row[h] != null ? String(row[h]) : '';
+      let extra = '';
+      if (h === 'item' && review) {
+        const reasons = row.review_notes || (Array.isArray(row.review_reasons) ? row.review_reasons.join('; ') : '');
+        extra = ' <span class="review-badge" title="' + escHtml(reasons || 'needs review') + '">review</span>';
+      }
+      html += '<td' + cls + '>' + escHtml(val) + extra + '</td>';
     });
     html += '</tr>';
   });
   html += '</tbody></table>';
   html += '<p class="preview-cap-note">Consolidated across all sheets — matches StackCT summary format. See Calculations tab for per-sheet audit.</p></div>';
   return html;
+}
+
+// A row needs review when the backend flagged it (CSV "needs_review" column is
+// "yes"/true, or the JSON summary row has needs_review truthy).
+function isReviewRow(row) {
+  const v = row.needs_review;
+  return v === true || v === 'yes' || v === 'true' || v === 1 || v === '1';
 }
 
 function formatSummaryHtml(text) {
@@ -1780,7 +1963,7 @@ async function fetchHistoryList() {
   try {
     let url = `/api/jobs/history?limit=${_historyLimit}&offset=${_historyOffset}`;
     if (_historyActiveOutcome) url += `&outcome=${encodeURIComponent(_historyActiveOutcome)}`;
-    const resp = await fetch(url);
+    const resp = await apiFetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     renderHistoryTable(data.runs || []);
@@ -1850,6 +2033,12 @@ function renderHistoryTable(runs) {
   tbody.querySelectorAll('.btn-history-expand').forEach(btn => {
     btn.addEventListener('click', () => toggleHistoryDetail(btn.dataset.jobId));
   });
+  tbody.querySelectorAll('.btn-history-report').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openHistoryReport(btn.dataset.runFolder);
+    });
+  });
 }
 
 function historyOutcomeBadge(outcome) {
@@ -1881,8 +2070,7 @@ function _historyDuration(sec) {
 function _historyActions(run) {
   let html = `<button type="button" class="btn btn-sm btn-history-expand" data-job-id="${escHtml(run.job_id)}">Details</button>`;
   if (run.run_folder) {
-    const folder = escHtml(run.run_folder).replace(/'/g, "\\'");
-    html += ` <button type="button" class="btn btn-sm btn-history-report" onclick="openHistoryReport('${folder}')">Open Report</button>`;
+    html += ` <button type="button" class="btn btn-sm btn-history-report" data-run-folder="${escHtml(run.run_folder)}">Open Report</button>`;
   }
   return html;
 }
@@ -1925,8 +2113,13 @@ async function toggleHistoryDetail(jobId) {
   const panel = detailRow.querySelector('.history-detail-panel');
   if (!panel || !panel.querySelector('.detail-muted')) return;
 
+  const url = new URL(window.location);
+  url.searchParams.set('job', jobId);
+  url.searchParams.set('page', 'job-history');
+  window.history.replaceState({}, '', url);
+
   try {
-    const resp = await fetch(`/api/jobs/history/${encodeURIComponent(jobId)}`);
+    const resp = await apiFetch(`/api/jobs/history/${encodeURIComponent(jobId)}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const run = await resp.json();
     renderHistoryDetail(panel, run);
@@ -1953,13 +2146,58 @@ function renderHistoryDetail(panel, run) {
   `;
 }
 
-function openHistoryReport(runFolder) {
+async function openHistoryReport(runFolder) {
   if (!runFolder) return;
+  navigateTo('reports');
   if (window.reportWorkspace?.openReportWorkspace) {
-    window.reportWorkspace.openReportWorkspace(runFolder);
+    await window.reportWorkspace.openReportWorkspace(runFolder);
+  }
+}
+
+async function restoreAppStateFromURL() {
+  const params = new URLSearchParams(window.location.search);
+  const run = params.get('run');
+  const page = params.get('page');
+  const jobId = params.get('job');
+
+  if (run) {
+    navigateTo('reports');
+    const open = () => window.reportWorkspace?.openReportWorkspace(run);
+    if (window.reportWorkspace) {
+      await open();
+    } else {
+      await new Promise((r) => setTimeout(r, 150));
+      await open();
+    }
     return;
   }
-  navigateTo('reports');
+
+  if (jobId) {
+    try {
+      const res = await apiFetch('/api/status/' + encodeURIComponent(jobId));
+      if (res.ok) {
+        const job = await res.json();
+        if (job.status === 'running' || job.status === 'queued') {
+          navigateTo('job-monitor');
+          resumeJobMonitor(jobId, job.project);
+          return;
+        }
+      }
+    } catch (e) { /* fall through to history */ }
+    navigateTo('job-history');
+    _historyPendingJobId = jobId;
+    await fetchHistoryList();
+    if (_historyPendingJobId) {
+      toggleHistoryDetail(_historyPendingJobId);
+      _historyPendingJobId = null;
+    }
+    return;
+  }
+
+  if (page && document.getElementById('page-' + page)) {
+    navigateTo(page);
+  }
 }
 
 initJobHistory();
+restoreAppStateFromURL().catch((err) => console.error('restoreAppStateFromURL:', err));

@@ -94,8 +94,10 @@ async def _capture_sheet_screenshot(
     """
     try:
         screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf_path = screenshots_dir / "pdfs" / f"{page_id}.pdf"
         success = await browser.download_drawing_image(
-            project_id, page_id, str(screenshot_path)
+            project_id, page_id, str(screenshot_path),
+            pdf_filepath=str(pdf_path),
         )
 
         if not success and browser.page:
@@ -111,7 +113,8 @@ async def _capture_sheet_screenshot(
 
             await asyncio.sleep(5)
             success = await browser.download_drawing_image(
-                project_id, page_id, str(screenshot_path)
+                project_id, page_id, str(screenshot_path),
+                pdf_filepath=str(pdf_path),
             )
 
         if not success:
@@ -361,13 +364,26 @@ async def run_project_scrape(project_id: int, project_name: str,
                              folder_id: Optional[int] = None,
                              log_callback: Optional[Callable] = None,
                              progress_callback: Optional[Callable] = None,
-                             cancel_check: Optional[Callable[[], bool]] = None) -> dict:
+                             cancel_check: Optional[Callable[[], bool]] = None,
+                             object_manifest_path: Optional[str] = None) -> dict:
     def log(msg: str, entry: dict = None):
         logger.info(msg)
         if log_callback:
             log_callback(entry if entry else msg)
 
     log(f"Starting: {project_name} (ID: {project_id})")
+
+    # Object manifest (optional): explicit upload path, else auto-discovery from
+    # the `manifests/` dir by project name. Drives canonical naming + the
+    # completeness guarantee so StackCT runs match the names a user expects and
+    # never silently drop an expected object.
+    from object_manifest import resolve_project_manifest
+    object_manifest = resolve_project_manifest(project_name, object_manifest_path)
+    if object_manifest:
+        log(
+            f"Object manifest active — {len(object_manifest)} object(s); "
+            "names locked + completeness enforced"
+        )
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_name = project_name.replace(" ", "_").replace("/", "-")
@@ -577,6 +593,8 @@ async def run_project_scrape(project_id: int, project_name: str,
         # PASS 2 — Analyze (no browser; Claude processes each screenshot)
         # ================================================================
         log("Pass 2 — Analyzing captured screenshots with Claude...")
+        if object_manifest:
+            _pipeline._manifest = object_manifest
         for idx, (page_info, entry) in enumerate(zip(pages, manifest.pages), 1):
             if _cancelled:
                 break
@@ -722,6 +740,21 @@ async def run_project_scrape(project_id: int, project_name: str,
         ]
         _project_type = _detect_project_type(_successful_extracted)
         logger.info("run_project_scrape: project_type=%r for %d sheets", _project_type, len(_successful_extracted))
+
+        from plan_deterministic_legends import (
+            build_deterministic_legends_from_run_dir,
+            inject_project_legends,
+        )
+        det_legends = build_deterministic_legends_from_run_dir(
+            screenshots_dir, object_manifest, companion_present=False,
+        )
+        if det_legends:
+            inject_project_legends(_successful_extracted, det_legends)
+            log(
+                f"Deterministic plan legends: {sum(len(s.get('rows') or []) for s in det_legends)} "
+                "authoritative row(s) from captured PDFs"
+            )
+
         all_estimates = []
         for _e in _successful_extracted:
             all_estimates.extend(apply_estimation_tables(_e, project_type=_project_type))
@@ -764,6 +797,7 @@ async def run_project_scrape(project_id: int, project_name: str,
             folder_id=folder_id,
             cross_references=cross_refs,
             linked_sheets=linked_meta,
+            manifest=object_manifest,
         )
 
         if sheets_failed or sheets_skipped or _cancelled:
@@ -816,6 +850,7 @@ async def run_analyze_from_manifest(
     log_callback: Optional[Callable] = None,
     progress_callback: Optional[Callable] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
+    object_manifest_path: Optional[str] = None,
 ) -> dict:
     """
     Analyze-only pass using an existing run manifest.
@@ -867,6 +902,12 @@ async def run_analyze_from_manifest(
     folder_id = run_manifest.folder_id
     pages = run_manifest.pages
     total = len(pages)
+
+    from object_manifest import resolve_project_manifest
+    object_manifest = resolve_project_manifest(project_name, object_manifest_path)
+    if object_manifest:
+        log(f"Object manifest active — {len(object_manifest)} object(s)")
+        _pipeline._manifest = object_manifest
 
     log(f"Analyze-only: {project_name} — {total} page(s) in manifest")
 
@@ -1056,6 +1097,21 @@ async def run_analyze_from_manifest(
         "run_analyze_from_manifest: project_type=%r for %d sheets",
         _project_type, len(_successful_extracted),
     )
+
+    from plan_deterministic_legends import (
+        build_deterministic_legends_from_run_dir,
+        inject_project_legends,
+    )
+    det_legends = build_deterministic_legends_from_run_dir(
+        screenshots_dir, object_manifest, companion_present=False,
+    )
+    if det_legends:
+        inject_project_legends(_successful_extracted, det_legends)
+        log(
+            f"Deterministic plan legends: "
+            f"{sum(len(s.get('rows') or []) for s in det_legends)} authoritative row(s)"
+        )
+
     all_estimates = []
     for _e in _successful_extracted:
         all_estimates.extend(apply_estimation_tables(_e, project_type=_project_type))
@@ -1098,6 +1154,7 @@ async def run_analyze_from_manifest(
         all_estimates,
         folder_id=folder_id,
         cross_references=cross_refs,
+        manifest=object_manifest,
     )
 
     if sheets_failed or sheets_skipped or _cancelled:

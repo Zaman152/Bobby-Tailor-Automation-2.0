@@ -20,7 +20,7 @@ def _make_pages(page_ids: list[int]) -> list[dict]:
     return [{"page_id": pid, "sheet_name": f"Sheet {pid}"} for pid in page_ids]
 
 
-def _fake_download(project_id, page_id, dest_path):
+def _fake_download(project_id, page_id, dest_path, pdf_filepath=None):
     """Write a plausible-sized PNG to dest_path so size checks pass."""
     p = Path(dest_path)
     p.parent.mkdir(parents=True, exist_ok=True)

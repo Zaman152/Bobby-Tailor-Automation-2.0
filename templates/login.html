@@ -91,7 +91,7 @@
     }
 
     .login-form input[type="email"],
-    .login-form input[type="password"] {
+    .login-form .password-input-wrap input {
       width: 100%;
       padding: 10px 14px;
       background: var(--bg-elevated);
@@ -103,8 +103,60 @@
       transition: border-color 0.15s;
     }
 
+    .login-form .password-input-wrap {
+      position: relative;
+    }
+
+    .login-form .password-input-wrap input {
+      padding-right: 44px;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .password-toggle:hover {
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .password-toggle svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+      flex-shrink: 0;
+    }
+
+    /* SVG ignores the hidden attribute — use display instead */
+    .password-toggle .icon-eye-off {
+      display: none;
+    }
+
+    .password-toggle.is-visible .icon-eye {
+      display: none;
+    }
+
+    .password-toggle.is-visible .icon-eye-off {
+      display: block;
+    }
+
     .login-form input[type="email"]:focus,
-    .login-form input[type="password"]:focus {
+    .login-form .password-input-wrap input:focus {
       border-color: var(--accent-primary);
     }
 
@@ -161,25 +213,58 @@
             name="email"
             required
             autocomplete="username"
-            placeholder="admin@bobbytailor.com"
+            placeholder="Enter your email"
           >
         </div>
 
         <div class="field">
           <label for="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            required
-            autocomplete="current-password"
-            placeholder="••••••••"
-          >
+          <div class="password-input-wrap">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              required
+              autocomplete="current-password"
+              placeholder="Enter your password"
+            >
+            <button
+              type="button"
+              class="password-toggle"
+              id="passwordToggle"
+              aria-label="Show password"
+              aria-pressed="false"
+            >
+              <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <button type="submit" class="login-submit">Sign in</button>
       </form>
     </div>
   </div>
+  <script>
+    (function () {
+      const input = document.getElementById('password');
+      const toggle = document.getElementById('passwordToggle');
+
+      toggle.addEventListener('click', function () {
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        toggle.classList.toggle('is-visible', show);
+        toggle.setAttribute('aria-pressed', show ? 'true' : 'false');
+        toggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      });
+    })();
+  </script>
 </body>
 </html>

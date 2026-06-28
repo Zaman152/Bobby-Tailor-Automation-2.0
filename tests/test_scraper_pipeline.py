@@ -24,7 +24,7 @@ from capture_manifest import PageEntry, RunManifest, manifest_path
 # Shared helpers / fixtures
 # ---------------------------------------------------------------------------
 
-def _fake_download(project_id, page_id, dest_path):
+def _fake_download(project_id, page_id, dest_path, pdf_filepath=None):
     """Write a plausible-sized fake image so size checks pass."""
     p = Path(dest_path)
     p.parent.mkdir(parents=True, exist_ok=True)
@@ -220,7 +220,7 @@ class TestPartialFailure:
 
         download_call = {"n": 0}
 
-        def _partial_download(project_id, page_id, dest_path):
+        def _partial_download(project_id, page_id, dest_path, pdf_filepath=None):
             download_call["n"] += 1
             if page_id == 302:
                 return False  # simulate capture failure on middle sheet
