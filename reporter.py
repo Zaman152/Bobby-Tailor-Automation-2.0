@@ -137,6 +137,7 @@ def generate_report(project_name: str,
         project_name, run_dir.name, all_extracted,
     )
     report["scale_calibration"] = scale_calibration
+    report["sheet_assets"] = _build_sheet_assets(all_extracted)
 
     # All files for this run live inside the run's folder with clean names
     json_path = run_dir / "takeoff.json"
@@ -392,6 +393,38 @@ def _image_rel_to_output(img_path) -> str:
         return ""
 
 
+def _sheet_image_rel(d: dict) -> str:
+    """Servable image path relative to OUTPUT_DIR for a sheet extraction dict."""
+    rel = d.get("_image_rel") or ""
+    if rel:
+        if rel.startswith("screenshots/"):
+            return rel
+        return _image_rel_to_output(rel)
+    return _image_rel_to_output(d.get("_source_sheet"))
+
+
+def _build_sheet_assets(all_extracted: list) -> Dict[str, Any]:
+    """Map sheet display names → image paths for UI traceability (lightbox / scale tab)."""
+    assets: Dict[str, Any] = {}
+    for d in all_extracted:
+        if d.get("_skipped") or d.get("error"):
+            continue
+        name = d.get("_sheet_name") or d.get("_source_sheet")
+        if not name:
+            continue
+        img = _sheet_image_rel(d)
+        if img:
+            assets[name] = {
+                "image": img,
+                "page_id": d.get("_page_id"),
+                "type": d.get("_sheet_type") or d.get("sheet_type") or "",
+            }
+    return assets
+
+
+_SCALE_SHEET_TYPES = frozenset({"floor_plan", "civil_site", "roof_plan"})
+
+
 def _build_scale_calibration(project_name: str, run_folder: str,
                              all_extracted: list) -> Dict[str, Any]:
     """Per-sheet scale + scale-independent raw geometry for the Verify module.
@@ -402,41 +435,70 @@ def _build_scale_calibration(project_name: str, run_folder: str,
     computed measured quantities, plus a link to the sheet image for tracing.
     """
     sheets: List[Dict[str, Any]] = []
+    seen: set = set()
     for d in all_extracted:
         geom = d.get("_geometry")
-        if not geom:
+        sheet = d.get("_sheet_name") or d.get("_source_sheet") or "unknown"
+        if sheet in seen:
             continue
-        raw = geom.get("raw")
-        scale_meta = geom.get("scale") or {}
-        fpp = scale_meta.get("feet_per_point")
-        fpi = round(fpp * 72.0, 4) if fpp else None
-        confidence = geom.get("confidence") or scale_meta.get("confidence") or "none"
-        # AUTO-VERIFIED: scale read cleanly from the sheet (ladder-snapped, high
-        # confidence) — accepted automatically; the user only confirms if desired.
-        auto_verified = bool(fpi and confidence == "high"
-                             and not geom.get("needs_review", True))
+        image = _sheet_image_rel(d)
+        sheet_type = d.get("_sheet_type") or d.get("sheet_type") or ""
+
+        if geom:
+            raw = geom.get("raw")
+            scale_meta = geom.get("scale") or {}
+            fpp = scale_meta.get("feet_per_point")
+            fpi = round(fpp * 72.0, 4) if fpp else None
+            confidence = geom.get("confidence") or scale_meta.get("confidence") or "none"
+            auto_verified = bool(fpi and confidence == "high"
+                                 and not geom.get("needs_review", True))
+            sheets.append({
+                "sheet": sheet,
+                "page_id": d.get("_page_id"),
+                "type": sheet_type,
+                "image": image,
+                "scale_text": d.get("scale") or "",
+                "feet_per_inch": fpi,
+                "scale_confidence": confidence,
+                "auto_verified": auto_verified,
+                "scale_source": scale_meta.get("method") or "none",
+                "page_width_pt": geom.get("page_width_pt"),
+                "page_height_pt": geom.get("page_height_pt"),
+                "raw": raw,
+                "measured": {
+                    "footprint_sf": geom.get("footprint_sf"),
+                    "total_linework_lf": geom.get("total_linework_lf"),
+                    "long_run_lf": geom.get("long_run_lf"),
+                },
+                "viewports": geom.get("viewports") or [],
+            })
+            seen.add(sheet)
+            continue
+
+        # No vector geometry (e.g. StackCT before PDF capture) — still show plan
+        # sheets so the user can verify scale against the sheet image.
+        if not image or sheet_type not in _SCALE_SHEET_TYPES:
+            continue
+        parsed = _parsed_scale(d.get("scale"))
+        fpi = parsed.get("feet_per_inch") if parsed else None
         sheets.append({
-            "sheet": d.get("_sheet_name") or d.get("_source_sheet") or "unknown",
+            "sheet": sheet,
             "page_id": d.get("_page_id"),
-            "type": d.get("_sheet_type") or d.get("sheet_type") or "",
-            "image": _image_rel_to_output(d.get("_source_sheet")),
+            "type": sheet_type,
+            "image": image,
             "scale_text": d.get("scale") or "",
             "feet_per_inch": fpi,
-            "scale_confidence": confidence,
-            "auto_verified": auto_verified,
-            "scale_source": scale_meta.get("method") or "none",
-            "page_width_pt": geom.get("page_width_pt"),
-            "page_height_pt": geom.get("page_height_pt"),
-            "raw": raw,
-            "measured": {
-                "footprint_sf": geom.get("footprint_sf"),
-                "total_linework_lf": geom.get("total_linework_lf"),
-                "long_run_lf": geom.get("long_run_lf"),
-            },
-            # Per-viewport breakdown for multi-scale sheets — each detail measured
-            # with its own scale; the Verify tab can show one row per viewport.
-            "viewports": geom.get("viewports") or [],
+            "scale_confidence": "medium" if fpi else "low",
+            "auto_verified": False,
+            "scale_source": "vision_detected",
+            "needs_scale_verify": True,
+            "page_width_pt": None,
+            "page_height_pt": None,
+            "raw": None,
+            "measured": {},
+            "viewports": [],
         })
+        seen.add(sheet)
     return {
         "project_name": project_name,
         "run_folder": run_folder,

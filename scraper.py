@@ -16,7 +16,7 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Callable, List, Dict, Any
-from config import SCREENSHOTS_DIR, REUSE_SCREENSHOTS, AUTO_INCLUDE_LINKED_SHEETS, MAX_LINKED_SHEETS
+from config import OUTPUT_DIR, SCREENSHOTS_DIR, REUSE_SCREENSHOTS, AUTO_INCLUDE_LINKED_SHEETS, MAX_LINKED_SHEETS
 from linked_sheets import collect_unresolved_refs, match_ref_to_page
 import stackct_store
 from browser import StackCTBrowser
@@ -66,6 +66,39 @@ def _safe_sheet_filename(sheet_name: str) -> str:
     safe = sheet_name.replace("/", "-").replace("\\", "-")
     safe = re.sub(r'[<>:"|?*]', "-", safe)
     return safe.strip() or "sheet"
+
+
+def _rel_output_path(path: Path) -> str:
+    """Path relative to OUTPUT_DIR for sheet-image serving (e.g. screenshots/...)."""
+    try:
+        return str(path.resolve().relative_to(Path(OUTPUT_DIR).resolve())).replace("\\", "/")
+    except ValueError:
+        return ""
+
+
+def _enrich_extracted_sheet(
+    extracted: dict,
+    sheet_name: str,
+    page_id: int,
+    screenshot_path: Path,
+    screenshots_dir: Path,
+) -> None:
+    """Attach canonical sheet name + servable image path (StackCT overwrites pipeline paths)."""
+    extracted["_source_sheet"] = sheet_name
+    extracted["_sheet_name"] = sheet_name
+    extracted["_page_id"] = page_id
+    extracted["_image_rel"] = _rel_output_path(screenshot_path)
+    pdf = screenshots_dir / "pdfs" / f"{page_id}.pdf"
+    if pdf.is_file():
+        extracted["_page_pdf"] = str(pdf)
+
+
+def _pdf_args_for_page(screenshots_dir: Path, page_id: int) -> dict:
+    """Keyword args for run_sheet when a per-page PDF was captured from StackCT."""
+    pdf = screenshots_dir / "pdfs" / f"{page_id}.pdf"
+    if pdf.is_file():
+        return {"pdf_path": str(pdf), "page_index": 0}
+    return {}
 
 
 def _failed_extraction(page_id: int, sheet_name: str, reason: str) -> dict:
@@ -320,9 +353,10 @@ async def _discover_and_add_linked_sheets(
 
         try:
             log(f"  [linked] Analyzing {sheet_name} with Claude (multi-pass)...")
-            extracted = _pipeline.run_sheet(str(screenshot_path), sheet_name)
-            extracted["_page_id"] = page_id
-            extracted["_source_sheet"] = sheet_name
+            extracted = _pipeline.run_sheet(
+                str(screenshot_path), sheet_name, **_pdf_args_for_page(screenshots_dir, page_id),
+            )
+            _enrich_extracted_sheet(extracted, sheet_name, page_id, screenshot_path, screenshots_dir)
 
             if "error" in extracted:
                 err = extracted.get("error", "analysis_failed")
@@ -630,9 +664,13 @@ async def run_project_scrape(project_id: int, project_name: str,
                     ),
                 )
 
-                extracted = _pipeline.run_sheet(str(screenshot_path), sheet_name)
-                extracted["_page_id"] = page_id
-                extracted["_source_sheet"] = sheet_name
+                extracted = _pipeline.run_sheet(
+                    str(screenshot_path), sheet_name,
+                    **_pdf_args_for_page(screenshots_dir, page_id),
+                )
+                _enrich_extracted_sheet(
+                    extracted, sheet_name, page_id, screenshot_path, screenshots_dir,
+                )
 
                 if "error" in extracted:
                     err = extracted.get("error", "analysis_failed")
@@ -1007,9 +1045,10 @@ async def run_analyze_from_manifest(
                 ),
             )
 
-            extracted = _pipeline.run_sheet(str(screenshot_path), sheet_name)
-            extracted["_page_id"] = page_id
-            extracted["_source_sheet"] = sheet_name
+            extracted = _pipeline.run_sheet(
+                str(screenshot_path), sheet_name, **_pdf_args_for_page(screenshots_dir, page_id),
+            )
+            _enrich_extracted_sheet(extracted, sheet_name, page_id, screenshot_path, screenshots_dir)
 
             if "error" in extracted:
                 err = extracted.get("error", "analysis_failed")

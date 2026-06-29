@@ -24,6 +24,7 @@ let TAB_IDS = [...BASE_TAB_IDS];
 // after clicking a source-sheet link in the Takeoff Summary.
 let scaleCalibration = null;
 let pendingScaleFocus = '';
+let sheetImageMap = {};  // normalized sheet key → { sheet, image }
 
 // Common architectural / engineering scales → feet represented by one inch.
 const COMMON_SCALES = [
@@ -51,6 +52,8 @@ const COMMON_SCALES = [
  */
 export async function openReportWorkspace(runFolder) {
   currentRun = runFolder;
+  sheetImageMap = {};
+  pendingScaleFocus = '';
 
   // Fetch report metadata
   let report;
@@ -296,7 +299,59 @@ async function loadTakeoffTab(container) {
   if (data.error) throw new Error(data.error);
   const report = data.data ?? data;
   takeoffRows = report.takeoff_summary || [];
+  ingestSheetAssets(report.sheet_assets || {});
   renderTakeoffWorksheet(container);
+}
+
+function normalizeSheetKey(name) {
+  return String(name || '').split('/').pop().trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function ingestSheetAssets(assets) {
+  if (!assets || typeof assets !== 'object') return;
+  for (const [name, meta] of Object.entries(assets)) {
+    if (!meta || !meta.image) continue;
+    sheetImageMap[normalizeSheetKey(name)] = { sheet: name, image: meta.image };
+  }
+}
+
+async function ensureSheetImageMap() {
+  if (Object.keys(sheetImageMap).length) return;
+  try {
+    const resp = await fetch(`/api/reports/${encodeURIComponent(currentRun)}/scale`, { credentials: 'same-origin' });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    for (const s of data.sheets || []) {
+      if (!s.sheet) continue;
+      sheetImageMap[normalizeSheetKey(s.sheet)] = {
+        sheet: s.sheet,
+        image: s.image || '',
+      };
+    }
+  } catch (err) {
+    console.warn('sheet image map load failed', err);
+  }
+}
+
+function resolveSheetContext(token) {
+  const raw = String(token || '').trim();
+  if (!raw) return null;
+  if (raw.includes('screenshots/') || /\.(png|jpg|jpeg)$/i.test(raw)) {
+    let rel = raw.replace(/\\/g, '/');
+    const idx = rel.indexOf('screenshots/');
+    if (idx >= 0) rel = rel.slice(idx);
+    else if (rel.startsWith('output/')) rel = rel.slice('output/'.length);
+    return { imageRel: rel, sheet: raw, focusSheet: raw };
+  }
+  const key = normalizeSheetKey(raw);
+  const hit = sheetImageMap[key];
+  if (hit) return { imageRel: hit.image, sheet: hit.sheet, focusSheet: hit.sheet };
+  for (const [k, v] of Object.entries(sheetImageMap)) {
+    if (k.includes(key) || key.includes(k)) {
+      return { imageRel: v.image, sheet: v.sheet, focusSheet: v.sheet };
+    }
+  }
+  return { imageRel: '', sheet: raw, focusSheet: raw };
 }
 
 function rowStatus(r) {
@@ -476,10 +531,20 @@ function onSheetLightboxKey(e) {
 
 // Show a sheet image in a lightbox so the user can trace a line back to the
 // drawing it came from, with a shortcut into Scale & Verify for that sheet.
-function openSheetLightbox(fullPath) {
-  if (!fullPath) return;
-  const url = sheetImageUrl(fullPath);
-  const base = String(fullPath).split('/').pop();
+async function openSheetLightbox(sheetToken) {
+  if (!sheetToken) return;
+  await ensureSheetImageMap();
+  const ctx = resolveSheetContext(sheetToken);
+  if (!ctx) return;
+
+  if (!ctx.imageRel) {
+    pendingScaleFocus = ctx.focusSheet || ctx.sheet;
+    switchTab('scale');
+    return;
+  }
+
+  const url = sheetImageUrl(ctx.imageRel);
+  const base = String(ctx.sheet).split('/').pop();
   removeSheetLightbox();
   const ov = document.createElement('div');
   ov.className = 'sheet-lightbox';
@@ -487,7 +552,7 @@ function openSheetLightbox(fullPath) {
   ov.innerHTML = `
     <div class="sheet-lightbox-panel">
       <div class="sheet-lightbox-head">
-        <strong title="${escapeHtml(fullPath)}">${escapeHtml(base)}</strong>
+        <strong title="${escapeHtml(ctx.sheet)}">${escapeHtml(base)}</strong>
         <div class="sheet-lightbox-actions">
           <a href="${url}" target="_blank" rel="noopener" class="sheet-lightbox-open">Open full size ↗</a>
           <button type="button" class="sheet-lightbox-verify">Verify scale →</button>
@@ -506,8 +571,8 @@ function openSheetLightbox(fullPath) {
   ov.addEventListener('click', (e) => { if (e.target === ov) removeSheetLightbox(); });
   ov.querySelector('.sheet-lightbox-close').addEventListener('click', removeSheetLightbox);
   ov.querySelector('.sheet-lightbox-verify').addEventListener('click', () => {
+    pendingScaleFocus = ctx.focusSheet || ctx.sheet;
     removeSheetLightbox();
-    pendingScaleFocus = fullPath;
     switchTab('scale');
   });
   document.addEventListener('keydown', onSheetLightboxKey);
@@ -629,6 +694,11 @@ async function loadScaleTab(container) {
   const data = await response.json();
   scaleCalibration = data;
   const sheets = data.sheets || [];
+  for (const s of sheets) {
+    if (s.sheet) {
+      sheetImageMap[normalizeSheetKey(s.sheet)] = { sheet: s.sheet, image: s.image || '' };
+    }
+  }
 
   if (!sheets.length) {
     container.innerHTML = `
@@ -668,6 +738,7 @@ async function loadScaleTab(container) {
             const userVerified = s.scale_source === 'user_verified';
             const autoVerified = !userVerified && s.auto_verified;
             const verified = userVerified || autoVerified;
+            const needsScale = s.needs_scale_verify && !verified;
             const vpCount = (s.viewports || []).length;
             const canMeasure = s.image && s.page_width_pt && s.page_height_pt;
             const imgLink = s.image
@@ -677,7 +748,7 @@ async function loadScaleTab(container) {
               ? `<button type="button" class="scale-measure-btn" data-idx="${i}">Measure items →</button>`
               : '';
             return `
-            <tr class="scale-row${verified ? ' scale-verified' : ''}" data-idx="${i}" data-sheet="${escapeHtml(s.sheet)}">
+            <tr class="scale-row${verified ? ' scale-verified' : ''}${needsScale ? ' scale-needs-verify' : ''}" data-idx="${i}" data-sheet="${escapeHtml(s.sheet)}">
               <td class="scale-sheet-name">${escapeHtml(String(s.sheet).split('/').pop())}</td>
               <td class="scale-detected">${escapeHtml(s.scale_text || '—')}${vpCount > 1 ? ` <span class="scale-vp-tag" title="${vpCount} viewports measured per-scale">${vpCount} viewports</span>` : ''}</td>
               <td>${confBadge(s.scale_confidence)}${userVerified ? ' <span class="scale-verified-tag">verified</span>' : (autoVerified ? ' <span class="scale-auto-tag" title="Read cleanly from the sheet and snapped to a standard scale — accepted automatically">⚡ Auto</span>' : '')}</td>
@@ -711,16 +782,31 @@ async function loadScaleTab(container) {
 }
 
 function focusScaleSheet(container, sheetToken) {
-  const base = String(sheetToken).split('/').pop().trim().toLowerCase();
+  const key = normalizeSheetKey(sheetToken);
   const rows = Array.from(container.querySelectorAll('.scale-row'));
-  const match = rows.find(r => {
-    const name = String(r.dataset.sheet || '').split('/').pop().trim().toLowerCase();
-    return name === base || name.includes(base) || base.includes(name);
-  });
+  let match = rows.find(r => normalizeSheetKey(r.dataset.sheet) === key);
+  if (!match) {
+    match = rows.find(r => {
+      const n = normalizeSheetKey(r.dataset.sheet);
+      return n.includes(key) || key.includes(n);
+    });
+  }
   if (match) {
     match.scrollIntoView({ behavior: 'smooth', block: 'center' });
     match.classList.add('scale-focus');
-    setTimeout(() => match.classList.remove('scale-focus'), 2200);
+    setTimeout(() => match.classList.remove('scale-focus'), 2800);
+    const inp = match.querySelector('.scale-fpi-input');
+    if (inp) setTimeout(() => inp.focus(), 350);
+    return;
+  }
+  const intro = container.querySelector('.scale-intro');
+  if (intro && !intro.querySelector('.scale-focus-miss')) {
+    const warn = document.createElement('p');
+    warn.className = 'scale-focus-miss';
+    const label = String(sheetToken).split('/').pop();
+    warn.textContent = `Sheet "${label}" is not in the scale table — re-run this project with the latest app to capture PDF geometry, or pick the matching row below.`;
+    intro.appendChild(warn);
+    setTimeout(() => warn.remove(), 8000);
   }
 }
 
