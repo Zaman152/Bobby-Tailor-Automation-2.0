@@ -6,14 +6,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — advanced accuracy pipeline (20-11–20-14) coded; deterministic test suite GREEN (348 passed); golden ≥97% gate hard-blocked on Anthropic API credits (every vision call returns `credit balance too low`)
+**Current focus:** Phase 21 — Accuracy & Learning Engine (v3) planned (18 plans, 10 waves, verified); plans-only 100%-accuracy mandate: vector-geometry-first measurement, zero-calibration scale, ensemble voting, cross-run learning store, package restructure
 
 ## Current Position
 
-Phase: 20 of 20 (Takeoff Measurement Precision) — human sign-off pending  
-Plan: 8/8 core + 20-08 + 20-09 + 20-10 complete; awaiting human verification checkpoint  
-Status: Golden 20% Crow / 0% Bob (Haiku extraction ceiling); generalization 99/99; ITEM_NAME_MAP 71  
-Last activity: 2026-06-04 — Completed 20-10 golden fixtures, general fixes, UAT update, SUMMARY
+Phase: 21 of 21 (Accuracy & Learning Engine v3) — Ready to execute  
+Plan: 0/18 complete (10 waves; 21-01 package restructure first; human checkpoints only at 21-17 accuracy gate + 21-18 UAT)  
+Status: Plans verified (2 blockers fixed in revision); all 13 V3-* requirements covered; benchmark protocol locked (uploads/ plan+take-off pairs, Crow+Bob hard gate)  
+Last activity: 2026-07-13 — Phase 21 planned via research → pattern map → 18 plans → checker revision loop → verification passed
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
