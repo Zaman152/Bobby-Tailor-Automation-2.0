@@ -808,7 +808,7 @@ Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
 | ID | Requirement |
 |----|-------------|
 | V3-ACC-01 | Vector-first measurement: SF/LF/areas computed from PDF vector geometry + text layer (dimension strings, room polygons, wall segments); vision labels semantics, never guesses numbers when geometry is available |
-| V3-ACC-02 | Auto scale detection v2: per-viewport scale binding, viewport-area-weighted dominant scale, cross-validation against dimension strings and known door widths; per-sheet scale confidence recorded and surfaced |
+| V3-ACC-02 | Auto scale detection v2 with zero calibration: scale solved deterministically per viewport from dimension strings vs geometry, cross-validated against printed scale notation and known door widths; per-sheet scale confidence recorded and surfaced |
 | V3-ACC-03 | Ensemble extraction: N-run self-consistency voting for EA counts and vision-measured quantities; tiled counting integrated with deduplication; disagreement lowers confidence and flags needs_review |
 | V3-ACC-04 | Model upgrade & adaptive fidelity: strongest available Claude vision models routed by sheet complexity; adaptive DPI/tiling so dense sheets are analyzed at legible resolution within API limits |
 | V3-ACC-05 | Verify-retry loop implemented (replaces ENABLE_VERIFY_RETRY stub): out-of-band quantities re-queried with targeted crops before flagging |
@@ -823,9 +823,9 @@ Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
 
 **Success Criteria** (what must be TRUE):
 
-1. Uploading a plans-only PDF (no companion, no manifest) produces a takeoff where every expected item category is present or explicitly flagged needs_review — zero silent misses
-2. On the Crow Cass and Bob's Discount fixtures run plans-only, quantity accuracy improves from 40%/8% baseline to ≥70%, with all remaining misses flagged (measured by scripts/vision_only_benchmark.py)
-3. Scale is auto-detected per sheet with confidence; on multi-scale sheets the main-plan viewport scale wins (Crow Cass resolves ~1"=20', not 1"=24' or detail scales)
+1. Uploading a plans-only PDF (no companion, no manifest, no calibration input) produces a complete takeoff where every detectable item, count, and measurement is extracted automatically — zero silent misses; anything genuinely indeterminable is explicitly flagged, and flagged items approach zero on vector CAD PDFs
+2. On the Crow Cass and Bob's Discount fixtures run plans-only, quantities derived from vector geometry + text layer (footprints, wall LF/SF, schedule counts, printed legend quantities) are ≥97% accurate vs golden, with overall quantity accuracy ≥90% (from 40%/8% baseline), measured by scripts/vision_only_benchmark.py
+3. Scale is auto-detected per viewport with zero human calibration — solved from dimension strings against geometry and cross-validated with printed scale notation and standard elements; on multi-scale sheets the main-plan viewport scale wins (Crow Cass resolves ~1"=20', not 1"=24' or detail scales)
 4. After a human verifies a run, corrections persist in the learning store; a repeat run of the same project applies them automatically (names, quantities context, scale, wall heights) without any manifest file
 5. Two identical runs of the same PDF produce quantity results within ±5% of each other (ensemble kills run-to-run variance)
 6. All modules live in a structured package; `pytest` passes; app boots via blueprints; README documents the new layout
