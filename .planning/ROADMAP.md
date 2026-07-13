@@ -29,6 +29,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [ ] **Phase 17: Production Takeoff Pipeline** — Screenshot reuse, two-phase capture/analyze, resume, demo-grade job UX
 - [ ] **Phase 18: Linked Sheet Resolution** — Auto-follow drawing cross-refs; capture/analyze linked detail sheets
 - [ ] **Phase 20: Takeoff Measurement Precision** — Plan-type-agnostic accurate take-offs; ≥97% golden regression; shared PDF+StackCT pipeline
+- [ ] **Phase 21: Accuracy & Learning Engine (v3)** — Plans-only production accuracy: vector-first measurement, auto scale detection v2, ensemble vision, persistent human-verified learning loop replacing manifests, package restructure, live-testing readiness
 
 ## Phase Details
 
@@ -793,6 +794,47 @@ Plans:
 
 Research: `.planning/phases/20-takeoff-measurement-precision/20-RESEARCH.md` (§11–§13 generalization)
 Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
+
+---
+
+### Phase 21: Accuracy & Learning Engine (v3)
+
+**Goal:** In real client scenarios only the plan PDF exists — no companion take-off, no golden CSV, no hand-written manifest. Phase 21 makes plans-only runs production-accurate and self-improving: measurement moves from raster vision guessing to vector-geometry-first with vision as semantic labeler, drawing scale is auto-detected per viewport with confidence, EA counts use ensemble/tiled voting, and every human verification is persisted to a learning store that is retrieved on future runs — so the system learns item vocabularies, scales, wall heights, and correction patterns per project type and eventually replaces manifest files entirely. The codebase is restructured from 30 flat root modules into a proper package, and the app ships ready for live testing.
+
+**Depends on:** Phase 16 (extraction prompts, aggregator), Phase 17 (two-phase pipeline), Phase 20 (shared TakeoffPipeline, scale modules, geometry_takeoff, benchmark harness)
+
+**Requirements:** V3-ACC-01, V3-ACC-02, V3-ACC-03, V3-ACC-04, V3-ACC-05, V3-LEARN-01, V3-LEARN-02, V3-LEARN-03, V3-LEARN-04, V3-STRUCT-01, V3-STRUCT-02, V3-PROD-01, V3-PROD-02
+
+| ID | Requirement |
+|----|-------------|
+| V3-ACC-01 | Vector-first measurement: SF/LF/areas computed from PDF vector geometry + text layer (dimension strings, room polygons, wall segments); vision labels semantics, never guesses numbers when geometry is available |
+| V3-ACC-02 | Auto scale detection v2: per-viewport scale binding, viewport-area-weighted dominant scale, cross-validation against dimension strings and known door widths; per-sheet scale confidence recorded and surfaced |
+| V3-ACC-03 | Ensemble extraction: N-run self-consistency voting for EA counts and vision-measured quantities; tiled counting integrated with deduplication; disagreement lowers confidence and flags needs_review |
+| V3-ACC-04 | Model upgrade & adaptive fidelity: strongest available Claude vision models routed by sheet complexity; adaptive DPI/tiling so dense sheets are analyzed at legible resolution within API limits |
+| V3-ACC-05 | Verify-retry loop implemented (replaces ENABLE_VERIFY_RETRY stub): out-of-band quantities re-queried with targeted crops before flagging |
+| V3-LEARN-01 | Correction store: human-verified overrides (quantities, names, scales, wall heights) persisted to SQLite keyed by project_type, sheet_type, item pattern — survives run deletion |
+| V3-LEARN-02 | Learned vocabulary: canonical item names/units accumulated from verified runs replace static ITEM_NAME_MAP lookups over time; auto-generated project manifest from verified takeoffs |
+| V3-LEARN-03 | Runtime feedback application: relevant learned corrections retrieved on new runs and injected into prompts, aggregation, and calculator assumptions (e.g. learned wall heights per project type) |
+| V3-LEARN-04 | Manifest independence: companion take-off and manifest files become optional dev/benchmark inputs only; production plans-only path reaches target accuracy without them |
+| V3-STRUCT-01 | Package restructure: root modules organized into src package (pipeline/, vision/, scale/, deterministic/, learning/, scrape/, web/) with Flask blueprints; all tests green after move |
+| V3-STRUCT-02 | Entry-point parity: PDF upload and StackCT paths share identical pipeline behavior (deterministic legends, learning retrieval, ensemble settings) with a parity test |
+| V3-PROD-01 | Plans-only accuracy gate: vision_only_benchmark integrated as CI-invocable gate; item-found ≥95% and quantity accuracy measurably improved per release; zero silent misses (every expected-category item present or flagged) |
+| V3-PROD-02 | Live-testing readiness: reviewed-items workflow (human verifies only flagged subset), API cost budget guard per run, structured error recovery, deployment docs updated |
+
+**Success Criteria** (what must be TRUE):
+
+1. Uploading a plans-only PDF (no companion, no manifest) produces a takeoff where every expected item category is present or explicitly flagged needs_review — zero silent misses
+2. On the Crow Cass and Bob's Discount fixtures run plans-only, quantity accuracy improves from 40%/8% baseline to ≥70%, with all remaining misses flagged (measured by scripts/vision_only_benchmark.py)
+3. Scale is auto-detected per sheet with confidence; on multi-scale sheets the main-plan viewport scale wins (Crow Cass resolves ~1"=20', not 1"=24' or detail scales)
+4. After a human verifies a run, corrections persist in the learning store; a repeat run of the same project applies them automatically (names, quantities context, scale, wall heights) without any manifest file
+5. Two identical runs of the same PDF produce quantity results within ±5% of each other (ensemble kills run-to-run variance)
+6. All modules live in a structured package; `pytest` passes; app boots via blueprints; README documents the new layout
+7. `21-UAT.md` signed off for live-testing readiness
+
+**Plans:** TBD (planned via /gsd-plan-phase)
+
+Research: `.planning/phases/21-accuracy-learning-engine/21-RESEARCH.md`
+Context: `.planning/phases/21-accuracy-learning-engine/21-CONTEXT.md`
 
 ---
 

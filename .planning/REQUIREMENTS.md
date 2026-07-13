@@ -151,6 +151,22 @@
 - [ ] **UX-11**: Responsive layouts verified at 375, 768, 1024, 1440px
 - [ ] **UX-12**: Login, Settings, and PDF pages visually aligned with main shell
 
+### Accuracy & Learning Engine v3 (Phase 21)
+
+- [ ] **V3-ACC-01**: Vector-first measurement — SF/LF/areas from PDF vector geometry + text layer; vision labels semantics, never guesses numbers when geometry exists
+- [ ] **V3-ACC-02**: Auto scale detection v2 — per-viewport binding, area-weighted dominant scale, cross-validated against dimension strings; per-sheet confidence recorded
+- [ ] **V3-ACC-03**: Ensemble extraction — N-run self-consistency voting for EA counts and vision quantities; tiled counting with dedup; disagreement flags needs_review
+- [ ] **V3-ACC-04**: Model upgrade & adaptive fidelity — strongest Claude vision models routed by sheet complexity; adaptive DPI/tiling for dense sheets
+- [ ] **V3-ACC-05**: Verify-retry loop implemented — out-of-band quantities re-queried with targeted crops before flagging (replaces ENABLE_VERIFY_RETRY stub)
+- [ ] **V3-LEARN-01**: Correction store — human-verified overrides persisted to SQLite keyed by project_type/sheet_type/item pattern; survives run deletion
+- [ ] **V3-LEARN-02**: Learned vocabulary — canonical names/units accumulated from verified runs supersede static ITEM_NAME_MAP; auto-generated manifest from verified takeoffs
+- [ ] **V3-LEARN-03**: Runtime feedback application — learned corrections retrieved and injected into prompts, aggregation, and calculator assumptions on new runs
+- [ ] **V3-LEARN-04**: Manifest independence — companion take-off and manifest files optional dev inputs only; plans-only path reaches target accuracy without them
+- [ ] **V3-STRUCT-01**: Package restructure — modules organized into structured package (pipeline/vision/scale/deterministic/learning/scrape/web) with Flask blueprints; tests green
+- [ ] **V3-STRUCT-02**: Entry-point parity — PDF and StackCT paths share identical pipeline behavior with parity test
+- [ ] **V3-PROD-01**: Plans-only accuracy gate — vision_only_benchmark as CI-invocable gate; item-found ≥95%; zero silent misses
+- [ ] **V3-PROD-02**: Live-testing readiness — flagged-subset human review workflow, per-run API cost budget guard, structured error recovery, deployment docs
+
 ## v2 Requirements
 
 ### Architecture & Scale
@@ -287,6 +303,19 @@
 | HIST-04 | Phase 19 | Complete |
 | HIST-05 | Phase 19 | Complete |
 | HIST-06 | Phase 19 | Complete |
+| V3-ACC-01 | Phase 21 | Pending |
+| V3-ACC-02 | Phase 21 | Pending |
+| V3-ACC-03 | Phase 21 | Pending |
+| V3-ACC-04 | Phase 21 | Pending |
+| V3-ACC-05 | Phase 21 | Pending |
+| V3-LEARN-01 | Phase 21 | Pending |
+| V3-LEARN-02 | Phase 21 | Pending |
+| V3-LEARN-03 | Phase 21 | Pending |
+| V3-LEARN-04 | Phase 21 | Pending |
+| V3-STRUCT-01 | Phase 21 | Pending |
+| V3-STRUCT-02 | Phase 21 | Pending |
+| V3-PROD-01 | Phase 21 | Pending |
+| V3-PROD-02 | Phase 21 | Pending |
 
 **Coverage:**
 - v1 requirements: 84 total (incl. Phase 14–19)
