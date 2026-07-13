@@ -1,0 +1,441 @@
+[
+  {
+    "item": "Bollards",
+    "quantity": 18.0,
+    "quantity_fmt": "18",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png"
+    ],
+    "item_type": "bollard",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "review_reasons": [],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png",
+        "qty": 18.0,
+        "description": "Bollard / Pipe Bollard",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Canopy",
+    "quantity": 194.0,
+    "quantity_fmt": "194",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png"
+    ],
+    "item_type": "canopy",
+    "line_count": 3,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png",
+        "qty": 192.0,
+        "description": "Metal canopy projection / awning overhang dimension",
+        "formula": "192 sf \u00d7 1.0 = 192 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png",
+        "qty": 1.0,
+        "description": "New metal canopy - prefinished black panels",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png",
+        "qty": 1.0,
+        "description": "Awning - fabric canopy over storefront",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Component",
+    "quantity": 7.0,
+    "quantity_fmt": "7",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png",
+      "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png"
+    ],
+    "item_type": "component",
+    "line_count": 6,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png",
+        "qty": 2.0,
+        "description": "New Bob's Discount Furniture and Mattresses signage - channel letter powder coated aluminum frame",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png",
+        "qty": 1.0,
+        "description": "New metal bow awning from 4 engineering solutions over truck dock",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png",
+        "qty": 1.0,
+        "description": "BILCO roof hatch - 2'-6\" x 3'-0\"",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png",
+        "qty": 1.0,
+        "description": "Self closing gate - roof hatch",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png",
+        "qty": 1.0,
+        "description": "New ladderport roof hatch safety grab bars",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png",
+        "qty": 1.0,
+        "description": "Roof Hatch - BILCO 'S' 2'-6\" x 3'-0\" (self-closing gate)",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Dock Doors",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png",
+        "qty": 1.0,
+        "description": "New overhead door",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Dock Leveler",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png",
+        "qty": 1.0,
+        "description": "New overhead dock leveler and seal/bumpers",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Door Frame - HM",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Door Frame - HM (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "Doors-HM",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Doors-HM (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "Doors-WD",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Doors-WD (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "Exterior Painting - CMU Wall",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Exterior Painting - CMU Wall (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "Exterior Painting-EIFS - ALT",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Exterior Painting-EIFS - ALT (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "Flooring",
+    "quantity": 0.83,
+    "quantity_fmt": "0.8",
+    "unit": "SQ_FT",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png"
+    ],
+    "item_type": "flooring",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png",
+        "qty": 0.83,
+        "description": "Plywood floor - receiving area",
+        "formula": "1 sf \u00d7 1.1 waste = 1 sf"
+      }
+    ]
+  },
+  {
+    "item": "Gas Piping",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Gas Piping (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "Ladder-H-24'",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png"
+    ],
+    "item_type": "ladder",
+    "line_count": 4,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png",
+        "qty": 1.0,
+        "description": "FS Industries Series M (or approved equal) ladder and ladder safety cage",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png",
+        "qty": 1.0,
+        "description": "Ladder safety cage - safety yellow powder coat",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png",
+        "qty": 1.0,
+        "description": "Ladder and ladder safety cage - furnish and install by contractor",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0007.png",
+        "qty": 1.0,
+        "description": "Roof Ladder / Ladder Safety Cage Assembly - FS Industries Series M or approved equal",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Lift",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Lift (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "Lintels",
+    "quantity": 71.39999999999999,
+    "quantity_fmt": "71.4",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png"
+    ],
+    "item_type": "lintel",
+    "line_count": 2,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png",
+        "qty": 12.6,
+        "description": "Lintel LINTEL (EXISTING) existing lintel - size not specified",
+        "formula": "12 lf \u00d7 1.05 = 13 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_Manifest_20260627_215915/page_0005.png",
+        "qty": 58.8,
+        "description": "Lintel LINTEL STOREFRONT - FRONT ELEV steel lintel - size not specified on this sheet",
+        "formula": "56 lf \u00d7 1.05 = 59 lf"
+      }
+    ]
+  },
+  {
+    "item": "Mobilization",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "standard_line_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": 1.0,
+        "description": "Mobilization (standard estimating line item)",
+        "formula": "standard_line_item"
+      }
+    ]
+  }
+]

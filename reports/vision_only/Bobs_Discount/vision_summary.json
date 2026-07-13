@@ -1,0 +1,426 @@
+[
+  {
+    "item": "Component",
+    "quantity": 23.0,
+    "quantity_fmt": "23",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0004.png",
+      "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0005.png",
+      "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png"
+    ],
+    "item_type": "component",
+    "line_count": 11,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0004.png",
+        "qty": 12.0,
+        "description": "Exhaust Hood/Fan Units (double-dot symbol pairs)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0005.png",
+        "qty": 2.0,
+        "description": "Bob's Discount Furniture and Mattresses Signage",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0005.png",
+        "qty": 1.0,
+        "description": "Truck dock elevation detail",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "Bilco 'S' Roof Hatch 2'-6\" x 3'-0\" with Self-Closing Gate",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "Self-Closing Adjustable Gate for Roof Hatch",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "New Ladderport Roof Hatch Safety Grab Bars",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "Bilco roof hatch (2'-6\" x 3'-0\" approx)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "Self-closing gate (roof hatch)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "Roof hatch railing assembly with safety grab bars",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "New Ladderport roof hatch safety grab bars with gate",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "2'-1\" bottom hoop (steel side rails)",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Doors",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0005.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0005.png",
+        "qty": 1.0,
+        "description": "Enlarged glazing and entry doors detail",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Doors-GL",
+    "quantity": 15.0,
+    "quantity_fmt": "15",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png"
+    ],
+    "item_type": "doors",
+    "line_count": 11,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 3.0,
+        "description": "HARDWARE SCHEDULE - EXTERIOR PERIMETER (NO GLASS) DOORS - SINGLE ENTRY/EXIT FUNCTION HARDWARE",
+        "formula": "qty from schedule (3)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - EXTERIOR PERIMETER (NO GLASS) DOORS - SINGLE ENTRY/EXIT FUNCTION HARDWARE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - EXTERIOR PERIMETER (NO GLASS) DOORS - SINGLE ENTRY/EXIT FUNCTION HARDWARE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - EXTERIOR PERIMETER (NO GLASS) DOORS - SINGLE ENTRY/EXIT FUNCTION HARDWARE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - EXTERIOR PERIMETER (NO GLASS) DOORS - SINGLE ENTRY/EXIT FUNCTION HARDWARE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 3.0,
+        "description": "HARDWARE SCHEDULE - EXTERIOR PERIMETER (NO GLASS) DOORS - DORMITORY HARDWARE",
+        "formula": "qty from schedule (3)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - EXTERIOR PERIMETER (NO GLASS) DOORS - DORMITORY HARDWARE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - EXTERIOR PERIMETER (NO GLASS) DOORS - DORMITORY HARDWARE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - EXTERIOR PERIMETER (NO GLASS) DOORS - DORMITORY HARDWARE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - EXTERIOR PERIMETER (NO GLASS) DOORS - DORMITORY HARDWARE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - EXTERIOR PERIMETER (NO GLASS) DOORS - DORMITORY HARDWARE",
+        "formula": "qty from schedule (1)"
+      }
+    ]
+  },
+  {
+    "item": "Doors-WD",
+    "quantity": 10.0,
+    "quantity_fmt": "10",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png"
+    ],
+    "item_type": "doors",
+    "line_count": 8,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - INTERIOR WOOD/DOOR HARDWARE (GENERAL, ELECTRICAL, MISC. HARDWARE, FORMAT ITEMS HARDWARE)",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - INTERIOR WOOD/DOOR HARDWARE (GENERAL, ELECTRICAL, MISC. HARDWARE, FORMAT ITEMS HARDWARE)",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - INTERIOR WOOD/DOOR HARDWARE (GENERAL, ELECTRICAL, MISC. HARDWARE, FORMAT ITEMS HARDWARE)",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 3.0,
+        "description": "HARDWARE SCHEDULE - INTERIOR WOOD/GLASS DOOR HARDWARE (GENERAL, ELECTRICAL, MISC. HARDWARE, FORMAT ITEMS HARDWARE) - 2 wide doors, MULTI-BEDROOM (3' wide doors), PUSH-PULL HARDWARE",
+        "formula": "qty from schedule (3)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - INTERIOR WOOD/GLASS DOOR HARDWARE (GENERAL, ELECTRICAL, MISC. HARDWARE, FORMAT ITEMS HARDWARE) - 2 wide doors, MULTI-BEDROOM (3' wide doors), PUSH-PULL HARDWARE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - INTERIOR WOOD/GLASS DOOR HARDWARE (GENERAL, ELECTRICAL, MISC. HARDWARE, FORMAT ITEMS HARDWARE) - 2 wide doors, MULTI-BEDROOM (3' wide doors), PUSH-PULL HARDWARE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - INTERIOR WOOD/GLASS DOOR HARDWARE (GENERAL, ELECTRICAL, MISC. HARDWARE, FORMAT ITEMS HARDWARE) - 2 wide doors, MULTI-BEDROOM (3' wide doors), PUSH-PULL HARDWARE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0006.png",
+        "qty": 1.0,
+        "description": "HARDWARE SCHEDULE - INTERIOR WOOD/GLASS DOOR HARDWARE (GENERAL, ELECTRICAL, MISC. HARDWARE, FORMAT ITEMS HARDWARE) - 2 wide doors, MULTI-BEDROOM (3' wide doors), PUSH-PULL HARDWARE",
+        "formula": "qty from schedule (1)"
+      }
+    ]
+  },
+  {
+    "item": "Flooring",
+    "quantity": 124.03,
+    "quantity_fmt": "124.0",
+    "unit": "SQ_FT",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png"
+    ],
+    "item_type": "flooring",
+    "line_count": 5,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 0.83,
+        "description": "Plywood thickness at floor receiving area",
+        "formula": "1 sf \u00d7 1.1 waste = 1 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 52.8,
+        "description": "Plywood height above floor in receiving area",
+        "formula": "48 sf \u00d7 1.1 waste = 53 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 33.0,
+        "description": "Tile termination detail dimension PT-1 spacing",
+        "formula": "30 sf \u00d7 1.1 waste = 33 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 33.0,
+        "description": "Tile termination detail dimension",
+        "formula": "30 sf \u00d7 1.1 waste = 33 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 4.4,
+        "description": "Clip angle anchor to floor dimension",
+        "formula": "4 sf \u00d7 1.1 waste = 4 sf"
+      }
+    ]
+  },
+  {
+    "item": "Ladder",
+    "quantity": 5.0,
+    "quantity_fmt": "5",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0004.png",
+      "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png"
+    ],
+    "item_type": "ladder",
+    "line_count": 5,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0004.png",
+        "qty": 1.0,
+        "description": "New Roof Hatch and Ladder (Keynote 2)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "Roof Hatch Safety Cage / Grab Bars - Ladder Port",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "PS Industries Series M (or approved equal) Ladder and Ladder Safety Cage",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "Roof Ladder and Safety Cage - Furnished by Contractor",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0007.png",
+        "qty": 1.0,
+        "description": "FS Industries Series M (or approved equal) ladder and ladder safety cage",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Mobilization",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "standard_line_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": 1.0,
+        "description": "Mobilization (standard estimating line item)",
+        "formula": "standard_line_item"
+      }
+    ]
+  },
+  {
+    "item": "RTU",
+    "quantity": 14.0,
+    "quantity_fmt": "14",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0004.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0004.png",
+        "qty": 14.0,
+        "description": "RTU/HVAC Equipment Units (circled symbols on roof plan)",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Windows",
+    "quantity": 2.0,
+    "quantity_fmt": "2",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0005.png"
+    ],
+    "item_type": "windows",
+    "line_count": 2,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0005.png",
+        "qty": 1.0,
+        "description": "Window section detail (enlarged view)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_Discount_20260627_212454/page_0005.png",
+        "qty": 1.0,
+        "description": "Enlarged glazing detail",
+        "formula": "count"
+      }
+    ]
+  }
+]

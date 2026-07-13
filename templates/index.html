@@ -188,11 +188,15 @@
               <p class="hint">
                 List expected objects (name + unit) for canonical naming and completeness.
                 Auto-discovery also checks <code>manifests/</code> by project name.
+                Accepts <code>.csv</code> or <code>.json</code>.
               </p>
               <div class="manifest-controls">
                 <button type="button" class="btn-ghost btn-sm" id="stackctManifestUploadBtn">
                   Choose manifest file…
                 </button>
+                <a href="/api/pdf/manifest/template" class="btn-ghost btn-sm manifest-template-btn">
+                  Download CSV template
+                </a>
                 <span class="manifest-status" id="stackctManifestStatus"></span>
               </div>
             </div>
@@ -252,14 +256,16 @@
               Upload a list of the objects you expect in this project (name + unit,
               no quantities). The app maps detected items to your names at runtime,
               and guarantees every listed object appears in the take-off — flagging
-              any it cannot find for review.
-              <a href="#" id="manifestTemplateLink">Download template (CSV)</a>
+              any it cannot find for review. Accepts <code>.csv</code> or <code>.json</code>.
             </p>
             <input type="file" id="manifestFileInput" accept=".csv,.json" style="display:none" />
             <div class="manifest-controls">
               <button type="button" class="btn-ghost btn-sm" id="manifestUploadBtn">
                 Choose manifest file…
               </button>
+              <a href="/api/pdf/manifest/template" class="btn-ghost btn-sm manifest-template-btn">
+                Download CSV template
+              </a>
               <span class="manifest-status" id="manifestStatus"></span>
             </div>
           </div>

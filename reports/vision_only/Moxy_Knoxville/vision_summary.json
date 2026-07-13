@@ -1,0 +1,3877 @@
+[
+  {
+    "item": "Base",
+    "quantity": 552.0,
+    "quantity_fmt": "552",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png"
+    ],
+    "item_type": "lift",
+    "line_count": 3,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 528.0,
+        "description": "Base - estimated base at floor perimeter of interior spaces",
+        "formula": "480 sf \u00d7 1.1 waste = 528 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 14.0,
+        "description": "Base - Elevator Lobby Elevation A",
+        "formula": "count [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 10.0,
+        "description": "Base - Elevator Lobby Elevation C",
+        "formula": "count [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "CMU Wall",
+    "quantity": 28020.0,
+    "quantity_fmt": "28,020",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png"
+    ],
+    "item_type": "cmu_wall",
+    "line_count": 14,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 3200.0,
+        "description": "CMU Wall exterior elevation facade area - East Drive Court elevation (approx total facade)",
+        "formula": "3200 sf \u00d7 1.0 = 3200 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 5600.0,
+        "description": "CMU Wall exterior elevation facade area - North Drive Court elevation (approx total facade)",
+        "formula": "5600 sf \u00d7 1.0 = 5600 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 3200.0,
+        "description": "CMU Wall exterior elevation facade area - South Driveway elevation (approx total facade)",
+        "formula": "3200 sf \u00d7 1.0 = 3200 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 5600.0,
+        "description": "CMU Wall exterior elevation facade area - South Drive Court elevation (approx total facade)",
+        "formula": "5600 sf \u00d7 1.0 = 5600 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 800.0,
+        "description": "CMU Wall - estimated area across all levels",
+        "formula": "800 sf \u00d7 1.0 = 800 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 2400.0,
+        "description": "CMU Wall - Level 07 Key Plan (hatched CMU walls shown in plan)",
+        "formula": "2400 sf \u00d7 1.0 = 2400 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 480.0,
+        "description": "CMU Wall - surface area of CMU walls (approximate from plan)",
+        "formula": "480 sf \u00d7 1.0 = 480 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 320.0,
+        "description": "CMU Wall estimated area",
+        "formula": "320 sf \u00d7 1.0 = 320 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 850.0,
+        "description": "CMU Wall - concrete masonry unit wall area",
+        "formula": "850 sf \u00d7 1.0 = 850 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 850.0,
+        "description": "CMU Wall - surface area of CMU walls",
+        "formula": "850 sf \u00d7 1.0 = 850 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 320.0,
+        "description": "CMU Wall - estimated exposed CMU wall surface",
+        "formula": "320 sf \u00d7 1.0 = 320 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 1200.0,
+        "description": "CMU Wall - L7 Corridor",
+        "formula": "1200 sf \u00d7 1.0 = 1200 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 2800.0,
+        "description": "CMU Wall - L2-L6 Corridors",
+        "formula": "2800 sf \u00d7 1.0 = 2800 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 400.0,
+        "description": "CMU Wall area (approximate)",
+        "formula": "400 sf \u00d7 1.0 = 400 sf [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Ceiling Grid",
+    "quantity": 32354.91,
+    "quantity_fmt": "32,354.9",
+    "unit": "SQ_FT",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "ceiling_grid",
+    "line_count": 21,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 44.28,
+        "description": "Acoustic Rafters dimension",
+        "formula": "41 sf \u00d7 1.08 waste = 44 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 15.55,
+        "description": "Ceiling dimension horizontal",
+        "formula": "14 sf \u00d7 1.08 waste = 16 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 4104.0,
+        "description": "Ceiling Grid for Level 01 Lobby",
+        "formula": "3800 sf \u00d7 1.08 waste = 4104 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 4104.0,
+        "description": "Ceiling Grid for Level 1 Lobby - Floor/Ceiling Plan",
+        "formula": "3800 sf \u00d7 1.08 waste = 4104 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 3780.0,
+        "description": "Ceiling Grid for Main Lobby / Lounge",
+        "formula": "3500 sf \u00d7 1.08 waste = 3780 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 270.0,
+        "description": "Ceiling Grid for Laundry",
+        "formula": "250 sf \u00d7 1.08 waste = 270 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 129.6,
+        "description": "Ceiling Grid for Unisex Restroom",
+        "formula": "120 sf \u00d7 1.08 waste = 130 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 324.0,
+        "description": "Ceiling Grid for Bar/Kitchen",
+        "formula": "300 sf \u00d7 1.08 waste = 324 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 1.08,
+        "description": "ACT (Acoustical Ceiling Tile)",
+        "formula": "count \u00d7 1.08"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 972.0,
+        "description": "Ceiling Grid for Level 1 Pop-Up Hub (overall)",
+        "formula": "900 sf \u00d7 1.08 waste = 972 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 2.0,
+        "description": "Circular decorative ceiling element",
+        "formula": "count \u00d7 1.08"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 1944.0,
+        "description": "Ceiling Grid for Level 07 Rooftop Bar - Main Bar/Lounge Area",
+        "formula": "1800 sf \u00d7 1.08 waste = 1944 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 972.0,
+        "description": "Ceiling Grid for Level 07 Rooftop Bar - Enclosed Bar/Back of House",
+        "formula": "900 sf \u00d7 1.08 waste = 972 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 270.0,
+        "description": "Ceiling Grid for Level 07 - Restroom/WC Area",
+        "formula": "250 sf \u00d7 1.08 waste = 270 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 324.0,
+        "description": "Ceiling Grid for Level 07 - Service/Corridor Area",
+        "formula": "300 sf \u00d7 1.08 waste = 324 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 37.8,
+        "description": "Ceiling tile - Lounge Fireplace Elevation",
+        "formula": "35 sf \u00d7 1.08 waste = 38 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 2268.0,
+        "description": "Ceiling Grid for L7 Corridor",
+        "formula": "2100 sf \u00d7 1.08 waste = 2268 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 5184.0,
+        "description": "Ceiling Grid for L2-L6 Corridors",
+        "formula": "4800 sf \u00d7 1.08 waste = 5184 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 3024.0,
+        "description": "Ceiling Grid for L7 Corridor",
+        "formula": "2800 sf \u00d7 1.08 waste = 3024 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 4536.0,
+        "description": "Ceiling Grid for L2-L6 Corridor",
+        "formula": "4200 sf \u00d7 1.08 waste = 4536 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 48.6,
+        "description": "Ceiling Grid for Typical Guestroom Bath",
+        "formula": "45 sf \u00d7 1.08 waste = 49 sf"
+      }
+    ]
+  },
+  {
+    "item": "Columns",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "columns",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Shower Column",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Component",
+    "quantity": 136.0,
+    "quantity_fmt": "136",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "component",
+    "line_count": 90,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 4.0,
+        "description": "Internally Illuminated Brand Sign - Moxy",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 2.0,
+        "description": "Internally Illuminated Black Brand Sign",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 1.0,
+        "description": "Gas Meter - Confirm Location w/ AUB",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 1.0,
+        "description": "Fire Department Connection",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 1.0,
+        "description": "Fire Pump Sign",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+        "qty": 1.0,
+        "description": "Internally Illuminated Brand Sign - MOXY",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+        "qty": 1.0,
+        "description": "Internally Illuminated Block Brand Sign",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+        "qty": 1.0,
+        "description": "Gas Meter - Confirm Location at AUR",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+        "qty": 1.0,
+        "description": "Fire Department Connection",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 2.0,
+        "description": "Internally Illuminated Brand Sign",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 2.0,
+        "description": "Internally Illuminated Block Brand Sign",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 1.0,
+        "description": "Gas Meter",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 1.0,
+        "description": "Fire Department Connection",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 1.0,
+        "description": "Knox Box",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 1.0,
+        "description": "Roof Access Sign",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 1.0,
+        "description": "Fire Pump Sign",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 1.0,
+        "description": "Counter at Pop-up Bar",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 1.0,
+        "description": "Main Entry - Level 01",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 1.0,
+        "description": "Work Room - Level 01",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 1.0,
+        "description": "Main Bar - Level 01",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 1.0,
+        "description": "Bear Sculpture",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Laundry Room",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Unisex Restroom",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Bar/Kitchen",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Lounge",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Library",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Host/Hostess Station",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Breakfast/Dining Area",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "P.B.C. (Portable Bar Cart) location",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Check-in Counter/Desk",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 4.0,
+        "description": "Dining Table",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 8.0,
+        "description": "Accent Chair",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 16.0,
+        "description": "Dining Chair",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 4.0,
+        "description": "Cafe Table",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 10.0,
+        "description": "Locker",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 1.0,
+        "description": "Dog Station",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 2.0,
+        "description": "Accent Table",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 1.0,
+        "description": "Pop-Up Bar",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 2.0,
+        "description": "Pop-Up Fridge",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 1.0,
+        "description": "Pop-Up Hub Station",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 1.0,
+        "description": "Breakroom",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 2.0,
+        "description": "Work Area",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 1.0,
+        "description": "Folding Band",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 1.0,
+        "description": "Game Hub",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 1.0,
+        "description": "Mural",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 1.0,
+        "description": "Event Setup Area",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "Kitchen",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "Rooftop Patio",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "Rooftop Lounge",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "Elev Lobby",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "Fitness",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "Bar / GRAB 2",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "Elev Corr",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "LF Unisex",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "BLNC area",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "ARCH",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "STG (Storage)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 1.0,
+        "description": "Millwork Bookcase",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 1.0,
+        "description": "Custom Graphic on Lockers",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 1.0,
+        "description": "Art / FFE piece",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 1.0,
+        "description": "Cased Opening MC 00",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 1.0,
+        "description": "Single Metal Decorative Sliding Screen with Visible Track and Lockable Hardware for Bar",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 1.0,
+        "description": "Double Metal Decorative Sliding Screen with Visible Track and Lockable Hardware for TV",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 1.0,
+        "description": "Solid Railing Section for Fold Down Seating",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 1.0,
+        "description": "Painted Mural",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+        "qty": 1.0,
+        "description": "Rooftop Patio Elevation A",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+        "qty": 1.0,
+        "description": "Rooftop Patio Elevation B",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+        "qty": 1.0,
+        "description": "Fitness Elevation A",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+        "qty": 1.0,
+        "description": "Fitness Elevation B",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+        "qty": 1.0,
+        "description": "Fitness Elevation D",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+        "qty": 1.0,
+        "description": "Fitness Elevation C",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+        "qty": 1.0,
+        "description": "Fitness Restroom Elevation A",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+        "qty": 1.0,
+        "description": "Fitness Restroom Elevation B",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+        "qty": 1.0,
+        "description": "Fitness Restroom Elevation D",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 1.0,
+        "description": "Ice Machine on L2",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Toilet",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Toilet Paper Holder",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Robe Hook",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "18\" Vertical Grab Bar",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Accessory Basket",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Vanity Right",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Vanity Left",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Faucet",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Vanity Mirror",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Vanity Light",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Shower Valve",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Shower Pan",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Amenity Bottles with Bracket by OSE",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Quartz Threshold",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Amenities Dispenser",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Door Frame-HM",
+    "quantity": 116.0,
+    "quantity_fmt": "116",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0021.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "doors",
+    "line_count": 10,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "low-confidence count"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 12.0,
+        "description": "Door Frame-HM (Hollow Metal Frames)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 8.0,
+        "description": "Door Frame - HM (Hollow Metal Frame)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 8.0,
+        "description": "Door Frame - HM (Hollow Metal Frame)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 4.0,
+        "description": "Door Frame-HM (Hollow Metal Frame)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 8.0,
+        "description": "Door Frame-HM - Hollow Metal Door Frame",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 14.0,
+        "description": "Door Frame - HM (Hollow Metal Frame)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0021.png",
+        "qty": 5.0,
+        "description": "Door Frame-HM (hollow metal frames in unisex restroom elevations)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 18.0,
+        "description": "Door Frame - HM (Hollow Metal Frame)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 38.0,
+        "description": "Door Frame - HM (Hollow Metal Frame)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Door Frame - HM (Hollow Metal Frame)",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Doors",
+    "quantity": 52.0,
+    "quantity_fmt": "52",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "doors",
+    "line_count": 9,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 1.0,
+        "description": "Roof Access Door",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 2.0,
+        "description": "Door and Casing - Hub Corridor",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 4.0,
+        "description": "Door and Casing - Hub Restroom",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 2.0,
+        "description": "Door - Employee Breakroom",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 2.0,
+        "description": "Door and Casing - Employee Breakroom",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 4.0,
+        "description": "Door and Casing - Employee Restroom",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 14.0,
+        "description": "Guest Room Doors - L7 Corridor",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 22.0,
+        "description": "Guest Room Doors - L2-L6 Corridors",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Bypass Shower Door",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Doors-HM",
+    "quantity": 99.0,
+    "quantity_fmt": "99",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0021.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png"
+    ],
+    "item_type": "doors",
+    "line_count": 10,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 12.0,
+        "description": "Doors-HM (Hollow Metal Doors)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 8.0,
+        "description": "Doors-HM (Hollow Metal Doors)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 6.0,
+        "description": "Doors - HM (Hollow Metal Door)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 8.0,
+        "description": "Doors - HM (Hollow Metal Door)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 4.0,
+        "description": "Doors-HM (Hollow Metal Door)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 6.0,
+        "description": "Doors-HM - Hollow Metal Doors",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 8.0,
+        "description": "Doors - HM (Hollow Metal Door)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0021.png",
+        "qty": 5.0,
+        "description": "Doors-HM (hollow metal doors in unisex restroom elevations)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 4.0,
+        "description": "Doors - HM (Hollow Metal Door)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 38.0,
+        "description": "Doors - HM (Hollow Metal Door)",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Doors-WD",
+    "quantity": 139.0,
+    "quantity_fmt": "139",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "doors",
+    "line_count": 9,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "low-confidence count"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 98.0,
+        "description": "Doors-WD (Wood Doors)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 4.0,
+        "description": "Doors-WD (Wood Doors)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 4.0,
+        "description": "Doors - WD (Wood Door)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 6.0,
+        "description": "Doors - WD (Wood Door)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 2.0,
+        "description": "Doors-WD (Wood Door)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 4.0,
+        "description": "Doors-WD - Wood Doors",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 6.0,
+        "description": "Doors - WD (Wood Door)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 14.0,
+        "description": "Doors - WD (Wood Door)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 1.0,
+        "description": "Door - WD (Wood Door)",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Drywall",
+    "quantity": 807.0,
+    "quantity_fmt": "807",
+    "unit": "SHEETS",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "drywall",
+    "line_count": 17,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "estimated wall area (perimeter/height assumption, not measured)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 78.0,
+        "description": "Drywall for Level 01 Lobby",
+        "formula": "ceil(2219 \u00d7 1.12 / 32sf/sheet) = 78 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 78.0,
+        "description": "Drywall for Level 1 Lobby - Floor/Ceiling Plan",
+        "formula": "ceil(2219 \u00d7 1.12 / 32sf/sheet) = 78 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 75.0,
+        "description": "Drywall for Main Lobby / Lounge",
+        "formula": "ceil(2130 \u00d7 1.12 / 32sf/sheet) = 75 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 20.0,
+        "description": "Drywall for Laundry",
+        "formula": "ceil(569 \u00d7 1.12 / 32sf/sheet) = 20 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 14.0,
+        "description": "Drywall for Unisex Restroom",
+        "formula": "ceil(394 \u00d7 1.12 / 32sf/sheet) = 14 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 22.0,
+        "description": "Drywall for Bar/Kitchen",
+        "formula": "ceil(624 \u00d7 1.12 / 32sf/sheet) = 22 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 38.0,
+        "description": "Drywall for Level 1 Pop-Up Hub (overall)",
+        "formula": "ceil(1080 \u00d7 1.12 / 32sf/sheet) = 38 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 54.0,
+        "description": "Drywall for Level 07 Rooftop Bar - Main Bar/Lounge Area",
+        "formula": "ceil(1527 \u00d7 1.12 / 32sf/sheet) = 54 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 38.0,
+        "description": "Drywall for Level 07 Rooftop Bar - Enclosed Bar/Back of House",
+        "formula": "ceil(1080 \u00d7 1.12 / 32sf/sheet) = 38 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 44.0,
+        "description": "Drywall for Level 07 - Terrace/Deck Areas",
+        "formula": "ceil(1247 \u00d7 1.12 / 32sf/sheet) = 44 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 20.0,
+        "description": "Drywall for Level 07 - Restroom/WC Area",
+        "formula": "ceil(569 \u00d7 1.12 / 32sf/sheet) = 20 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 22.0,
+        "description": "Drywall for Level 07 - Service/Corridor Area",
+        "formula": "ceil(624 \u00d7 1.12 / 32sf/sheet) = 22 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 58.0,
+        "description": "Drywall for L7 Corridor",
+        "formula": "ceil(1650 \u00d7 1.12 / 32sf/sheet) = 58 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 88.0,
+        "description": "Drywall for L2-L6 Corridors",
+        "formula": "ceil(2494 \u00d7 1.12 / 32sf/sheet) = 88 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 67.0,
+        "description": "Drywall for L7 Corridor",
+        "formula": "ceil(1905 \u00d7 1.12 / 32sf/sheet) = 67 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 82.0,
+        "description": "Drywall for L2-L6 Corridor",
+        "formula": "ceil(2333 \u00d7 1.12 / 32sf/sheet) = 82 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 9.0,
+        "description": "Drywall for Typical Guestroom Bath",
+        "formula": "ceil(241 \u00d7 1.12 / 32sf/sheet) = 9 sheets"
+      }
+    ]
+  },
+  {
+    "item": "Electrical Panels",
+    "quantity": 86.0,
+    "quantity_fmt": "86",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png"
+    ],
+    "item_type": "ceiling_grid",
+    "line_count": 2,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 43.0,
+        "description": "Acoustic Panels dimension 1",
+        "formula": "40 sf \u00d7 1.08 waste = 43 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 43.0,
+        "description": "Acoustic Panels dimension 2",
+        "formula": "40 sf \u00d7 1.08 waste = 43 sf"
+      }
+    ]
+  },
+  {
+    "item": "Exposed Structure",
+    "quantity": 10570.0,
+    "quantity_fmt": "10,570",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png"
+    ],
+    "item_type": "exposed_structure",
+    "line_count": 11,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 600.0,
+        "description": "Exposed Structure - estimated area across all levels",
+        "formula": "600 sf \u00d7 1.0 = 600 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 3500.0,
+        "description": "Exposed Structure - Level 07 Key Plan rooftop area",
+        "formula": "3500 sf \u00d7 1.0 = 3500 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 320.0,
+        "description": "Exposed Structure - ceiling/wall area of exposed structure (approximate)",
+        "formula": "320 sf \u00d7 1.0 = 320 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 1200.0,
+        "description": "Exposed Structure estimated area",
+        "formula": "1200 sf \u00d7 1.0 = 1200 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1200.0,
+        "description": "Exposed Structure ceiling/wall area",
+        "formula": "1200 sf \u00d7 1.0 = 1200 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 200.0,
+        "description": "Exposed Structure - estimated exposed ceiling/structure area",
+        "formula": "200 sf \u00d7 1.0 = 200 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 600.0,
+        "description": "Exposed Structure - estimated exposed structural ceiling/soffit area",
+        "formula": "600 sf \u00d7 1.0 = 600 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 1200.0,
+        "description": "Exposed Structure for Level 07 - Terrace/Deck Areas",
+        "formula": "1200 sf \u00d7 1.0 = 1200 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 350.0,
+        "description": "Exposed Structure - L7 Corridor",
+        "formula": "350 sf \u00d7 1.0 = 350 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 800.0,
+        "description": "Exposed Structure - L2-L6 Corridors",
+        "formula": "800 sf \u00d7 1.0 = 800 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 600.0,
+        "description": "Exposed Structure area (approximate)",
+        "formula": "600 sf \u00d7 1.0 = 600 sf [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Flooring",
+    "quantity": 119929.37000000001,
+    "quantity_fmt": "119,929.4",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "flooring",
+    "line_count": 39,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 12621.4,
+        "description": "Level 07 floor elevation",
+        "formula": "11474 sf \u00d7 1.1 waste = 12621 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 12463.0,
+        "description": "Level 06 floor elevation",
+        "formula": "11330 sf \u00d7 1.1 waste = 12463 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 12326.6,
+        "description": "Level 05 floor elevation",
+        "formula": "11206 sf \u00d7 1.1 waste = 12327 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 12174.8,
+        "description": "Level 04 floor elevation",
+        "formula": "11068 sf \u00d7 1.1 waste = 12175 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 12053.8,
+        "description": "Level 03 floor elevation",
+        "formula": "10958 sf \u00d7 1.1 waste = 12054 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 11917.4,
+        "description": "Level 02 floor elevation",
+        "formula": "10834 sf \u00d7 1.1 waste = 11917 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 11722.7,
+        "description": "Level 01 floor elevation",
+        "formula": "10657 sf \u00d7 1.1 waste = 11723 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 1.65,
+        "description": "Brick Tile area zone dimension",
+        "formula": "2 sf \u00d7 1.1 waste = 2 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 4.95,
+        "description": "Quarry Tile area zone",
+        "formula": "4 sf \u00d7 1.1 waste = 5 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 33.55,
+        "description": "Floor plan dimension horizontal",
+        "formula": "30 sf \u00d7 1.1 waste = 34 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 11.22,
+        "description": "Floor plan dimension vertical",
+        "formula": "10 sf \u00d7 1.1 waste = 11 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 4180.0,
+        "description": "Flooring for Level 01 Lobby",
+        "formula": "3800 sf \u00d7 1.1 waste = 4180 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 4180.0,
+        "description": "Flooring for Level 1 Lobby - Floor/Ceiling Plan",
+        "formula": "3800 sf \u00d7 1.1 waste = 4180 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 3850.0,
+        "description": "Flooring for Main Lobby / Lounge",
+        "formula": "3500 sf \u00d7 1.1 waste = 3850 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 275.0,
+        "description": "Flooring for Laundry",
+        "formula": "250 sf \u00d7 1.1 waste = 275 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 132.0,
+        "description": "Flooring for Unisex Restroom",
+        "formula": "120 sf \u00d7 1.1 waste = 132 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 330.0,
+        "description": "Flooring for Bar/Kitchen",
+        "formula": "300 sf \u00d7 1.1 waste = 330 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 990.0,
+        "description": "Flooring for Level 1 Pop-Up Hub (overall)",
+        "formula": "900 sf \u00d7 1.1 waste = 990 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 1980.0,
+        "description": "Flooring for Level 07 Rooftop Bar - Main Bar/Lounge Area",
+        "formula": "1800 sf \u00d7 1.1 waste = 1980 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 990.0,
+        "description": "Flooring for Level 07 Rooftop Bar - Enclosed Bar/Back of House",
+        "formula": "900 sf \u00d7 1.1 waste = 990 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 1320.0,
+        "description": "Flooring for Level 07 - Terrace/Deck Areas",
+        "formula": "1200 sf \u00d7 1.1 waste = 1320 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 275.0,
+        "description": "Flooring for Level 07 - Restroom/WC Area",
+        "formula": "250 sf \u00d7 1.1 waste = 275 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 330.0,
+        "description": "Flooring for Level 07 - Service/Corridor Area",
+        "formula": "300 sf \u00d7 1.1 waste = 330 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 66.0,
+        "description": "Acoustic tile - Main Entry Lounge Elevation C",
+        "formula": "60 sf \u00d7 1.1 waste = 66 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 49.5,
+        "description": "Acoustic tile - Main Entry Lounge Elevation B area",
+        "formula": "45 sf \u00d7 1.1 waste = 50 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 33.0,
+        "description": "Textured tile 11A - Main Entry Lounge Elevation C",
+        "formula": "30 sf \u00d7 1.1 waste = 33 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 27.5,
+        "description": "Smooth tile 11B - Main Entry Lounge Elevation C",
+        "formula": "25 sf \u00d7 1.1 waste = 28 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 22.0,
+        "description": "Textured tile - Lounge Fireplace Elevation",
+        "formula": "20 sf \u00d7 1.1 waste = 22 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 16.5,
+        "description": "Smooth/Matte tile - Lounge Fireplace Elevation",
+        "formula": "15 sf \u00d7 1.1 waste = 16 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 52.8,
+        "description": "Tile - Hub Restroom Elevation A tile area",
+        "formula": "48 sf \u00d7 1.1 waste = 53 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 39.6,
+        "description": "Tile - Hub Restroom Elevation B tile area",
+        "formula": "36 sf \u00d7 1.1 waste = 40 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 52.8,
+        "description": "Tile - Hub Restroom Elevation C tile area",
+        "formula": "48 sf \u00d7 1.1 waste = 53 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 39.6,
+        "description": "Tile - Hub Restroom Elevation D tile area",
+        "formula": "36 sf \u00d7 1.1 waste = 40 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+        "qty": 27.5,
+        "description": "Tile TR 04 - Fitness Restroom Elevation D",
+        "formula": "25 sf \u00d7 1.1 waste = 28 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 2310.0,
+        "description": "Flooring for L7 Corridor",
+        "formula": "2100 sf \u00d7 1.1 waste = 2310 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 5280.0,
+        "description": "Flooring for L2-L6 Corridors",
+        "formula": "4800 sf \u00d7 1.1 waste = 5280 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 3080.0,
+        "description": "Flooring for L7 Corridor",
+        "formula": "2800 sf \u00d7 1.1 waste = 3080 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 4620.0,
+        "description": "Flooring for L2-L6 Corridor",
+        "formula": "4200 sf \u00d7 1.1 waste = 4620 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 49.5,
+        "description": "Flooring for Typical Guestroom Bath",
+        "formula": "45 sf \u00d7 1.1 waste = 50 sf"
+      }
+    ]
+  },
+  {
+    "item": "Guard Rail",
+    "quantity": 1689.2000000000003,
+    "quantity_fmt": "1,689.2",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png"
+    ],
+    "item_type": "guard_rail",
+    "line_count": 9,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 288.4,
+        "description": "Guard Rail - roof level and balcony locations - approximate total",
+        "formula": "280 lf \u00d7 1.03 = 288 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+        "qty": 82.4,
+        "description": "Guard Rail at Level 07 rooftop / terrace - West elevation approximate",
+        "formula": "80 lf \u00d7 1.03 = 82 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+        "qty": 61.8,
+        "description": "Guard Rail at Level 07 rooftop / terrace - North elevation approximate",
+        "formula": "60 lf \u00d7 1.03 = 62 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 185.4,
+        "description": "Guard Rail at balcony/elevated areas (approx, all elevations)",
+        "formula": "180 lf \u00d7 1.03 = 185 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 329.6,
+        "description": "Guard Rail - estimated linear footage from all levels",
+        "formula": "320 lf \u00d7 1.03 = 330 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 329.6,
+        "description": "Guard Rail - Level 07 Key Plan rooftop perimeter",
+        "formula": "320 lf \u00d7 1.03 = 330 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 41.2,
+        "description": "Guard Rail - linear feet of guard rail (approximate from plan)",
+        "formula": "40 lf \u00d7 1.03 = 41 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 185.4,
+        "description": "Guard Rail - linear feet of guard rail at rooftop edges",
+        "formula": "180 lf \u00d7 1.03 = 185 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 185.4,
+        "description": "Guard Rail - estimated at open rooftop terrace perimeters",
+        "formula": "180 lf \u00d7 1.03 = 185 lf [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Guestroom-Wall Covering",
+    "quantity": 40968.0,
+    "quantity_fmt": "40,968",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 12,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 14852.0,
+        "description": "Guestroom-Wall Covering - estimated area across all guestroom levels",
+        "formula": "ceil(18000lf \u00d7 12 / 16\" OC) + 1 = 13501; \u00d7 1.1 waste = 14852 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 9902.0,
+        "description": "Guestroom Wall Covering - Level 05 Key Plan (all guestrooms both wings)",
+        "formula": "ceil(12000lf \u00d7 12 / 16\" OC) + 1 = 9001; \u00d7 1.1 waste = 9902 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 9902.0,
+        "description": "Guestroom Wall Covering - Level 06 Key Plan (all guestrooms both wings)",
+        "formula": "ceil(12000lf \u00d7 12 / 16\" OC) + 1 = 9001; \u00d7 1.1 waste = 9902 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 1487.0,
+        "description": "WC-1 Wall Covering Type 1 - Level 05 Key Plan guestroom feature walls",
+        "formula": "ceil(1800lf \u00d7 12 / 16\" OC) + 1 = 1351; \u00d7 1.1 waste = 1487 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 1487.0,
+        "description": "WC-1 Wall Covering Type 1 - Level 06 Key Plan guestroom feature walls",
+        "formula": "ceil(1800lf \u00d7 12 / 16\" OC) + 1 = 1351; \u00d7 1.1 waste = 1487 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 167.0,
+        "description": "Guestroom-Wall Covering - SF of wall covering in guestroom areas (approximate)",
+        "formula": "ceil(200lf \u00d7 12 / 16\" OC) + 1 = 151; \u00d7 1.1 waste = 167 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 266.0,
+        "description": "Guestroom-Wall Covering - wall covering surface area in guestroom-type spaces",
+        "formula": "ceil(320lf \u00d7 12 / 16\" OC) + 1 = 241; \u00d7 1.1 waste = 266 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 744.0,
+        "description": "Guestroom Wall Covering - L7 Corridor",
+        "formula": "ceil(900lf \u00d7 12 / 16\" OC) + 1 = 676; \u00d7 1.1 waste = 744 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 1734.0,
+        "description": "Guestroom Wall Covering - L2-L6 Corridors",
+        "formula": "ceil(2100lf \u00d7 12 / 16\" OC) + 1 = 1576; \u00d7 1.1 waste = 1734 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 291.0,
+        "description": "Guestroom Wall Covering area (approximate)",
+        "formula": "ceil(350lf \u00d7 12 / 16\" OC) + 1 = 264; \u00d7 1.1 waste = 291 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 101.0,
+        "description": "Guestroom-Wall Covering - wall covering area in typical guestroom bath",
+        "formula": "ceil(120lf \u00d7 12 / 16\" OC) + 1 = 91; \u00d7 1.1 waste = 101 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 35.0,
+        "description": "WC-2 - wall covering type 2 area in typical guestroom bath",
+        "formula": "ceil(40lf \u00d7 12 / 16\" OC) + 1 = 31; \u00d7 1.1 waste = 35 [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Gyp Ceiling",
+    "quantity": 76605.68,
+    "quantity_fmt": "76,605.7",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "drywall",
+    "line_count": 19,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 23760.0,
+        "description": "Gyp Ceiling - estimated area across all levels",
+        "formula": "22000 sf \u00d7 1.08 waste = 23760 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 15120.0,
+        "description": "Gyp Ceiling - Level 05 Key Plan (guestrooms and corridors)",
+        "formula": "14000 sf \u00d7 1.08 waste = 15120 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 15120.0,
+        "description": "Gyp Ceiling - Level 06 Key Plan (guestrooms and corridors)",
+        "formula": "14000 sf \u00d7 1.08 waste = 15120 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 6480.0,
+        "description": "Gyp Ceiling - Level 07 Key Plan (amenity/lobby/fitness areas)",
+        "formula": "6000 sf \u00d7 1.08 waste = 6480 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 99.0,
+        "description": "Gyp Ceiling - gypsum board ceiling area",
+        "formula": "ceil(2800 \u00d7 1.12 / 32sf/sheet) = 99 sheets [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 99.0,
+        "description": "Gyp Ceiling - gypsum board ceiling area Level 7",
+        "formula": "ceil(2800 \u00d7 1.12 / 32sf/sheet) = 99 sheets [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 97.2,
+        "description": "GYP ceiling region 1 - area annotation",
+        "formula": "90 sf \u00d7 1.08 waste = 97 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 97.2,
+        "description": "GYP ceiling region 2 - area annotation",
+        "formula": "90 sf \u00d7 1.08 waste = 97 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 103.68,
+        "description": "GYP ceiling region 3 - area annotation",
+        "formula": "96 sf \u00d7 1.08 waste = 104 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 116.64,
+        "description": "GYP soffit/ceiling height annotation near bar area",
+        "formula": "108 sf \u00d7 1.08 waste = 117 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 129.6,
+        "description": "GYP ceiling annotation lower right area",
+        "formula": "120 sf \u00d7 1.08 waste = 130 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 142.56,
+        "description": "GYP ceiling WC area annotation",
+        "formula": "132 sf \u00d7 1.08 waste = 143 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 129.6,
+        "description": "GYP ceiling lower left area annotation",
+        "formula": "120 sf \u00d7 1.08 waste = 130 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 97.2,
+        "description": "GYP ceiling annotation far lower left",
+        "formula": "90 sf \u00d7 1.08 waste = 97 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 2268.0,
+        "description": "Gyp Ceiling - L7 Corridor",
+        "formula": "2100 sf \u00d7 1.08 waste = 2268 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 5184.0,
+        "description": "Gyp Ceiling - L2-L6 Corridors",
+        "formula": "4800 sf \u00d7 1.08 waste = 5184 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 3024.0,
+        "description": "L7 Corridor RCP Plan - Gyp Ceiling area (approximate)",
+        "formula": "2800 sf \u00d7 1.08 waste = 3024 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 4536.0,
+        "description": "L2-L6 Corridor RCP Plan - Gyp Ceiling area (approximate)",
+        "formula": "4200 sf \u00d7 1.08 waste = 4536 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 2.0,
+        "description": "Gyp Ceiling - gypsum ceiling area in typical guestroom bath",
+        "formula": "ceil(45 \u00d7 1.12 / 32sf/sheet) = 2 sheets [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Gyp Soffit",
+    "quantity": 9540.0,
+    "quantity_fmt": "9,540",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png"
+    ],
+    "item_type": "exterior_soffit",
+    "line_count": 13,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 1200.0,
+        "description": "Gyp Soffit - underside of canopy/soffit areas both elevations - approximate",
+        "formula": "1200 sf \u00d7 1.0 = 1200 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 2400.0,
+        "description": "Gyp Soffit - estimated linear/area from all levels",
+        "formula": "2400 sf \u00d7 1.0 = 2400 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 1200.0,
+        "description": "Gyp Soffit - Level 05 Key Plan (corridor soffits and room entry soffits)",
+        "formula": "1200 sf \u00d7 1.0 = 1200 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 1200.0,
+        "description": "Gyp Soffit - Level 06 Key Plan (corridor soffits and room entry soffits)",
+        "formula": "1200 sf \u00d7 1.0 = 1200 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 600.0,
+        "description": "Gyp Soffit - Level 07 Key Plan",
+        "formula": "600 sf \u00d7 1.0 = 600 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 651.0,
+        "description": "Gyp Soffit - Level 01 Lobby RCP estimated area",
+        "formula": "620 lf \u00d7 1.05 = 651 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 12.0,
+        "description": "Gyp Soffit - gypsum board soffit area",
+        "formula": "ceil(320 \u00d7 1.12 / 32sf/sheet) = 12 sheets [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 84.0,
+        "description": "Gyp Soffit - estimated soffit area visible in RCP",
+        "formula": "80 lf \u00d7 1.05 = 84 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 13.0,
+        "description": "Gyp Soffit - gypsum board soffit area Level 7",
+        "formula": "ceil(350 \u00d7 1.12 / 32sf/sheet) = 13 sheets [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 420.0,
+        "description": "Gyp Soffit - L7 Corridor",
+        "formula": "420 sf \u00d7 1.0 = 420 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 960.0,
+        "description": "Gyp Soffit - L2-L6 Corridors",
+        "formula": "960 sf \u00d7 1.0 = 960 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 320.0,
+        "description": "Gyp Soffit area L7 Corridor (approximate)",
+        "formula": "320 sf \u00d7 1.0 = 320 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 480.0,
+        "description": "Gyp Soffit area L2-L6 Corridor (approximate)",
+        "formula": "480 sf \u00d7 1.0 = 480 sf [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Gyp Wall",
+    "quantity": 54721.0,
+    "quantity_fmt": "54,721",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "drywall",
+    "line_count": 20,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 662.0,
+        "description": "Gyp Wall - interior wall area visible at openings - approximate",
+        "formula": "ceil(800lf \u00d7 12 / 16\" OC) + 1 = 601; \u00d7 1.1 waste = 662 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 26402.0,
+        "description": "Gyp Wall - estimated area across all levels",
+        "formula": "ceil(32000lf \u00d7 12 / 16\" OC) + 1 = 24001; \u00d7 1.1 waste = 26402 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 6602.0,
+        "description": "Gyp Wall - Level 05 Key Plan (corridor and back-of-house walls)",
+        "formula": "ceil(8000lf \u00d7 12 / 16\" OC) + 1 = 6001; \u00d7 1.1 waste = 6602 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 6602.0,
+        "description": "Gyp Wall - Level 06 Key Plan (corridor and back-of-house walls)",
+        "formula": "ceil(8000lf \u00d7 12 / 16\" OC) + 1 = 6001; \u00d7 1.1 waste = 6602 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 3302.0,
+        "description": "Gyp Wall - Level 07 Key Plan (amenity and service areas)",
+        "formula": "ceil(4000lf \u00d7 12 / 16\" OC) + 1 = 3001; \u00d7 1.1 waste = 3302 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 99.0,
+        "description": "Gyp Wall - area of gypsum board walls (approximate from plan)",
+        "formula": "ceil(2800 \u00d7 1.12 / 32sf/sheet) = 99 sheets [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 1982.0,
+        "description": "Gyp Wall - Level 01 Lobby FC Plan estimated area",
+        "formula": "ceil(2400lf \u00d7 12 / 16\" OC) + 1 = 1801; \u00d7 1.1 waste = 1982 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 78.0,
+        "description": "Gyp Wall - gypsum board wall area",
+        "formula": "ceil(2200 \u00d7 1.12 / 32sf/sheet) = 78 sheets [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 13.0,
+        "description": "Gyp Wall - estimated interior gypsum wall surface area",
+        "formula": "ceil(350 \u00d7 1.12 / 32sf/sheet) = 13 sheets [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 113.0,
+        "description": "Gyp Wall - gypsum board wall surface area Level 7",
+        "formula": "ceil(3200 \u00d7 1.12 / 32sf/sheet) = 113 sheets [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 85.0,
+        "description": "Gyp Wall - estimated gypsum wall surface area",
+        "formula": "ceil(2400 \u00d7 1.12 / 32sf/sheet) = 85 sheets [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 101.0,
+        "description": "Gyp Wall - Main Entry Lounge Elevation D approximate area",
+        "formula": "ceil(120lf \u00d7 12 / 16\" OC) + 1 = 91; \u00d7 1.1 waste = 101 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 1.0,
+        "description": "Gyp Wall - Hub Corridor Elevation A paint area",
+        "formula": "ceil(96 sf \u00d7 2 coats / 350 sf/gal) = 1 gal [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 1.0,
+        "description": "Gyp Wall - Hub Corridor Elevation B paint area",
+        "formula": "ceil(96 sf \u00d7 2 coats / 350 sf/gal) = 1 gal [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0018.png",
+        "qty": 1.0,
+        "description": "Gyp Wall - Hub Corridor Elevation C paint area",
+        "formula": "ceil(72 sf \u00d7 2 coats / 350 sf/gal) = 1 gal [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 1487.0,
+        "description": "Gyp Wall - L7 Corridor",
+        "formula": "ceil(1800lf \u00d7 12 / 16\" OC) + 1 = 1351; \u00d7 1.1 waste = 1487 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 3467.0,
+        "description": "Gyp Wall - L2-L6 Corridors",
+        "formula": "ceil(4200lf \u00d7 12 / 16\" OC) + 1 = 3151; \u00d7 1.1 waste = 3467 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 1487.0,
+        "description": "Gyp Wall area L7 Corridor (approximate)",
+        "formula": "ceil(1800lf \u00d7 12 / 16\" OC) + 1 = 1351; \u00d7 1.1 waste = 1487 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 2229.0,
+        "description": "Gyp Wall area L2-L6 Corridor (approximate)",
+        "formula": "ceil(2700lf \u00d7 12 / 16\" OC) + 1 = 2026; \u00d7 1.1 waste = 2229 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 7.0,
+        "description": "Gyp Wall - gypsum board wall area in typical guestroom bath",
+        "formula": "ceil(180 \u00d7 1.12 / 32sf/sheet) = 7 sheets [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Hand Rail",
+    "quantity": 577.5,
+    "quantity_fmt": "577.5",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png"
+    ],
+    "item_type": "hand_rail",
+    "line_count": 6,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 84.0,
+        "description": "Hand Rail - stair locations both elevations - approximate",
+        "formula": "80 lf \u00d7 1.05 = 84 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 252.0,
+        "description": "Hand Rail - estimated linear footage from all levels",
+        "formula": "240 lf \u00d7 1.05 = 252 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 84.0,
+        "description": "Hand Rail - Level 07 Key Plan interior stair and rooftop",
+        "formula": "80 lf \u00d7 1.05 = 84 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 31.5,
+        "description": "Hand Rail - linear feet of hand rail (approximate from stair and ramp locations)",
+        "formula": "30 lf \u00d7 1.05 = 32 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 63.0,
+        "description": "Hand Rail - linear feet of hand rail",
+        "formula": "60 lf \u00d7 1.05 = 63 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 63.0,
+        "description": "Hand Rail - estimated at stair and ramp locations",
+        "formula": "60 lf \u00d7 1.05 = 63 lf [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Lift",
+    "quantity": 517.0,
+    "quantity_fmt": "517",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png"
+    ],
+    "item_type": "drywall",
+    "line_count": 19,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)",
+      "estimated wall area (perimeter/height assumption, not measured)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 1.0,
+        "description": "Lift",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+        "qty": 1.0,
+        "description": "Lift",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 4.0,
+        "description": "Lift (Elevator)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 3.0,
+        "description": "Lift (Elevator)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 1.0,
+        "description": "Lift",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Main Elevator",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Lift (Elevator/Platform Lift)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 1.0,
+        "description": "Lift - Elevator/Lift",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 1.0,
+        "description": "Lift",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 30.0,
+        "description": "Custom graphic on lockers - Elevator Lobby Elevation B",
+        "formula": "count [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 12.0,
+        "description": "Valance - Main Entry Lounge Elevation C / Elevator Lobby",
+        "formula": "count [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 1.0,
+        "description": "Casework opening - Elevator Lobby Elevation C",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 1.0,
+        "description": "Lift",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 1.0,
+        "description": "Elevator Lobby",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 1.0,
+        "description": "Lift (Elevator)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 220.0,
+        "description": "Flooring for Elevator Lobby",
+        "formula": "200 sf \u00d7 1.1 waste = 220 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 216.0,
+        "description": "Ceiling Grid for Elevator Lobby",
+        "formula": "200 sf \u00d7 1.08 waste = 216 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 3.0,
+        "description": "Paint for Elevator Lobby",
+        "formula": "ceil(509 sf \u00d7 2 coats / 350 sf/gal) = 3 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 18.0,
+        "description": "Drywall for Elevator Lobby",
+        "formula": "ceil(509 \u00d7 1.12 / 32sf/sheet) = 18 sheets"
+      }
+    ]
+  },
+  {
+    "item": "Lintels",
+    "quantity": 791.6999999999999,
+    "quantity_fmt": "791.7",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png"
+    ],
+    "item_type": "lintel",
+    "line_count": 6,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 336.0,
+        "description": "Lintel LINTEL-SOUTH Steel lintel, size per structural",
+        "formula": "320 lf \u00d7 1.05 = 336 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 220.5,
+        "description": "Lintel LINTEL-EAST Steel lintel, size per structural",
+        "formula": "210 lf \u00d7 1.05 = 220 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 84.0,
+        "description": "Lintels - linear feet of lintels above openings (approximate)",
+        "formula": "80 lf \u00d7 1.05 = 84 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 50.4,
+        "description": "Lintels - linear feet of lintels above openings",
+        "formula": "48 lf \u00d7 1.05 = 50 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 50.4,
+        "description": "Lintels - estimated linear footage above openings",
+        "formula": "48 lf \u00d7 1.05 = 50 lf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 50.4,
+        "description": "Lintel unspecified not specified on this sheet",
+        "formula": "48 lf \u00d7 1.05 = 50 lf"
+      }
+    ]
+  },
+  {
+    "item": "Mobilization",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "standard_line_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": 1.0,
+        "description": "Mobilization (standard estimating line item)",
+        "formula": "standard_line_item"
+      }
+    ]
+  },
+  {
+    "item": "Paint",
+    "quantity": 144.0,
+    "quantity_fmt": "144",
+    "unit": "GALLONS",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "paint",
+    "line_count": 20,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)",
+      "estimated wall area (perimeter/height assumption, not measured)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 13.0,
+        "description": "Paint for Level 01 Lobby",
+        "formula": "ceil(2219 sf \u00d7 2 coats / 350 sf/gal) = 13 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 13.0,
+        "description": "Paint for Level 1 Lobby - Floor/Ceiling Plan",
+        "formula": "ceil(2219 sf \u00d7 2 coats / 350 sf/gal) = 13 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 13.0,
+        "description": "Paint for Main Lobby / Lounge",
+        "formula": "ceil(2130 sf \u00d7 2 coats / 350 sf/gal) = 13 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 4.0,
+        "description": "Paint for Laundry",
+        "formula": "ceil(569 sf \u00d7 2 coats / 350 sf/gal) = 4 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 3.0,
+        "description": "Paint for Unisex Restroom",
+        "formula": "ceil(394 sf \u00d7 2 coats / 350 sf/gal) = 3 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 4.0,
+        "description": "Paint for Bar/Kitchen",
+        "formula": "ceil(624 sf \u00d7 2 coats / 350 sf/gal) = 4 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 7.0,
+        "description": "Paint for Level 1 Pop-Up Hub (overall)",
+        "formula": "ceil(1080 sf \u00d7 2 coats / 350 sf/gal) = 7 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 9.0,
+        "description": "Paint for Level 07 Rooftop Bar - Main Bar/Lounge Area",
+        "formula": "ceil(1527 sf \u00d7 2 coats / 350 sf/gal) = 9 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 7.0,
+        "description": "Paint for Level 07 Rooftop Bar - Enclosed Bar/Back of House",
+        "formula": "ceil(1080 sf \u00d7 2 coats / 350 sf/gal) = 7 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 8.0,
+        "description": "Paint for Level 07 - Terrace/Deck Areas",
+        "formula": "ceil(1247 sf \u00d7 2 coats / 350 sf/gal) = 8 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 4.0,
+        "description": "Paint for Level 07 - Restroom/WC Area",
+        "formula": "ceil(569 sf \u00d7 2 coats / 350 sf/gal) = 4 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 4.0,
+        "description": "Paint for Level 07 - Service/Corridor Area",
+        "formula": "ceil(624 sf \u00d7 2 coats / 350 sf/gal) = 4 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 1.0,
+        "description": "Paint wall - Main Entry Lounge Elevation A",
+        "formula": "ceil(40 sf \u00d7 2 coats / 350 sf/gal) = 1 gal [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 1.0,
+        "description": "Paint - Lounge Fireplace Elevation",
+        "formula": "ceil(30 sf \u00d7 2 coats / 350 sf/gal) = 1 gal [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0020.png",
+        "qty": 1.0,
+        "description": "PT 04 Paint - Fitness Elevation C upper area",
+        "formula": "ceil(160 sf \u00d7 2 coats / 350 sf/gal) = 1 gal [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 10.0,
+        "description": "Paint for L7 Corridor",
+        "formula": "ceil(1650 sf \u00d7 2 coats / 350 sf/gal) = 10 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 15.0,
+        "description": "Paint for L2-L6 Corridors",
+        "formula": "ceil(2494 sf \u00d7 2 coats / 350 sf/gal) = 15 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 11.0,
+        "description": "Paint for L7 Corridor",
+        "formula": "ceil(1905 sf \u00d7 2 coats / 350 sf/gal) = 11 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 14.0,
+        "description": "Paint for L2-L6 Corridor",
+        "formula": "ceil(2333 sf \u00d7 2 coats / 350 sf/gal) = 14 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 2.0,
+        "description": "Paint for Typical Guestroom Bath",
+        "formula": "ceil(241 sf \u00d7 2 coats / 350 sf/gal) = 2 gal"
+      }
+    ]
+  },
+  {
+    "item": "Schedule Item",
+    "quantity": 50.0,
+    "quantity_fmt": "50",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png"
+    ],
+    "item_type": "schedule_item",
+    "line_count": 11,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 1.0,
+        "description": "DESK TABLE",
+        "formula": "count from schedule (qty column = 1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 4.0,
+        "description": "ACCENT CHAIR",
+        "formula": "count from schedule (qty column = 4)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 4.0,
+        "description": "DINING CHAIR",
+        "formula": "count from schedule (qty column = 4)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 4.0,
+        "description": "DINING TABLE",
+        "formula": "count from schedule (qty column = 4)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 10.0,
+        "description": "LOCKERS",
+        "formula": "count from schedule (qty column = 10)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 1.0,
+        "description": "DOG STATION",
+        "formula": "count from schedule (qty column = 1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 8.0,
+        "description": "ACCENT CHAIR",
+        "formula": "count from schedule (qty column = 8)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 4.0,
+        "description": "CAFE TABLE",
+        "formula": "count from schedule (qty column = 4)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 8.0,
+        "description": "DINING CHAIR",
+        "formula": "count from schedule (qty column = 8)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 4.0,
+        "description": "DINING CHAIR",
+        "formula": "count from schedule (qty column = 4)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0013.png",
+        "qty": 2.0,
+        "description": "ACCENT TABLE",
+        "formula": "count from schedule (qty column = 2)"
+      }
+    ]
+  },
+  {
+    "item": "Sealed Concrete",
+    "quantity": 2200.0,
+    "quantity_fmt": "2,200",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png"
+    ],
+    "item_type": "exposed_structure",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 2200.0,
+        "description": "Exposed Concrete Flooring area - Level 1 Lobby FC Plan",
+        "formula": "2200 sf \u00d7 1.0 = 2200 sf [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Stairs",
+    "quantity": 432.0,
+    "quantity_fmt": "432",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png"
+    ],
+    "item_type": "stairs",
+    "line_count": 15,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "estimated wall area (perimeter/height assumption, not measured)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 1.0,
+        "description": "Knox Box - Key to Fire Pump Room & Key to Stair E Roof Access",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0005.png",
+        "qty": 1.0,
+        "description": "Knox Box - Fire Pump Room and Key to Stair 2 Roof Access",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 3.0,
+        "description": "Stairs (Stairwells)",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 3.0,
+        "description": "Stairs",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 2.0,
+        "description": "Stairs",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 2.0,
+        "description": "Stairs",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Main Stair",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 1.0,
+        "description": "Stairs",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 198.0,
+        "description": "Flooring for Main Stair",
+        "formula": "180 sf \u00d7 1.1 waste = 198 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 194.0,
+        "description": "Ceiling Grid for Main Stair",
+        "formula": "180 sf \u00d7 1.08 waste = 194 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 3.0,
+        "description": "Paint for Main Stair",
+        "formula": "ceil(483 sf \u00d7 2 coats / 350 sf/gal) = 3 gal"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 17.0,
+        "description": "Drywall for Main Stair",
+        "formula": "ceil(483 \u00d7 1.12 / 32sf/sheet) = 17 sheets"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 2.0,
+        "description": "Stairs - Staircase",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 2.0,
+        "description": "Stairs",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 2.0,
+        "description": "Stairs",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Storefront/Curtain Wall",
+    "quantity": 48.0,
+    "quantity_fmt": "48",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png"
+    ],
+    "item_type": "windows",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 48.0,
+        "description": "Window units - multi-pane storefront style",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "WC-1",
+    "quantity": 14832.0,
+    "quantity_fmt": "14,832",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "flooring",
+    "line_count": 14,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 4292.0,
+        "description": "WC-1 (Brick Veneer) wall covering area - South elevation - approximate",
+        "formula": "ceil(5200lf \u00d7 12 / 16\" OC) + 1 = 3901; \u00d7 1.1 waste = 4292 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0004.png",
+        "qty": 3137.0,
+        "description": "WC-1 (Brick Veneer) wall covering area - East elevation - approximate",
+        "formula": "ceil(3800lf \u00d7 12 / 16\" OC) + 1 = 2851; \u00d7 1.1 waste = 3137 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 2889.0,
+        "description": "WC-1 Brick Veneer wall covering area (approx, all elevations)",
+        "formula": "ceil(3500lf \u00d7 12 / 16\" OC) + 1 = 2626; \u00d7 1.1 waste = 2889 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 1487.0,
+        "description": "WC-1 Wall Covering type 1 - estimated area",
+        "formula": "ceil(1800lf \u00d7 12 / 16\" OC) + 1 = 1351; \u00d7 1.1 waste = 1487 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 150.0,
+        "description": "WC-1 Wall Covering Type 1 (approximate SF from plan)",
+        "formula": "ceil(180lf \u00d7 12 / 16\" OC) + 1 = 136; \u00d7 1.1 waste = 150 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 233.0,
+        "description": "WC-1 Wall Covering estimated area",
+        "formula": "ceil(280lf \u00d7 12 / 16\" OC) + 1 = 211; \u00d7 1.1 waste = 233 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 150.0,
+        "description": "WC-1 - Wall Covering type 1 area",
+        "formula": "ceil(180lf \u00d7 12 / 16\" OC) + 1 = 136; \u00d7 1.1 waste = 150 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 150.0,
+        "description": "WC-1 - wall covering type 1 surface area",
+        "formula": "ceil(180lf \u00d7 12 / 16\" OC) + 1 = 136; \u00d7 1.1 waste = 150 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 101.0,
+        "description": "WC-1 wall covering area",
+        "formula": "ceil(120lf \u00d7 12 / 16\" OC) + 1 = 91; \u00d7 1.1 waste = 101 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 398.0,
+        "description": "WC-1 Wall Covering Type 1 - L7 Corridor",
+        "formula": "ceil(480lf \u00d7 12 / 16\" OC) + 1 = 361; \u00d7 1.1 waste = 398 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 909.0,
+        "description": "WC-1 Wall Covering Type 1 - L2-L6 Corridors",
+        "formula": "ceil(1100lf \u00d7 12 / 16\" OC) + 1 = 826; \u00d7 1.1 waste = 909 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 348.0,
+        "description": "WC-1 Wall Covering area L7 Corridor (approximate)",
+        "formula": "ceil(420lf \u00d7 12 / 16\" OC) + 1 = 316; \u00d7 1.1 waste = 348 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 522.0,
+        "description": "WC-1 Wall Covering area L2-L6 Corridor (approximate)",
+        "formula": "ceil(630lf \u00d7 12 / 16\" OC) + 1 = 474; \u00d7 1.1 waste = 522 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 66.0,
+        "description": "WC-1 - wall tile area (shower walls, subway tile MINCY TSVN-3X6)",
+        "formula": "60 sf \u00d7 1.1 waste = 66 sf [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "WC-10",
+    "quantity": 1193.0,
+    "quantity_fmt": "1,193",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 11,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 332.0,
+        "description": "WC-10 Wall Covering type 10 - estimated area",
+        "formula": "ceil(400lf \u00d7 12 / 16\" OC) + 1 = 301; \u00d7 1.1 waste = 332 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 167.0,
+        "description": "WC-10 Wall Covering Type 10 - Level 07 Key Plan",
+        "formula": "ceil(200lf \u00d7 12 / 16\" OC) + 1 = 151; \u00d7 1.1 waste = 167 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 101.0,
+        "description": "WC-10 Wall Covering Type 10 (approximate SF from plan)",
+        "formula": "ceil(120lf \u00d7 12 / 16\" OC) + 1 = 91; \u00d7 1.1 waste = 101 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 64.0,
+        "description": "WC-10 Wall Covering estimated area",
+        "formula": "ceil(75lf \u00d7 12 / 16\" OC) + 1 = 58; \u00d7 1.1 waste = 64 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 68.0,
+        "description": "WC-10 - Wall Covering type 10 area",
+        "formula": "ceil(80lf \u00d7 12 / 16\" OC) + 1 = 61; \u00d7 1.1 waste = 68 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 76.0,
+        "description": "WC-10 - wall covering type 10 surface area",
+        "formula": "ceil(90lf \u00d7 12 / 16\" OC) + 1 = 69; \u00d7 1.1 waste = 76 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 48.0,
+        "description": "WC-10 wall covering area",
+        "formula": "ceil(55lf \u00d7 12 / 16\" OC) + 1 = 43; \u00d7 1.1 waste = 48 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 76.0,
+        "description": "WC-10 Wall Covering Type 10 - L7 Corridor",
+        "formula": "ceil(90lf \u00d7 12 / 16\" OC) + 1 = 69; \u00d7 1.1 waste = 76 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 175.0,
+        "description": "WC-10 Wall Covering Type 10 - L2-L6 Corridors",
+        "formula": "ceil(210lf \u00d7 12 / 16\" OC) + 1 = 159; \u00d7 1.1 waste = 175 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 76.0,
+        "description": "WC-10 Wall Covering area (approximate)",
+        "formula": "ceil(90lf \u00d7 12 / 16\" OC) + 1 = 69; \u00d7 1.1 waste = 76 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 10.0,
+        "description": "WC-10 - wall covering type 10 area",
+        "formula": "ceil(10lf \u00d7 12 / 16\" OC) + 1 = 9; \u00d7 1.1 waste = 10 [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "WC-2",
+    "quantity": 5761.0,
+    "quantity_fmt": "5,761",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 12,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 992.0,
+        "description": "WC-2 Cementitious Panel (accent) wall covering area (approx, all elevations)",
+        "formula": "ceil(1200lf \u00d7 12 / 16\" OC) + 1 = 901; \u00d7 1.1 waste = 992 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 992.0,
+        "description": "WC-2 Wall Covering type 2 - estimated area",
+        "formula": "ceil(1200lf \u00d7 12 / 16\" OC) + 1 = 901; \u00d7 1.1 waste = 992 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 992.0,
+        "description": "WC-2 Wall Covering Type 2 - Level 05 Key Plan",
+        "formula": "ceil(1200lf \u00d7 12 / 16\" OC) + 1 = 901; \u00d7 1.1 waste = 992 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 992.0,
+        "description": "WC-2 Wall Covering Type 2 - Level 06 Key Plan",
+        "formula": "ceil(1200lf \u00d7 12 / 16\" OC) + 1 = 901; \u00d7 1.1 waste = 992 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 134.0,
+        "description": "WC-2 Wall Covering Type 2 (approximate SF from plan)",
+        "formula": "ceil(160lf \u00d7 12 / 16\" OC) + 1 = 121; \u00d7 1.1 waste = 134 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 150.0,
+        "description": "WC-2 Wall Covering estimated area",
+        "formula": "ceil(180lf \u00d7 12 / 16\" OC) + 1 = 136; \u00d7 1.1 waste = 150 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 183.0,
+        "description": "WC-2 - Wall Covering type 2 area",
+        "formula": "ceil(220lf \u00d7 12 / 16\" OC) + 1 = 166; \u00d7 1.1 waste = 183 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 134.0,
+        "description": "WC-2 - wall covering type 2 surface area",
+        "formula": "ceil(160lf \u00d7 12 / 16\" OC) + 1 = 121; \u00d7 1.1 waste = 134 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 81.0,
+        "description": "WC-2 wall covering area",
+        "formula": "ceil(95lf \u00d7 12 / 16\" OC) + 1 = 73; \u00d7 1.1 waste = 81 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 266.0,
+        "description": "WC-2 Wall Covering Type 2 - L7 Corridor",
+        "formula": "ceil(320lf \u00d7 12 / 16\" OC) + 1 = 241; \u00d7 1.1 waste = 266 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 612.0,
+        "description": "WC-2 Wall Covering Type 2 - L2-L6 Corridors",
+        "formula": "ceil(740lf \u00d7 12 / 16\" OC) + 1 = 556; \u00d7 1.1 waste = 612 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 233.0,
+        "description": "WC-2 Wall Covering area (approximate)",
+        "formula": "ceil(280lf \u00d7 12 / 16\" OC) + 1 = 211; \u00d7 1.1 waste = 233 [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "WC-4",
+    "quantity": 3811.0,
+    "quantity_fmt": "3,811",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 13,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0006.png",
+        "qty": 662.0,
+        "description": "WC-4 Cementitious Panel (accent variant) wall covering area (approx, all elevations)",
+        "formula": "ceil(800lf \u00d7 12 / 16\" OC) + 1 = 601; \u00d7 1.1 waste = 662 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 744.0,
+        "description": "WC-4 Wall Covering type 4 - estimated area",
+        "formula": "ceil(900lf \u00d7 12 / 16\" OC) + 1 = 676; \u00d7 1.1 waste = 744 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 497.0,
+        "description": "WC-4 Wall Covering Type 4 - Level 05 Key Plan",
+        "formula": "ceil(600lf \u00d7 12 / 16\" OC) + 1 = 451; \u00d7 1.1 waste = 497 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 497.0,
+        "description": "WC-4 Wall Covering Type 4 - Level 06 Key Plan",
+        "formula": "ceil(600lf \u00d7 12 / 16\" OC) + 1 = 451; \u00d7 1.1 waste = 497 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 117.0,
+        "description": "WC-4 Wall Covering Type 4 (approximate SF from plan)",
+        "formula": "ceil(140lf \u00d7 12 / 16\" OC) + 1 = 106; \u00d7 1.1 waste = 117 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 126.0,
+        "description": "WC-4 Wall Covering estimated area",
+        "formula": "ceil(150lf \u00d7 12 / 16\" OC) + 1 = 114; \u00d7 1.1 waste = 126 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 134.0,
+        "description": "WC-4 - Wall Covering type 4 area",
+        "formula": "ceil(160lf \u00d7 12 / 16\" OC) + 1 = 121; \u00d7 1.1 waste = 134 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 117.0,
+        "description": "WC-4 - wall covering type 4 surface area",
+        "formula": "ceil(140lf \u00d7 12 / 16\" OC) + 1 = 106; \u00d7 1.1 waste = 117 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 68.0,
+        "description": "WC-4 wall covering area",
+        "formula": "ceil(80lf \u00d7 12 / 16\" OC) + 1 = 61; \u00d7 1.1 waste = 68 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 200.0,
+        "description": "WC-4 Wall Covering Type 4 - L7 Corridor",
+        "formula": "ceil(240lf \u00d7 12 / 16\" OC) + 1 = 181; \u00d7 1.1 waste = 200 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 464.0,
+        "description": "WC-4 Wall Covering Type 4 - L2-L6 Corridors",
+        "formula": "ceil(560lf \u00d7 12 / 16\" OC) + 1 = 421; \u00d7 1.1 waste = 464 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 167.0,
+        "description": "WC-4 Wall Covering area (approximate)",
+        "formula": "ceil(200lf \u00d7 12 / 16\" OC) + 1 = 151; \u00d7 1.1 waste = 167 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 18.0,
+        "description": "WC-4 - wall covering type 4 area",
+        "formula": "ceil(20lf \u00d7 12 / 16\" OC) + 1 = 16; \u00d7 1.1 waste = 18 [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "WC-6",
+    "quantity": 2420.0,
+    "quantity_fmt": "2,420",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 12,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 579.0,
+        "description": "WC-6 Wall Covering type 6 - estimated area",
+        "formula": "ceil(700lf \u00d7 12 / 16\" OC) + 1 = 526; \u00d7 1.1 waste = 579 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 662.0,
+        "description": "WC-6 Wall Covering Type 6 - Level 07 Key Plan amenity areas",
+        "formula": "ceil(800lf \u00d7 12 / 16\" OC) + 1 = 601; \u00d7 1.1 waste = 662 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 109.0,
+        "description": "WC-6 Wall Covering Type 6 (approximate SF from plan)",
+        "formula": "ceil(130lf \u00d7 12 / 16\" OC) + 1 = 99; \u00d7 1.1 waste = 109 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 101.0,
+        "description": "WC-6 Wall Covering estimated area",
+        "formula": "ceil(120lf \u00d7 12 / 16\" OC) + 1 = 91; \u00d7 1.1 waste = 101 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 117.0,
+        "description": "WC-6 - Wall Covering type 6 area",
+        "formula": "ceil(140lf \u00d7 12 / 16\" OC) + 1 = 106; \u00d7 1.1 waste = 117 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 101.0,
+        "description": "WC-6 - wall covering type 6 surface area",
+        "formula": "ceil(120lf \u00d7 12 / 16\" OC) + 1 = 91; \u00d7 1.1 waste = 101 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 64.0,
+        "description": "WC-6 wall covering area",
+        "formula": "ceil(75lf \u00d7 12 / 16\" OC) + 1 = 58; \u00d7 1.1 waste = 64 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 40.0,
+        "description": "WC-6 Wallcovering - Library/Elevator Lobby",
+        "formula": "count [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 150.0,
+        "description": "WC-6 Wall Covering Type 6 - L7 Corridor",
+        "formula": "ceil(180lf \u00d7 12 / 16\" OC) + 1 = 136; \u00d7 1.1 waste = 150 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 348.0,
+        "description": "WC-6 Wall Covering Type 6 - L2-L6 Corridors",
+        "formula": "ceil(420lf \u00d7 12 / 16\" OC) + 1 = 316; \u00d7 1.1 waste = 348 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 134.0,
+        "description": "WC-6 Wall Covering area (approximate)",
+        "formula": "ceil(160lf \u00d7 12 / 16\" OC) + 1 = 121; \u00d7 1.1 waste = 134 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 15.0,
+        "description": "WC-6 - wall covering type 6 area",
+        "formula": "ceil(15lf \u00d7 12 / 16\" OC) + 1 = 13; \u00d7 1.1 waste = 15 [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "WC-7",
+    "quantity": 1881.0,
+    "quantity_fmt": "1,881",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 12,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 497.0,
+        "description": "WC-7 Wall Covering type 7 - estimated area",
+        "formula": "ceil(600lf \u00d7 12 / 16\" OC) + 1 = 451; \u00d7 1.1 waste = 497 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 332.0,
+        "description": "WC-7 Wall Covering Type 7 - Level 07 Key Plan",
+        "formula": "ceil(400lf \u00d7 12 / 16\" OC) + 1 = 301; \u00d7 1.1 waste = 332 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 93.0,
+        "description": "WC-7 Wall Covering Type 7 (approximate SF from plan)",
+        "formula": "ceil(110lf \u00d7 12 / 16\" OC) + 1 = 84; \u00d7 1.1 waste = 93 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 81.0,
+        "description": "WC-7 Wall Covering estimated area",
+        "formula": "ceil(95lf \u00d7 12 / 16\" OC) + 1 = 73; \u00d7 1.1 waste = 81 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 101.0,
+        "description": "WC-7 - Wall Covering type 7 area",
+        "formula": "ceil(120lf \u00d7 12 / 16\" OC) + 1 = 91; \u00d7 1.1 waste = 101 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 93.0,
+        "description": "WC-7 - wall covering type 7 surface area",
+        "formula": "ceil(110lf \u00d7 12 / 16\" OC) + 1 = 84; \u00d7 1.1 waste = 93 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 76.0,
+        "description": "WC-7 wall covering area",
+        "formula": "ceil(90lf \u00d7 12 / 16\" OC) + 1 = 69; \u00d7 1.1 waste = 76 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 35.0,
+        "description": "WC-7 Wallcovering - Elevator Lobby Elevation A",
+        "formula": "count [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 134.0,
+        "description": "WC-7 Wall Covering Type 7 - L7 Corridor",
+        "formula": "ceil(160lf \u00d7 12 / 16\" OC) + 1 = 121; \u00d7 1.1 waste = 134 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 307.0,
+        "description": "WC-7 Wall Covering Type 7 - L2-L6 Corridors",
+        "formula": "ceil(370lf \u00d7 12 / 16\" OC) + 1 = 279; \u00d7 1.1 waste = 307 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 117.0,
+        "description": "WC-7 Wall Covering area (approximate)",
+        "formula": "ceil(140lf \u00d7 12 / 16\" OC) + 1 = 106; \u00d7 1.1 waste = 117 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 15.0,
+        "description": "WC-7 - wall covering type 7 area",
+        "formula": "ceil(15lf \u00d7 12 / 16\" OC) + 1 = 13; \u00d7 1.1 waste = 15 [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "WC-8",
+    "quantity": 1704.0,
+    "quantity_fmt": "1,704",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 12,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 414.0,
+        "description": "WC-8 Wall Covering type 8 - estimated area",
+        "formula": "ceil(500lf \u00d7 12 / 16\" OC) + 1 = 376; \u00d7 1.1 waste = 414 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 414.0,
+        "description": "WC-8 Wall Covering Type 8 - Level 07 Key Plan lobby/bar areas",
+        "formula": "ceil(500lf \u00d7 12 / 16\" OC) + 1 = 376; \u00d7 1.1 waste = 414 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 84.0,
+        "description": "WC-8 Wall Covering Type 8 (approximate SF from plan)",
+        "formula": "ceil(100lf \u00d7 12 / 16\" OC) + 1 = 76; \u00d7 1.1 waste = 84 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 93.0,
+        "description": "WC-8 Wall Covering estimated area",
+        "formula": "ceil(110lf \u00d7 12 / 16\" OC) + 1 = 84; \u00d7 1.1 waste = 93 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 84.0,
+        "description": "WC-8 - Wall Covering type 8 area",
+        "formula": "ceil(100lf \u00d7 12 / 16\" OC) + 1 = 76; \u00d7 1.1 waste = 84 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 84.0,
+        "description": "WC-8 - wall covering type 8 surface area",
+        "formula": "ceil(100lf \u00d7 12 / 16\" OC) + 1 = 76; \u00d7 1.1 waste = 84 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 56.0,
+        "description": "WC-8 wall covering area",
+        "formula": "ceil(65lf \u00d7 12 / 16\" OC) + 1 = 50; \u00d7 1.1 waste = 56 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 30.0,
+        "description": "WC-8 Wallcovering - Elevator Lobby Elevation B",
+        "formula": "count [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 101.0,
+        "description": "WC-8 Wall Covering Type 8 - L7 Corridor",
+        "formula": "ceil(120lf \u00d7 12 / 16\" OC) + 1 = 91; \u00d7 1.1 waste = 101 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 233.0,
+        "description": "WC-8 Wall Covering Type 8 - L2-L6 Corridors",
+        "formula": "ceil(280lf \u00d7 12 / 16\" OC) + 1 = 211; \u00d7 1.1 waste = 233 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 101.0,
+        "description": "WC-8 Wall Covering area (approximate)",
+        "formula": "ceil(120lf \u00d7 12 / 16\" OC) + 1 = 91; \u00d7 1.1 waste = 101 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 10.0,
+        "description": "WC-8 - wall covering type 8 area",
+        "formula": "ceil(10lf \u00d7 12 / 16\" OC) + 1 = 9; \u00d7 1.1 waste = 10 [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "WC-9",
+    "quantity": 1382.0,
+    "quantity_fmt": "1,382",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 12,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0008.png",
+        "qty": 373.0,
+        "description": "WC-9 Wall Covering type 9 - estimated area",
+        "formula": "ceil(450lf \u00d7 12 / 16\" OC) + 1 = 339; \u00d7 1.1 waste = 373 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0009.png",
+        "qty": 249.0,
+        "description": "WC-9 Wall Covering Type 9 - Level 07 Key Plan",
+        "formula": "ceil(300lf \u00d7 12 / 16\" OC) + 1 = 226; \u00d7 1.1 waste = 249 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 76.0,
+        "description": "WC-9 Wall Covering Type 9 (approximate SF from plan)",
+        "formula": "ceil(90lf \u00d7 12 / 16\" OC) + 1 = 69; \u00d7 1.1 waste = 76 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0011.png",
+        "qty": 72.0,
+        "description": "WC-9 Wall Covering estimated area",
+        "formula": "ceil(85lf \u00d7 12 / 16\" OC) + 1 = 65; \u00d7 1.1 waste = 72 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0012.png",
+        "qty": 76.0,
+        "description": "WC-9 - Wall Covering type 9 area",
+        "formula": "ceil(90lf \u00d7 12 / 16\" OC) + 1 = 69; \u00d7 1.1 waste = 76 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0014.png",
+        "qty": 81.0,
+        "description": "WC-9 - wall covering type 9 surface area",
+        "formula": "ceil(95lf \u00d7 12 / 16\" OC) + 1 = 73; \u00d7 1.1 waste = 81 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0015.png",
+        "qty": 60.0,
+        "description": "WC-9 wall covering area",
+        "formula": "ceil(70lf \u00d7 12 / 16\" OC) + 1 = 54; \u00d7 1.1 waste = 60 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 25.0,
+        "description": "WC-9 Wallcovering - Elevator Lobby Elevation C",
+        "formula": "count [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 84.0,
+        "description": "WC-9 Wall Covering Type 9 - L7 Corridor",
+        "formula": "ceil(100lf \u00d7 12 / 16\" OC) + 1 = 76; \u00d7 1.1 waste = 84 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0022.png",
+        "qty": 192.0,
+        "description": "WC-9 Wall Covering Type 9 - L2-L6 Corridors",
+        "formula": "ceil(230lf \u00d7 12 / 16\" OC) + 1 = 174; \u00d7 1.1 waste = 192 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0023.png",
+        "qty": 84.0,
+        "description": "WC-9 Wall Covering area (approximate)",
+        "formula": "ceil(100lf \u00d7 12 / 16\" OC) + 1 = 76; \u00d7 1.1 waste = 84 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0040.png",
+        "qty": 10.0,
+        "description": "WC-9 - wall covering type 9 area",
+        "formula": "ceil(10lf \u00d7 12 / 16\" OC) + 1 = 9; \u00d7 1.1 waste = 10 [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Wall Framing",
+    "quantity": 147.0,
+    "quantity_fmt": "147",
+    "unit": "STUDS",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 4,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0010.png",
+        "qty": 1.0,
+        "description": "Art Wall",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 68.0,
+        "description": "Wood (WOOD) wall surface - Main Entry Lounge Elevation A",
+        "formula": "ceil(80lf \u00d7 12 / 16\" OC) + 1 = 61; \u00d7 1.1 waste = 68 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 35.0,
+        "description": "Wood wall surface - Main Entry Lounge Elevation B",
+        "formula": "ceil(40lf \u00d7 12 / 16\" OC) + 1 = 31; \u00d7 1.1 waste = 35 [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 43.0,
+        "description": "Wood wall surface - Main Entry Lounge Elevation C",
+        "formula": "ceil(50lf \u00d7 12 / 16\" OC) + 1 = 39; \u00d7 1.1 waste = 43 [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Windows",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png"
+    ],
+    "item_type": "windows",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260628_040509/page_0016.png",
+        "qty": 1.0,
+        "description": "Valance - Window B",
+        "formula": "count"
+      }
+    ]
+  }
+]

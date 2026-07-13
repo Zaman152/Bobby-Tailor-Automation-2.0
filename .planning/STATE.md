@@ -6,7 +6,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 20 — gap closure plans complete; 20-10 human sign-off pending (golden: Crow 20%, Bob 0% — Haiku ceiling reached)
+**Current focus:** Phase 20 — advanced accuracy pipeline (20-11–20-14) coded; deterministic test suite GREEN (348 passed); golden ≥97% gate hard-blocked on Anthropic API credits (every vision call returns `credit balance too low`)
 
 ## Current Position
 

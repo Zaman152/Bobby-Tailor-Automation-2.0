@@ -18,7 +18,7 @@ os.environ.setdefault(
 )
 
 import config
-from reporter import generate_report
+from reporter import generate_report, enrich_scale_calibration
 
 
 def _extracted_with_geometry():
@@ -50,6 +50,30 @@ def _extracted_with_geometry():
     }]
 
 
+def _extracted_scale_only_plans():
+    """Multiple floor plans with images but no vector geometry (typical Crow Cass)."""
+    plans = [
+        ("A-101", "floor_plan", "1/8\" = 1'-0\""),
+        ("A-111", "floor_plan", "1/8\" = 1'-0\""),
+        ("A-112", "floor_plan", "1/8\" = 1'-0\""),
+        ("A-113", "floor_plan", "1/8\" = 1'-0\""),
+        ("A-121", "floor_plan", "1/8\" = 1'-0\""),
+        ("A-131", "floor_plan", "1/8\" = 1'-0\""),
+    ]
+    out = []
+    for i, (name, typ, scale) in enumerate(plans, start=1):
+        out.append({
+            "_source_sheet": name,
+            "_sheet_name": name,
+            "_sheet_type": typ,
+            "_page_id": i,
+            "_image_rel": f"screenshots/crow/page_{i:04d}.png",
+            "scale": scale,
+            "_tokens_in": 0, "_tokens_out": 0, "_cost_usd": 0,
+        })
+    return out
+
+
 class ScaleCalibrationReporterTests(unittest.TestCase):
     def test_reporter_writes_calibration_with_raw(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -70,6 +94,44 @@ class ScaleCalibrationReporterTests(unittest.TestCase):
                 self.assertGreater(s["measured"]["footprint_sf"], 0)
             finally:
                 config.OUTPUT_DIR = old
+
+    def test_reporter_lists_all_scale_bearing_plans_without_geometry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            old = config.OUTPUT_DIR
+            config.OUTPUT_DIR = tmp
+            try:
+                report = generate_report(
+                    "Crow Cass", _extracted_scale_only_plans(), [])
+                calib = report["scale_calibration"]
+                names = {s["sheet"] for s in calib["sheets"]}
+                self.assertEqual(names, {
+                    "A-101", "A-111", "A-112", "A-113", "A-121", "A-131",
+                })
+                for s in calib["sheets"]:
+                    self.assertTrue(s["needs_scale_verify"])
+                    self.assertIsNone(s["raw"])
+            finally:
+                config.OUTPUT_DIR = old
+
+    def test_enrich_backfills_missing_plan_rows(self):
+        calib = {"sheets": [{
+            "sheet": "A-101", "page_id": 1, "type": "floor_plan",
+            "image": "screenshots/crow/page_0001.png",
+            "scale_text": "1/8\" = 1'-0\"", "feet_per_inch": 96,
+            "raw": {"footprint_pt2": 1}, "measured": {"footprint_sf": 100},
+        }]}
+        report = {
+            "sheet_assets": {
+                "A-101": {"image": "screenshots/crow/page_0001.png", "type": "floor_plan"},
+                "A-111": {"image": "screenshots/crow/page_0002.png", "type": "floor_plan"},
+            },
+            "sheet_log": [
+                {"sheet": "A-111", "type": "floor_plan", "scale": "1/8\" = 1'-0\""},
+            ],
+        }
+        enriched = enrich_scale_calibration(calib, report)
+        names = {s["sheet"] for s in enriched["sheets"]}
+        self.assertEqual(names, {"A-101", "A-111"})
 
 
 class ScaleEndpointTests(unittest.TestCase):

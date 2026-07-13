@@ -24,7 +24,8 @@ def generate_report(project_name: str,
                     folder_id: Optional[int] = None,
                     cross_references: Optional[list] = None,
                     linked_sheets: Optional[list] = None,
-                    manifest=None) -> dict:
+                    manifest=None,
+                    screenshots_dir: Optional[str] = None) -> dict:
     """
     Build the final takeoff report.
 
@@ -101,6 +102,7 @@ def generate_report(project_name: str,
         "linked_sheets_suggested": linked_suggested,
         "linked_sheets_added_count": len(linked_added),
         "linked_sheets_suggested_count": len(linked_suggested),
+        "screenshots_dir": screenshots_dir or "",
         "raw_line_items": raw_line_items,               # Source-of-truth list
         "by_sheet": _group_by_sheet(raw_line_items + calculated_items),
         "by_category": _group_by_category(raw_line_items),
@@ -423,6 +425,82 @@ def _build_sheet_assets(all_extracted: list) -> Dict[str, Any]:
 
 
 _SCALE_SHEET_TYPES = frozenset({"floor_plan", "civil_site", "roof_plan"})
+_SCALE_NAME_MARKERS = (
+    "FLOOR PLAN", "ROOF PLAN", "SITE PLAN", "CIVIL", "LAYOUT PLAN",
+    "PLOT PLAN", "MASTER PLAN",
+)
+
+
+def _is_scale_bearing(name: str, sheet_type: str = "") -> bool:
+    """True when a sheet carries a drawing scale the user may need to verify."""
+    typ = (sheet_type or "").strip().lower()
+    if typ in _SCALE_SHEET_TYPES:
+        return True
+    upper = (name or "").upper()
+    return any(m in upper for m in _SCALE_NAME_MARKERS)
+
+
+def _scale_only_entry(
+    sheet: str,
+    image: str,
+    sheet_type: str,
+    scale_text: str = "",
+    page_id=None,
+    scale_source: str = "vision_detected",
+) -> Dict[str, Any]:
+    parsed = _parsed_scale(scale_text)
+    fpi = parsed.get("feet_per_inch") if parsed else None
+    return {
+        "sheet": sheet,
+        "page_id": page_id,
+        "type": sheet_type,
+        "image": image,
+        "scale_text": scale_text or "",
+        "feet_per_inch": fpi,
+        "scale_confidence": "medium" if fpi else "low",
+        "auto_verified": False,
+        "scale_source": scale_source,
+        "needs_scale_verify": True,
+        "page_width_pt": None,
+        "page_height_pt": None,
+        "raw": None,
+        "measured": {},
+        "viewports": [],
+    }
+
+
+def enrich_scale_calibration(calib: dict, report: dict) -> dict:
+    """Backfill scale rows for plan sheets missing from an older calibration file."""
+    if not calib:
+        calib = {"sheets": []}
+    sheets = list(calib.get("sheets") or [])
+    seen = {s["sheet"] for s in sheets if s.get("sheet")}
+    assets = report.get("sheet_assets") or {}
+    log_by_name = {
+        e["sheet"]: e for e in (report.get("sheet_log") or [])
+        if e.get("sheet")
+    }
+
+    def _append(name: str, image: str, sheet_type: str, scale_text: str, page_id=None):
+        if not name or name in seen or not image:
+            return
+        if not _is_scale_bearing(name, sheet_type):
+            return
+        sheets.append(_scale_only_entry(name, image, sheet_type, scale_text, page_id))
+        seen.add(name)
+
+    for name, meta in assets.items():
+        log_e = log_by_name.get(name) or {}
+        _append(
+            name,
+            meta.get("image") or "",
+            meta.get("type") or log_e.get("type") or "",
+            log_e.get("scale") or "",
+            meta.get("page_id") or log_e.get("page_id"),
+        )
+
+    calib["sheets"] = sheets
+    return calib
 
 
 def _build_scale_calibration(project_name: str, run_folder: str,
@@ -475,29 +553,15 @@ def _build_scale_calibration(project_name: str, run_folder: str,
             seen.add(sheet)
             continue
 
-        # No vector geometry (e.g. StackCT before PDF capture) — still show plan
-        # sheets so the user can verify scale against the sheet image.
-        if not image or sheet_type not in _SCALE_SHEET_TYPES:
+        # No vector geometry — still list every scale-bearing plan sheet so the
+        # user can verify per-sheet scales (partial floor plans often differ).
+        if not image or not _is_scale_bearing(sheet, sheet_type):
             continue
-        parsed = _parsed_scale(d.get("scale"))
-        fpi = parsed.get("feet_per_inch") if parsed else None
-        sheets.append({
-            "sheet": sheet,
-            "page_id": d.get("_page_id"),
-            "type": sheet_type,
-            "image": image,
-            "scale_text": d.get("scale") or "",
-            "feet_per_inch": fpi,
-            "scale_confidence": "medium" if fpi else "low",
-            "auto_verified": False,
-            "scale_source": "vision_detected",
-            "needs_scale_verify": True,
-            "page_width_pt": None,
-            "page_height_pt": None,
-            "raw": None,
-            "measured": {},
-            "viewports": [],
-        })
+        sheets.append(_scale_only_entry(
+            sheet, image, sheet_type,
+            d.get("scale") or "",
+            d.get("_page_id"),
+        ))
         seen.add(sheet)
     return {
         "project_name": project_name,

@@ -1,0 +1,12 @@
+{
+  "overall_qty": 0.08333333333333333,
+  "name_found_rate": 0.3333333333333333,
+  "qty_acc_when_found": 0.25,
+  "count_qty": 0.14285714285714285,
+  "count_found": 0.5714285714285714,
+  "measured_qty": 0.0,
+  "measured_found": 0.0,
+  "n_total": 12,
+  "n_count": 7,
+  "n_measured": 5
+}

@@ -1,0 +1,136 @@
+{
+  "audited": 7,
+  "patterns": {
+    "multi_set": 6,
+    "no_sets_found": 1
+  },
+  "projects": [
+    {
+      "project_id": 7416168,
+      "project_name": "Morehouse Spelman - 70% CDs Set",
+      "pattern": "multi_set",
+      "plan_set_count": 3,
+      "landing_page_count": 120,
+      "plan_sets": [
+        {
+          "folder_id": 35240651,
+          "name": "Plans MSP3- ISSUE FOR BID-COMBINEDv1 MSP3- ISSUE FOR BID-COMBINEDv2",
+          "sheet_count": 120
+        },
+        {
+          "folder_id": 35240700,
+          "name": "MSP3- ISSUE FOR BID-COMBINEDv1",
+          "sheet_count": 120
+        },
+        {
+          "folder_id": 35240694,
+          "name": "MSP3- ISSUE FOR BID-COMBINEDv2",
+          "sheet_count": 180
+        }
+      ]
+    },
+    {
+      "project_id": 7414097,
+      "project_name": "ATL 081 - GMP R2 (Core and Shell + 8 Phases Only)",
+      "pattern": "no_sets_found",
+      "plan_set_count": 0,
+      "landing_page_count": 0,
+      "plan_sets": []
+    },
+    {
+      "project_id": 7413793,
+      "project_name": "Bid for Baking Social",
+      "pattern": "multi_set",
+      "plan_set_count": 2,
+      "landing_page_count": 22,
+      "plan_sets": [
+        {
+          "folder_id": 35218810,
+          "name": "Plans 2026_0515_Baking Social Permit Set Combined 1",
+          "sheet_count": 22
+        },
+        {
+          "folder_id": 35218877,
+          "name": "2026_0515_Baking Social Permit Set Combined 1",
+          "sheet_count": 22
+        }
+      ]
+    },
+    {
+      "project_id": 7415026,
+      "project_name": "Athens Fire Station No. 3",
+      "pattern": "multi_set",
+      "plan_set_count": 2,
+      "landing_page_count": 120,
+      "plan_sets": [
+        {
+          "folder_id": 35228910,
+          "name": "Plans Athens Fire Station No. 3 - 100_ CD Set - Drawings - 2026-04-24",
+          "sheet_count": 120
+        },
+        {
+          "folder_id": 35228916,
+          "name": "Athens Fire Station No. 3 - 100_ CD Set - Drawings - 2026-04-24",
+          "sheet_count": 120
+        }
+      ]
+    },
+    {
+      "project_id": 7409312,
+      "project_name": "LaserAway - Cumming, GA",
+      "pattern": "multi_set",
+      "plan_set_count": 2,
+      "landing_page_count": 43,
+      "plan_sets": [
+        {
+          "folder_id": 35190267,
+          "name": "Plans Exhibit A - 260138 LSA Cumming_ GA CD_5-7-26",
+          "sheet_count": 43
+        },
+        {
+          "folder_id": 35190393,
+          "name": "Exhibit A - 260138 LSA Cumming_ GA CD_5-7-26",
+          "sheet_count": 43
+        }
+      ]
+    },
+    {
+      "project_id": 7413817,
+      "project_name": "Baking Social - The Battery",
+      "pattern": "multi_set",
+      "plan_set_count": 2,
+      "landing_page_count": 45,
+      "plan_sets": [
+        {
+          "folder_id": 35218945,
+          "name": "2026_0506_PERMIT SET COMBINED_BAKING SOCIAL S_S",
+          "sheet_count": 45
+        },
+        {
+          "folder_id": 35218946,
+          "name": "2026_0515_Baking Social Permit Set Combined",
+          "sheet_count": 45
+        }
+      ]
+    },
+    {
+      "project_id": 7402786,
+      "project_name": "SmartServ Tennis Lab",
+      "pattern": "multi_set",
+      "plan_set_count": 2,
+      "landing_page_count": 27,
+      "plan_sets": [
+        {
+          "folder_id": 35150627,
+          "name": "202603_Interior Guide V1.0_TENNISPOT_Proofcopy (1) (1)",
+          "sheet_count": 27
+        },
+        {
+          "folder_id": 35150626,
+          "name": "Smart Serve Tennis Lab Report",
+          "sheet_count": 27
+        }
+      ]
+    }
+  ]
+}

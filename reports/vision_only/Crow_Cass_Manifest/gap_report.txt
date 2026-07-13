@@ -1,0 +1,29 @@
+====================================================================================
+VISION-ONLY BENCHMARK — Crow_Cass_Manifest
+====================================================================================
+Overall quantity accuracy: 40%   Name/found rate: 100%   Qty acc when found: 40%
+  Counts (EA)   n= 6  found=100%  qty_ok=33%
+  Measured(SF/LF) n= 4  found=100%  qty_ok=50%
+  [rescore] runtime=?  cost=$0.0000  sheets=?
+
+STATUS    ITEM                                  GOLDEN            AI    ERR%  CAT
+------------------------------------------------------------------------------------
+FAIL_QTY  Bollards                               28.00          0.00   100.0  count
+FAIL_QTY  CMU Wall                            2,204.33    204,750.00  9188.5  measured
+FAIL_QTY  Columns-H-35'                         132.00         25.00    81.1  count
+PASS      Exposed Structure                 395,673.42    397,500.00     0.5  measured
+FAIL_QTY  Internal Tilt up walls            108,442.66     10,500.00    90.3  measured
+PASS      Ladder-H-20'                            1.00          1.00     0.0  count
+FAIL_QTY  Lift                                    1.00          0.00   100.0  count
+PASS      Mobilization                            1.00          1.00     0.0  count
+PASS      Sealed Concrete                   395,673.42    397,556.00     0.5  measured
+FAIL_QTY  Stairs                                 10.00          8.00    20.0  count
+
+EXTRA items AI produced not in golden:
+  + Component                      4.0 EA
+  + Dock Doors                     98.0 EA
+  + Doors                          28.0 EA
+  + Flooring                       437311.6 SQ_FT
+  + Guard Rail                     1.54 LF
+  + Hand Rail                      1.58 LF
+  + Windows                        47.0 EA

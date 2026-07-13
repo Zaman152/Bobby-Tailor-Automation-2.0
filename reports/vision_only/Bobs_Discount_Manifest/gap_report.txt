@@ -1,0 +1,28 @@
+====================================================================================
+VISION-ONLY BENCHMARK — Bobs_Discount_Manifest
+====================================================================================
+Overall quantity accuracy: 8%   Name/found rate: 100%   Qty acc when found: 8%
+  Counts (EA)   n= 7  found=100%  qty_ok=14%
+  Measured(SF/LF) n= 5  found=100%  qty_ok=0%
+  [rescore] runtime=?  cost=$0.0000  sheets=?
+
+STATUS    ITEM                                  GOLDEN            AI    ERR%  CAT
+------------------------------------------------------------------------------------
+FAIL_QTY  Bollards                               11.00         18.00    63.6  count
+FAIL_QTY  Canopy                                 79.44        194.00   144.2  measured
+FAIL_QTY  Exterior Painting - CMU Wall       16,218.94          0.00   100.0  measured
+FAIL_QTY  Doors-HM                                5.00          0.00   100.0  count
+FAIL_QTY  Doors-WD                                7.00          0.00   100.0  count
+FAIL_QTY  Exterior Painting-EIFS - ALT        3,053.04          0.00   100.0  measured
+FAIL_QTY  Door Frame - HM                        12.00          0.00   100.0  count
+FAIL_QTY  Gas Piping                            886.77          0.00   100.0  measured
+FAIL_QTY  Ladder-H-24'                            1.00          4.00   300.0  count
+FAIL_QTY  Lift                                    1.00          0.00   100.0  count
+FAIL_QTY  Lintels                               179.24         71.40    60.2  measured
+PASS      Mobilization                            1.00          1.00     0.0  count
+
+EXTRA items AI produced not in golden:
+  + Component                      7.0 EA
+  + Dock Doors                     1.0 EA
+  + Dock Leveler                   1.0 EA
+  + Flooring                       0.83 SQ_FT

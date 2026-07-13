@@ -836,6 +836,7 @@ async def run_project_scrape(project_id: int, project_name: str,
             cross_references=cross_refs,
             linked_sheets=linked_meta,
             manifest=object_manifest,
+            screenshots_dir=str(screenshots_dir),
         )
 
         if sheets_failed or sheets_skipped or _cancelled:

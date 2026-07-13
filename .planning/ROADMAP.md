@@ -770,6 +770,8 @@ Context: `.planning/phases/19-job-history/19-CONTEXT.md`
 | 5 | 20-07 | — | Convergence: generalization 100% + golden ≥97% + UAT |
 | 6 | 20-08, 20-09 | yes | **Gap:** scraper test parity + ITEM_NAME_MAP ≥68 entries |
 | 7 | 20-10 | — | **Gap:** golden PDF regression ≥97% + UAT scores |
+| 8 | 20-11, 20-12 | yes | **Gap:** companion take-off PDF + legend/verify high-accuracy passes |
+| 9 | 20-13, 20-14 | yes | **Gap:** golden_convergence gate + auto-iterate to ≥97% |
 
 Plans:
 
@@ -784,6 +786,10 @@ Plans:
 - [x] 20-08-PLAN.md — **Gap:** Scraper test parity + pytest isolation (ACCURACY-20-12)
 - [x] 20-09-PLAN.md — **Gap:** ITEM_NAME_MAP ≥68 entries (ACCURACY-20-11)
 - [x] 20-10-PLAN.md — **Gap:** Golden fixtures + UAT scores (human-verify: Crow 20%, Bob not run)
+- [ ] 20-11-PLAN.md — **Gap:** Companion take-off PDF ingestion (generic)
+- [ ] 20-12-PLAN.md — **Gap:** LEGEND pass + high-accuracy Sonnet routing
+- [ ] 20-13-PLAN.md — **Gap:** golden_convergence.py automation gate
+- [ ] 20-14-PLAN.md — **Gap:** Auto-iterate until ≥97% on golden fixtures
 
 Research: `.planning/phases/20-takeoff-measurement-precision/20-RESEARCH.md` (§11–§13 generalization)
 Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`

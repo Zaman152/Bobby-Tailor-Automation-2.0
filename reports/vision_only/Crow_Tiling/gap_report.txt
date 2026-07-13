@@ -1,0 +1,31 @@
+====================================================================================
+VISION-ONLY BENCHMARK — Crow Tiling
+====================================================================================
+Overall quantity accuracy: 10%   Name/found rate: 100%   Qty acc when found: 10%
+  Counts (EA)   n= 6  found=100%  qty_ok=17%
+  Measured(SF/LF) n= 4  found=100%  qty_ok=0%
+  [manifest] runtime=489s  cost=$0.2992  sheets=4
+
+STATUS    ITEM                                  GOLDEN            AI    ERR%  CAT
+------------------------------------------------------------------------------------
+FAIL_QTY  Bollards                               28.00         17.00    39.3  count
+FAIL_QTY  CMU Wall                            2,204.33         35.00    98.4  measured
+FAIL_QTY  Columns-H-35'                         132.00        108.00    18.2  count
+FAIL_QTY  Exposed Structure                 395,673.42  1,123,556.00   184.0  measured
+FAIL_QTY  Internal Tilt up walls            108,442.66     18,200.00    83.2  measured
+FAIL_QTY  Ladder-H-20'                            1.00          3.00   200.0  count
+FAIL_QTY  Lift                                    1.00          0.00   100.0  count
+PASS      Mobilization                            1.00          1.00     0.0  count
+FAIL_QTY  Sealed Concrete                   395,673.42  1,131,112.00   185.9  measured
+FAIL_QTY  Stairs                                 10.00         16.00    60.0  count
+
+EXTRA items AI produced not in golden:
+  + Component                      3.0 EA
+  + Curb & Gutter                  0.05 LF
+  + Dock Doors                     102.0 EA
+  + Doors                          321.0 EA
+  + Electrical Panels              88.0 EA
+  + Flooring                       437320.39999999997 SQ_FT
+  + Guard Rail                     3.08 LF
+  + Hand Rail                      1.58 LF
+  + Paint                          505.0 GALLONS

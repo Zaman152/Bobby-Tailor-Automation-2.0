@@ -551,11 +551,6 @@ function bindPdfEvents() {
   const manBtn = document.getElementById('manifestUploadBtn');
   if (manInp) manInp.addEventListener('change', () => onManifestFileSelected(manInp));
   if (manBtn) manBtn.addEventListener('click', () => manInp?.click());
-  const tmplLink = document.getElementById('manifestTemplateLink');
-  if (tmplLink) tmplLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    window.location.href = '/api/pdf/manifest/template';
-  });
 
   const stackctManBtn = document.getElementById('stackctManifestUploadBtn');
   if (stackctManBtn) stackctManBtn.addEventListener('click', () => {

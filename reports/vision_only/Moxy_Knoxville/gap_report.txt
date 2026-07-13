@@ -1,0 +1,44 @@
+====================================================================================
+VISION-ONLY BENCHMARK — Moxy Knoxville
+====================================================================================
+Overall quantity accuracy: 4%   Name/found rate: 100%   Qty acc when found: 4%
+  Counts (EA)   n= 6  found=100%  qty_ok=17%
+  Measured(SF/LF) n=18  found=100%  qty_ok=0%
+  [manifest] runtime=1710s  cost=$1.5323  sheets=20
+
+STATUS    ITEM                                  GOLDEN            AI    ERR%  CAT
+------------------------------------------------------------------------------------
+FAIL_QTY  Base                                3,541.01        552.00    84.4  measured
+FAIL_QTY  CMU Wall                            6,916.47     28,020.00   305.1  measured
+FAIL_QTY  Door Frame-HM                         215.00        116.00    46.0  count
+FAIL_QTY  Doors-HM≈Doors                         10.00         52.00   420.0  count
+FAIL_QTY  Doors-WD≈Doors                        213.00         52.00    75.6  count
+FAIL_QTY  Exposed Structure                   3,770.94     10,570.00   180.3  measured
+FAIL_QTY  Guard Rail                            188.58      1,689.20   795.7  measured
+FAIL_QTY  Guestroom-Wall Covering            27,013.93     40,968.00    51.7  measured
+FAIL_QTY  Gyp Ceiling                        58,680.40     76,605.68    30.5  measured
+FAIL_QTY  Gyp Soffit                            260.07      9,540.00  3568.2  measured
+FAIL_QTY  Gyp Wall                          129,521.23     54,721.00    57.8  measured
+FAIL_QTY  Hand Rail                              64.61        577.50   793.8  measured
+FAIL_QTY  Lift                                    1.00        517.00 51600.0  count
+FAIL_QTY  Lintels                             1,530.39        791.70    48.3  measured
+PASS      Mobilization                            1.00          1.00     0.0  count
+FAIL_QTY  Stairs                                 28.00        432.00  1442.9  count
+FAIL_QTY  WC-1                                2,880.64     14,832.00   414.9  measured
+FAIL_QTY  WC-10≈WC-1                            148.77     14,832.00  9869.8  measured
+FAIL_QTY  WC-2≈WC-1                             649.47     14,832.00  2183.7  measured
+FAIL_QTY  WC-4≈WC-1                             169.28     14,832.00  8661.8  measured
+FAIL_QTY  WC-6≈WC-1                           1,136.62     14,832.00  1204.9  measured
+FAIL_QTY  WC-7≈WC-1                           1,571.00     14,832.00   844.1  measured
+FAIL_QTY  WC-8≈WC-1                             352.43     14,832.00  4108.5  measured
+FAIL_QTY  WC-9≈WC-1                             523.84     14,832.00  2731.4  measured
+
+EXTRA items AI produced not in golden:
+  + Columns                        1.0 EA
+  + Component                      136.0 EA
+  + Electrical Panels              86.0 EA
+  + Flooring                       119929.37000000001 SF
+  + Paint                          144.0 GALLONS
+  + Schedule Item                  50.0 EA
+  + Sealed Concrete                2200.0 SF
+  + Windows                        1.0 EA

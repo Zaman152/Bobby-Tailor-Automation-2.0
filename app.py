@@ -1309,10 +1309,19 @@ def get_scale_calibration(run_folder: str):
         return jsonify({"error": "Invalid path"}), 400
     if not (Path(OUTPUT_DIR) / run_folder).is_dir():
         return jsonify({"error": "Not found"}), 404
+    sub = Path(OUTPUT_DIR) / run_folder
     calib = _load_scale_calibration(run_folder)
     if calib is None:
         return jsonify({"run_folder": run_folder, "sheets": [],
                         "supported": False})
+    tk = sub / "takeoff.json"
+    if tk.is_file():
+        try:
+            report = json.loads(tk.read_text(encoding="utf-8"))
+            from reporter import enrich_scale_calibration
+            calib = enrich_scale_calibration(calib, report)
+        except (json.JSONDecodeError, OSError):
+            pass
     calib["supported"] = bool(calib.get("sheets"))
     return jsonify(calib)
 

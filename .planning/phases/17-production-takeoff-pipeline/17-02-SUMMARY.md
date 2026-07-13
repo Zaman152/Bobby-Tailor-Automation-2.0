@@ -20,6 +20,7 @@ key-files:
   created:
     - capture_manifest.py
     - tests/test_capture_manifest.py
+    - tests/test_scraper_two_phase.py
   modified:
     - scraper.py
 
@@ -36,8 +37,8 @@ decisions:
 metrics:
   duration: "5 min 29 sec"
   completed: "2026-06-01"
-  tests_added: 10
-  tests_passing: 19
+  tests_added: 14
+  tests_passing: 23
 ---
 
 # Phase 17 Plan 02: Capture/Analyze Split with Manifest Summary

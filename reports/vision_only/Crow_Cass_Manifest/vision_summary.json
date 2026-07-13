@@ -1,0 +1,526 @@
+[
+  {
+    "item": "Bollards",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Bollards (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "CMU Wall",
+    "quantity": 204750.0,
+    "quantity_fmt": "204,750",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png"
+    ],
+    "item_type": "cmu_wall",
+    "line_count": 6,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+        "qty": 47250.0,
+        "description": "CMU Wall - perimeter masonry block wall at 35 ft assumed height; perimeter estimated from plan (~1,350 LF x 35 ft)",
+        "formula": "47250 sf \u00d7 1.0 = 47250 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png",
+        "qty": 14875.0,
+        "description": "CMU Wall area - West Elevation (width ~500 LF x 35 ft height, net of openings approx 15%)",
+        "formula": "14875 sf \u00d7 1.0 = 14875 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png",
+        "qty": 14875.0,
+        "description": "CMU Wall area - East Elevation (width ~500 LF x 35 ft height, net of openings approx 15%)",
+        "formula": "14875 sf \u00d7 1.0 = 14875 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png",
+        "qty": 24500.0,
+        "description": "CMU Wall area - South Elevation (width ~1000 LF x 35 ft height, net of dock doors and openings approx 30%)",
+        "formula": "24500 sf \u00d7 1.0 = 24500 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png",
+        "qty": 24500.0,
+        "description": "CMU Wall area - North Elevation (width ~1000 LF x 35 ft height, net of dock doors and openings approx 30%)",
+        "formula": "24500 sf \u00d7 1.0 = 24500 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png",
+        "qty": 78750.0,
+        "description": "CMU Wall total all four elevations combined (net of openings)",
+        "formula": "78750 sf \u00d7 1.0 = 78750 sf [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Columns-H-35'",
+    "quantity": 25.0,
+    "quantity_fmt": "25",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png"
+    ],
+    "item_type": "columns",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png",
+        "qty": 25.0,
+        "description": "Structural column - gray vertical element",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Component",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 3,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+        "qty": 2.0,
+        "description": "Office Pod - built-out",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+        "qty": 1.0,
+        "description": "Future Office Pod",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+        "qty": 1.0,
+        "description": "Electrical Room / Fire Pump Room",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Concrete Slab",
+    "quantity": 0.1,
+    "quantity_fmt": "0.1",
+    "unit": "CY",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0003.png"
+    ],
+    "item_type": "concrete_slab",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0003.png",
+        "qty": 0.1,
+        "description": "Concrete slab thickness at dock",
+        "formula": "8 sf \u00d7 4\" / (12 \u00d7 27) = 0.10 cy"
+      }
+    ]
+  },
+  {
+    "item": "Dock Doors",
+    "quantity": 98.0,
+    "quantity_fmt": "98",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+        "qty": 98.0,
+        "description": "Overhead Doors 9'-0\" x 10'-0\"",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Doors",
+    "quantity": 28.0,
+    "quantity_fmt": "28",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png",
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0004.png"
+    ],
+    "item_type": "doors",
+    "line_count": 7,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png",
+        "qty": 18.0,
+        "description": "Door opening - small rectangular openings",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0004.png",
+        "qty": 2.0,
+        "description": "DOOR SCHEDULE",
+        "formula": "qty from schedule (2)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0004.png",
+        "qty": 2.0,
+        "description": "DOOR SCHEDULE",
+        "formula": "qty from schedule (2)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0004.png",
+        "qty": 2.0,
+        "description": "DOOR SCHEDULE",
+        "formula": "qty from schedule (2)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0004.png",
+        "qty": 2.0,
+        "description": "DOOR SCHEDULE",
+        "formula": "qty from schedule (2)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0004.png",
+        "qty": 1.0,
+        "description": "DOOR SCHEDULE",
+        "formula": "qty from schedule (1)"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0004.png",
+        "qty": 1.0,
+        "description": "DOOR SCHEDULE",
+        "formula": "qty from schedule (1)"
+      }
+    ]
+  },
+  {
+    "item": "Exposed Structure",
+    "quantity": 397500.0,
+    "quantity_fmt": "397,500",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png"
+    ],
+    "item_type": "exposed_structure",
+    "line_count": 2,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+        "qty": 385000.0,
+        "description": "Exposed Structure / Open Web Bar Joist / Exposed Roof Deck - warehouse bays (SEE 1/A-111, 1/A-112, 1/A-113 areas minus office pods)",
+        "formula": "385000 sf \u00d7 1.0 = 385000 sf [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+        "qty": 12500.0,
+        "description": "Office Pod areas - finished ceiling (not exposed structure), three office pods visible",
+        "formula": "12500 sf \u00d7 1.0 = 12500 sf [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Flooring",
+    "quantity": 437311.6,
+    "quantity_fmt": "437,311.6",
+    "unit": "SQ_FT",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png"
+    ],
+    "item_type": "flooring",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+        "qty": 437311.6,
+        "description": "Building total floor area - Cass White Road industrial building",
+        "formula": "397556 sf \u00d7 1.1 waste = 437312 sf"
+      }
+    ]
+  },
+  {
+    "item": "Guard Rail",
+    "quantity": 1.54,
+    "quantity_fmt": "1.5",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0003.png"
+    ],
+    "item_type": "guard_rail",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0003.png",
+        "qty": 1.54,
+        "description": "Steel pipe guardrail OD - ramp",
+        "formula": "2 lf \u00d7 1.03 = 2 lf"
+      }
+    ]
+  },
+  {
+    "item": "Hand Rail",
+    "quantity": 1.58,
+    "quantity_fmt": "1.6",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0003.png"
+    ],
+    "item_type": "hand_rail",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0003.png",
+        "qty": 1.58,
+        "description": "Handrail attach at vertical support",
+        "formula": "2 lf \u00d7 1.05 = 2 lf"
+      }
+    ]
+  },
+  {
+    "item": "Internal Tilt up walls",
+    "quantity": 10500.0,
+    "quantity_fmt": "10,500",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png"
+    ],
+    "item_type": "internal_tilt_up_wall",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "approximate dimension (field verify)"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+        "qty": 10500.0,
+        "description": "Internal Tilt-Up Walls - interior tilt-up panel walls separating office pods from warehouse at 35 ft assumed height; estimated ~300 LF x 35 ft",
+        "formula": "10500 sf \u00d7 1.0 = 10500 sf [FIELD VERIFY \u00b1]"
+      }
+    ]
+  },
+  {
+    "item": "Ladder-H-20'",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png"
+    ],
+    "item_type": "ladder",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+        "qty": 1.0,
+        "description": "Access Ladder",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Lift",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Lift (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "Mobilization",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "standard_line_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "review_reasons": [],
+    "source": "",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": 1.0,
+        "description": "Mobilization (standard estimating line item)",
+        "formula": "standard_line_item"
+      }
+    ]
+  },
+  {
+    "item": "Sealed Concrete",
+    "quantity": 397556.0,
+    "quantity_fmt": "397,556",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png"
+    ],
+    "item_type": "sealed_concrete",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0001.png",
+        "qty": 397556.0,
+        "description": "Sealed Concrete / Slab on Grade - entire building footprint",
+        "formula": "397556 sf \u00d7 1.0 = 397556 sf"
+      }
+    ]
+  },
+  {
+    "item": "Stairs",
+    "quantity": 8.0,
+    "quantity_fmt": "8",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0003.png"
+    ],
+    "item_type": "stairs",
+    "line_count": 4,
+    "needs_review": false,
+    "confidence": "medium",
+    "review_reasons": [],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0003.png",
+        "qty": 2.0,
+        "description": "Handrail OD - stair",
+        "formula": "2 lf \u00d7 1.05 = 2 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0003.png",
+        "qty": 2.0,
+        "description": "Guardrail OD - stair",
+        "formula": "2 lf \u00d7 1.03 = 2 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0003.png",
+        "qty": 3.0,
+        "description": "Stair rail angle steel stringer",
+        "formula": "3 lf \u00d7 1.05 = 3 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0003.png",
+        "qty": 1.0,
+        "description": "Stairs / Stair Run - Open Metal Grate Tread Stair",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Windows",
+    "quantity": 47.0,
+    "quantity_fmt": "47",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png"
+    ],
+    "item_type": "windows",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_Manifest_20260627_215121/page_0002.png",
+        "qty": 47.0,
+        "description": "Window - blue glazed units",
+        "formula": "count"
+      }
+    ]
+  }
+]
