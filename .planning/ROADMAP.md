@@ -840,7 +840,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 21-02-PLAN.md — Flask app factory + 7 blueprints + jobs_runtime (V3-STRUCT-01)
+- [x] 21-02-PLAN.md — Flask app factory + 7 blueprints + jobs_runtime (V3-STRUCT-01)
 - [x] 21-03-PLAN.md — deterministic/dimensions.py: dimension-line association (Recipe A) + synthetic fixtures (V3-ACC-01/02)
 - [ ] 21-04-PLAN.md — learning/store.py + distill.py: corrections/vocabulary/assumptions/manifests (V3-LEARN-01/02)
 - [ ] 21-05-PLAN.md — Model routing v2, PRICING July 2026, 1568px render retarget + crop helper (V3-ACC-04)

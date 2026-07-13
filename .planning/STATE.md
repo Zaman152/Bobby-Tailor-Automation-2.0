@@ -11,9 +11,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 4/18 complete (21-01, 21-03, 21-04, 21-05)  
-Status: 21-03 complete — Recipe A dimension-line association live; Crow 1136'/350' paired; 16 layer-1 tests + 544 non-golden green  
-Last activity: 2026-07-14 — Completed 21-03-PLAN.md (dimensions.py, synthetic fixtures)
+Plan: 5/18 complete (21-01, 21-02, 21-03, 21-04, 21-05)  
+Status: 21-02 complete — Flask create_app() factory + 7 blueprints + jobs_runtime; parity tests green  
+Last activity: 2026-07-14 — Completed 21-02-PLAN.md (app.py structural split)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -126,6 +126,16 @@ None yet.
 | Chained dims on one segment split by text projection when extension-line crossings insufficient | 21-03 |
 | Synthetic generator uses page.draw_line (Shape.commit invisible to get_drawings) | 21-03 |
 | Crow page 0 consensus fpi≈40 matches printed scale (dominant_scale), not 20 fpi research note | 21-03 |
+
+### 21-02 Decisions
+
+| Decision | Source |
+|----------|--------|
+| Blueprint endpoints prefixed (auth.login, projects.index); PUBLIC_ENDPOINTS + login_view updated | 21-02 |
+| create_app sets template_folder/static_folder to repo root (parents[3]) | 21-02 |
+| jobs_runtime owns jobs dict + thread launchers; no Flask request in job threads | 21-02 |
+| verify.py owns scale/verify/measurements/calibrate; reports.py owns list/preview/sheet-image | 21-02 |
+| Scale tests patch config.OUTPUT_DIR (not app.OUTPUT_DIR) after blueprint split | 21-02 |
 
 ### 21-01 Decisions
 
@@ -244,6 +254,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14 01:17 UTC  
-Stopped at: Completed 21-03-PLAN.md — dimensions.py Recipe A engine, synthetic fixtures, layer-1 tests green  
+Last session: 2026-07-14 01:12 UTC  
+Stopped at: Completed 21-02-PLAN.md — Flask factory + blueprints + jobs_runtime  
 Resume file: None
