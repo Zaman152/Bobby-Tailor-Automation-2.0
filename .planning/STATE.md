@@ -11,9 +11,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 1/18 complete (Wave 1 done: 21-01 package restructure; human checkpoints only at 21-17 accuracy gate + 21-18 UAT)  
-Status: 21-01 complete — src/bobbytailor/ package live, 34 modules moved as 100% renames, root shims keep all legacy imports working, 505 deterministic tests green  
-Last activity: 2026-07-13 — Completed 21-01-PLAN.md (package restructure, editable install, shims)
+Plan: 4/18 complete (21-01, 21-03, 21-04, 21-05)  
+Status: 21-03 complete — Recipe A dimension-line association live; Crow 1136'/350' paired; 16 layer-1 tests + 544 non-golden green  
+Last activity: 2026-07-14 — Completed 21-03-PLAN.md (dimensions.py, synthetic fixtures)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -115,6 +115,17 @@ From 14-04 (Two-Step Plan Selection UI):
 ### Pending Todos
 
 None yet.
+
+### 21-03 Decisions
+
+| Decision | Source |
+|----------|--------|
+| Shapely 2 STRtree.query returns numpy indices — index into segment list, not geometry id() map | 21-03 |
+| Overall dims (feet≥100) pick longest grammar-verified segment; bay dims cap at 5× median corridor length | 21-03 |
+| PERP_MIN_PT=0 so rotated vertical text on the dimension line is not rejected | 21-03 |
+| Chained dims on one segment split by text projection when extension-line crossings insufficient | 21-03 |
+| Synthetic generator uses page.draw_line (Shape.commit invisible to get_drawings) | 21-03 |
+| Crow page 0 consensus fpi≈40 matches printed scale (dominant_scale), not 20 fpi research note | 21-03 |
 
 ### 21-01 Decisions
 
@@ -233,6 +244,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-13 19:55 UTC  
-Stopped at: Completed 21-01-PLAN.md — package restructure done, shims live, suite green  
+Last session: 2026-07-14 01:17 UTC  
+Stopped at: Completed 21-03-PLAN.md — dimensions.py Recipe A engine, synthetic fixtures, layer-1 tests green  
 Resume file: None
