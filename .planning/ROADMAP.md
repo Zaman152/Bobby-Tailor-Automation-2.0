@@ -831,7 +831,27 @@ Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
 6. All modules live in a structured package; `pytest` passes; app boots via blueprints; README documents the new layout
 7. `21-UAT.md` signed off for live-testing readiness
 
-**Plans:** TBD (planned via /gsd-plan-phase)
+**Plans:** 18 plans (10 waves)
+
+Plans:
+- [ ] 21-01-PLAN.md — Package restructure: git mv into src/bobbytailor/, root shims, pyproject (V3-STRUCT-01)
+- [ ] 21-02-PLAN.md — Flask app factory + 7 blueprints + jobs_runtime (V3-STRUCT-01)
+- [ ] 21-03-PLAN.md — deterministic/dimensions.py: dimension-line association (Recipe A) + synthetic fixtures (V3-ACC-01/02)
+- [ ] 21-04-PLAN.md — learning/store.py + distill.py: corrections/vocabulary/assumptions/manifests (V3-LEARN-01/02)
+- [ ] 21-05-PLAN.md — Model routing v2, PRICING July 2026, 1568px render retarget + crop helper (V3-ACC-04)
+- [ ] 21-06-PLAN.md — deterministic/symbols.py clustering + tables.py generalized schedules (V3-ACC-01)
+- [ ] 21-07-PLAN.md — viewports.py + scale_solver.py: zero-calibration RANSAC solve + scale_truth gates (V3-ACC-02)
+- [ ] 21-08-PLAN.md — vision schemas (no-numbers), Set-of-Mark overlays, crop galleries, structured outputs (V3-ACC-01/04)
+- [ ] 21-09-PLAN.md — Verify endpoints feed the learning store in-request (V3-LEARN-01)
+- [ ] 21-10-PLAN.md — walls.py parallel-pair LF + rooms.py polygonize SF + footprint cross-check (V3-ACC-01)
+- [ ] 21-11-PLAN.md — vision/ensemble.py: N-run voting, tiled dedup, BudgetGuard (V3-ACC-03, V3-PROD-02)
+- [ ] 21-12-PLAN.md — vision/fusion.py: provenance-ranked merge + record/replay harness (V3-ACC-01)
+- [ ] 21-13-PLAN.md — Pipeline integration: RunSettings, deterministic-first flow, provenance reporting (V3-ACC-01/03)
+- [ ] 21-14-PLAN.md — Verify-retry loop with targeted crops (V3-ACC-05)
+- [ ] 21-15-PLAN.md — Plans-only contract + StackCT blob parity + companion demotion (V3-STRUCT-02, V3-LEARN-04)
+- [ ] 21-16-PLAN.md — Learning retrieval + 3-seam injection + anti-amplification guardrail (V3-LEARN-02/03/04)
+- [ ] 21-17-PLAN.md — Accuracy gate: provenance-split benchmark, reproducibility, accuracy_gate.sh (V3-PROD-01)
+- [ ] 21-18-PLAN.md — Shim removal, import migration, docs, 21-UAT.md sign-off (V3-PROD-02, V3-STRUCT-01)
 
 Research: `.planning/phases/21-accuracy-learning-engine/21-RESEARCH.md`
 Context: `.planning/phases/21-accuracy-learning-engine/21-CONTEXT.md`
