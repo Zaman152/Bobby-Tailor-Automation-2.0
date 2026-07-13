@@ -88,6 +88,21 @@ Out of scope: FastAPI migration (ARCH-01, v2), Celery/Redis queue (ARCH-02), Exc
 </canonical_refs>
 
 <specifics>
+## Benchmark Protocol (LOCKED — user directive 2026-07-13)
+
+`uploads/` contains 2 PDFs per project — the plan set and the human take-off:
+
+| Project | Plans (ONLY pipeline input) | Take-off (ground truth, EVALUATION ONLY) | Pages | p1 vector paths / words |
+|---|---|---|---|---|
+| Crow Cass | `Crow - Cass White Road-Plans.pdf` | `Crow - Cass White Road-Take offs.pdf` | 4 | 33,499 / 1,566 |
+| Bob's Discount | `Bob's Discount Furniture - Kennesaw, GA-plans.pdf` | `...-Take offds.pdf` (note typo in filename) | 7 | 287 / 702 |
+| Chelsea Bear Creek | `Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf` | `...-take offs.pdf` | 32 | 5,951 / 813 |
+| Moxy Knoxville | `Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf` | `...-Take offs.pdf` | 40 | 374 / 488 |
+
+- All four plan PDFs verified as vector CAD (real `get_drawings()` paths + extractable text layer, 3024×2160pt arch sheets). The geometry+text engine applies to all of them.
+- Accuracy evaluation loop: run the pipeline on the plans PDF ALONE, then score the produced take-off against the human take-off PDF. The take-off PDF must NEVER be discoverable by the runtime pipeline (kill the sibling `*takeoff*.pdf` auto-discovery for production; benchmark scripts pass it explicitly as the scoring reference).
+- All four projects should be scored in the accuracy gate (Crow + Bob as the hard gate per research; Chelsea + Moxy tracked, promoted to gating as they stabilize).
+
 ## Specific Ideas
 
 - Known concrete failures to fix (from benchmarks): Bollards 0-17 vs 28; Columns 90 vs 132; CMU Wall 17 vs 2,204 SF; Tilt-up walls MISSING; door schedule rows partial (3/5, 3/7); gas piping missed; WC-1 quantity duplicated across WC-2..10 on Moxy.
