@@ -1,0 +1,44 @@
+{
+  "pages": [
+    {
+      "page": 0,
+      "dims": [
+        {
+          "text": "50'-0\"",
+          "feet": 50.0,
+          "expected_associated": true
+        },
+        {
+          "text": "40'-0\"",
+          "feet": 40.0,
+          "expected_associated": true
+        },
+        {
+          "text": "12'-6 1/2\"",
+          "feet": 12.541666666666666,
+          "expected_associated": true
+        },
+        {
+          "text": "20'-0\"",
+          "feet": 20.0,
+          "expected_associated": true
+        },
+        {
+          "text": "30'-0\"",
+          "feet": 30.0,
+          "expected_associated": true
+        },
+        {
+          "text": "25'-0\"",
+          "feet": 25.0,
+          "expected_associated": true
+        },
+        {
+          "text": "NOTE 36'-0\" TYP",
+          "feet": 36.0,
+          "expected_associated": false
+        }
+      ]
+    }
+  ]
+}
