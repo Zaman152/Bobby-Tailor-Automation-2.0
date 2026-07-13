@@ -155,7 +155,7 @@ class ScaleEndpointTests(unittest.TestCase):
 
         import app as app_module
         self.patchers = [
-            mock.patch.object(app_module, "OUTPUT_DIR", self.tmp.name),
+            mock.patch("config.OUTPUT_DIR", self.tmp.name),
             mock.patch("flask_login.utils._get_user", return_value=get_admin()),
         ]
         for p in self.patchers:
