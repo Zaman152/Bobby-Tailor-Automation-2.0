@@ -10,10 +10,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 ## Current Position
 
-Phase: 21 of 21 (Accuracy & Learning Engine v3) — Ready to execute  
-Plan: 0/18 complete (10 waves; 21-01 package restructure first; human checkpoints only at 21-17 accuracy gate + 21-18 UAT)  
-Status: Plans verified (2 blockers fixed in revision); all 13 V3-* requirements covered; benchmark protocol locked (uploads/ plan+take-off pairs, Crow+Bob hard gate)  
-Last activity: 2026-07-13 — Phase 21 planned via research → pattern map → 18 plans → checker revision loop → verification passed
+Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
+Plan: 1/18 complete (Wave 1 done: 21-01 package restructure; human checkpoints only at 21-17 accuracy gate + 21-18 UAT)  
+Status: 21-01 complete — src/bobbytailor/ package live, 34 modules moved as 100% renames, root shims keep all legacy imports working, 505 deterministic tests green  
+Last activity: 2026-07-13 — Completed 21-01-PLAN.md (package restructure, editable install, shims)
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
@@ -115,6 +115,17 @@ From 14-04 (Two-Step Plan Selection UI):
 ### Pending Todos
 
 None yet.
+
+### 21-01 Decisions
+
+| Decision | Source |
+|----------|--------|
+| Root shims star-re-export AND alias sys.modules[__name__] to the real package module — monkeypatch through either import path hits one module object | 21-01 |
+| requires-python kept at >=3.9 (deployment/test runtime is macOS system Python 3.9.6, not 3.10) | 21-01 |
+| app.py shim repoints Flask template_folder/static_folder to repo root (Flask resolves relative to module location) | 21-01 |
+| settings.py + seed_admin.py received the same repo-root .env fix as config.py (parents[3] from src/bobbytailor/web/) | 21-01 |
+| New Phase 21 modules are created directly in src/bobbytailor/ final homes; internal flat imports stay until the import-migration plan | 21-01 |
+| Deterministic suite green count is 505 (plan's 348 figure was stale) | 21-01 |
 
 ### 20-00 Decisions
 
@@ -218,9 +229,10 @@ None yet.
 - Flask background-thread context leaks — use primitive payloads only in job threads (research PITFALLS #3)
 - Claude schedule counting accuracy — document confidence limits; v2 review UI (EST-02)
 - Pricing table may go stale — verify quarterly against Anthropic docs
+- GitNexus index stale after 21-01 package move (symbols indexed at old root paths) — run `npx gitnexus analyze` before impact analysis in later plans
 
 ## Session Continuity
 
-Last session: 2026-06-04 20:44 UTC  
-Stopped at: Completed 20-10-PLAN.md — golden fixtures copied, 6 general fixes, 3 API runs, UAT updated; at checkpoint awaiting human verify  
+Last session: 2026-07-13 19:55 UTC  
+Stopped at: Completed 21-01-PLAN.md — package restructure done, shims live, suite green  
 Resume file: None
