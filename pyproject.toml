@@ -21,6 +21,9 @@ dependencies = [
     "flask-limiter>=3.5.0",
     "pymupdf>=1.26",
     "pillow>=10.0.0",
+    "shapely>=2.0",
+    "numpy>=1.26",
+    "networkx>=3.2",
 ]
 
 [tool.setuptools]
