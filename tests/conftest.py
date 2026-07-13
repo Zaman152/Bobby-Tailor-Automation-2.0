@@ -20,6 +20,19 @@ from __future__ import annotations
 import importlib
 import os
 import sys
+from pathlib import Path
+
+# Phase 21 transition (V3-STRUCT-01): modules live in src/bobbytailor/ with
+# root-level import shims. Ensure the repo root (shims) is importable, and
+# fall back to a direct src/ path insert when the bobbytailor package is not
+# installed (e.g. fresh checkout without `pip install -e .`).
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+try:
+    import bobbytailor  # noqa: F401
+except ImportError:
+    sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 # Keep unit tests on 3-pass floor_plan unless explicitly testing high-accuracy mode.
 os.environ.setdefault("TAKEOFF_ACCURACY_MODE", "standard")

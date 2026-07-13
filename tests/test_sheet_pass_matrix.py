@@ -36,7 +36,12 @@ sys.modules.setdefault("claude_analyzer", _CA_MOCK)
 # Now import the module under test (after stubs are in place)
 import importlib.util, pathlib
 
-_MODULE_PATH = pathlib.Path(__file__).parent.parent / "sheet_pass_matrix.py"
+# Phase 21 (V3-STRUCT-01): real module lives under src/bobbytailor/pipeline/;
+# the root-level sheet_pass_matrix.py is an import shim.
+_MODULE_PATH = (
+    pathlib.Path(__file__).parent.parent
+    / "src" / "bobbytailor" / "pipeline" / "sheet_pass_matrix.py"
+)
 _spec = importlib.util.spec_from_file_location("sheet_pass_matrix", _MODULE_PATH)
 _spm = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_spm)

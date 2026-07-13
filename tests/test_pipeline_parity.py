@@ -56,8 +56,21 @@ for _m in ["linked_sheets", "stackct_store", "browser", "capture_manifest",
     sys.modules.setdefault(_m, MagicMock())
 
 
+# Phase 21 (V3-STRUCT-01): real modules live under src/bobbytailor/; root-level
+# files are import shims. Load/inspect the real sources directly.
+_SRC_ROOT = pathlib.Path(__file__).parent.parent / "src" / "bobbytailor"
+_SRC_FILES = {
+    "claude_analyzer": _SRC_ROOT / "vision" / "claude_analyzer.py",
+    "sheet_pass_matrix": _SRC_ROOT / "pipeline" / "sheet_pass_matrix.py",
+    "takeoff_pipeline": _SRC_ROOT / "pipeline" / "takeoff_pipeline.py",
+    "calculator": _SRC_ROOT / "pipeline" / "calculator.py",
+    "scraper": _SRC_ROOT / "scrape" / "scraper.py",
+    "pdf_analyzer": _SRC_ROOT / "pipeline" / "pdf_analyzer.py",
+}
+
+
 def _load(name: str):
-    path = pathlib.Path(__file__).parent.parent / f"{name}.py"
+    path = _SRC_FILES[name]
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
@@ -98,23 +111,23 @@ class TestNoPipelineBypass:
 
     def test_scraper_does_not_import_analyze_drawing(self):
         """scraper.py must not import analyze_drawing at the top level."""
-        src = (pathlib.Path(__file__).parent.parent / "scraper.py").read_text()
+        src = _SRC_FILES["scraper"].read_text()
         assert "from claude_analyzer import analyze_drawing" not in src
         assert "import analyze_drawing" not in src
 
     def test_pdf_analyzer_does_not_import_analyze_drawing(self):
         """pdf_analyzer.py must not import analyze_drawing."""
-        src = (pathlib.Path(__file__).parent.parent / "pdf_analyzer.py").read_text()
+        src = _SRC_FILES["pdf_analyzer"].read_text()
         assert "from claude_analyzer import analyze_drawing" not in src
 
     def test_scraper_has_pipeline_import(self):
         """scraper.py must import TakeoffPipeline."""
-        src = (pathlib.Path(__file__).parent.parent / "scraper.py").read_text()
+        src = _SRC_FILES["scraper"].read_text()
         assert "TakeoffPipeline" in src
 
     def test_pdf_analyzer_has_pipeline_import(self):
         """pdf_analyzer.py must import TakeoffPipeline."""
-        src = (pathlib.Path(__file__).parent.parent / "pdf_analyzer.py").read_text()
+        src = _SRC_FILES["pdf_analyzer"].read_text()
         assert "TakeoffPipeline" in src
 
 
@@ -422,8 +435,8 @@ class TestPassParity:
 
     def test_both_paths_use_same_run_sheet(self):
         """Verify pdf_analyzer and scraper both call the module-level _pipeline singleton pattern."""
-        pdf_src = (pathlib.Path(__file__).parent.parent / "pdf_analyzer.py").read_text()
-        scraper_src = (pathlib.Path(__file__).parent.parent / "scraper.py").read_text()
+        pdf_src = _SRC_FILES["pdf_analyzer"].read_text()
+        scraper_src = _SRC_FILES["scraper"].read_text()
 
         # pdf_analyzer uses TakeoffPipeline().run_project
         assert "run_project" in pdf_src

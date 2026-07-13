@@ -34,8 +34,17 @@ sys.modules.setdefault("anthropic", MagicMock())
 
 import importlib.util, pathlib
 
+# Phase 21 (V3-STRUCT-01): real modules live under src/bobbytailor/; root-level
+# files are import shims, so load the real sources directly.
+_SRC_ROOT = pathlib.Path(__file__).parent.parent / "src" / "bobbytailor"
+_SRC_FILES = {
+    "claude_analyzer": _SRC_ROOT / "vision" / "claude_analyzer.py",
+    "sheet_pass_matrix": _SRC_ROOT / "pipeline" / "sheet_pass_matrix.py",
+    "takeoff_pipeline": _SRC_ROOT / "pipeline" / "takeoff_pipeline.py",
+}
+
 def _load(name: str):
-    path = pathlib.Path(__file__).parent.parent / f"{name}.py"
+    path = _SRC_FILES[name]
     spec = importlib.util.spec_from_file_location(name, path)
     mod  = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
