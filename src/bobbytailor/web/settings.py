@@ -11,7 +11,11 @@ from typing import Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
-ENV_PATH = Path(__file__).resolve().parent / ".env"
+# Repo root is three levels up from src/bobbytailor/web/; fall back to cwd
+# if the root .env is missing (e.g. installed non-editable).
+ENV_PATH = Path(__file__).resolve().parents[3] / ".env"
+if not ENV_PATH.exists():
+    ENV_PATH = Path.cwd() / ".env"
 
 SENSITIVE_FIELDS = {"STACKCT_PASSWORD", "ANTHROPIC_API_KEY"}
 

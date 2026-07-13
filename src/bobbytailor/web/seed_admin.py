@@ -19,7 +19,8 @@ from flask_bcrypt import Bcrypt
 
 ADMIN_EMAIL: str = "admin@bobbytailor.com"
 ADMIN_PASSWORD: str = "BobbyTheAdmin@1"
-ENV_PATH: Path = Path(__file__).resolve().parent / ".env"
+# Repo root is three levels up from src/bobbytailor/web/.
+ENV_PATH: Path = Path(__file__).resolve().parents[3] / ".env"
 
 _bcrypt = Bcrypt()
 
