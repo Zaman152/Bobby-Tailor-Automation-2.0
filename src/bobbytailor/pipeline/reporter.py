@@ -77,6 +77,30 @@ def generate_report(project_name: str,
         if m:
             model_counts[m] = model_counts.get(m, 0) + 1
 
+    # Run-level budget block (21-13, V3-PROD-02): every sheet carries the
+    # shared BudgetGuard state — surface the one with the highest spend
+    # (the final accounting). None when no sheet recorded a budget
+    # (pre-21 runs render unchanged).
+    budget_block = None
+    for d in all_extracted:
+        b = d.get("_budget")
+        if isinstance(b, dict) and b.get("cap_usd") is not None:
+            if budget_block is None or (b.get("spent_usd") or 0) > (
+                budget_block.get("spent_usd") or 0
+            ):
+                budget_block = b
+
+    # Fusion audit trail (21-12/13): rejected vision quantity claims and
+    # grounding violations, aggregated per sheet — never silently dropped.
+    fusion_rejected: list = []
+    for d in all_extracted:
+        sheet = d.get("_sheet_name") or d.get("_source_sheet") or "unknown"
+        for rej in d.get("fusion_rejected") or []:
+            if isinstance(rej, dict):
+                entry = dict(rej)
+                entry["sheet"] = sheet
+                fusion_rejected.append(entry)
+
     report = {
         "project_name": project_name,
         "folder_id": folder_id,
@@ -91,6 +115,9 @@ def generate_report(project_name: str,
             "cost_per_sheet": round(total_cost / max(len(all_extracted), 1), 4),
             "models_used": model_counts,
         },
+        # 21-13 additive fields (never rename existing keys — 03-02/03-03).
+        "budget": budget_block,
+        "fusion_rejected": fusion_rejected,
         "calculated_takeoff": calculated_items,         # Section 5 deliverable
         "takeoff_summary": takeoff_summary,
         # Pristine vision aggregate — preserved so the verification worksheet can
@@ -127,6 +154,10 @@ def generate_report(project_name: str,
                 "tokens_out": d.get("_tokens_out", 0),
                 "cost_usd": d.get("_cost_usd", 0),
                 "model_used": d.get("_model_used", ""),
+                # 21-13: deterministic-first surfacing (None on pre-21 runs).
+                "measurement_mode": d.get("measurement_mode"),
+                "scale_confidence": d.get("scale_confidence"),
+                "main_plan_region": d.get("main_plan_region"),
             }
             for d in all_extracted
         ],
@@ -268,6 +299,9 @@ def _flatten_raw_extractions(all_extracted: list) -> List[Dict[str, Any]]:
                 "unit": c.get("unit", ""),
                 "location_on_sheet": c.get("location", ""),
                 "source_text": c.get("specification", ""),
+                # 21-13: per-item quantity provenance (geometry | text_layer |
+                # schedule_table | learned | vision_ensemble; "" pre-21).
+                "provenance": c.get("provenance", ""),
             })
 
         # ROOMS — area-based
@@ -635,7 +669,7 @@ def _write_raw_csv(items: list, path: Path):
     """Raw extraction CSV — every measurement/component/room/material Claude saw."""
     fields = [
         "category", "sheet", "sheet_type", "page_id",
-        "description", "value", "unit",
+        "description", "value", "unit", "provenance",
         "location_on_sheet", "source_text"
     ]
     with open(path, "w", newline="") as f:
@@ -685,6 +719,88 @@ def _write_calculated_csv(items: list, path: Path):
 
 # ─── Human-readable summary ──────────────────────────────────────────────────
 
+# Provenance values counted as deterministic — the numerator of the share the
+# accuracy gate asserts ≥97% accurate (geometry/text-derived quantities).
+_DETERMINISTIC_PROVENANCES = ("geometry", "text_layer", "schedule_table")
+
+
+def _scale_confidence_lines(report: dict) -> list:
+    """SCALE CONFIDENCE section: per-sheet main-plan solve summary (21-13).
+
+    Every field access is None-guarded so pre-21 reports (no
+    ``scale_confidence`` on sheet_log entries) render without KeyError.
+    """
+    lines = ["─" * 70, "SCALE CONFIDENCE", "─" * 70]
+    any_row = False
+    for entry in report.get("sheet_log") or []:
+        sc = entry.get("scale_confidence")
+        if not sc:
+            continue
+        viewports = [v for v in sc if isinstance(v, dict)]
+        main = next((v for v in viewports if v.get("is_main")), None)
+        if main is None:
+            main = next((v for v in viewports if v.get("fpi")), None)
+        sheet = str(entry.get("sheet") or "?")
+        mode = entry.get("measurement_mode") or ""
+        if main is None:
+            lines.append(
+                f"  [{sheet:<28}] no solved viewport scale"
+                + (f"  (mode={mode})" if mode else "")
+            )
+            any_row = True
+            continue
+        fpi = main.get("fpi")
+        fpi_txt = f"1\" = {fpi:g}'" if fpi else "unsolved"
+        printed = main.get("printed_agreement")
+        printed_txt = (
+            "printed ✓" if printed is True
+            else ("printed ✗" if printed is False else "printed n/a")
+        )
+        share = main.get("inlier_share") or 0.0
+        lines.append(
+            f"  [{sheet:<28}] main {str(main.get('region_id') or '?'):<4} "
+            f"{fpi_txt:<12} conf={str(main.get('confidence') or '?'):<7} "
+            f"method={str(main.get('method') or '?'):<26} "
+            f"({main.get('n_inliers') or 0} dims, {share * 100.0:.0f}% share, {printed_txt})"
+        )
+        any_row = True
+    if not any_row:
+        lines.append("  (no per-viewport scale data recorded)")
+    lines.append("")
+    return lines
+
+
+def _provenance_breakdown_lines(report: dict) -> list:
+    """PROVENANCE BREAKDOWN section: item counts per quantity provenance.
+
+    The deterministic share (geometry/text_layer/schedule_table) is the
+    number the plans-only accuracy gate asserts ≥97% accurate. None-guarded
+    for pre-21 reports (components without a provenance field).
+    """
+    lines = ["─" * 70, "PROVENANCE BREAKDOWN", "─" * 70]
+    counts: dict = {}
+    for item in report.get("raw_line_items") or []:
+        if not isinstance(item, dict) or item.get("category") != "component":
+            continue
+        prov = str(item.get("provenance") or "").strip()
+        if prov:
+            counts[prov] = counts.get(prov, 0) + 1
+    if not counts:
+        lines.append("  (no provenance-tagged items recorded)")
+        lines.append("")
+        return lines
+    total = sum(counts.values())
+    for prov in sorted(counts, key=lambda p: -counts[p]):
+        lines.append(f"  {prov:<18} {counts[prov]:>5} items")
+    deterministic = sum(counts.get(p, 0) for p in _DETERMINISTIC_PROVENANCES)
+    lines.append(
+        f"  Geometry/text-derived quantities: {deterministic}/{total} "
+        f"({deterministic * 100.0 / total:.1f}% of provenance-tagged items)"
+    )
+    lines.append("")
+    return lines
+
+
 def _write_summary(report: dict, path: Path):
     lines = [
         "═" * 70,
@@ -706,7 +822,20 @@ def _write_summary(report: dict, path: Path):
     lines.append(f"Input tokens:     {usage.get('total_tokens_in', 0):,}")
     lines.append(f"Output tokens:    {usage.get('total_tokens_out', 0):,}")
     lines.append(f"Cost per sheet:   ${usage.get('cost_per_sheet', 0):.4f} USD")
+
+    # 21-13: per-run budget guard accounting (None-guarded — pre-21 runs
+    # simply omit the line, same graceful pattern as api_usage in 03-03).
+    budget = report.get("budget")
+    if isinstance(budget, dict) and budget.get("cap_usd") is not None:
+        exhausted = "  (EXHAUSTED — remaining items flagged)" if budget.get("exhausted") else ""
+        lines.append(
+            f"Budget:           ${budget.get('spent_usd', 0):.4f} spent of "
+            f"${budget.get('cap_usd', 0):.2f} cap{exhausted}"
+        )
     lines.append("")
+
+    lines.extend(_scale_confidence_lines(report))
+    lines.extend(_provenance_breakdown_lines(report))
 
     def _s(val, default=""):
         """Coerce None / non-string values to a safe string for formatting."""

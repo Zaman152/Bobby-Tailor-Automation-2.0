@@ -1,9 +1,137 @@
-"""Reporter wiring for Phase 16 outputs."""
+"""Reporter wiring for Phase 16 outputs + 21-13 provenance/scale surfacing."""
 import json
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 from reporter import generate_report
+
+
+@contextmanager
+def _isolated_output_dir():
+    with tempfile.TemporaryDirectory() as tmp:
+        import config
+        old = config.OUTPUT_DIR
+        config.OUTPUT_DIR = tmp
+        try:
+            yield tmp
+        finally:
+            config.OUTPUT_DIR = old
+
+
+def _fused_extracted() -> list:
+    """A stub 21-13 vector-sheet extraction (fuse_sheet output shape)."""
+    return [{
+        "_source_sheet": "A-101.png",
+        "_sheet_name": "A-101",
+        "_sheet_type": "floor_plan",
+        "_tokens_in": 100,
+        "_tokens_out": 50,
+        "_cost_usd": 0.01,
+        "_model_used": "claude-sonnet-5",
+        "measurement_mode": "vector",
+        "main_plan_region": "R1",
+        "scale_confidence": [{
+            "region_id": "R1", "kind": "main_plan", "is_main": True,
+            "fpp": 0.5555, "fpi": 40.0, "confidence": "high",
+            "n_inliers": 30, "inlier_share": 0.887,
+            "printed_agreement": True, "door_check": None,
+            "method": "ransac_consensus",
+        }],
+        "fusion_rejected": [{
+            "name": "CMU Wall", "quantity": 17, "unit": "SF",
+            "provenance": "vision_ensemble", "confidence": "low",
+            "rejected_by": "geometry", "reason": "vision_quantity_blocked",
+        }],
+        "_budget": {"cap_usd": 10.0, "spent_usd": 0.01, "exhausted": False},
+        "components": [
+            {"name": "CMU Wall", "quantity": 2204.0, "unit": "LF",
+             "provenance": "geometry", "confidence": "high",
+             "candidate_id": "WALL-TC1", "needs_review": False},
+            {"name": "Building Footprint", "quantity": 397600, "unit": "SF",
+             "provenance": "text_layer", "confidence": "high"},
+            {"name": "Door 101", "quantity": 1, "unit": "EA",
+             "provenance": "schedule_table", "confidence": "medium"},
+        ],
+        "measurements": [],
+    }]
+
+
+# ── 21-13: provenance / scale-confidence / budget surfacing ─────────────────
+
+def test_takeoff_json_carries_measurement_mode_scale_confidence_provenance():
+    with _isolated_output_dir():
+        report = generate_report("Fused Proj", _fused_extracted(), [])
+        run_dir = Path(report["_files"]["run_folder"])
+        with open(run_dir / "takeoff.json") as f:
+            data = json.load(f)
+
+        # Per-sheet surfacing in sheet_log.
+        entry = data["sheet_log"][0]
+        assert entry["measurement_mode"] == "vector"
+        assert entry["main_plan_region"] == "R1"
+        sc = entry["scale_confidence"]
+        assert sc and sc[0]["fpi"] == 40.0
+        assert sc[0]["n_inliers"] == 30
+        assert sc[0]["inlier_share"] == 0.887
+        assert sc[0]["printed_agreement"] is True
+
+        # Per-item provenance on raw component rows.
+        comps = [i for i in data["raw_line_items"] if i["category"] == "component"]
+        provs = {c["description"]: c["provenance"] for c in comps}
+        assert provs["CMU Wall"] == "geometry"
+        assert provs["Building Footprint"] == "text_layer"
+        assert provs["Door 101"] == "schedule_table"
+
+        # Run-level budget block + fusion_rejected audit list.
+        assert data["budget"] == {"cap_usd": 10.0, "spent_usd": 0.01, "exhausted": False}
+        assert data["fusion_rejected"][0]["reason"] == "vision_quantity_blocked"
+        assert data["fusion_rejected"][0]["sheet"] == "A-101"
+
+
+def test_summary_txt_has_scale_confidence_and_provenance_sections():
+    with _isolated_output_dir():
+        report = generate_report("Fused Proj", _fused_extracted(), [])
+        text = Path(report["_files"]["summary_txt"]).read_text()
+        assert "SCALE CONFIDENCE" in text
+        assert "PROVENANCE BREAKDOWN" in text
+        # Main-plan solve line: fpi, confidence, method.
+        assert '1" = 40\'' in text
+        assert "conf=high" in text
+        assert "ransac_consensus" in text
+        # Provenance counts + the deterministic share the gate asserts on.
+        assert "geometry" in text
+        assert "Geometry/text-derived quantities: 3/3 (100.0%" in text
+        # Budget accounting under API USAGE.
+        assert "Budget:" in text
+        assert "$10.00 cap" in text
+
+
+def test_pre21_report_renders_without_new_fields():
+    """Regression: pre-21 extraction dicts (no measurement_mode /
+    scale_confidence / provenance / _budget) must render without KeyError,
+    and the new sections degrade gracefully."""
+    extracted = [{
+        "_source_sheet": "A1",
+        "_tokens_in": 0,
+        "_tokens_out": 0,
+        "_cost_usd": 0,
+        "components": [{"name": "Door", "quantity": 4, "unit": "ea"}],
+    }]
+    with _isolated_output_dir():
+        report = generate_report("Old Shape", extracted, [])
+        run_dir = Path(report["_files"]["run_folder"])
+        with open(run_dir / "takeoff.json") as f:
+            data = json.load(f)
+        assert data["budget"] is None
+        assert data["fusion_rejected"] == []
+        assert data["sheet_log"][0]["measurement_mode"] is None
+        assert data["sheet_log"][0]["scale_confidence"] is None
+        text = Path(report["_files"]["summary_txt"]).read_text()
+        assert "SCALE CONFIDENCE" in text
+        assert "(no per-viewport scale data recorded)" in text
+        assert "(no provenance-tagged items recorded)" in text
+        assert "Budget:" not in text  # no guard recorded on pre-21 runs
 
 
 def test_generate_report_includes_takeoff_summary_and_cross_refs():
