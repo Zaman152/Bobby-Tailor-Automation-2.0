@@ -83,6 +83,11 @@ JOB_HISTORY_RETENTION_DAYS: int = int(os.environ.get("JOB_HISTORY_RETENTION_DAYS
 # Preview settings
 MAX_PREVIEW_ROWS = int(os.getenv("MAX_PREVIEW_ROWS", "500"))  # Cap for CSV preview
 
+# Upload hardening (21-REVIEW WR-04): request body size cap for PDF/manifest
+# uploads — Flask MAX_CONTENT_LENGTH is derived from this in create_app so a
+# multi-GB POST is rejected with 413 before it is read to disk/memory.
+MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "500"))
+
 # Screenshot reuse: skip blob download when a matching file already exists on disk
 REUSE_SCREENSHOTS = os.getenv("REUSE_SCREENSHOTS", "true").lower() in ("1", "true", "yes")
 

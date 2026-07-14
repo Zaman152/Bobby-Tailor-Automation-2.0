@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional
 
 from flask import Blueprint, jsonify, request, Response
+from werkzeug.utils import secure_filename
 
 from bobbytailor.web.jobs_runtime import jobs, object_manifests, uploads
 from bobbytailor.web.jobs_runtime import _pdf_job, _stackct_job
@@ -15,6 +16,16 @@ from bobbytailor.web.jobs_runtime import _pdf_job, _stackct_job
 logger = logging.getLogger(__name__)
 
 runs_bp = Blueprint("runs", __name__)
+
+
+def _safe_upload_name(filename, fallback: str = "upload.pdf") -> str:
+    """Sanitize a browser-supplied filename for on-disk storage (WR-04).
+
+    ``secure_filename`` strips path separators, control characters, and
+    anything else unsafe for a single path segment; it can return an empty
+    string for fully-hostile names, so a fallback is provided.
+    """
+    return secure_filename(filename or "") or fallback
 
 @runs_bp.route("/api/run/stackct", methods=["POST"])
 def run_stackct():
@@ -107,7 +118,7 @@ def upload_pdf():
         return jsonify({"error": "Only PDF files accepted"}), 400
 
     upload_id = str(uuid.uuid4())[:8]
-    save_path = os.path.join("uploads", f"{upload_id}_{f.filename}")
+    save_path = os.path.join("uploads", f"{upload_id}_{_safe_upload_name(f.filename)}")
     f.save(save_path)
 
     from bobbytailor.pipeline.pdf_analyzer import get_pdf_metadata
@@ -257,11 +268,11 @@ def run_pdf():
         return jsonify({"error": "No file uploaded"}), 400
 
     f = request.files["file"]
-    if not f.filename.endswith(".pdf"):
+    if not f.filename or not f.filename.lower().endswith(".pdf"):
         return jsonify({"error": "Only PDF files accepted"}), 400
 
     project_name = request.form.get("project_name") or Path(f.filename).stem
-    save_path = os.path.join("uploads", f"{str(uuid.uuid4())[:8]}_{f.filename}")
+    save_path = os.path.join("uploads", f"{str(uuid.uuid4())[:8]}_{_safe_upload_name(f.filename)}")
     f.save(save_path)
 
     job_id = str(uuid.uuid4())[:8]

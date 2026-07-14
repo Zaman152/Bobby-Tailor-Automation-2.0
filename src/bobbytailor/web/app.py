@@ -11,7 +11,7 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.exceptions import HTTPException
 
 from bobbytailor.web.auth import bcrypt, init_admin, limiter, login_manager
-from bobbytailor.config import OUTPUT_DIR
+from bobbytailor.config import MAX_UPLOAD_MB, OUTPUT_DIR
 from bobbytailor.web.blueprints import (
     auth_bp,
     jobs_bp,
@@ -47,6 +47,9 @@ def create_app() -> Flask:
         SESSION_COOKIE_SAMESITE="Lax",
         PERMANENT_SESSION_LIFETIME=43200,
         WTF_CSRF_TIME_LIMIT=3600,
+        # Upload size cap (WR-04): reject oversize request bodies with 413
+        # before they are read to disk/memory (resource-exhaustion guard).
+        MAX_CONTENT_LENGTH=MAX_UPLOAD_MB * 1024 * 1024,
     )
 
     csrf = CSRFProtect(app)

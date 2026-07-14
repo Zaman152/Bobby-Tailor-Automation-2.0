@@ -139,3 +139,102 @@ def test_logout_post_without_csrf_returns_400(client):
 def test_logout_get_returns_405(client):
     resp = client.get("/logout")
     assert resp.status_code == 405
+
+
+# ── Upload hardening (21-REVIEW WR-04) ──────────────────────────────────────
+
+@pytest.fixture
+def authed_client():
+    """Logged-in test client with CSRF disabled (endpoint behavior tests)."""
+    from unittest import mock
+
+    from bobbytailor.web.auth import get_admin
+
+    app = create_app()
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    with mock.patch("flask_login.utils._get_user", return_value=get_admin()):
+        yield app.test_client()
+
+
+def test_max_content_length_is_configured(client):
+    from bobbytailor.config import MAX_UPLOAD_MB
+
+    assert client.application.config["MAX_CONTENT_LENGTH"] == MAX_UPLOAD_MB * 1024 * 1024
+
+
+def test_oversize_upload_rejected_with_413(authed_client):
+    import io
+
+    authed_client.application.config["MAX_CONTENT_LENGTH"] = 1024  # 1 KB cap
+    resp = authed_client.post(
+        "/api/pdf/upload",
+        data={"file": (io.BytesIO(b"x" * 4096), "big.pdf")},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 413
+
+
+def test_upload_filename_is_sanitized_on_disk(authed_client, tmp_path):
+    import io
+    import os
+    from unittest import mock
+
+    from bobbytailor.web import jobs_runtime
+
+    canned_meta = {"page_count": 1, "file_size_bytes": 10, "pages": []}
+    with mock.patch(
+        "bobbytailor.pipeline.pdf_analyzer.get_pdf_metadata",
+        return_value=canned_meta,
+    ):
+        resp = authed_client.post(
+            "/api/pdf/upload",
+            data={"file": (io.BytesIO(b"%PDF-1.4 fake"), "../../etc/evil name.pdf")},
+            content_type="multipart/form-data",
+        )
+    assert resp.status_code == 200
+    upload_id = resp.get_json()["upload_id"]
+    try:
+        save_path = jobs_runtime.uploads[upload_id]["save_path"]
+        # The raw client filename must never dictate directories: the saved
+        # file is a single path segment directly under uploads/.
+        assert os.path.dirname(save_path) == "uploads"
+        assert "/" not in os.path.basename(save_path)
+        assert ".." not in save_path
+        assert os.path.isfile(save_path)
+    finally:
+        meta = jobs_runtime.uploads.pop(upload_id, None)
+        if meta and os.path.isfile(meta["save_path"]):
+            os.remove(meta["save_path"])
+
+
+def test_run_pdf_missing_or_uppercase_filename_handled(authed_client):
+    import io
+
+    # No filename → clean 400, never an AttributeError 500.
+    resp = authed_client.post(
+        "/api/run/pdf",
+        data={"file": (io.BytesIO(b"%PDF-1.4"), "")},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 400
+
+    # Uppercase extension is accepted (parity with upload_pdf).
+    from unittest import mock
+
+    from bobbytailor.web import jobs_runtime
+
+    with mock.patch("bobbytailor.web.blueprints.runs._pdf_job"):
+        resp = authed_client.post(
+            "/api/run/pdf",
+            data={"file": (io.BytesIO(b"%PDF-1.4"), "PLANS.PDF")},
+            content_type="multipart/form-data",
+        )
+    assert resp.status_code == 200
+    job_id = resp.get_json()["job_id"]
+    jobs_runtime.jobs.pop(job_id, None)
+    # Remove the file the endpoint saved.
+    import glob
+    import os
+    for leftover in glob.glob(os.path.join("uploads", "*_PLANS.PDF")):
+        os.remove(leftover)
