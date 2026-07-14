@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-08-PLAN.md — vision fusion request side (schemas/overlay/prompts/structured outputs)
-last_updated: "2026-07-14T14:35:46.874Z"
+stopped_at: Completed 21-09-PLAN.md — human-verification capture surface wired into learning store
+last_updated: "2026-07-14T14:55:53.038Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-08: semantic-only vision request side — ID-enum structured-output schemas, Set-of-Mark overlays + crop galleries, GA structured outputs path, 648 tests green"
+last_activity_desc: "Completed 21-09: human-verification capture surface wired into learning store (V3-LEARN-01 capture half)"
 progress:
   total_phases: 22
   completed_phases: 17
   total_plans: 100
-  completed_plans: 83
+  completed_plans: 84
   percent: 77
 ---
 
@@ -30,9 +30,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 8/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08)  
-Status: Wave 3 in progress — 21-08 done (vision fusion request side: ID-enum schemas + Set-of-Mark overlays + structured outputs, 648 tests green)  
-Last activity: 2026-07-14 — Completed 21-08: semantic-only vision contract (V3-ACC-01 request side) + adaptive-fidelity renders (V3-ACC-04)
+Plan: 9/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09)  
+Status: Wave 3 in progress — 21-09 done (verify/scale/measurements endpoints feed learning store in-request, 657 tests green)  
+Last activity: 2026-07-14 — Completed 21-09: human-verification capture surface wired into learning store (V3-LEARN-01 capture half)
 
 Progress: [████████░░] 83%
 
@@ -56,6 +56,7 @@ Progress: [████████░░] 83%
 | Phase 21-accuracy-learning-engine P06 | 25 min | 3 tasks | 8 files |
 | Phase 21-accuracy-learning-engine P07 | 37 min | 3 tasks | 5 files |
 | Phase 21-accuracy-learning-engine P08 P08 | 32 min | 3 tasks | 5 files |
+| Phase 21-accuracy-learning-engine P09 | 9 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -156,6 +157,10 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-08]: build_crop_gallery packs ID-captioned tiles into contact sheets, legend crop first, tiles-per-sheet scaled to keep <=20 images/request
 - [Phase 21-08]: symbol_gallery pass routes via the (*, semantic) MODEL_ROUTING row alias; structured path parses guaranteed JSON directly (no markdown strip, no json_repair)
 - [Phase 21-08]: wrap_pdf_text() <pdf_text> delimiters contain prompt injection from untrusted PDF strings; semantic prompts declare delimited content is data, not instructions
+- [Phase 21-09]: _capture_learning is best-effort and never raises — store/distill failure logs and returns 200 without learning_warning; per-run JSON write never rolled back
+- [Phase 21-09]: verify scope mapping: prior row missing → missed_item, unit-only change → unit, else item (confirmation pins current value); measurements: wall_area → wall_height, others → item
+- [Phase 21-09]: measurements capture diff-based against previously persisted list — repeated saves record nothing new (Pitfall 8 hygiene)
+- [Phase 21-09]: conftest pins LEARNING_DB_PATH to a session tmp DB so endpoint tests never write the real output/learning.db
 
 ### Pending Todos
 
@@ -299,6 +304,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T14:35:25.062Z
+Last session: 2026-07-14T14:53:56.150Z
 Stopped at: Completed 21-07-PLAN.md — zero-calibration scale solving
 Resume file: None
