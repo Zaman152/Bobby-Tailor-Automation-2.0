@@ -1,18 +1,103 @@
 # Bobby Tailor — StackCT Automated Estimation & Take-off
 
-Automated construction estimation: logs into StackCT, scrapes every drawing page,
-extracts measurements/schedules/components via Claude vision, applies estimation
-formulas, and produces a structured take-off report with full source traceability.
+Automated construction estimation: logs into StackCT (or takes a direct PDF
+upload), extracts measurements deterministically from PDF vector geometry and
+the text layer, uses Claude vision for semantic labeling and residual counting,
+applies estimation formulas, and produces a structured take-off report with
+full source traceability. Every human verification is persisted to a learning
+store and applied automatically on future runs.
 
 ## Setup
 
 ```bash
 pip install -r requirements.txt
+pip install -e .            # installs the src/bobbytailor package (required)
 playwright install chromium
 
 cp .env.example .env
 # Edit .env and add your ANTHROPIC_API_KEY + StackCT login
 ```
+
+## Package layout
+
+All application code lives in the `src/bobbytailor` package (installed
+editable via `pip install -e .`). The only Python files at the repo root are
+the two entry points: `app.py` (gunicorn/Flask, `app:app`) and `main.py` (CLI).
+
+```
+src/bobbytailor/
+├── config.py            Settings loaded from .env (single source of env truth)
+├── pipeline/            Orchestration: takeoff_pipeline (core), pdf_analyzer
+│                        (PDF entry), pass matrix/model routing, calculator,
+│                        aggregator, reporter, cross_references
+├── deterministic/       Vector-geometry measurement engine: dimensions, walls,
+│                        rooms, viewports, scale_solver/extraction/recalc,
+│                        symbols, tables (schedules), footprint, legends
+├── vision/              Claude vision: claude_analyzer (prompts/API), schemas
+│                        (structured outputs), ensemble (N-run voting +
+│                        BudgetGuard), fusion (provenance merge), overlay,
+│                        verify_retry
+├── learning/            Cross-run learning: store (SQLite), distill
+│                        (corrections → vocabulary/assumptions), retrieval
+│                        (per-run learned context)
+├── scrape/              StackCT: browser (Playwright), scraper (entry point),
+│                        capture_manifest, sheet_preview, stackct_sync
+├── stores/              SQLite stores: stackct_store, job_store, project_cache
+├── devtools/            Dev/benchmark-only inputs: companion_takeoff,
+│                        object_manifest (NEVER used by the production path)
+└── web/                 Flask: app factory (create_app), blueprints/ (auth,
+                         projects, runs, reports, verify, settings, jobs),
+                         jobs_runtime, auth, settings, seed_admin
+```
+
+Import style is absolute package paths everywhere
+(`from bobbytailor.deterministic.walls import extract_walls`); there are no
+root-level import shims.
+
+## Plans-only input contract (production)
+
+Production runs take **plan PDFs only** — a direct upload or a StackCT scrape.
+No companion take-off PDFs, no golden CSVs, no hand-written manifests. The
+pipeline never auto-discovers sibling `*takeoff*.pdf` files (that discovery is
+confined to `bobbytailor.devtools` and `scripts/`).
+
+Ground-truth take-off PDFs exist only for **evaluation**: benchmark scripts
+pass them explicitly via `--takeoff-pdf` (see
+`scripts/vision_only_benchmark.py`), and the scoring reference is never
+visible to the pipeline under test.
+
+## Learning loop
+
+1. **Capture** — when a human verifies a run in the web UI (quantity fix, item
+   rename, scale correction, wall height, missed item), the correction is
+   persisted in-request to the learning DB (`{OUTPUT_DIR}/learning.db` by
+   default, `LEARNING_DB_PATH` to override).
+2. **Distill** — raw corrections are replayed into learned vocabulary
+   (canonical names/units), assumptions (wall heights, scales), and an
+   auto-generated internal manifest, keyed by project and project type.
+3. **Apply** — every new run retrieves the relevant learned context at run
+   start and injects it into prompts, aggregation naming, and calculator
+   assumptions. Learned data only re-flags quantities (`re_verify`), it never
+   silently substitutes deterministic geometry/text values.
+
+Repeat runs of a verified project therefore improve automatically — no
+manifest files required.
+
+## Accuracy gate
+
+One command scores the plans-only pipeline against the human take-offs in
+`uploads/` (Crow Cass + Bob's Discount gate hard; Chelsea + Moxy tracked):
+
+```bash
+bash scripts/accuracy_gate.sh            # spends real API credits (~$5–15)
+bash scripts/accuracy_gate.sh --budget 5 # cap per-run spend (USD)
+```
+
+Assertions per gating project: geometry/text-provenance quantity accuracy
+≥ 97%, overall ≥ 90%, item-found ≥ 95%, zero silent misses, ~0 vision quantity
+share, and two-run reproducibility within ±5% per item. The gate pins
+`LEARNING_DB_PATH` to a fresh temp DB so scores are cold-pipeline and
+machine-independent.
 
 ## VPS Deployment (Ubuntu)
 
@@ -36,6 +121,7 @@ cd bobby-tailor
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install -e .
 
 playwright install chromium
 playwright install-deps chromium
@@ -61,8 +147,17 @@ mkdir -p uploads output output/screenshots
 | `MAX_PREVIEW_ROWS` | CSV preview row cap in web UI | `500` |
 | `JOB_HISTORY_RETENTION_DAYS` | Days to keep job history in SQLite (0 = forever) | `90` |
 | `RUN_SCHEDULE` | Cron expression for scheduled runs | `0 8 * * *` |
+| `LEARNING_DB_PATH` | Learning store SQLite path | `{OUTPUT_DIR}/learning.db` |
+| `API_BUDGET_PER_RUN_USD` | Hard API spend cap per run (BudgetGuard) | `10.0` |
+| `ENSEMBLE_N` | Self-consistency ensemble size for vision counts | `3` |
+| `CLAUDE_MODEL_SEMANTIC` | Model for semantic labeling passes | `claude-sonnet-5` |
+| `CLAUDE_MODEL_DENSE` | Model for dense legend/schedule structuring | `claude-opus-4-8` |
+| `CLAUDE_MODEL_ESCALATION` | Escalation model (`ESCALATION_ENABLED=true`) | `claude-fable-5` |
+| `CLAUDE_MODEL_CLASSIFY` | Model for sheet classification | `CLAUDE_MODEL` |
 
-See `.env.example` for the full list and comments.
+See `.env.example` for the full list and comments, and
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the complete deployment guide
+(env table, error recovery, learning DB backup, restart-on-deploy).
 
 ### Running with Gunicorn
 
@@ -141,7 +236,7 @@ sudo certbot --nginx -d your-domain.com
 
 ### Chromium launch flags
 
-`browser.py` launches Chromium with VPS-safe flags:
+`bobbytailor/scrape/browser.py` launches Chromium with VPS-safe flags:
 
 - `--no-sandbox` — required in Docker and many restricted environments
 - `--disable-dev-shm-usage` — routes shared memory to `/tmp` when `/dev/shm` is capped at 64 MB
@@ -203,7 +298,7 @@ Add the output as `SECRET_KEY=<value>` in your `.env` file.
 **2. Seed the admin account (once):**
 
 ```bash
-python seed_admin.py
+python -m bobbytailor.web.seed_admin
 ```
 
 This writes `ADMIN_EMAIL` and `ADMIN_PASSWORD_HASH` to `.env`. Never commit `.env`.
@@ -245,7 +340,7 @@ RATE_LIMIT_STORAGE_URI=redis://127.0.0.1:6379
 **Browser crashes with "Target closed":**
 
 - Check `/dev/shm`: `df -h /dev/shm`
-- Confirm `--disable-dev-shm-usage` is in `browser.py` launch args
+- Confirm `--disable-dev-shm-usage` is in `bobbytailor/scrape/browser.py` launch args
 - Check memory: `free -h`
 
 **Screenshots are blank:**
@@ -451,31 +546,38 @@ output/
 ## Architecture
 
 ```
-app.py            Flask web UI + background job runner
-main.py           CLI entry point
-scraper.py        Orchestrator: login → page discovery → screenshot → analyze → calc → report
-browser.py        Playwright control (login, navigate, screenshot the drawing canvas)
-claude_analyzer.py  Claude vision extraction with prompt caching
-calculator.py     Estimation tables + formula engine
-reporter.py       Output generation (per-run folders, CSV + JSON + summary)
-config.py         Settings loaded from .env
-project_cache.py  24-hour project list cache
-pdf_analyzer.py   Direct-PDF mode (skips browser if you have the drawings as PDF)
-templates/        Web UI
+app.py                     Gunicorn/Flask entry (app:app) — 5-line wrapper over
+                           bobbytailor.web.app.create_app()
+main.py                    CLI entry point (StackCT scrape runs)
+src/bobbytailor/           The application package — see "Package layout" above
+templates/, static/        Web UI assets (resolved from repo root by create_app)
+scripts/                   Dev/CI tools: accuracy_gate.sh, vision_only_benchmark.py
 ```
 
 ## How it works
 
-1. **Login** — Playwright authenticates via Auth0 (handles email → password flow)
-2. **Discover pages** — Reads `data-page-id` attributes from the thumbnail grid (1 call, no per-page clicking)
-3. **Screenshot** — Navigates to each drawing page, dismisses StackCT promo overlays via CSS, captures the `#canvas-interaction` element at 2x DPR. Image is auto-compressed to fit Anthropic's 5 MB limit.
-4. **Analyze** — Sends each PNG to Claude with a cached extraction prompt. Auto-routes schedule/panel sheets to Sonnet for better tabular reading; everything else uses Haiku.
-5. **Calculate** — Applies estimation tables (flooring, paint, drywall, framing, concrete, schedules) with real construction formulas.
-6. **Report** — Writes 4 files per run inside a timestamped folder.
+1. **Input** — Playwright scrapes StackCT (login → page discovery → canvas
+   capture + vector blob retention), or a plan PDF is uploaded directly. Both
+   paths share the same `TakeoffPipeline` (entry-point parity).
+2. **Deterministic first** — on vector sheets, quantities come from geometry +
+   the text layer: viewport segmentation, zero-calibration scale solving from
+   dimension strings, wall LF, room SF, symbol clusters, schedule tables,
+   printed dimensions.
+3. **Vision as semantic engine** — Claude labels regions/symbols/rooms via
+   structured outputs (no numbers where geometry can answer); residual counts
+   use N-run ensemble voting + tiled counting under a per-run BudgetGuard.
+4. **Fusion** — deterministic and vision results merge with provenance ranking;
+   vision can never overwrite a deterministic quantity. Out-of-band values get
+   a verify-retry pass with targeted crops before being flagged.
+5. **Learning** — learned vocabulary/assumptions from prior human verifications
+   are injected at run start; new verifications persist to the learning store.
+6. **Calculate & report** — estimation tables with real construction formulas;
+   per-run folder with CSVs, `takeoff.json` (incl. provenance + API cost), and
+   a human-readable summary.
 
 ## Estimation Tables
 
-All formulas live in `calculator.py → ESTIMATION_TABLES`. Edit those dict values to match your job's waste factors, coverage rates, sheet sizes, stud spacings, etc.
+All formulas live in `bobbytailor/pipeline/calculator.py → ESTIMATION_TABLES`. Edit those dict values to match your job's waste factors, coverage rates, sheet sizes, stud spacings, etc.
 
 ```python
 ESTIMATION_TABLES = {
@@ -547,13 +649,15 @@ cp "uploads/Bob's Discount Furniture - Kennesaw, GA-plans.pdf" \
 After copying, re-run `pytest tests/test_golden_takeoff.py -v -m golden` to score both projects.
 The acceptance threshold is **≥97%** on both fixtures.
 
-**Companion take-off PDF (recommended for any project):** When estimators upload a paired quantity
-take-off document in the same folder as the plans PDF, the pipeline parses its tables automatically.
-Name it with `takeoff`, `take-off`, or `quantity` in the filename (e.g. `warehouse_takeoff.pdf` next to
-`warehouse_plans.pdf`). For golden fixtures, optional:
+**Companion take-off PDFs are evaluation-only.** The production pipeline never
+reads them (plans-only contract) — sibling `*takeoff*.pdf` auto-discovery was
+removed in Phase 21. Benchmarks pass the ground-truth take-off explicitly:
 
 ```bash
-cp "uploads/Crow - Cass White Road-Take offs.pdf" tests/fixtures/crow_cass/crow_cass_takeoff.pdf
+python3 scripts/vision_only_benchmark.py \
+  --name crow \
+  --plans-pdf "uploads/Crow - Cass White Road-Plans.pdf" \
+  --takeoff-pdf "uploads/Crow - Cass White Road-Take offs.pdf"
 ```
 
 **High-accuracy mode (default):** `export TAKEOFF_ACCURACY_MODE=high` runs Sonnet on floor-plan
