@@ -8,27 +8,46 @@ import logging
 import os
 from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
+
+from PIL import Image
+
 from calculator import resolve_spec_lookups
 from cross_references import resolve_cross_references
 from reporter import generate_report
 from takeoff_pipeline import TakeoffPipeline
 from page_text_enrichment import enrich_components_from_page_text
 from companion_takeoff import find_companion_takeoff_pdf, extract_legend_schedules
-from config import SCREENSHOTS_DIR
+from config import RENDER_TARGET_PX, SCREENSHOTS_DIR
 
 logger = logging.getLogger(__name__)
 
-# Anthropic vision limit: longest image side must be ≤ 8000 px
-_MAX_IMAGE_LONG_SIDE_PX = 7900
+# Anthropic vision hard cap: the API rejects images whose longest side
+# exceeds 8000 px (RESEARCH §5 image constraints, verified July 2026).
+# This is a SAFETY cap only — whole-sheet renders target RENDER_TARGET_PX
+# (default 1568 px, the model's standard downscale resolution); detail
+# zooms use render_clip_crop() instead of bigger full-page rasters.
+_MAX_IMAGE_LONG_SIDE_PX = 8000
 
 
 def _effective_render_scale(page: fitz.Page, scale: float) -> float:
-    """Clamp *scale* so rendered PNG longest side stays within API limits."""
+    """Clamp *scale* so the rendered PNG longest side stays within the API cap.
+
+    Shared by takeoff_pipeline's hi-res crop/tile renderers as the single
+    source of the 8000 px API limit.
+    """
     longest = max(page.rect.width, page.rect.height)
     if longest <= 0:
         return scale
     return min(scale, _MAX_IMAGE_LONG_SIDE_PX / longest)
+
+
+def _target_render_scale(page: fitz.Page, target_px: int) -> float:
+    """Zoom factor placing the page's long edge at *target_px* (API-capped)."""
+    longest = max(page.rect.width, page.rect.height)
+    if longest <= 0:
+        return 1.0
+    return _effective_render_scale(page, target_px / longest)
 
 # Generic noise patterns for building-code / standard references that can
 # produce alphanumeric tokens matching sheet-ID regexes.  Adding a new
@@ -68,21 +87,36 @@ def _is_noise_sheet_candidate(candidate: str, page_text: str) -> bool:
     return False
 
 
-def _page_to_image(pdf_path: str, page_num: int, output_dir: str, scale: float = 2.5) -> str:
-    """Render a single PDF page to a PNG (default 2.5×, clamped to API max dimensions).
+def _page_to_image(
+    pdf_path: str,
+    page_num: int,
+    output_dir: str,
+    target_px: Optional[int] = None,
+) -> str:
+    """Render a single PDF page to a PNG with its long edge at ≈*target_px*.
+
+    Claude downscales standard whole-sheet vision input to ~1568 px long edge
+    (RESEARCH §5) — rendering larger wastes tokens and upload size without
+    adding model-visible detail. Regions that need legibility are zoomed via
+    render_clip_crop() instead of inflating the full-page raster.
 
     Args:
         pdf_path:   Path to the PDF file.
         page_num:   0-based page index.
         output_dir: Directory to save the image.
+        target_px:  Long-edge target in pixels; defaults to config
+                    RENDER_TARGET_PX (1568). Always capped at the 8000 px
+                    API limit.
 
     Returns:
         Absolute path to the saved PNG file.
     """
+    if target_px is None:
+        target_px = RENDER_TARGET_PX
     doc = fitz.open(pdf_path)
     try:
         page = doc[page_num]
-        scale = _effective_render_scale(page, scale)
+        scale = _target_render_scale(page, target_px)
         mat = fitz.Matrix(scale, scale)
         pix = page.get_pixmap(matrix=mat)
         img_path = str(Path(output_dir) / f"page_{page_num + 1:04d}.png")
@@ -90,6 +124,43 @@ def _page_to_image(pdf_path: str, page_num: int, output_dir: str, scale: float =
         return img_path
     finally:
         doc.close()
+
+
+def render_clip_crop(
+    page: fitz.Page,
+    rect_pt: Union[fitz.Rect, tuple],
+    target_px: int = 1568,
+) -> Image.Image:
+    """Render a clip region of *page* at a zoom targeting *target_px* long edge.
+
+    The shared zoom primitive for adaptive fidelity: verify-retry arbitration
+    crops (21-14), crop galleries (21-08), and ensemble tiles (21-11) all zoom
+    INTO a region at native detail rather than rendering bigger whole-sheet
+    rasters.
+
+    Args:
+        page:      An open fitz.Page.
+        rect_pt:   Clip rectangle in page points — a fitz.Rect or an
+                   (x0, y0, x1, y1) tuple.
+        target_px: Desired long-edge size of the rendered crop in pixels
+                   (default 1568). Capped so the render never exceeds the
+                   8000 px API limit.
+
+    Returns:
+        PIL.Image (RGB) of the rendered crop.
+
+    Raises:
+        ValueError: If the clip rectangle is empty, infinite, or degenerate.
+    """
+    clip = fitz.Rect(rect_pt)
+    if clip.is_empty or clip.is_infinite:
+        raise ValueError(f"render_clip_crop: invalid clip rect {rect_pt!r}")
+    longest = max(clip.width, clip.height)
+    if longest <= 0:
+        raise ValueError(f"render_clip_crop: degenerate clip rect {rect_pt!r}")
+    zoom = min(target_px, _MAX_IMAGE_LONG_SIDE_PX) / longest
+    pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), clip=clip)
+    return Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
 
 
 def get_title_block_text(doc: fitz.Document, page_num: int) -> str:
