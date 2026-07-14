@@ -96,6 +96,76 @@ def generate_dimensions_page() -> tuple[fitz.Document, list[dict]]:
     return doc, truth
 
 
+# ── Symbol clustering fixtures (Recipe D, 21-06) ─────────────────────────────
+
+# Asymmetric 4-segment polyline (open "flag") — asymmetry makes rotation and
+# mirror invariance non-trivial, so the dihedral min-hash is actually proven.
+_SYMBOL_PTS = [(0.0, 0.0), (20.0, 0.0), (20.0, 12.0), (8.0, 12.0), (8.0, 4.0)]
+_SYMBOL_CENTER = (10.0, 6.0)
+
+
+def _draw_symbol(page: fitz.Page, ox: float, oy: float, transform: Optional[str] = None) -> None:
+    """Draw the 4-segment test symbol centered at (ox, oy), optionally transformed."""
+    cx, cy = _SYMBOL_CENTER
+    pts = []
+    for x, y in _SYMBOL_PTS:
+        dx, dy = x - cx, y - cy
+        if transform == "rot90":
+            dx, dy = -dy, dx
+        elif transform == "rot180":
+            dx, dy = -dx, -dy
+        elif transform == "rot270":
+            dx, dy = dy, -dx
+        elif transform == "mirror":
+            dx = -dx
+        pts.append((ox + dx, oy + dy))
+    for a, b in zip(pts, pts[1:]):
+        page.draw_line(fitz.Point(*a), fitz.Point(*b))
+
+
+def generate_symbols_page() -> tuple[fitz.Document, dict]:
+    """Build one page with known symbol-group ground truth (Recipe D).
+
+    Content:
+      * 12 identical 4-segment symbols — 7 plain, 3 rotated (90/180/270),
+        2 mirrored → ONE group of 12 (rotation/mirror invariance).
+      * 5 identical circles → ONE group of 5.
+      * A 20-stroke 45-degree hatch field (2.83 pt spacing) → collapsed, no group.
+      * One unique triangle → excluded by the count >= 3 filter.
+    """
+    doc = fitz.open()
+    page = doc.new_page(width=612, height=792)
+
+    transforms = [None] * 7 + ["rot90", "rot180", "rot270", "mirror", "mirror"]
+    positions = [(90.0 + (i % 4) * 60.0, 90.0 + (i // 4) * 60.0) for i in range(12)]
+    for (ox, oy), transform in zip(positions, transforms):
+        _draw_symbol(page, ox, oy, transform)
+
+    for i in range(5):
+        page.draw_circle(fitz.Point(100.0 + i * 60.0, 320.0), 8.0)
+
+    hatch_strokes = 20
+    for i in range(hatch_strokes):
+        x = 80.0 + i * 4.0
+        page.draw_line(fitz.Point(x, 420.0), fitz.Point(x + 30.0, 450.0))
+
+    page.draw_line(fitz.Point(450.0, 540.0), fitz.Point(480.0, 540.0))
+    page.draw_line(fitz.Point(480.0, 540.0), fitz.Point(465.0, 510.0))
+    page.draw_line(fitz.Point(465.0, 510.0), fitz.Point(450.0, 540.0))
+
+    truth = {
+        "pdf": "symbols_synthetic.pdf",
+        "fpp": 0.1,
+        "expected_groups": [
+            {"count": 12, "shape": "4-segment flag (7 plain, 3 rotated, 2 mirrored)"},
+            {"count": 5, "shape": "circle r=8pt"},
+        ],
+        "hatch_strokes": hatch_strokes,
+        "unique_shapes": 1,
+    }
+    return doc, truth
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -115,9 +185,17 @@ def main() -> None:
     doc.save(pdf_path)
     doc.close()
 
-    payload = {"pages": [{"page": 0, "dims": truth}]}
+    sym_doc, sym_truth = generate_symbols_page()
+    sym_pdf_path = out_dir / "symbols_synthetic.pdf"
+    sym_doc.save(sym_pdf_path)
+    sym_doc.close()
+
+    payload = {
+        "pages": [{"page": 0, "dims": truth}],
+        "symbols": sym_truth,
+    }
     truth_path.write_text(json.dumps(payload, indent=2) + "\n")
-    print(f"Wrote {pdf_path} and {truth_path}")
+    print(f"Wrote {pdf_path}, {sym_pdf_path} and {truth_path}")
 
 
 if __name__ == "__main__":

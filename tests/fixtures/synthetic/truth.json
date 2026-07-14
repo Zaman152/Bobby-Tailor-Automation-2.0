@@ -40,5 +40,21 @@
         }
       ]
     }
-  ]
+  ],
+  "symbols": {
+    "pdf": "symbols_synthetic.pdf",
+    "fpp": 0.1,
+    "expected_groups": [
+      {
+        "count": 12,
+        "shape": "4-segment flag (7 plain, 3 rotated, 2 mirrored)"
+      },
+      {
+        "count": 5,
+        "shape": "circle r=8pt"
+      }
+    ],
+    "hatch_strokes": 20,
+    "unique_shapes": 1
+  }
 }
