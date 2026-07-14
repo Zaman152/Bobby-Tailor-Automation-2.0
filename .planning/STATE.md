@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-14-PLAN.md — targeted-crop verify-retry loop
-last_updated: "2026-07-14T18:05:15.312Z"
+stopped_at: Completed 21-15-PLAN.md — plans-only entry points + blob retention
+last_updated: "2026-07-14T18:45:19.144Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-14: targeted-crop verify-retry loop — flagged out-of-band quantities and ensemble disagreements arbitrated by bounded, budget-charged dense-model crop questions (V3-ACC-05); legacy env stub removed"
+last_activity_desc: "Completed 21-15: plans-only entry points — companion auto-discovery killed, StackCT blob retention + vector probe, RunSettings parity, isolation tests (V3-STRUCT-02, V3-LEARN-04)"
 progress:
   total_phases: 22
   completed_phases: 17
   total_plans: 100
-  completed_plans: 88
+  completed_plans: 90
   percent: 77
 ---
 
@@ -30,9 +30,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 14/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11, 21-12, 21-13, 21-14)  
-Status: Wave 7 in progress — 21-14 (targeted-crop verify-retry: bounded budget-charged arbitration of out-of-band/ensemble-disagreement flags, 774 tests green)  
-Last activity: 2026-07-14 — Completed 21-14: verify_retry.py engine + pipeline wiring; ENABLE_VERIFY_RETRY stub replaced by settings.verify_retry_enabled (V3-ACC-05)
+Plan: 15/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11, 21-12, 21-13, 21-14, 21-15)  
+Status: Wave 7 in progress — 21-15 (plans-only entry points: companion auto-discovery killed, blob retention + vector probe, RunSettings parity, 789 tests green)  
+Last activity: 2026-07-14 — Completed 21-15: plans-only production contract test-enforced; StackCT vector-capable via retained blobs (V3-STRUCT-02, V3-LEARN-04)
 
 Progress: [█████████░] 88%
 
@@ -62,6 +62,7 @@ Progress: [█████████░] 88%
 | Phase 21-accuracy-learning-engine P12 P12 | 25 min | 3 tasks | 3 files |
 | Phase 21-accuracy-learning-engine P13 P13 | 40 min | 3 tasks | 5 files |
 | Phase 21-accuracy-learning-engine P14 P14 | 14 min | 2 tasks | 3 files |
+| Phase 21-accuracy-learning-engine P15 P15 | 27 min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -186,6 +187,10 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-14]: verify_retry answers are choice-enum grounded; symbol-anchored out-of-band flags get legend labels as choices (relabel path) — on vector sheets the deterministic count is exact, so the label is the suspect, never the number
 - [Phase 21-14]: Retry bound semantics: deny ('no') is definite (single attempt, flag kept unresolved); only 'unclear' consumes the second attempt, which widens the crop pad 0.25→0.75 for more context
 - [Phase 21-14]: Verify-retry merge-back: relabeled renames the component (quantity/unit untouched) and clears needs_review; confirmed downgrades the flag to a note; unresolved keeps the flag — retry_history mandatory on every touched item
+- [Phase 21]: 21-15: Sibling manifest auto-discovery (_find_manifest) removed with companion discovery — explicit manifest_path is the only manifest input to run_pdf_analysis — Same ground-truth-leakage class as *takeoff*.pdf siblings; plans-only LOCKED contract
+- [Phase 21]: 21-15: StackCT blobs live at {run_dir}/blobs/{page_id}.pdf with _page_blob_path legacy pdfs/ fallback; REUSE_SCREENSHOTS also reuses cached blobs; PageEntry.is_vector stores the runtime probe — Vector data must reach the deterministic engine on cached and resumed runs
+- [Phase 21]: 21-15: Scraper keeps _pipeline singleton but refreshes RunSettings.from_env() per run via new TakeoffPipeline.settings setter — settings-identical to pdf_analyzer — Preserves scraper._pipeline test patch seam while enforcing V3-STRUCT-02 parity
+- [Phase 21]: 21-15: Parity tests spy run_sheet.__globals__ via patch.dict and use a global fitz.open spy for companion isolation — Robust to spec-load vs package-import dual module objects in the parity harness
 
 ### Pending Todos
 
@@ -329,6 +334,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T18:05:15.307Z
-Stopped at: Completed 21-14-PLAN.md — targeted-crop verify-retry loop
+Last session: 2026-07-14T18:45:03.755Z
+Stopped at: Completed 21-15-PLAN.md — plans-only entry points + blob retention
 Resume file: None
