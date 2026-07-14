@@ -158,8 +158,8 @@
 - [ ] **V3-ACC-03**: Ensemble extraction — N-run self-consistency voting for EA counts and vision quantities; tiled counting with dedup; disagreement flags needs_review
 - [ ] **V3-ACC-04**: Model upgrade & adaptive fidelity — strongest Claude vision models routed by sheet complexity; adaptive DPI/tiling for dense sheets
 - [ ] **V3-ACC-05**: Verify-retry loop implemented — out-of-band quantities re-queried with targeted crops before flagging (replaces ENABLE_VERIFY_RETRY stub)
-- [ ] **V3-LEARN-01**: Correction store — human-verified overrides persisted to SQLite keyed by project_type/sheet_type/item pattern; survives run deletion
-- [ ] **V3-LEARN-02**: Learned vocabulary — canonical names/units accumulated from verified runs supersede static ITEM_NAME_MAP; auto-generated manifest from verified takeoffs
+- [x] **V3-LEARN-01**: Correction store — human-verified overrides persisted to SQLite keyed by project_type/sheet_type/item pattern; survives run deletion
+- [x] **V3-LEARN-02**: Learned vocabulary — canonical names/units accumulated from verified runs supersede static ITEM_NAME_MAP; auto-generated manifest from verified takeoffs
 - [ ] **V3-LEARN-03**: Runtime feedback application — learned corrections retrieved and injected into prompts, aggregation, and calculator assumptions on new runs
 - [ ] **V3-LEARN-04**: Manifest independence — companion take-off and manifest files optional dev inputs only; plans-only path reaches target accuracy without them
 - [ ] **V3-STRUCT-01**: Package restructure — modules organized into structured package (pipeline/vision/scale/deterministic/learning/scrape/web) with Flask blueprints; tests green
@@ -308,8 +308,8 @@
 | V3-ACC-03 | Phase 21 | Pending |
 | V3-ACC-04 | Phase 21 | Pending |
 | V3-ACC-05 | Phase 21 | Pending |
-| V3-LEARN-01 | Phase 21 | Pending |
-| V3-LEARN-02 | Phase 21 | Pending |
+| V3-LEARN-01 | Phase 21 | Complete |
+| V3-LEARN-02 | Phase 21 | Complete |
 | V3-LEARN-03 | Phase 21 | Pending |
 | V3-LEARN-04 | Phase 21 | Pending |
 | V3-STRUCT-01 | Phase 21 | Pending |
@@ -318,6 +318,7 @@
 | V3-PROD-02 | Phase 21 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 84 total (incl. Phase 14–19)
 - Mapped to phases: 84
 - Unmapped: 0 ✓

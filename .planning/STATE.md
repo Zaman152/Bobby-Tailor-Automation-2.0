@@ -1,3 +1,22 @@
+---
+gsd_state_version: 1.0
+milestone: v2.0
+milestone_name: milestone
+current_phase: 21
+current_phase_name: Accuracy & Learning Engine v3
+status: executing
+stopped_at: Completed 21-04-PLAN.md — durable learning store + distill
+last_updated: "2026-07-14T12:15:45.898Z"
+last_activity: 2026-07-14
+last_activity_desc: "Baseline re-verified on clean HEAD: 536 non-golden tests green; GitNexus reindexed"
+progress:
+  total_phases: 22
+  completed_phases: 17
+  total_plans: 100
+  completed_plans: 78
+  percent: 77
+---
+
 # Project State
 
 ## Project Reference
@@ -11,11 +30,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 3/18 complete (21-01, 21-02, 21-03)  
-Status: 21-04/21-05 prior attempt rejected (uncommitted low-quality work, stashed) — re-executing wave 2 remainder then waves 3-10  
-Last activity: 2026-07-14 — Baseline re-verified on clean HEAD: 536 non-golden tests green; GitNexus reindexed
+Plan: 4/18 complete (21-01, 21-02, 21-03, 21-04)  
+Status: Wave 2 in progress — 21-04 re-executed clean (learning store + distill, 549 tests green); 21-05 next, then waves 3-10  
+Last activity: 2026-07-14 — Completed 21-04: durable learning store (learning.db, 4 tables) + idempotent distill with conflict/decay
 
-Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
+Progress: [████████░░] 78%
 
 ## Performance Metrics
 
@@ -32,6 +51,7 @@ Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 | 03-api-cost-transparency | 3 | 7.5 min | 2.5 min |
 
 **Recent Trend:** Phase 3 executed in 3 sequential waves (03-01 → 03-02 → 03-03)
+| Phase 21-accuracy-learning-engine P04 | 15 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -111,6 +131,10 @@ From 14-04 (Two-Step Plan Selection UI):
 - Project list shows "N sets · M sheets" instead of single sheet count
 - Radio card picker with folder metadata visible
 - Back button hidden for single-set projects
+- [Phase 21-04]: Dedicated learning.db (not stackct.db) at OUTPUT_DIR; LEARNING_DB_PATH env override; schema init keyed by DB path so monkeypatched test DBs re-init automatically
+- [Phase 21-04]: learning_vocabulary UNIQUE widened to (project_type, raw_pattern, canonical_name, unit) — §6 conflict/decay needs decayed old + new mappings to coexist; 2-col UNIQUE makes that unrepresentable
+- [Phase 21-04]: Distilled state is a pure function of the log: replay in id order, last_seen = correction created_at (never now), staleness decay fires at new-verified-run boundaries — incremental == full_rebuild under any batching
+- [Phase 21-04]: Assumptions distilled at BOTH exact (project_key) and type (project_key NULL) levels so learning transfers to new projects; retrieval precedence keeps exact rows winning
 
 ### Pending Todos
 
@@ -254,6 +278,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14 01:12 UTC  
-Stopped at: Completed 21-02-PLAN.md — Flask factory + blueprints + jobs_runtime  
+Last session: 2026-07-14T12:15:45.892Z
+Stopped at: Completed 21-04-PLAN.md — durable learning store + distill
 Resume file: None
