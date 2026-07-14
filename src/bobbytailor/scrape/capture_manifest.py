@@ -24,6 +24,10 @@ class PageEntry:
     capture_status: str            # "pending" | "ok" | "failed" | "skipped"
     analysis_status: str           # "pending" | "ok" | "failed" | "skipped"
     source: Optional[str] = None  # "linked_ref" for auto-added pages; None for user-selected
+    # Runtime vector/raster probe of the retained per-page PDF blob (21-15):
+    # True → deterministic vector engine eligible; False → raster/ensemble
+    # fallback; None → no blob captured (screenshot-only page).
+    is_vector: Optional[bool] = None
 
 
 @dataclass
@@ -73,6 +77,7 @@ class RunManifest:
                     capture_status=p.get("capture_status", "pending"),
                     analysis_status=p.get("analysis_status", "pending"),
                     source=p.get("source"),
+                    is_vector=p.get("is_vector"),
                 )
                 for p in data.get("pages", [])
             ],

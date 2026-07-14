@@ -24,7 +24,12 @@ from capture_manifest import PageEntry, RunManifest, manifest_path
 from sheet_preview import find_screenshot_paths
 from claude_analyzer import make_navigation_decision
 from calculator import apply_estimation_tables, resolve_spec_lookups, _detect_project_type
-from takeoff_pipeline import TakeoffPipeline
+from takeoff_pipeline import (
+    RunSettings,
+    TakeoffPipeline,
+    VECTOR_MIN_DRAWING_ITEMS,
+    VECTOR_MIN_WORDS,
+)
 from cross_references import resolve_cross_references
 from reporter import generate_report
 
@@ -33,7 +38,20 @@ logger = logging.getLogger(__name__)
 # Shared TakeoffPipeline instance — stateless; safe to reuse across jobs.
 # Using a singleton avoids repeated module-level setup while keeping the
 # analyzer injectable in tests via TakeoffPipeline(analyzer=...).
-_pipeline = TakeoffPipeline()
+# RunSettings are constructed identically to pdf_analyzer (V3-STRUCT-02
+# parity) and refreshed per run via _refresh_pipeline_settings().
+_pipeline = TakeoffPipeline(settings=RunSettings.from_env())
+
+
+def _refresh_pipeline_settings() -> None:
+    """Rebuild the shared pipeline's RunSettings from the environment.
+
+    Identical construction to pdf_analyzer.run_pdf_analysis (V3-STRUCT-02):
+    both entry points call ``RunSettings.from_env()`` at run start, so the
+    StackCT path and the PDF-upload path always run under the same
+    deterministic/ensemble/learning/budget configuration.
+    """
+    _pipeline.settings = RunSettings.from_env()
 
 # User-facing error codes returned in result dict (mapped to messages in app.py)
 ERROR_LOGIN_FAILED = "login_failed"
@@ -76,6 +94,112 @@ def _rel_output_path(path: Path) -> str:
         return ""
 
 
+def _page_blob_path(screenshots_dir: Path, page_id: int) -> Path:
+    """Canonical retained per-page vector PDF blob path for a run (21-15).
+
+    Blobs live under ``{run_dir}/blobs/{page_id}.pdf``. Falls back to the
+    legacy ``pdfs/`` layout so pre-21-15 run folders resumed via
+    run_analyze_from_manifest keep their vector data. When neither exists the
+    canonical (blobs/) path is returned as the write location.
+    """
+    blob = screenshots_dir / "blobs" / f"{page_id}.pdf"
+    if blob.is_file():
+        return blob
+    legacy = screenshots_dir / "pdfs" / f"{page_id}.pdf"
+    if legacy.is_file():
+        return legacy
+    return blob
+
+
+def probe_page_vector(pdf_path_or_page) -> dict:
+    """Runtime vector/raster probe for a captured page (RESEARCH Open Q1).
+
+    Applies the is_vector_sheet heuristic (a sheet is raster-only when it has
+    fewer than ``VECTOR_MIN_DRAWING_ITEMS`` drawing paths AND fewer than
+    ``VECTOR_MIN_WORDS`` text-layer words) and reports the raw counts so the
+    decision is auditable per page.
+
+    Args:
+        pdf_path_or_page: Path (str/Path) to a single-page PDF blob, or an
+            open ``fitz.Page``.
+
+    Returns:
+        ``{"is_vector": bool, "drawing_items": int, "words": int}``.
+        Unreadable input counts as raster (flag-don't-guess) — the page then
+        routes to the ensemble fallback exactly like a raster upload.
+    """
+    import fitz  # lazy — keeps scraper importable when PyMuPDF is stubbed
+
+    doc = None
+    page = pdf_path_or_page
+    if isinstance(pdf_path_or_page, (str, Path)):
+        try:
+            doc = fitz.open(str(pdf_path_or_page))
+            page = doc[0]
+        except Exception as exc:  # noqa: BLE001 — untrusted blob must not crash
+            logger.warning("probe_page_vector: cannot open %s: %s", pdf_path_or_page, exc)
+            if doc is not None:
+                doc.close()
+            return {"is_vector": False, "drawing_items": 0, "words": 0}
+    try:
+        try:
+            drawing_items = len(page.get_drawings())
+        except Exception:  # noqa: BLE001
+            drawing_items = 0
+        try:
+            words = len(page.get_text("words"))
+        except Exception:  # noqa: BLE001
+            words = 0
+    finally:
+        if doc is not None:
+            doc.close()
+    is_vector = not (
+        drawing_items < VECTOR_MIN_DRAWING_ITEMS and words < VECTOR_MIN_WORDS
+    )
+    return {"is_vector": is_vector, "drawing_items": drawing_items, "words": words}
+
+
+def _probe_and_record_vector(
+    entry: PageEntry,
+    screenshots_dir: Path,
+    page_id: int,
+    log: Callable,
+) -> None:
+    """Probe a captured page blob and store is_vector in the capture manifest."""
+    blob = _page_blob_path(screenshots_dir, page_id)
+    if not blob.is_file():
+        return
+    probe = probe_page_vector(blob)
+    entry.is_vector = probe["is_vector"]
+    log(
+        f"  Vector probe {entry.sheet_name}: is_vector={probe['is_vector']} "
+        f"(drawings={probe['drawing_items']}, words={probe['words']})"
+    )
+
+
+def _reuse_cached_blob(
+    cached_screenshot: Path, screenshots_dir: Path, page_id: int,
+) -> bool:
+    """Copy the per-page PDF blob matching a cached screenshot into this run.
+
+    REUSE_SCREENSHOTS-style caching (17-01): when a screenshot is reused from
+    a prior run folder, the matching vector blob is reused too so the
+    deterministic engine keeps its vector data without a fresh download.
+    """
+    src_dir = cached_screenshot.parent
+    for sub in ("blobs", "pdfs"):
+        src = src_dir / sub / f"{page_id}.pdf"
+        try:
+            if src.is_file() and src.stat().st_size > 500:
+                dest = screenshots_dir / "blobs" / f"{page_id}.pdf"
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dest)
+                return True
+        except OSError as exc:
+            logger.warning("Cached blob reuse failed for page %s: %s", page_id, exc)
+    return False
+
+
 def _enrich_extracted_sheet(
     extracted: dict,
     sheet_name: str,
@@ -88,14 +212,22 @@ def _enrich_extracted_sheet(
     extracted["_sheet_name"] = sheet_name
     extracted["_page_id"] = page_id
     extracted["_image_rel"] = _rel_output_path(screenshot_path)
-    pdf = screenshots_dir / "pdfs" / f"{page_id}.pdf"
+    pdf = _page_blob_path(screenshots_dir, page_id)
     if pdf.is_file():
         extracted["_page_pdf"] = str(pdf)
 
 
 def _pdf_args_for_page(screenshots_dir: Path, page_id: int) -> dict:
-    """Keyword args for run_sheet when a per-page PDF was captured from StackCT."""
-    pdf = screenshots_dir / "pdfs" / f"{page_id}.pdf"
+    """Keyword args for run_sheet when a per-page PDF blob was captured.
+
+    Passing the blob path into TakeoffPipeline.run_sheet routes the sheet
+    through the deterministic vector engine (21-13); screenshots remain for
+    UI/preview only. Raster blobs are detected inside run_sheet by the same
+    is_vector_sheet heuristic probe_page_vector logs at capture time, so
+    raster StackCT pages hit the ensemble fallback exactly like raster
+    uploads.
+    """
+    pdf = _page_blob_path(screenshots_dir, page_id)
     if pdf.is_file():
         return {"pdf_path": str(pdf), "page_index": 0}
     return {}
@@ -127,7 +259,9 @@ async def _capture_sheet_screenshot(
     """
     try:
         screenshot_path.parent.mkdir(parents=True, exist_ok=True)
-        pdf_path = screenshots_dir / "pdfs" / f"{page_id}.pdf"
+        # Retain the per-page vector PDF blob (21-15): the deterministic
+        # engine measures on this file; the screenshot is UI/preview only.
+        pdf_path = screenshots_dir / "blobs" / f"{page_id}.pdf"
         success = await browser.download_drawing_image(
             project_id, page_id, str(screenshot_path),
             pdf_filepath=str(pdf_path),
@@ -313,6 +447,8 @@ async def _discover_and_add_linked_sheets(
             if cached_path and cached_path.is_file() and cached_path.stat().st_size > 1000:
                 screenshot_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(cached_path, screenshot_path)
+                # Reuse the matching vector blob from the prior run too.
+                _reuse_cached_blob(cached_path, screenshots_dir, page_id)
                 log(f"  [linked] Using cached screenshot for {sheet_name}")
                 page_entry.capture_status = "ok"
             else:
@@ -327,6 +463,10 @@ async def _discover_and_add_linked_sheets(
                     reason = skip_reason or "capture_failed"
                     log(f"  [linked] Could not capture {sheet_name} ({reason})")
                     page_entry.capture_status = "failed"
+
+            # Vector/raster probe of the retained blob (21-15) — manifest-stored.
+            if page_entry.capture_status == "ok":
+                _probe_and_record_vector(page_entry, screenshots_dir, page_id, log)
 
             manifest.save(mpath)
 
@@ -406,6 +546,10 @@ async def run_project_scrape(project_id: int, project_name: str,
             log_callback(entry if entry else msg)
 
     log(f"Starting: {project_name} (ID: {project_id})")
+
+    # Entry-point parity (V3-STRUCT-02): construct RunSettings.from_env()
+    # once per run — identical to pdf_analyzer.run_pdf_analysis.
+    _refresh_pipeline_settings()
 
     # Object manifest (optional): explicit upload path, else auto-discovery from
     # the `manifests/` dir by project name. Drives canonical naming + the
@@ -550,6 +694,8 @@ async def run_project_scrape(project_id: int, project_name: str,
                 if cached_path and cached_path.is_file() and cached_path.stat().st_size > 1000:
                     screenshot_path.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(cached_path, screenshot_path)
+                    # Reuse the matching vector blob from the prior run too.
+                    _reuse_cached_blob(cached_path, screenshots_dir, page_id)
                     msg = f"[{idx}/{total}] Using cached screenshot for {sheet_name}"
                     log(msg, _make_log_entry(msg, "sheet_progress", idx, total, sheet_name))
                     entry.capture_status = "ok"
@@ -599,6 +745,11 @@ async def run_project_scrape(project_id: int, project_name: str,
                     "sheet_name": sheet_name,
                     "reason": reason,
                 })
+
+            # Runtime vector/raster probe of the retained blob (21-15):
+            # logged per page and stored in the capture manifest.
+            if entry.capture_status == "ok":
+                _probe_and_record_vector(entry, screenshots_dir, page_id, log)
 
             manifest.save(mpath)
 
@@ -916,6 +1067,10 @@ async def run_analyze_from_manifest(
         logger.info(msg)
         if log_callback:
             log_callback(entry if entry else msg)
+
+    # Entry-point parity (V3-STRUCT-02): construct RunSettings.from_env()
+    # once per run — identical to pdf_analyzer.run_pdf_analysis.
+    _refresh_pipeline_settings()
 
     # Resolve manifest path ---------------------------------------------------
     if manifest_path_override:

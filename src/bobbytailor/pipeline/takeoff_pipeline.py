@@ -628,6 +628,16 @@ class TakeoffPipeline:
         """The shared RunSettings this pipeline was constructed with."""
         return self._settings
 
+    @settings.setter
+    def settings(self, value: RunSettings) -> None:
+        """Replace the run configuration (V3-STRUCT-02 entry-point parity).
+
+        The scraper keeps a module-level pipeline singleton, so it refreshes
+        settings via ``RunSettings.from_env()`` at the start of every run —
+        the identical construction pdf_analyzer performs per run.
+        """
+        self._settings = value
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------

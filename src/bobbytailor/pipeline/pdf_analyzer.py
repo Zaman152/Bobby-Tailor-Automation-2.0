@@ -356,10 +356,10 @@ def run_pdf_analysis(
         pdf_path, dev_manifest=manifest,
     )
 
-    # Shared RunSettings (21-13): both entry points construct the pipeline
-    # from the same env-driven settings — the parity foundation for 21-15
-    # (scraper's module-level singleton defaults to RunSettings.from_env()
-    # inside the constructor, so the two constructions are identical).
+    # Shared RunSettings (21-13/21-15, V3-STRUCT-02): both entry points
+    # construct RunSettings.from_env() at run start — the scraper refreshes
+    # its module-level singleton the same way, so StackCT and PDF-upload runs
+    # are settings-identical by construction.
     pipeline = TakeoffPipeline(settings=RunSettings.from_env())
     all_extracted, all_estimates, _project_type = pipeline.run_project(
         pipeline_pages,
