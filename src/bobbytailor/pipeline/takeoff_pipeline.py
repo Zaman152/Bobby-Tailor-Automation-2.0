@@ -88,6 +88,15 @@ from bobbytailor.vision.ensemble import (
 )
 from bobbytailor.vision.fusion import build_registry, fuse_sheet, merge_with_provenance
 
+# Learned-context retrieval + anti-amplification guardrail (21-16,
+# V3-LEARN-02/03/04). Module-level imports so tests can patch
+# `takeoff_pipeline.load_learned_context` (patchability convention, 20-00).
+from bobbytailor.learning.retrieval import (  # noqa: F401 (re-exported for patching)
+    LearnedContext,
+    apply_learned_quantity_flags,
+    load_learned_context,
+)
+
 # Verify-retry arbitration (21-14): module-level import so tests can patch
 # `takeoff_pipeline.retry_flagged_items` (patchability convention, 20-00).
 from bobbytailor.vision.verify_retry import retry_flagged_items
@@ -479,6 +488,90 @@ def _manifest_wall_height(manifest) -> float:
     return max(heights) if heights else default
 
 
+def _join_hints(*hints: Optional[str]) -> Optional[str]:
+    """Join non-empty user hints with a blank line; None when all are empty."""
+    parts = [h for h in hints if h]
+    if not parts:
+        return None
+    return "\n\n".join(parts)
+
+
+def _resolve_wall_height(manifest, learned) -> "tuple[float, str]":
+    """Wall/ceiling height for derived wall areas, with its source.
+
+    Precedence (RESEARCH §6 injection point 3): an explicit manifest
+    ``height_ft`` assumption wins (deterministic dev input for this run);
+    otherwise a learned ``wall_height_ft`` assumption applies — learned data
+    only fills the gap when no schedule/legend/manifest source exists;
+    otherwise the conventional 9 ft cold-start default. The returned source
+    ("manifest" | "learned" | "default") flags the assumption downstream
+    (``assumption_source`` on derived wall-area items) — an assumption is
+    never silent, whatever supplied it.
+    """
+    default = 9.0
+    if manifest:
+        heights = []
+        for e in manifest.entries:
+            h = e.assumptions.get("height_ft")
+            if h:
+                try:
+                    heights.append(float(h))
+                except (TypeError, ValueError):
+                    pass
+        if heights:
+            return max(heights), "manifest"
+    if learned is not None:
+        try:
+            value = learned.get_assumption_value("wall_height_ft")
+        except Exception:  # noqa: BLE001 — learning must never break a run
+            value = None
+        if isinstance(value, dict):
+            value = value.get("wall_height_ft") or value.get("height_ft") or value.get("value")
+        try:
+            height = float(value) if value is not None else None
+        except (TypeError, ValueError):
+            height = None
+        if height and height > 0:
+            return height, "learned"
+    return default, "default"
+
+
+def _learned_scale_prior(learned, sheet_name: str) -> Optional[float]:
+    """Learned feet-per-inch scale prior for *sheet_name*, if any.
+
+    Reads the 21-04 assumption keys ``scale_fpi:<sheetname-pattern>`` (exact
+    normalized sheet name first, then the ``*`` wildcard). The value feeds
+    ``resolve_scale_v2(..., learned_prior=...)`` — which already ranks it
+    LAST (21-07): the prior fires ONLY when the solved and printed tiers are
+    empty, so a learned scale can never outrank deterministic evidence
+    (anti-amplification, V3-LEARN-04).
+    """
+    if learned is None:
+        return None
+    pattern = str(sheet_name or "").strip().lower()
+    for key in ("scale_fpi:%s" % pattern, "scale_fpi:*"):
+        try:
+            value = learned.get_assumption_value(key)
+        except Exception:  # noqa: BLE001 — learning must never break a run
+            return None
+        if value is None:
+            continue
+        if isinstance(value, dict):
+            value = (
+                value.get("feet_per_inch")
+                or value.get("fpi")
+                or value.get("scale_ft_per_in")
+                or value.get("value")
+            )
+        try:
+            fpi = float(value)
+        except (TypeError, ValueError):
+            continue
+        if fpi > 0:
+            return fpi
+    return None
+
+
 # merge_passes is imported from claude_analyzer (canonical implementation, plan 20-03).
 # It is also re-exported here so callers that imported it from takeoff_pipeline continue
 # to work without modification.
@@ -622,6 +715,10 @@ class TakeoffPipeline:
         self._run_budget: Optional[BudgetGuard] = None
         # extract_schedules() scans the whole document — cache per pdf_path.
         self._schedules_cache: dict = {}
+        # Run-level LearnedContext (21-16, V3-LEARN-03): retrieved ONCE at
+        # run start (never per-sheet DB churn) and injected forward into
+        # prompt hints, the scale-prior feed, and the guardrail flags.
+        self._learned_context: Optional[LearnedContext] = None
 
     @property
     def settings(self) -> RunSettings:
@@ -637,6 +734,38 @@ class TakeoffPipeline:
         the identical construction pdf_analyzer performs per run.
         """
         self._settings = value
+
+    @property
+    def learned_context(self) -> Optional[LearnedContext]:
+        """The run's retrieved LearnedContext (None: disabled / cold start)."""
+        return self._learned_context
+
+    def load_learning(
+        self, project_key: Optional[str], project_type: Optional[str] = None
+    ) -> Optional[LearnedContext]:
+        """Load (or refresh) the run-level LearnedContext — best effort.
+
+        Called by both entry points at run start (project_type inferred from
+        prior corrections) and again once ``_detect_project_type`` has run,
+        so type-level vocabulary/manifests join the bundle. Learning is
+        strictly additive: any store failure logs and leaves the run
+        learning-free (the 21-09 best-effort convention) — a broken
+        learning DB must never break a take-off.
+        """
+        self._learned_context = None
+        if not project_key or not self._settings.learning_enabled:
+            return None
+        try:
+            # Module-level name lookup so tests can patch
+            # `takeoff_pipeline.load_learned_context`.
+            self._learned_context = load_learned_context(project_key, project_type)
+        except Exception as exc:  # noqa: BLE001 — learning is best-effort
+            logger.warning(
+                "load_learning: learned-context retrieval failed for %r (%s) "
+                "— run continues without learning", project_key, exc,
+            )
+            self._learned_context = None
+        return self._learned_context
 
     # ------------------------------------------------------------------
     # Public API
@@ -722,6 +851,10 @@ class TakeoffPipeline:
                 full_page_text=full_page_text,
             )
             if routed is not None:
+                # Guardrail (21-16, V3-LEARN-04): prior human quantity
+                # corrections attach re_verify flags AFTER fusion — never a
+                # quantity substitution.
+                self._apply_learned_flags_safe(routed)
                 return routed
             # None → fall through to the legacy vision flow (e.g. a vector
             # schedule sheet where find_tables() found nothing).
@@ -741,6 +874,19 @@ class TakeoffPipeline:
         # Columns, Stairs, etc.).
         count_hint = _build_count_hint(getattr(self, "_manifest", None))
         measure_hint = _build_measure_hint(getattr(self, "_manifest", None))
+        # Learned-context injection point 1 (RESEARCH §6): the expected-items
+        # + naming-conventions block joins the existing user_hint slot. It is
+        # a HINT (data-delimited, length-capped) — cold start renders None
+        # and the hints are exactly what they were before learning existed.
+        learned_hint = None
+        ctx = getattr(self, "_learned_context", None)
+        if ctx is not None:
+            try:
+                learned_hint = ctx.render_prompt_hint()
+            except Exception as exc:  # noqa: BLE001 — learning is additive
+                logger.warning("run_sheet: learned prompt hint failed: %s", exc)
+        count_hint = _join_hints(count_hint, learned_hint)
+        measure_hint = _join_hints(measure_hint, learned_hint)
         # Dense symbol sheets benefit from a higher-resolution count render so
         # small repeated symbols stay legible.
         count_hires = resolved_type in ("floor_plan", "civil_site", "roof_plan")
@@ -891,7 +1037,28 @@ class TakeoffPipeline:
                     )
         merged["_budget"] = _budget_state(guard)
 
+        # Guardrail (21-16, V3-LEARN-04): re_verify flags for previously
+        # human-corrected items — quantities are never substituted.
+        self._apply_learned_flags_safe(merged)
+
         return merged
+
+    def _apply_learned_flags_safe(self, merged: dict) -> None:
+        """Attach learned re_verify flags to a sheet result — never fatal.
+
+        Enforces the RESEARCH §6 anti-amplification guardrail via
+        :func:`apply_learned_quantity_flags` (module-level import —
+        patchable): a learned value can NEVER overwrite a quantity whose
+        provenance is geometry/text_layer with HIGH confidence; prior human
+        quantity corrections surface as re_verify flags only.
+        """
+        ctx = getattr(self, "_learned_context", None)
+        if ctx is None or not isinstance(merged, dict):
+            return
+        try:
+            apply_learned_quantity_flags(merged.get("components") or [], ctx)
+        except Exception as exc:  # noqa: BLE001 — learning is additive
+            logger.warning("run_sheet: learned quantity flags failed: %s", exc)
 
     # ------------------------------------------------------------------
     # Deterministic-first orchestration (21-13, V3-ACC-01/03)
@@ -1065,10 +1232,17 @@ class TakeoffPipeline:
             )
 
         main_id = select_main_plan(viewports_with_scales)
+        # Learned-context injection point 3a (RESEARCH §6): the learned
+        # scale prior feeds resolve_scale_v2, which ranks it LAST (21-07) —
+        # it fires only when the solved AND printed tiers are empty, so a
+        # learned scale can never displace deterministic evidence.
         scale = resolve_scale_v2(
             page,
             viewports_with_scales,
             override_feet_per_inch=getattr(self, "_scale_fpi", None),
+            learned_prior=_learned_scale_prior(
+                getattr(self, "_learned_context", None), sheet_name
+            ),
         )
         fpp = float(scale.feet_per_point or 0.0)
 
@@ -1650,6 +1824,7 @@ class TakeoffPipeline:
         project_legend_schedules: Optional[list] = None,
         manifest=None,
         scale_feet_per_inch: Optional[float] = None,
+        project_key: Optional[str] = None,
     ) -> "tuple[list[dict], list[dict], str]":
         """Run the full pipeline for every page in a project.
 
@@ -1695,6 +1870,13 @@ class TakeoffPipeline:
         self._run_budget = BudgetGuard(self._settings.budget_usd)
         # Deterministic table cache is per-run (avoid stale cross-run reuse).
         self._schedules_cache = {}
+        # Learned-context retrieval (21-16, V3-LEARN-03): ONE bundle at run
+        # start (project_type inferred from prior corrections for repeat
+        # runs) — injected into prompt hints, the per-sheet scale-prior feed,
+        # and the guardrail flags. Refreshed once more below when the
+        # project_type detector has run, so type-level vocabulary/manifests
+        # join for calculator/aggregation. Never per-sheet DB churn.
+        self.load_learning(project_key)
 
         total = len(pages)
         all_extracted: list[dict] = []
@@ -1775,9 +1957,20 @@ class TakeoffPipeline:
             project_type, len(all_extracted),
         )
 
-        # Manifest-driven wall height for derived wall-area estimates (replaces the
-        # blanket 9ft assumption when the manifest supplies a wall height_ft).
-        wall_height_ft = _manifest_wall_height(getattr(self, "_manifest", None))
+        # Refresh the learned context with the DETECTED project_type so the
+        # type-level vocabulary/assumptions/expected-items join the bundle
+        # for the calculator and downstream aggregation (RESEARCH §6).
+        if project_key and self._settings.learning_enabled:
+            self.load_learning(project_key, project_type)
+
+        # Wall height for derived wall-area estimates: manifest assumption >
+        # learned wall_height_ft (injection point 3b — applies ONLY when no
+        # manifest/schedule source exists) > the 9 ft cold-start default.
+        # Whatever the source, the assumption is flagged on derived items
+        # (assumption_source) — never a silent substitution.
+        wall_height_ft, wall_height_source = _resolve_wall_height(
+            getattr(self, "_manifest", None), self._learned_context,
+        )
 
         all_estimates: list[dict] = []
         for extracted in all_extracted:
@@ -1790,6 +1983,7 @@ class TakeoffPipeline:
                     apply_estimation_tables(
                         extracted, project_type=project_type,
                         wall_height_ft=wall_height_ft,
+                        wall_height_source=wall_height_source,
                     )
                 )
 

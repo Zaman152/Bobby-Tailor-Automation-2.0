@@ -29,6 +29,7 @@ from takeoff_pipeline import (
     TakeoffPipeline,
     VECTOR_MIN_DRAWING_ITEMS,
     VECTOR_MIN_WORDS,
+    _resolve_wall_height,
 )
 from cross_references import resolve_cross_references
 from reporter import generate_report
@@ -550,6 +551,10 @@ async def run_project_scrape(project_id: int, project_name: str,
     # Entry-point parity (V3-STRUCT-02): construct RunSettings.from_env()
     # once per run — identical to pdf_analyzer.run_pdf_analysis.
     _refresh_pipeline_settings()
+    # Learned-context retrieval at run start (21-16, V3-LEARN-03) — same
+    # seam pdf_analyzer gets via run_project(project_key=...): prompt hints,
+    # scale priors, and re_verify guardrail flags on every run_sheet call.
+    _pipeline.load_learning(project_name)
 
     # Object manifest (optional): explicit upload path, else auto-discovery from
     # the `manifests/` dir by project name. Drives canonical naming + the
@@ -946,9 +951,22 @@ async def run_project_scrape(project_id: int, project_name: str,
                 "authoritative row(s) from captured PDFs"
             )
 
+        # Refresh the learned context with the DETECTED project_type (same
+        # two-stage retrieval run_project performs) and resolve the wall
+        # height: manifest > learned wall_height_ft > 9 ft default — the
+        # assumption source is stamped on derived wall-area items.
+        _pipeline.load_learning(project_name, _project_type)
+        _wall_height_ft, _wall_height_source = _resolve_wall_height(
+            object_manifest, _pipeline.learned_context,
+        )
+
         all_estimates = []
         for _e in _successful_extracted:
-            all_estimates.extend(apply_estimation_tables(_e, project_type=_project_type))
+            all_estimates.extend(apply_estimation_tables(
+                _e, project_type=_project_type,
+                wall_height_ft=_wall_height_ft,
+                wall_height_source=_wall_height_source,
+            ))
 
         successful = [d for d in all_extracted if "error" not in d]
         if not successful:
@@ -990,6 +1008,7 @@ async def run_project_scrape(project_id: int, project_name: str,
             linked_sheets=linked_meta,
             manifest=object_manifest,
             screenshots_dir=str(screenshots_dir),
+            learned=_pipeline.learned_context,
         )
 
         if sheets_failed or sheets_skipped or _cancelled:
@@ -1098,6 +1117,10 @@ async def run_analyze_from_manifest(
     folder_id = run_manifest.folder_id
     pages = run_manifest.pages
     total = len(pages)
+
+    # Learned-context retrieval at run start (21-16, V3-LEARN-03) — parity
+    # with run_project_scrape and pdf_analyzer.run_pdf_analysis.
+    _pipeline.load_learning(project_name)
 
     from object_manifest import resolve_project_manifest
     object_manifest = resolve_project_manifest(project_name, object_manifest_path)
@@ -1310,9 +1333,20 @@ async def run_analyze_from_manifest(
             f"{sum(len(s.get('rows') or []) for s in det_legends)} authoritative row(s)"
         )
 
+    # Two-stage learned retrieval + wall-height resolution — identical to
+    # run_project_scrape (assumption source stamped on derived wall areas).
+    _pipeline.load_learning(project_name, _project_type)
+    _wall_height_ft, _wall_height_source = _resolve_wall_height(
+        object_manifest, _pipeline.learned_context,
+    )
+
     all_estimates = []
     for _e in _successful_extracted:
-        all_estimates.extend(apply_estimation_tables(_e, project_type=_project_type))
+        all_estimates.extend(apply_estimation_tables(
+            _e, project_type=_project_type,
+            wall_height_ft=_wall_height_ft,
+            wall_height_source=_wall_height_source,
+        ))
 
     # Report ------------------------------------------------------------------
     successful = [d for d in all_extracted if "error" not in d]
@@ -1353,6 +1387,7 @@ async def run_analyze_from_manifest(
         folder_id=folder_id,
         cross_references=cross_refs,
         manifest=object_manifest,
+        learned=_pipeline.learned_context,
     )
 
     if sheets_failed or sheets_skipped or _cancelled:

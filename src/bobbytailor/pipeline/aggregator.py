@@ -138,8 +138,23 @@ def _extract_spec_for_name(canonical: str, description: str) -> str:
     return ""
 
 
-def normalize_item_name(description: str, item_type: str, unit: str) -> tuple:
+def normalize_item_name(description: str, item_type: str, unit: str, learned=None) -> tuple:
     d = (description or "").lower()
+    # Learned vocabulary FIRST (V3-LEARN-02): learning_vocabulary rows —
+    # distilled from prior human corrections — are consulted via an
+    # exact/normalized match BEFORE the static regex list, so a correction
+    # made once never recurs. On a miss the static ITEM_NAME_MAP below runs
+    # unchanged: it is the cold-start floor and is never deleted, and its
+    # carefully sequenced first-match-wins ordering (20-05/20-09 decisions)
+    # is never disturbed by the learned lookup.
+    if learned is not None:
+        try:
+            hit = learned.lookup_name(description)
+        except Exception:  # noqa: BLE001 — learning must never break naming
+            hit = None
+        if hit is not None:
+            learned_name, learned_unit = hit
+            return learned_name, (learned_unit or unit or "EA")
     for pattern, name, default_unit in ITEM_NAME_MAP:
         if re.search(pattern, d, re.IGNORECASE):
             spec_match = _extract_spec_for_name(name, d)
@@ -184,7 +199,7 @@ def _inject_standard_line_items(buckets: Dict[str, Dict]) -> None:
         })
 
 
-def aggregate_takeoff(calculated_items: List[Dict], manifest=None) -> List[Dict]:
+def aggregate_takeoff(calculated_items: List[Dict], manifest=None, learned=None) -> List[Dict]:
     """Consolidate per-sheet items into project-level totals.
 
     When ``manifest`` (an :class:`object_manifest.Manifest`) is supplied, detected
@@ -192,6 +207,14 @@ def aggregate_takeoff(calculated_items: List[Dict], manifest=None) -> List[Dict]
     no hardcoded map), and every manifest object is guaranteed to appear in the
     output — anything not found in the plans is emitted flagged ``needs_review``
     so nothing is ever silently missed.
+
+    When ``learned`` (a :class:`bobbytailor.learning.retrieval.LearnedContext`)
+    is supplied, learning_vocabulary mappings distilled from prior human
+    corrections are consulted before the static ITEM_NAME_MAP (V3-LEARN-02).
+    Naming precedence: companion legend > manifest > learned > static map.
+    Rows whose NAME came from learned vocabulary carry ``source: "learned"``
+    — the naming provenance marker only; quantities are summed from the
+    underlying items untouched (quantity provenance is never altered here).
     """
     buckets: Dict[str, Dict] = defaultdict(lambda: {
         "quantity": 0.0,
@@ -222,7 +245,7 @@ def aggregate_takeoff(calculated_items: List[Dict], manifest=None) -> List[Dict]
         if item.get("qty_source") == "companion_takeoff_legend":
             desc = item.get("description", "")
             name, _ = normalize_item_name(
-                desc, item.get("item_type", ""), item.get("unit", ""),
+                desc, item.get("item_type", ""), item.get("unit", ""), learned=learned,
             )
             legend_names.add(name)
             # A legend bucket is keyed by its cleaned label, and a vision row binds
@@ -262,8 +285,19 @@ def aggregate_takeoff(calculated_items: List[Dict], manifest=None) -> List[Dict]
                 canonical_unit = (entry.unit or unit or "").strip().upper()
                 bucket_source = "manifest"
             else:
-                canonical_name, canonical_unit = normalize_item_name(desc, itype, unit)
-                bucket_source = "vision"
+                canonical_name, canonical_unit = normalize_item_name(
+                    desc, itype, unit, learned=learned,
+                )
+                # Item provenance "learned": the NAME/unit came from
+                # learning_vocabulary (aggregation marks the naming origin;
+                # the summed quantity keeps its own provenance untouched).
+                learned_hit = None
+                if learned is not None:
+                    try:
+                        learned_hit = learned.lookup_name(desc)
+                    except Exception:  # noqa: BLE001
+                        learned_hit = None
+                bucket_source = "learned" if learned_hit is not None else "vision"
             # Suppress non-legend duplicates of any legend-backed item. Matches exact
             # canonical names and base-vs-spec variants (e.g. vision "Columns" when
             # the legend reports "Columns-H-35'") so the authoritative legend isn't

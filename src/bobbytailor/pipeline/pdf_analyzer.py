@@ -361,12 +361,17 @@ def run_pdf_analysis(
     # its module-level singleton the same way, so StackCT and PDF-upload runs
     # are settings-identical by construction.
     pipeline = TakeoffPipeline(settings=RunSettings.from_env())
+    # project_key threads the run into the learning store (21-16,
+    # V3-LEARN-03): run_project retrieves the LearnedContext once at run
+    # start and injects it into prompt hints, scale priors, wall-height
+    # assumptions, and re_verify guardrail flags.
     all_extracted, all_estimates, _project_type = pipeline.run_project(
         pipeline_pages,
         progress_callback=_progress,
         project_legend_schedules=project_legends or None,
         manifest=manifest,
         scale_feet_per_inch=scale_feet_per_inch,
+        project_key=project_name,
     )
 
     # Emit "complete" progress for each successfully analyzed sheet
@@ -390,4 +395,5 @@ def run_pdf_analysis(
     return generate_report(
         project_name, all_extracted, all_estimates,
         cross_references=cross_refs, manifest=manifest,
+        learned=pipeline.learned_context,
     )

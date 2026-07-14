@@ -25,7 +25,8 @@ def generate_report(project_name: str,
                     cross_references: Optional[list] = None,
                     linked_sheets: Optional[list] = None,
                     manifest=None,
-                    screenshots_dir: Optional[str] = None) -> dict:
+                    screenshots_dir: Optional[str] = None,
+                    learned=None) -> dict:
     """
     Build the final takeoff report.
 
@@ -39,6 +40,9 @@ def generate_report(project_name: str,
         linked_sheets: Optional list of linked-sheet metadata dicts from Phase 18;
                        each has at minimum {page_id, sheet_name, ref_from} and optional
                        suggested_only=True when AUTO_INCLUDE_LINKED_SHEETS is off
+        learned: Optional bobbytailor.learning.retrieval.LearnedContext — the
+                 run's retrieved learning bundle (21-16, V3-LEARN-02/03).
+                 Threads learned vocabulary into aggregation naming.
     """
     all_estimates = all_estimates or []
 
@@ -64,7 +68,7 @@ def generate_report(project_name: str,
 
     specification_tables = _collect_specification_tables(all_extracted)
     from aggregator import aggregate_takeoff
-    takeoff_summary = aggregate_takeoff(calculated_items, manifest=manifest)
+    takeoff_summary = aggregate_takeoff(calculated_items, manifest=manifest, learned=learned)
 
     # Aggregate API usage across all sheets
     total_cost = sum(d.get("_cost_usd", 0) for d in all_extracted)

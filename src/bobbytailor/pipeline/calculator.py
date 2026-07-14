@@ -387,7 +387,8 @@ MATERIAL_NOTE_MAP = [
 # ─── Public entry point ──────────────────────────────────────────────────────
 
 def apply_estimation_tables(extracted_data: dict, project_type: str = "auto",
-                            wall_height_ft: float = 9.0) -> List[dict]:
+                            wall_height_ft: float = 9.0,
+                            wall_height_source: str = "default") -> List[dict]:
     """
     Apply estimation tables to extracted drawing data.
 
@@ -396,8 +397,12 @@ def apply_estimation_tables(extracted_data: dict, project_type: str = "auto",
         project_type: Building type key from PROJECT_TYPE_PROFILES. Defaults to
             "auto", which uses content-first note matching with a universal fallback.
         wall_height_ft: Assumed wall/ceiling height for derived wall-area estimates.
-            Sourced from the object manifest when available; otherwise the 9ft
+            Sourced from the object manifest when available, else a learned
+            ``wall_height_ft`` assumption (21-16, V3-LEARN-03), else the 9ft
             default. Derived wall areas are always flagged ``needs_review``.
+        wall_height_source: Where the height came from ("manifest" |
+            "learned" | "default") — stamped as ``assumption_source`` on
+            derived wall-area items so the assumption is never silent.
 
     Returns list of calculated takeoff items with source traceability.
     """
@@ -419,7 +424,10 @@ def apply_estimation_tables(extracted_data: dict, project_type: str = "auto",
 
     # 3) Process rooms — content-first area calculations
     for room in extracted_data.get("rooms", []):
-        estimates.extend(_calculate_from_room(room, sheet_name, project_type, wall_height_ft))
+        estimates.extend(_calculate_from_room(
+            room, sheet_name, project_type, wall_height_ft,
+            wall_height_source=wall_height_source,
+        ))
 
     # 4) Process schedules — takeoff schedules only
     for sched in extracted_data.get("schedules", []):
@@ -650,7 +658,8 @@ def _room_note_text(room: dict) -> str:
 
 
 def _calculate_from_room(room: dict, sheet_name: str, project_type: str = "auto",
-                         wall_height_ft: float = 9.0) -> List[dict]:
+                         wall_height_ft: float = 9.0,
+                         wall_height_source: str = "default") -> List[dict]:
     """Content-first room area calculation.
 
     Priority chain:
@@ -671,11 +680,14 @@ def _calculate_from_room(room: dict, sheet_name: str, project_type: str = "auto"
     if not area or area == 0:
         return results
 
-    ceiling_ht = wall_height_ft or 9  # ft — manifest-driven, else default
+    ceiling_ht = wall_height_ft or 9  # ft — manifest/learned-driven, else default
     perimeter = 4 * (area ** 0.5)
     wall_area = perimeter * ceiling_ht
     src_area = dimensions or f"area={area_raw}"
-    src_wall = f"wall area ≈ perimeter ({perimeter:.0f}lf) × {ceiling_ht:g}ft ceiling"
+    src_wall = (
+        f"wall area ≈ perimeter ({perimeter:.0f}lf) × {ceiling_ht:g}ft ceiling"
+        f" ({wall_height_source} height)"
+    )
 
     profile = PROJECT_TYPE_PROFILES.get(project_type, PROJECT_TYPE_PROFILES["auto"])
     skip = set(profile.get("skip_items", []))
@@ -730,20 +742,26 @@ def _calculate_from_room(room: dict, sheet_name: str, project_type: str = "auto"
             results.append(_room_calc(room_name, "ceiling_grid", area, "sq_ft", sheet_name, src_area))
 
     # --- Step 4: produce wall items ---
+    # Derived wall areas always carry the height assumption's source
+    # (manifest | learned | default) — the assumption is never silent.
     if content_wall:
         for item_type in content_wall:
-            results.append(_room_calc(room_name, item_type, wall_area, "sq_ft", sheet_name, src_wall))
+            results.append(_room_calc(room_name, item_type, wall_area, "sq_ft", sheet_name, src_wall,
+                                      assumption_source=wall_height_source))
     else:
         wall_defaults = [i for i in profile.get("default_wall_items", []) if i not in skip]
         if wall_defaults:
             for item_type in wall_defaults:
-                results.append(_room_calc(room_name, item_type, wall_area, "sq_ft", sheet_name, src_wall))
+                results.append(_room_calc(room_name, item_type, wall_area, "sq_ft", sheet_name, src_wall,
+                                          assumption_source=wall_height_source))
         else:
             # Universal fallback — paint + drywall (unless profile explicitly skips them)
             if "paint" not in skip:
-                results.append(_room_calc(room_name, "paint", wall_area, "sq_ft", sheet_name, src_wall))
+                results.append(_room_calc(room_name, "paint", wall_area, "sq_ft", sheet_name, src_wall,
+                                          assumption_source=wall_height_source))
             if "drywall" not in skip:
-                results.append(_room_calc(room_name, "drywall", wall_area, "sq_ft", sheet_name, src_wall))
+                results.append(_room_calc(room_name, "drywall", wall_area, "sq_ft", sheet_name, src_wall,
+                                          assumption_source=wall_height_source))
 
     return [r for r in results if r]
 
@@ -1136,15 +1154,26 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
 
 
 def _room_calc(room_name: str, item_type: str, area: float, unit_in: str,
-               sheet_name: str, source_note: str) -> Optional[dict]:
-    """Apply a single estimation table to a room's area."""
+               sheet_name: str, source_note: str,
+               assumption_source: Optional[str] = None) -> Optional[dict]:
+    """Apply a single estimation table to a room's area.
+
+    ``assumption_source`` names where a height assumption embedded in the
+    quantity came from ("manifest" | "learned" | "default") — stamped on the
+    result so a learned assumption is visibly flagged, never silent
+    (21-16, RESEARCH §6 injection point 3).
+    """
     try:
         calc_qty, calc_unit, formula = _apply_formula(item_type, area, unit_in, str(area))
         table = ESTIMATION_TABLES.get(item_type, {})
         # Wall quantities derived from the perimeter≈4·√area × default-height proxy
         # are rough estimates, not measured geometry — flag them for human review.
         is_estimated = "≈" in (source_note or "")
+        result_extra = {}
+        if assumption_source:
+            result_extra["assumption_source"] = assumption_source
         return {
+            **result_extra,
             "item_type": item_type,
             "description": f"{item_type.replace('_', ' ').title()} for {room_name}",
             "raw_value": round(area, 1),
