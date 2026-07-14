@@ -267,12 +267,12 @@ def load_learned_context(
     project_key = str(project_key or "").strip()
 
     # Corrections serve two purposes: project_type inference for repeat runs
-    # and the project-scoped quantity-correction flags (guardrail).
-    all_item_corrections = store.get_corrections(
-        scope=store.SCOPE_ITEM, limit=_CORRECTIONS_SCAN_LIMIT
-    )
+    # (ANY scope counts — a project verified only via renames/scale fixes
+    # must still recover its type) and the project-scoped quantity-correction
+    # flags (scope 'item' only — guardrail input).
+    recent_corrections = store.get_corrections(limit=_CORRECTIONS_SCAN_LIMIT)
     if not project_type:
-        project_type = _infer_project_type(project_key, all_item_corrections)
+        project_type = _infer_project_type(project_key, recent_corrections)
     project_type = str(project_type or "").strip()
 
     vocabulary = store.get_vocabulary(project_type or None)
@@ -290,7 +290,9 @@ def load_learned_context(
 
     quantity_corrections: Dict[str, dict] = {}
     if project_key:
-        for row in all_item_corrections:
+        for row in recent_corrections:
+            if row.get("scope") != store.SCOPE_ITEM:
+                continue
             if row.get("project_key") != project_key:
                 continue
             key = _normalize(row.get("item_pattern"))
