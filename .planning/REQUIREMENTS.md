@@ -154,7 +154,7 @@
 ### Accuracy & Learning Engine v3 (Phase 21)
 
 - [x] **V3-ACC-01**: Vector-first measurement — SF/LF/areas from PDF vector geometry + text layer; vision labels semantics, never guesses numbers when geometry exists
-- [ ] **V3-ACC-02**: Auto scale detection v2 — per-viewport binding, area-weighted dominant scale, cross-validated against dimension strings; per-sheet confidence recorded
+- [x] **V3-ACC-02**: Auto scale detection v2 — per-viewport binding, area-weighted dominant scale, cross-validated against dimension strings; per-sheet confidence recorded
 - [ ] **V3-ACC-03**: Ensemble extraction — N-run self-consistency voting for EA counts and vision quantities; tiled counting with dedup; disagreement flags needs_review
 - [x] **V3-ACC-04**: Model upgrade & adaptive fidelity — strongest Claude vision models routed by sheet complexity; adaptive DPI/tiling for dense sheets
 - [ ] **V3-ACC-05**: Verify-retry loop implemented — out-of-band quantities re-queried with targeted crops before flagging (replaces ENABLE_VERIFY_RETRY stub)
@@ -304,7 +304,7 @@
 | HIST-05 | Phase 19 | Complete |
 | HIST-06 | Phase 19 | Complete |
 | V3-ACC-01 | Phase 21 | Complete |
-| V3-ACC-02 | Phase 21 | Pending |
+| V3-ACC-02 | Phase 21 | Complete |
 | V3-ACC-03 | Phase 21 | Pending |
 | V3-ACC-04 | Phase 21 | Complete |
 | V3-ACC-05 | Phase 21 | Pending |

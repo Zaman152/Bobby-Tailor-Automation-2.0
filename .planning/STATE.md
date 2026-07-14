@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-06-PLAN.md — symbol clustering + generalized schedules
-last_updated: "2026-07-14T13:12:40.556Z"
+stopped_at: Completed 21-07-PLAN.md — zero-calibration scale solving
+last_updated: "2026-07-14T13:55:21.603Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-06: Recipe D symbol clustering (style-partitioned union-find, dihedral min-hash) + 6-kind schedule extraction with bbox masks"
+last_activity_desc: "Completed 21-07: zero-calibration scale solving — viewport segmentation + weighted RANSAC consensus, Crow p0 dimension_solve/high 40 fpi, 626 tests green"
 progress:
   total_phases: 22
   completed_phases: 17
@@ -30,9 +30,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 6/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06)  
-Status: Wave 3 in progress — 21-06 done (Recipe D symbol clustering + generalized schedules, 601 tests green)  
-Last activity: 2026-07-14 — Completed 21-06: style-partitioned Recipe D clustering (Crow 136 columns / 56 bollard-scale deterministic), 6-kind schedule extraction with bbox masks
+Plan: 7/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07)  
+Status: Wave 3 in progress — 21-07 done (zero-calibration scale solving: viewports + weighted RANSAC + resolve_scale_v2, 626 tests green)  
+Last activity: 2026-07-14 — Completed 21-07: per-viewport scale solve — Crow p0 dimension_solve/high 40 fpi, Bob 10.57 fpi over decoys, layer-2 gates green
 
 Progress: [████████░░] 81%
 
@@ -54,6 +54,7 @@ Progress: [████████░░] 81%
 | Phase 21-accuracy-learning-engine P04 | 15 min | 3 tasks | 4 files |
 | Phase 21-accuracy-learning-engine P05 | 18 min | 3 tasks | 8 files |
 | Phase 21-accuracy-learning-engine P06 | 25 min | 3 tasks | 8 files |
+| Phase 21-accuracy-learning-engine P07 | 37 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -144,6 +145,11 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-06]: Symbol union-find partitioned by path style class (stroke/fill/width) — endpoint proximity alone merges columns into the wall network; style separation makes CAD blocks enumerable (Crow 136 columns)
 - [Phase 21-06]: Near-duplicate signature merge via second coarse hash (1pt/2deg) + kind counts; MIN_CLUSTER_PRIMITIVES=2 excludes dash/tick noise from symbol groups
 - [Phase 21-06]: Schedule tables claimed by at most one kind (registry order); door kind delegates rows to schedule_extraction and locates bboxes with the same imported gates
+- [Phase 21-07]: RANSAC scale consensus measured in paper-length explained (sum of inlier points), not sample count — recovers Bob 3/32"=1'-0" truth over six identical mispaired 216pt decoys that capture count-voting
+- [Phase 21-07]: Crow p0 main-plan truth is 1"=40' (printed scale + 1136'/350' overall dims); plan's 20-fpi acceptance was a stale research note — geometrically impossible on a 3024pt-wide sheet
+- [Phase 21-07]: HIGH scale confidence = three-condition conjunction (>=8 inliers AND >=80% share AND printed agreement within 1%); printed conflict caps at LOW
+- [Phase 21-07]: Viewport bboxes in UNROTATED PyMuPDF space; leftover claiming uses frozen bboxes + midpoint union so border segments cannot explode a region
+- [Phase 21-07]: resolve_scale_v2 learned prior fires ONLY when solved+printed tiers empty (anti-amplification); unbacked printed tier capped at medium
 
 ### Pending Todos
 
@@ -287,6 +293,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T13:12:22.096Z
-Stopped at: Completed 21-04-PLAN.md — durable learning store + distill
+Last session: 2026-07-14T13:54:43.998Z
+Stopped at: Completed 21-07-PLAN.md — zero-calibration scale solving
 Resume file: None
