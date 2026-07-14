@@ -1,0 +1,98 @@
+{
+  "project": "crow_cass",
+  "pdf": "crow_cass_plans.pdf",
+  "recorded": "2026-07-14",
+  "verification": "Hand-verified against the printed scale text on each sheet (rendered pages read by a human) and cross-checked with the on-sheet dimension strings: page 0 carries 1136'-0\" over 2058.2pt and 350'-0\" over 643.6pt (39.74 / 39.16 ft-per-inch), matching the printed 'SCALE: 1\" = 40'-0\"' under '1 OVERALL FLOOR PLAN'. NOTE: the 21-RESEARCH note claiming a 1\"=20' main-plan truth is geometrically impossible on this sheet (1136 ft at 20 fpi needs 4090pt; the page is 3024pt wide) — see the 21-03 STATE decision 'Crow page 0 consensus fpi=40 matches printed scale'. The 1\"=20' scale exists on this set only on the page-1 West/East elevation viewports.",
+  "pages": [
+    {
+      "page": 0,
+      "sheet": "A-101 OVERALL FLOOR PLAN",
+      "viewports": [
+        {
+          "approx_bbox_pt": [280, 860, 2620, 2110],
+          "fpi": 40,
+          "is_main": true,
+          "printed": "1\" = 40'-0\""
+        },
+        {
+          "approx_bbox_pt": [300, 30, 700, 380],
+          "fpi": 0.6667,
+          "is_main": false,
+          "printed": "1 1/2\" = 1'-0\" (TYPICAL S.C.C.P./SF DETAIL)"
+        },
+        {
+          "approx_bbox_pt": [900, 30, 1400, 380],
+          "fpi": 0.6667,
+          "is_main": false,
+          "printed": "1 1/2\" = 1'-0\" (TYPICAL S.C.C.P. JOINT DETAIL)"
+        },
+        {
+          "approx_bbox_pt": [1500, 30, 1950, 380],
+          "fpi": 0.6667,
+          "is_main": false,
+          "printed": "1 1/2\" = 1'-0\" (TYPICAL S.C.C.P. CORNER DETAIL)"
+        },
+        {
+          "approx_bbox_pt": [2100, 30, 2500, 380],
+          "fpi": 0.6667,
+          "is_main": false,
+          "printed": "1 1/2\" = 1'-0\" (TYP. S.C.C.P. MITERED CORNER)"
+        }
+      ]
+    },
+    {
+      "page": 1,
+      "sheet": "A-201 EXTERIOR ELEVATIONS - OPTION 01",
+      "viewports": [
+        {
+          "approx_bbox_pt": [380, 160, 2500, 740],
+          "fpi": 20,
+          "is_main": false,
+          "printed": "1\" = 20'-0\" (OVERALL WEST ELEVATION)"
+        },
+        {
+          "approx_bbox_pt": [390, 900, 2600, 1370],
+          "fpi": 40,
+          "is_main": false,
+          "printed": "1\" = 40'-0\" (OVERALL SOUTH ELEVATION)"
+        },
+        {
+          "approx_bbox_pt": [370, 1370, 2610, 1900],
+          "fpi": 20,
+          "is_main": false,
+          "printed": "1\" = 20'-0\" (OVERALL EAST ELEVATION)"
+        },
+        {
+          "approx_bbox_pt": [370, 1900, 2510, 2110],
+          "fpi": 40,
+          "is_main": false,
+          "printed": "1\" = 40'-0\" (OVERALL NORTH ELEVATION)"
+        }
+      ]
+    },
+    {
+      "page": 2,
+      "sheet": "A-401 details (bollard/ramp/dock sections)",
+      "note": "Detail sheet — no plan viewport; per-detail scales range 1/4\"..1 1/2\" = 1'-0\" and are not gated.",
+      "viewports": [
+        {
+          "approx_bbox_pt": null,
+          "fpi": null,
+          "is_main": false
+        }
+      ]
+    },
+    {
+      "page": 3,
+      "sheet": "Door schedule / frame types",
+      "note": "Schedule sheet — no solvable plan viewport.",
+      "viewports": [
+        {
+          "approx_bbox_pt": null,
+          "fpi": null,
+          "is_main": false
+        }
+      ]
+    }
+  ]
+}

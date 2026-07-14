@@ -1,0 +1,92 @@
+{
+  "project": "bobs_discount",
+  "pdf": "bobs_discount_plans.pdf",
+  "recorded": "2026-07-14",
+  "verification": "Hand-verified against the printed 'SCALE: 3/32\" = 1'-0\"' (10.6667 ft-per-inch) on the page 1/2 plan viewports (rendered pages read by a human), corroborated by the grid-bay label spacing: the six 30'-0\" bay labels on the right dimension chain sit exactly 202.5pt apart (30ft * 72 / 202.5 = 10.67 fpi) and the 250'-0\" overall dim spans 1700.9pt (10.58 fpi). The six identical 216.0pt candidate pairings that suggest 10.0 fpi are mispaired decoys (216pt = 3.0in would put the bays at 1\"=10', contradicting both the printed scale and the label pitch). Pages are rotation=270; bboxes are in the UNROTATED coordinate space PyMuPDF reports for text/drawings.",
+  "pages": [
+    {
+      "page": 0,
+      "sheet": "Cover / index",
+      "note": "Cover sheet — no measurable viewport.",
+      "viewports": [
+        {
+          "approx_bbox_pt": null,
+          "fpi": null,
+          "is_main": false
+        }
+      ]
+    },
+    {
+      "page": 1,
+      "sheet": "A1.1 FLOOR FINISH PLAN",
+      "viewports": [
+        {
+          "approx_bbox_pt": [72, 99, 2124, 2295],
+          "fpi": 10.6667,
+          "is_main": true,
+          "printed": "3/32\" = 1'-0\""
+        }
+      ]
+    },
+    {
+      "page": 2,
+      "sheet": "REFLECTED CEILING PLAN",
+      "viewports": [
+        {
+          "approx_bbox_pt": [72, 99, 2124, 2295],
+          "fpi": 10.6667,
+          "is_main": true,
+          "printed": "3/32\" = 1'-0\""
+        }
+      ]
+    },
+    {
+      "page": 3,
+      "sheet": "Interior details",
+      "note": "Detail sheet (printed 1\" = 1'-0\" callouts) — no plan viewport.",
+      "viewports": [
+        {
+          "approx_bbox_pt": null,
+          "fpi": null,
+          "is_main": false
+        }
+      ]
+    },
+    {
+      "page": 4,
+      "sheet": "Exterior elevations / demolition",
+      "note": "Elevation sheet (printed 1/8\" and 1/4\" = 1'-0\" callouts) — no plan viewport.",
+      "viewports": [
+        {
+          "approx_bbox_pt": null,
+          "fpi": null,
+          "is_main": false
+        }
+      ]
+    },
+    {
+      "page": 5,
+      "sheet": "Schedules / sections",
+      "note": "No plan viewport.",
+      "viewports": [
+        {
+          "approx_bbox_pt": null,
+          "fpi": null,
+          "is_main": false
+        }
+      ]
+    },
+    {
+      "page": 6,
+      "sheet": "Large-scale details",
+      "note": "Detail sheet (printed 1/3\" and 1 1/3\" class callouts) — no plan viewport.",
+      "viewports": [
+        {
+          "approx_bbox_pt": null,
+          "fpi": null,
+          "is_main": false
+        }
+      ]
+    }
+  ]
+}
