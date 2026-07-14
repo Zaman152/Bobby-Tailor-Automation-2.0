@@ -28,7 +28,9 @@ def _fake_download(project_id, page_id, dest_path, pdf_filepath=None):
     return True
 
 
-def _fake_analyze(image_path: str, sheet_name: str) -> dict:
+def _fake_analyze(image_path: str, sheet_name: str, **kwargs) -> dict:
+    # **kwargs: run_sheet also receives budget=<run-level BudgetGuard> and
+    # pdf blob kwargs (21-REVIEW WR-05) — irrelevant to canned results.
     return {
         "measurements": [{"label": "m1", "value": 1, "unit": "ft"}],
         "components": [],

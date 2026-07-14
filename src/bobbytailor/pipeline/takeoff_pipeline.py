@@ -714,9 +714,10 @@ class TakeoffPipeline:
         self._manifest = None
         # Optional reliable drawing scale (feet per inch) for geometry measurement.
         self._scale_fpi = None
-        # One BudgetGuard per run (set by run_project); run_sheet falls back
-        # to a per-sheet guard when called standalone (scraper path — 21-15
-        # parity will thread the run-level guard there too).
+        # One BudgetGuard per run (set by run_project). The scraper path
+        # threads its own run-level guard via run_sheet(budget=...) —
+        # 21-REVIEW WR-05 parity. The per-sheet fallback in run_sheet exists
+        # only for standalone/dev callers so no call site is ever unguarded.
         self._run_budget: Optional[BudgetGuard] = None
         # extract_schedules() scans the whole document — cache per pdf_path.
         self._schedules_cache: dict = {}

@@ -32,7 +32,9 @@ def _fake_download(project_id, page_id, dest_path, pdf_filepath=None):
     return True
 
 
-def _fake_analyze(image_path: str, sheet_name: str) -> dict:
+def _fake_analyze(image_path: str, sheet_name: str, **kwargs) -> dict:
+    # **kwargs: run_sheet also receives budget=<run-level BudgetGuard> and
+    # pdf blob kwargs (21-REVIEW WR-05) — irrelevant to canned results.
     return {
         "measurements": [{"label": "width", "value": 10, "unit": "ft"}],
         "components": [{"type": "door", "count": 2}],
@@ -161,7 +163,7 @@ class TestFullPipeline:
         pages = _make_pages([1, 2, 3])
         call_count = {"n": 0}
 
-        def counting_analyze(image_path, sheet_name):
+        def counting_analyze(image_path, sheet_name, **kwargs):
             call_count["n"] += 1
             return _fake_analyze(image_path, sheet_name)
 
@@ -301,7 +303,7 @@ class TestAnalyzeOnlyFromManifest:
 
         call_count = {"n": 0}
 
-        def counting_analyze(image_path, sheet_name):
+        def counting_analyze(image_path, sheet_name, **kwargs):
             call_count["n"] += 1
             return _fake_analyze(image_path, sheet_name)
 

@@ -25,10 +25,12 @@ from bobbytailor.scrape.sheet_preview import find_screenshot_paths
 from bobbytailor.vision.claude_analyzer import make_navigation_decision
 from bobbytailor.pipeline.calculator import apply_estimation_tables, resolve_spec_lookups, _detect_project_type
 from bobbytailor.pipeline.takeoff_pipeline import (
+    BudgetGuard,
     RunSettings,
     TakeoffPipeline,
     VECTOR_MIN_DRAWING_ITEMS,
     VECTOR_MIN_WORDS,
+    _budget_state,
     _resolve_wall_height,
 )
 from bobbytailor.pipeline.cross_references import resolve_cross_references
@@ -328,12 +330,16 @@ async def _discover_and_add_linked_sheets(
     log: Callable,
     progress_callback: Optional[Callable],
     cancel_check: Optional[Callable[[], bool]],
+    run_budget: Optional[BudgetGuard] = None,
 ) -> "tuple[List[dict], List[dict]]":
     """Pass 2a–2c: discover linked pages, capture them, analyze them.
 
     Returns (new_extracted, linked_meta) where:
       new_extracted: extraction dicts for linked pages (title_sheets excluded)
       linked_meta: list of {page_id, sheet_name, ref_from} for report metadata
+
+    ``run_budget`` is the caller's run-level BudgetGuard (V3-PROD-02):
+    linked-sheet analysis charges the SAME per-run cap as the main pass.
 
     Estimates are NOT computed here — the caller (run_project_scrape) batches
     estimation after all sheets (including linked) with a single project_type.
@@ -495,7 +501,9 @@ async def _discover_and_add_linked_sheets(
         try:
             log(f"  [linked] Analyzing {sheet_name} with Claude (multi-pass)...")
             extracted = _pipeline.run_sheet(
-                str(screenshot_path), sheet_name, **_pdf_args_for_page(screenshots_dir, page_id),
+                str(screenshot_path), sheet_name,
+                budget=run_budget,
+                **_pdf_args_for_page(screenshots_dir, page_id),
             )
             _enrich_extracted_sheet(extracted, sheet_name, page_id, screenshot_path, screenshots_dir)
 
@@ -551,6 +559,12 @@ async def run_project_scrape(project_id: int, project_name: str,
     # Entry-point parity (V3-STRUCT-02): construct RunSettings.from_env()
     # once per run — identical to pdf_analyzer.run_pdf_analysis.
     _refresh_pipeline_settings()
+    # ONE BudgetGuard per run (V3-PROD-02, 21-REVIEW WR-05): every run_sheet
+    # call in this run — main pass AND linked-sheet pass — charges this
+    # guard, exactly like run_project threads self._run_budget on the PDF
+    # path. Without it, run_sheet fell back to a FRESH per-sheet guard and
+    # an N-sheet StackCT job could legally spend N× the per-run cap.
+    run_budget = BudgetGuard(_pipeline.settings.budget_usd)
     # Learned-context retrieval at run start (21-16, V3-LEARN-03) — same
     # seam pdf_analyzer gets via run_project(project_key=...): prompt hints,
     # scale priors, and re_verify guardrail flags on every run_sheet call.
@@ -822,6 +836,7 @@ async def run_project_scrape(project_id: int, project_name: str,
 
                 extracted = _pipeline.run_sheet(
                     str(screenshot_path), sheet_name,
+                    budget=run_budget,
                     **_pdf_args_for_page(screenshots_dir, page_id),
                 )
                 _enrich_extracted_sheet(
@@ -913,6 +928,7 @@ async def run_project_scrape(project_id: int, project_name: str,
                 log=log,
                 progress_callback=progress_callback,
                 cancel_check=cancel_check,
+                run_budget=run_budget,
             )
             all_extracted.extend(new_extracted)
             # Batch estimation (with project_type) happens below after all sheets
@@ -967,6 +983,13 @@ async def run_project_scrape(project_id: int, project_name: str,
                 wall_height_ft=_wall_height_ft,
                 wall_height_source=_wall_height_source,
             ))
+
+        # Final run-level budget accounting on every sheet dict — identical
+        # to run_project (the reporter surfaces one run-level block).
+        _final_budget = _budget_state(run_budget)
+        for _e in all_extracted:
+            if isinstance(_e, dict):
+                _e["_budget"] = _final_budget
 
         successful = [d for d in all_extracted if "error" not in d]
         if not successful:
@@ -1090,6 +1113,9 @@ async def run_analyze_from_manifest(
     # Entry-point parity (V3-STRUCT-02): construct RunSettings.from_env()
     # once per run — identical to pdf_analyzer.run_pdf_analysis.
     _refresh_pipeline_settings()
+    # ONE BudgetGuard per run (V3-PROD-02, 21-REVIEW WR-05) — analyze-only
+    # runs charge the same run-level cap as full runs.
+    run_budget = BudgetGuard(_pipeline.settings.budget_usd)
 
     # Resolve manifest path ---------------------------------------------------
     if manifest_path_override:
@@ -1227,7 +1253,9 @@ async def run_analyze_from_manifest(
             )
 
             extracted = _pipeline.run_sheet(
-                str(screenshot_path), sheet_name, **_pdf_args_for_page(screenshots_dir, page_id),
+                str(screenshot_path), sheet_name,
+                budget=run_budget,
+                **_pdf_args_for_page(screenshots_dir, page_id),
             )
             _enrich_extracted_sheet(extracted, sheet_name, page_id, screenshot_path, screenshots_dir)
 
@@ -1347,6 +1375,13 @@ async def run_analyze_from_manifest(
             wall_height_ft=_wall_height_ft,
             wall_height_source=_wall_height_source,
         ))
+
+    # Final run-level budget accounting on every sheet dict — identical to
+    # run_project (the reporter surfaces one run-level block).
+    _final_budget = _budget_state(run_budget)
+    for _e in all_extracted:
+        if isinstance(_e, dict):
+            _e["_budget"] = _final_budget
 
     # Report ------------------------------------------------------------------
     successful = [d for d in all_extracted if "error" not in d]

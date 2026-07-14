@@ -26,7 +26,9 @@ from bobbytailor.scrape.capture_manifest import PageEntry, RunManifest, manifest
 # Fixtures & helpers
 # ---------------------------------------------------------------------------
 
-def _fake_analyze(image_path: str, sheet_name: str) -> dict:
+def _fake_analyze(image_path: str, sheet_name: str, **kwargs) -> dict:
+    # **kwargs: run_sheet also receives budget=<run-level BudgetGuard> and
+    # pdf blob kwargs (21-REVIEW WR-05) — irrelevant to canned results.
     return {
         "measurements": [{"label": "m1", "value": 1, "unit": "ft"}],
         "components": [],
@@ -176,7 +178,7 @@ class TestSkipAlreadyAnalyzed:
 
         call_count = {"n": 0}
 
-        def counting_analyze(image_path, sheet_name):
+        def counting_analyze(image_path, sheet_name, **kwargs):
             call_count["n"] += 1
             return _fake_analyze(image_path, sheet_name)
 
@@ -196,7 +198,7 @@ class TestSkipAlreadyAnalyzed:
         # No cache file → must re-analyze
         call_count = {"n": 0}
 
-        def counting_analyze(image_path, sheet_name):
+        def counting_analyze(image_path, sheet_name, **kwargs):
             call_count["n"] += 1
             return _fake_analyze(image_path, sheet_name)
 
@@ -218,7 +220,7 @@ class TestSkipAlreadyAnalyzed:
 
         call_count = {"n": 0}
 
-        def counting_analyze(image_path, sheet_name):
+        def counting_analyze(image_path, sheet_name, **kwargs):
             call_count["n"] += 1
             return _fake_analyze(image_path, sheet_name)
 
@@ -239,7 +241,7 @@ class TestSkipAlreadyAnalyzed:
         )
         call_count = {"n": 0}
 
-        def counting_analyze(image_path, sheet_name):
+        def counting_analyze(image_path, sheet_name, **kwargs):
             call_count["n"] += 1
             return _fake_analyze(image_path, sheet_name)
 
@@ -258,7 +260,7 @@ class TestSkipAlreadyAnalyzed:
         )
         call_count = {"n": 0}
 
-        def counting_analyze(image_path, sheet_name):
+        def counting_analyze(image_path, sheet_name, **kwargs):
             call_count["n"] += 1
             return _fake_analyze(image_path, sheet_name)
 

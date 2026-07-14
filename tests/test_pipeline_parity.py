@@ -776,6 +776,101 @@ class TestDeterministicCallSiteParity:
         assert '"page_index": i' in src
 
 
+class TestBudgetParity:
+    """21-REVIEW WR-05: ONE run-level BudgetGuard across every sheet on the
+    StackCT path — never a fresh per-sheet guard (V3-PROD-02 hard cap)."""
+
+    def _two_page_run(self, tmp_path):
+        run_dir = tmp_path / "run_001"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        pages = []
+        page_json = []
+        for i, name in enumerate(("A1.1", "A1.2"), start=1):
+            rel = f"00{i}_{name}.jpg"
+            (run_dir / rel).write_bytes(b"fake-jpg" * 200)
+            entry = MagicMock()
+            entry.page_id = 1000 + i
+            entry.sheet_name = name
+            entry.capture_status = "ok"
+            entry.analysis_status = "pending"
+            entry.screenshot_rel = rel
+            pages.append(entry)
+            page_json.append({
+                "page_id": 1000 + i, "sheet_name": name,
+                "screenshot_rel": rel, "capture_status": "ok",
+                "analysis_status": "pending", "source": "main",
+            })
+        mpath = run_dir / "manifest.json"
+        mpath.write_text(json.dumps({
+            "project_id": 1, "project_name": "Budget Parity",
+            "folder_id": None, "pages": page_json,
+        }))
+        fake_manifest = MagicMock()
+        fake_manifest.project_name = "Budget Parity"
+        fake_manifest.folder_id = None
+        fake_manifest.pages = pages
+        fake_manifest.save = MagicMock()
+        return mpath, fake_manifest
+
+    def test_analyze_from_manifest_threads_one_run_budget(self, tmp_path):
+        from bobbytailor.pipeline.takeoff_pipeline import BudgetGuard
+        from bobbytailor.scrape import scraper
+
+        mpath, fake_manifest = self._two_page_run(tmp_path)
+
+        def fresh_result(*args, **kwargs):
+            return {
+                "_sheet_type": "floor_plan",
+                "_sheet_name": kwargs.get("sheet_name") or (args[1] if len(args) > 1 else "?"),
+                "_passes_run": ["count", "measure"], "_skipped": False,
+                "components": [], "measurements": [], "rooms": [], "schedules": [],
+            }
+
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_sheet.side_effect = fresh_result
+
+        with (
+            patch("bobbytailor.scrape.scraper.RunManifest") as mock_rm,
+            patch("bobbytailor.scrape.scraper._pipeline", mock_pipeline),
+            patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+            patch("bobbytailor.scrape.scraper._detect_project_type", return_value="auto"),
+            patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.scrape.scraper.generate_report", return_value={"report": "ok"}),
+            patch("bobbytailor.devtools.object_manifest.resolve_project_manifest", return_value=None),
+            patch("bobbytailor.deterministic.plan_deterministic_legends."
+                  "build_deterministic_legends_from_run_dir", return_value=[]),
+        ):
+            mock_rm.load.return_value = fake_manifest
+            _fresh_loop().run_until_complete(
+                scraper.run_analyze_from_manifest(manifest_path_override=mpath)
+            )
+
+        calls = mock_pipeline.run_sheet.call_args_list
+        assert len(calls) == 2, f"expected 2 run_sheet calls, got {len(calls)}"
+        budgets = [c.kwargs.get("budget") for c in calls]
+        assert all(isinstance(b, BudgetGuard) for b in budgets), (
+            f"every run_sheet call must receive the run-level BudgetGuard, got {budgets}"
+        )
+        assert budgets[0] is budgets[1], (
+            "each sheet received a DIFFERENT BudgetGuard — the per-run cap "
+            "multiplies by sheet count (WR-05 regression)"
+        )
+
+    def test_run_project_scrape_source_threads_run_budget(self):
+        """Source-level: both scraper entry functions construct one run-level
+        guard and pass budget=run_budget into run_sheet (incl. linked pass)."""
+        src = _SRC_FILES["scraper"].read_text()
+        assert src.count("run_budget = BudgetGuard(") == 2, (
+            "run_project_scrape AND run_analyze_from_manifest must each "
+            "construct one run-level BudgetGuard"
+        )
+        assert src.count("budget=run_budget") >= 3, (
+            "main pass, analyze-only pass, and linked-sheet pass must all "
+            "charge the run-level guard"
+        )
+
+
 class TestLearningCallSiteParity:
     """The learning seam is shared identically by both entry points (21-16)."""
 
