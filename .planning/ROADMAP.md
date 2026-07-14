@@ -831,7 +831,7 @@ Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
 6. All modules live in a structured package; `pytest` passes; app boots via blueprints; README documents the new layout
 7. `21-UAT.md` signed off for live-testing readiness
 
-**Plans:** 9/18 plans executed
+**Plans:** 10/18 plans executed
 
 Plans:
 **Wave 1**
@@ -854,7 +854,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 21-10-PLAN.md — walls.py parallel-pair LF + rooms.py polygonize SF + footprint cross-check (V3-ACC-01)
+- [x] 21-10-PLAN.md — walls.py parallel-pair LF + rooms.py polygonize SF + footprint cross-check (V3-ACC-01)
 - [ ] 21-11-PLAN.md — vision/ensemble.py: N-run voting, tiled dedup, BudgetGuard (V3-ACC-03, V3-PROD-02)
 
 **Wave 5** *(blocked on Wave 4 completion)*

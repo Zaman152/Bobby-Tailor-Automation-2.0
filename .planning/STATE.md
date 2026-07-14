@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-09-PLAN.md — human-verification capture surface wired into learning store
-last_updated: "2026-07-14T14:55:53.038Z"
+stopped_at: Completed 21-10-PLAN.md — wall & room measurement engines (Recipes B/C)
+last_updated: "2026-07-14T15:55:49.235Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-09: human-verification capture surface wired into learning store (V3-LEARN-01 capture half)"
+last_activity_desc: "Completed 21-10: wall LF-by-class + room polygonize + footprint dual-method cross-check (V3-ACC-01 measure half)"
 progress:
   total_phases: 22
   completed_phases: 17
   total_plans: 100
-  completed_plans: 84
-  percent: 77
+  completed_plans: 85
+  percent: 85
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 9/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09)  
-Status: Wave 3 in progress — 21-09 done (verify/scale/measurements endpoints feed learning store in-request, 657 tests green)  
-Last activity: 2026-07-14 — Completed 21-09: human-verification capture surface wired into learning store (V3-LEARN-01 capture half)
+Plan: 10/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10)  
+Status: Wave 4 in progress — 21-10 done (Recipe B/C wall+room engines, Crow footprint anchor 0.02%, 681 tests green)  
+Last activity: 2026-07-14 — Completed 21-10: wall LF-by-class + room polygonize + footprint dual-method cross-check (V3-ACC-01 measure half)
 
-Progress: [████████░░] 83%
+Progress: [█████████░] 85%
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [████████░░] 83%
 | Phase 21-accuracy-learning-engine P07 | 37 min | 3 tasks | 5 files |
 | Phase 21-accuracy-learning-engine P08 P08 | 32 min | 3 tasks | 5 files |
 | Phase 21-accuracy-learning-engine P09 | 9 min | 2 tasks | 3 files |
+| Phase 21-accuracy-learning-engine P10 P10 | 53 min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -161,6 +162,10 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-09]: verify scope mapping: prior row missing → missed_item, unit-only change → unit, else item (confirmation pins current value); measurements: wall_area → wall_height, others → item
 - [Phase 21-09]: measurements capture diff-based against previously persisted list — repeated saves record nothing new (Pitfall 8 hygiene)
 - [Phase 21-09]: conftest pins LEARNING_DB_PATH to a session tmp DB so endpoint tests never write the real output/learning.db
+- [Phase 21-10]: NETWORK_PRECISION_GRID 1e-6 snap on room-network inputs before unary_union — interpolate-derived connector endpoints round off the line in float, GEOS never nodes them, polygonize merges faces
+- [Phase 21-10]: Wall opening gaps need corroboration (both faces broken OR door-leaf perpendicular segment) — dashed linework otherwise floods opening_gap_widths and poisons the 3'-0" door_check
+- [Phase 21-10]: WallSegment.centerline_pt spans chain end-to-end (openings included) so rooms polygonize closes across doors; length_pt is material-only for honest LF
+- [Phase 21-10]: Crow p0 office pods are single dashed outlines (not wall pairs) — unclosed/unlabeled rooms are vision-fallback territory; footprint anchor 397,692 vs 397,600 SF (0.02%)
 
 ### Pending Todos
 
@@ -304,6 +309,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T14:53:56.150Z
-Stopped at: Completed 21-07-PLAN.md — zero-calibration scale solving
+Last session: 2026-07-14T15:55:19.944Z
+Stopped at: Completed 21-10-PLAN.md — wall & room measurement engines (Recipes B/C)
 Resume file: None
