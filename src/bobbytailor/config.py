@@ -47,6 +47,15 @@ ESCALATION_ENABLED = os.getenv("ESCALATION_ENABLED", "false").lower() in ("1", "
 # adding model-visible detail. Detail zooms use render_clip_crop() instead.
 RENDER_TARGET_PX = int(os.getenv("RENDER_TARGET_PX", "1568"))
 
+# Phase 21 ensemble + budget guard (21-11, V3-ACC-03 / V3-PROD-02).
+# Hard per-run API spend cap in USD — every ensemble/verify-retry call is
+# charged against a BudgetGuard; hitting the cap flags remaining items as
+# needs_review ("budget_exhausted") instead of silently truncating results.
+API_BUDGET_PER_RUN_USD = float(os.getenv("API_BUDGET_PER_RUN_USD", "10.0"))
+# Default ensemble size for residual vision numbers: N=3 samples, escalating
+# to N=5 when the first 3 disagree (21-RESEARCH.md §4).
+ENSEMBLE_N = int(os.getenv("ENSEMBLE_N", "3"))
+
 # StackCT URLs
 STACKCT_BASE_URL = "https://go.stackct.com"
 STACKCT_LOGIN_URL = "https://id.stackct.com/u/login/identifier"

@@ -67,6 +67,12 @@ os.environ.setdefault("CLAUDE_MODEL_DENSE", "claude-opus-4-8")
 os.environ.setdefault("CLAUDE_MODEL_ESCALATION", "claude-fable-5")
 os.environ.setdefault("CLAUDE_MODEL_CLASSIFY", "claude-haiku-4-5-classify")
 
+# Phase 21 ensemble voting + budget guard (21-11). Pin N=3 and the default
+# $10 cap so run_ensemble fan-out counts and ensemble_settings() assertions
+# are deterministic under any collection order / developer .env content.
+os.environ.setdefault("ENSEMBLE_N", "3")
+os.environ.setdefault("API_BUDGET_PER_RUN_USD", "10.0")
+
 
 def _ensure_real(name: str) -> None:
     """Import *name* into sys.modules if it is not already registered.
