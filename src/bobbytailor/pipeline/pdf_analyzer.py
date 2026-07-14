@@ -344,10 +344,13 @@ def run_pdf_analysis(
     # NEVER auto-discovered — a human take-off is an evaluation-only input
     # that benchmark scripts pass explicitly as the scoring reference
     # (scripts/vision_only_benchmark.py). Likewise, object-manifest files are
-    # no longer auto-discovered from the plans PDF's folder: a manifest is an
-    # optional, explicitly uploaded dev input (manifest_path).
+    # NEVER auto-discovered — neither from the plans PDF's folder nor from
+    # the `manifests/` dir (allow_discovery=False, 21-REVIEW WR-08): a
+    # manifest is an optional, explicitly uploaded dev input (manifest_path).
     from bobbytailor.devtools.object_manifest import resolve_project_manifest
-    manifest = resolve_project_manifest(project_name, explicit_path=manifest_path)
+    manifest = resolve_project_manifest(
+        project_name, explicit_path=manifest_path, allow_discovery=False,
+    )
     if manifest:
         logger.info("Using object manifest with %d objects", len(manifest))
 

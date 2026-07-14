@@ -570,12 +570,15 @@ async def run_project_scrape(project_id: int, project_name: str,
     # scale priors, and re_verify guardrail flags on every run_sheet call.
     _pipeline.load_learning(project_name)
 
-    # Object manifest (optional): explicit upload path, else auto-discovery from
-    # the `manifests/` dir by project name. Drives canonical naming + the
-    # completeness guarantee so StackCT runs match the names a user expects and
-    # never silently drop an expected object.
+    # Object manifest (optional dev input): EXPLICIT upload path only.
+    # Plans-only LOCKED contract + WR-08: no manifests/-dir auto-discovery on
+    # any production path — a stale or catch-all `default` manifest must
+    # never silently join a run (it would lock names, inject expected-item
+    # hints, and force needs_review rows).
     from bobbytailor.devtools.object_manifest import resolve_project_manifest
-    object_manifest = resolve_project_manifest(project_name, object_manifest_path)
+    object_manifest = resolve_project_manifest(
+        project_name, object_manifest_path, allow_discovery=False,
+    )
     if object_manifest:
         log(
             f"Object manifest active — {len(object_manifest)} object(s); "
@@ -1148,8 +1151,12 @@ async def run_analyze_from_manifest(
     # with run_project_scrape and pdf_analyzer.run_pdf_analysis.
     _pipeline.load_learning(project_name)
 
+    # Explicit manifest path only — no auto-discovery on production paths
+    # (plans-only LOCKED contract, WR-08).
     from bobbytailor.devtools.object_manifest import resolve_project_manifest
-    object_manifest = resolve_project_manifest(project_name, object_manifest_path)
+    object_manifest = resolve_project_manifest(
+        project_name, object_manifest_path, allow_discovery=False,
+    )
     if object_manifest:
         log(f"Object manifest active — {len(object_manifest)} object(s)")
         _pipeline._manifest = object_manifest

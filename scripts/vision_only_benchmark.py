@@ -96,6 +96,11 @@ _MEASURED_DEFAULT_TOL_PCT = 5.0
 _DECOY_SENTINEL_ITEM = "Decoy Sentinel Item"
 _DECOY_SENTINEL_QTY = 999999.0
 
+# Sentinel item of the planted catch-all decoy manifest (manifests/default.json).
+# If it ever surfaces, production regressed to manifests/-dir auto-discovery
+# (21-REVIEW WR-08 — plans-only LOCKED contract).
+_DECOY_MANIFEST_ITEM = "Decoy Manifest Item Zzqx"
+
 DEFAULT_THRESHOLDS = {
     "min_geometry_acc": 0.97,
     "min_overall_acc": 0.90,
@@ -650,9 +655,40 @@ def _plant_decoy_takeoff(tmp_dir: Path, plans_stem: str) -> Path:
     return decoy
 
 
+def _plant_decoy_manifest() -> Optional[Path]:
+    """Plant a catch-all ``manifests/default.json`` decoy in the CWD (WR-08).
+
+    The `default` manifest matches EVERY project under the old slug
+    discovery, so if its sentinel item ever surfaces in a production result
+    the manifests/-dir auto-discovery regressed. Only planted when no real
+    default manifest exists; returns the planted path for cleanup (None when
+    skipped).
+    """
+    manifests_dir = Path("manifests")
+    decoy = manifests_dir / "default.json"
+    if decoy.exists():
+        print("WARNING: manifests/default.json already exists — decoy manifest "
+              "tripwire skipped (remove the file to enable it)")
+        return None
+    manifests_dir.mkdir(exist_ok=True)
+    decoy.write_text(json.dumps([{"name": _DECOY_MANIFEST_ITEM, "unit": "EA"}]))
+    return decoy
+
+
+def _cleanup_decoy_manifest(decoy: Optional[Path]) -> None:
+    if decoy is None:
+        return
+    try:
+        decoy.unlink()
+        decoy.parent.rmdir()  # only removes the dir when we created it empty
+    except OSError:
+        pass
+
+
 def _assert_no_ground_truth_leakage(result: dict, decoy: Path) -> None:
     """Fail loudly if the pipeline result shows ANY trace of the planted decoy
-    or of companion-legend ingestion (regression tripwire for auto-discovery)."""
+    take-off, decoy manifest, or companion-legend ingestion (regression
+    tripwire for every auto-discovery class)."""
     summary = _summary_of(result)
     for row in summary:
         assert row.get("source") != "companion_takeoff_legend", (
@@ -661,6 +697,10 @@ def _assert_no_ground_truth_leakage(result: dict, decoy: Path) -> None:
         name = str(row.get("item", "")).lower()
         assert _DECOY_SENTINEL_ITEM.lower() not in name, (
             f"GROUND-TRUTH LEAKAGE: planted decoy item surfaced: {row.get('item')}"
+        )
+        assert _DECOY_MANIFEST_ITEM.lower() not in name, (
+            f"MANIFEST LEAKAGE: planted decoy manifest item surfaced: {row.get('item')} "
+            "— manifests/-dir auto-discovery regressed (WR-08)"
         )
         assert _qty(row) != _DECOY_SENTINEL_QTY, (
             f"GROUND-TRUTH LEAKAGE: planted decoy sentinel quantity surfaced on {row.get('item')}"
@@ -692,16 +732,33 @@ def run_vision(name: str, plans: Path, manifest: Optional[Path], run_tag: str = 
         print(f"[{name}{run_tag}] decoy sibling planted + discoverable by devtools finder "
               f"— production result will be asserted leakage-free")
 
-        kwargs = {}
-        if manifest:
-            kwargs["manifest_path"] = str(manifest)
-        t0 = time.time()
-        result = run_pdf_analysis(
-            str(isolated), project_name=f"VisionOnly {name}{run_tag}", **kwargs)
-        elapsed = time.time() - t0
+        # WR-08 tripwire: a catch-all manifests/default.json is planted and
+        # must be discoverable by the DEVTOOLS finder, yet never reach the
+        # production result (production passes allow_discovery=False).
+        decoy_manifest = _plant_decoy_manifest()
+        if decoy_manifest is not None:
+            from bobbytailor.devtools.object_manifest import discover_manifest_path
+            found = discover_manifest_path(f"VisionOnly {name}{run_tag}")
+            assert found and Path(found).resolve() == decoy_manifest.resolve(), (
+                f"Decoy manifest should be discoverable by the devtools finder, got: {found}"
+            )
+            print(f"[{name}{run_tag}] decoy manifests/default.json planted + discoverable "
+                  f"by devtools finder — production result will be asserted manifest-free")
+
+        try:
+            kwargs = {}
+            if manifest:
+                kwargs["manifest_path"] = str(manifest)
+            t0 = time.time()
+            result = run_pdf_analysis(
+                str(isolated), project_name=f"VisionOnly {name}{run_tag}", **kwargs)
+            elapsed = time.time() - t0
+        finally:
+            _cleanup_decoy_manifest(decoy_manifest)
 
         _assert_no_ground_truth_leakage(result, decoy)
-        print(f"[{name}{run_tag}] plans-only confirmed (planted sibling take-off NOT read)")
+        print(f"[{name}{run_tag}] plans-only confirmed (planted sibling take-off and "
+              f"decoy manifest NOT read)")
 
     meta = {
         "mode": "manifest" if manifest else "plans-only",

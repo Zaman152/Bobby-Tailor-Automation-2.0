@@ -959,6 +959,93 @@ class TestCompanionIsolation:
         )
         discovery_spy.assert_not_called()
 
+    def test_manifest_discovery_never_runs_on_pdf_path(self, tmp_path, monkeypatch):
+        """21-REVIEW WR-08: a discoverable manifests/default.json (catch-all)
+        must never join a production PDF run — explicit manifest_path is the
+        only manifest input (plans-only LOCKED contract)."""
+        import bobbytailor.devtools.object_manifest as om
+        from bobbytailor.pipeline import pdf_analyzer
+
+        plans = tmp_path / "Isolation Project-Plans.pdf"
+        _make_vector_pdf(plans, n_lines=10)
+
+        # Plant a catch-all default manifest discoverable relative to CWD.
+        monkeypatch.chdir(tmp_path)
+        manifests_dir = tmp_path / "manifests"
+        manifests_dir.mkdir()
+        (manifests_dir / "default.json").write_text(
+            json.dumps([{"name": "Decoy Manifest Item", "unit": "EA"}])
+        )
+        # Sanity: the devtools finder WOULD discover it.
+        assert om.discover_manifest_path("Isolation Project") is not None
+
+        discovery_spy = MagicMock(wraps=om.discover_manifest_path)
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_project.return_value = ([], [], "auto")
+
+        with (
+            patch.object(om, "discover_manifest_path", discovery_spy),
+            patch("bobbytailor.pipeline.pdf_analyzer.TakeoffPipeline",
+                  return_value=mock_pipeline),
+            patch("bobbytailor.pipeline.pdf_analyzer._page_to_image",
+                  return_value=str(tmp_path / "p.png")),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.generate_report", return_value={"report": "ok"}),
+            patch("bobbytailor.deterministic.plan_deterministic_legends."
+                  "build_deterministic_legends", return_value=[]),
+        ):
+            # NOTE: resolve_project_manifest stays REAL — the production
+            # call site itself must refuse discovery.
+            pdf_analyzer.run_pdf_analysis(str(plans), "Isolation Project")
+
+        discovery_spy.assert_not_called()
+        assert mock_pipeline.run_project.call_args.kwargs.get("manifest") is None
+
+    def test_manifest_discovery_never_runs_on_scraper_path(self, tmp_path, monkeypatch):
+        """WR-08 parity: the StackCT analyze path is production too — no
+        manifests/-dir discovery there either."""
+        import bobbytailor.devtools.object_manifest as om
+        from bobbytailor.scrape import scraper
+
+        run_dir, mpath = _build_scraper_run_dir(tmp_path, with_blob=False)
+
+        monkeypatch.chdir(tmp_path)
+        manifests_dir = tmp_path / "manifests"
+        manifests_dir.mkdir()
+        (manifests_dir / "default.json").write_text(
+            json.dumps([{"name": "Decoy Manifest Item", "unit": "EA"}])
+        )
+        assert om.discover_manifest_path("Parity Test") is not None
+
+        discovery_spy = MagicMock(wraps=om.discover_manifest_path)
+        floor_result = {
+            "_sheet_type": "floor_plan", "_sheet_name": "A1.1",
+            "_passes_run": ["count", "measure"], "_skipped": False,
+            "components": [], "measurements": [], "rooms": [], "schedules": [],
+        }
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_sheet.return_value = floor_result
+
+        with (
+            patch.object(om, "discover_manifest_path", discovery_spy),
+            patch("bobbytailor.scrape.scraper.RunManifest") as mock_rm,
+            patch("bobbytailor.scrape.scraper._pipeline", mock_pipeline),
+            patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+            patch("bobbytailor.scrape.scraper._detect_project_type", return_value="auto"),
+            patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.scrape.scraper.generate_report", return_value={"report": "ok"}),
+            patch("bobbytailor.deterministic.plan_deterministic_legends."
+                  "build_deterministic_legends_from_run_dir", return_value=[]),
+        ):
+            mock_rm.load.return_value = _fake_scraper_manifest()
+            _fresh_loop().run_until_complete(
+                scraper.run_analyze_from_manifest(manifest_path_override=mpath)
+            )
+
+        discovery_spy.assert_not_called()
+
     def test_companion_discovery_absent_from_production_namespaces(self):
         from bobbytailor.pipeline import pdf_analyzer
         from bobbytailor.scrape import scraper

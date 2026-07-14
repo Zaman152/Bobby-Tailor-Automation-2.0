@@ -296,13 +296,15 @@ def load_manifest_safe(path: Optional[str]) -> Optional[Manifest]:
         return None
 
 
-# ── Auto-discovery ────────────────────────────────────────────────────────────
-# StackCT runs are launched from the plan picker, which has no manifest upload
-# control. To let those runs still benefit from manifest naming + completeness,
-# we look for a project-associated manifest file dropped in a `manifests/` dir.
-# Name the file after the project (e.g. ``manifests/crow_cass.json``) — matching
-# is slug-based and fuzzy, so "Crow - Cass White Road" finds "crow_cass.json".
-# ``manifests/default.json`` (if present) is used as a last-resort fallback.
+# ── Auto-discovery (DEV/BENCHMARK ONLY — 21-REVIEW WR-08) ────────────────────
+# Slug-based lookup of a project-associated manifest file in a `manifests/`
+# dir (e.g. ``manifests/crow_cass.json``; ``manifests/default.json`` is a
+# catch-all fallback). The PRODUCTION entry points (pdf_analyzer and both
+# scraper run functions) call resolve_project_manifest with
+# ``allow_discovery=False`` — per the plans-only LOCKED contract, an
+# explicitly provided manifest path is the ONLY manifest input to a
+# production run; a stale/default manifests-dir file must never silently
+# join a run. Discovery remains available for explicit dev tooling.
 
 DEFAULT_MANIFEST_DIRS = ("manifests",)
 
@@ -352,8 +354,13 @@ def resolve_project_manifest(
     project_name: str,
     explicit_path: Optional[str] = None,
     search_dirs: Optional[Iterable[str]] = None,
+    allow_discovery: bool = True,
 ) -> Optional[Manifest]:
     """Load the manifest for a run: explicit path first, else auto-discovery.
+
+    ``allow_discovery=False`` (the PRODUCTION setting — WR-08) restricts the
+    lookup to the explicit path: no manifests/-dir slug matching and no
+    ``default`` catch-all, per the plans-only LOCKED contract.
 
     Never raises — returns None when nothing usable is found.
     """
@@ -361,6 +368,8 @@ def resolve_project_manifest(
         m = load_manifest_safe(explicit_path)
         if m:
             return m
+    if not allow_discovery:
+        return None
     found = discover_manifest_path(project_name, search_dirs=search_dirs)
     if found:
         logger.info("Auto-discovered object manifest %s for project %r", found, project_name)

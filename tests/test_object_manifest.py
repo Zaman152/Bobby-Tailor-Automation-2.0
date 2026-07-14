@@ -236,6 +236,23 @@ def test_resolve_returns_none_when_nothing_found(tmp_path):
     assert resolve_project_manifest("Unknown", search_dirs=[str(tmp_path)]) is None
 
 
+def test_resolve_allow_discovery_false_is_explicit_only(tmp_path):
+    """21-REVIEW WR-08: production passes allow_discovery=False — a matching
+    slug file AND the catch-all default must both be ignored."""
+    _write_manifest(tmp_path, "crow_cass", ["Columns"])
+    _write_manifest(tmp_path, "default", ["X"])
+    assert resolve_project_manifest(
+        "Crow Cass White Road", search_dirs=[str(tmp_path)], allow_discovery=False
+    ) is None
+
+    explicit = _write_manifest(tmp_path, "explicit_one", ["Bollards"])
+    m = resolve_project_manifest(
+        "Crow Cass White Road", explicit_path=str(explicit),
+        search_dirs=[str(tmp_path)], allow_discovery=False,
+    )
+    assert m and [e.name for e in m.entries] == ["Bollards"]
+
+
 def test_template_csv_has_header():
     t = template_csv()
     assert t.splitlines()[0].startswith("name,unit")

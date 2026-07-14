@@ -64,9 +64,9 @@ def run_stackct():
     analyze_only: bool = bool(data.get("analyze_only", False))
     manifest_dir: Optional[str] = data.get("manifest_dir") or None
 
-    # Optional object manifest (canonical names + completeness). If none is
-    # explicitly attached, run_project_scrape auto-discovers one from the
-    # `manifests/` dir by project name.
+    # Optional object manifest (canonical names + completeness) — used ONLY
+    # when explicitly attached to this run. Production never auto-discovers
+    # manifest files (plans-only LOCKED contract, 21-REVIEW WR-08).
     object_manifest_path: Optional[str] = None
     object_manifest_id = data.get("object_manifest_id")
     if object_manifest_id:
