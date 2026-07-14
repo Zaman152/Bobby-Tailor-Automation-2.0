@@ -298,12 +298,15 @@ Add the output as `SECRET_KEY=<value>` in your `.env` file.
 **2. Seed the admin account (once):**
 
 ```bash
-python -m bobbytailor.web.seed_admin
+ADMIN_SEED_PASSWORD='<strong password>' python -m bobbytailor.web.seed_admin
+# or generate a strong random password (printed once — store it immediately):
+python -m bobbytailor.web.seed_admin --generate
 ```
 
-This writes `ADMIN_EMAIL` and `ADMIN_PASSWORD_HASH` to `.env`. Never commit `.env`.
+This writes `ADMIN_EMAIL` and `ADMIN_PASSWORD_HASH` to `.env`. The plaintext
+password is never stored in source control or in `.env`. Never commit `.env`.
 
-Default admin email: `admin@bobbytailor.com`. To change the password, re-run with env overrides or manually update `ADMIN_PASSWORD_HASH` using:
+Default admin email: `admin@bobbytailor.com` (override with `ADMIN_SEED_EMAIL`). To change the password, re-run with env overrides or manually update `ADMIN_PASSWORD_HASH` using:
 
 ```bash
 python -c "import bcrypt; print(bcrypt.hashpw(b'newpassword', bcrypt.gensalt(rounds=12)).decode())"

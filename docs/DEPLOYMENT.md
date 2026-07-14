@@ -13,7 +13,7 @@ restart discipline, error recovery, and data durability.
 | Web UI / API (production) | `gunicorn -w 2 -b 127.0.0.1:5050 app:app --timeout 300` | Root `app.py` is a 5-line wrapper: `from bobbytailor.web.app import create_app; app = create_app()` |
 | Web UI (local dev) | `python3 app.py` | Flask dev server on port 5050 |
 | CLI scrape run | `python3 main.py [--project-id N]` | StackCT scrape → analyze → report |
-| Admin seeding (once) | `python -m bobbytailor.web.seed_admin` | Writes `ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH` to `.env` |
+| Admin seeding (once) | `ADMIN_SEED_PASSWORD='<strong password>' python -m bobbytailor.web.seed_admin` (or `--generate`) | Writes `ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH` to `.env`; the password is never stored in source |
 | Accuracy gate (CI/manual) | `bash scripts/accuracy_gate.sh` | Spends real API credits (~$5–15/run) |
 
 The application must be installed as a package before any entry point works:
@@ -37,7 +37,7 @@ reader; it crash-fails at startup when a required variable is missing.
 | `STACKCT_EMAIL` / `STACKCT_PASSWORD` | StackCT login (Auth0) |
 | `ANTHROPIC_API_KEY` | Claude API key (console.anthropic.com) |
 | `SECRET_KEY` | Flask session signing — `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH` | Web login (bcrypt hash) — seed via `python -m bobbytailor.web.seed_admin` |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH` | Web login (bcrypt hash) — seed via `ADMIN_SEED_PASSWORD='<strong password>' python -m bobbytailor.web.seed_admin` (or `--generate` for a random, printed-once password) |
 
 ### Cost & accuracy controls
 
