@@ -309,3 +309,487 @@ def merge_with_provenance(results: List[dict]) -> dict:
         merged["schedules"] = schedules
     merged["fusion_rejected"] = rejected
     return merged
+
+
+# ── fuse_sheet: ID-grounded label application ────────────────────────────────
+
+# Label a symbol group as this when no legend item matches (must stay in sync
+# with bobbytailor.vision.schemas.UNKNOWN_LABEL — imported lazily below to
+# keep this module import-light).
+_UNKNOWN_LABEL = "unknown"
+
+
+def _field(obj, name: str, default=None):
+    """Read a field from a dataclass-like object or a plain dict."""
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
+
+
+def _wall_candidate_id(thickness_class: str) -> str:
+    """Wall candidate ID for a thickness class ("TC1" → "WALL-TC1")."""
+    cls = str(thickness_class)
+    return cls if cls.startswith("WALL-") else "WALL-%s" % cls
+
+
+def _polygon_bbox(polygon_wkt: str) -> tuple:
+    """PDF-point bbox of a WKT polygon (shapely lazily; zeros on failure)."""
+    try:
+        from shapely import wkt as _wkt  # lazy — heavy import
+
+        return tuple(round(v, 3) for v in _wkt.loads(polygon_wkt).bounds)
+    except Exception:  # noqa: BLE001
+        return (0.0, 0.0, 0.0, 0.0)
+
+
+def _walls_bbox_by_class(walls) -> Dict[str, tuple]:
+    """Union bbox of every wall centerline, grouped by candidate ID."""
+    boxes: Dict[str, List[float]] = {}
+    for wall in walls or []:
+        cid = _field(wall, "candidate_id", "") or _wall_candidate_id(
+            _field(wall, "thickness_class", "") or ""
+        )
+        if not cid or cid == "WALL-":
+            continue
+        for x, y in _field(wall, "centerline_pt", ()) or ():
+            box = boxes.get(cid)
+            if box is None:
+                boxes[cid] = [x, y, x, y]
+            else:
+                box[0] = min(box[0], x)
+                box[1] = min(box[1], y)
+                box[2] = max(box[2], x)
+                box[3] = max(box[3], y)
+    return {cid: tuple(round(v, 3) for v in box) for cid, box in boxes.items()}
+
+
+def build_registry(deterministic_bundle: dict) -> Dict[str, dict]:
+    """Candidate registry ``{candidate_id: {"bbox_pt": ..., "kind": ...}}``.
+
+    Built from ALL deterministic candidates in the bundle: symbol groups
+    (``SYM-n``), wall thickness classes (``WALL-TCn``), room polygons
+    (``ROOM-n``) and viewport regions (``Rn``). Every candidate carries its
+    PDF-point bbox in OUR registry keyed by ID — the model is never asked
+    for coordinates (RESEARCH §3 "Grounding answers back to geometry").
+    """
+    registry: Dict[str, dict] = {}
+
+    for group in deterministic_bundle.get("symbol_groups") or []:
+        cid = _field(group, "candidate_id", "")
+        if cid:
+            registry[cid] = {
+                "bbox_pt": tuple(_field(group, "representative_bbox_pt", ()) or ()),
+                "kind": "symbol_group",
+            }
+
+    walls = deterministic_bundle.get("walls") or []
+    for cid, bbox in _walls_bbox_by_class(walls).items():
+        registry[cid] = {"bbox_pt": bbox, "kind": "wall_class"}
+    # Classes present in wall_lf_by_class but without segment records still
+    # need registry entries so their label answers ground-validate.
+    for cls in deterministic_bundle.get("wall_lf_by_class") or {}:
+        registry.setdefault(
+            _wall_candidate_id(cls), {"bbox_pt": (0.0, 0.0, 0.0, 0.0), "kind": "wall_class"}
+        )
+
+    for room in deterministic_bundle.get("rooms") or []:
+        cid = _field(room, "candidate_id", "")
+        if cid:
+            registry[cid] = {
+                "bbox_pt": _polygon_bbox(_field(room, "polygon_wkt", "") or ""),
+                "kind": "room",
+            }
+
+    for viewport in deterministic_bundle.get("viewports") or []:
+        cid = _field(viewport, "region_id", "")
+        if cid:
+            registry[cid] = {
+                "bbox_pt": tuple(_field(viewport, "bbox_pt", ()) or ()),
+                "kind": "region",
+            }
+
+    return registry
+
+
+def _reject_unknown_id(candidate_id, source: str, answer, rejected: List[dict]) -> None:
+    rejected.append(
+        {
+            "candidate_id": candidate_id,
+            "source": source,
+            "answer": answer,
+            "reason": "unknown_candidate_id",
+        }
+    )
+
+
+def _grounded_labels(
+    entries,
+    id_key: str,
+    source: str,
+    registry: Dict[str, dict],
+    rejected: List[dict],
+) -> Dict[str, dict]:
+    """Index vision label entries by candidate ID, dropping out-of-registry IDs.
+
+    Every vision answer ID is validated against the registry (membership
+    check); unknown IDs are dropped and flagged in ``fusion_rejected`` —
+    they can never produce a component (threat model: grounding bypass).
+    """
+    grounded: Dict[str, dict] = {}
+    for entry in entries or []:
+        if not isinstance(entry, dict):
+            continue
+        cid = entry.get(id_key)
+        if cid not in registry:
+            _reject_unknown_id(cid, source, entry.get("label"), rejected)
+            continue
+        grounded[cid] = entry
+    return grounded
+
+
+def _fuse_symbol_groups(
+    bundle: dict, labels_by_id: Dict[str, dict], components: List[dict]
+) -> None:
+    """Symbol groups → EA components; count is ALWAYS the deterministic size."""
+    for group in bundle.get("symbol_groups") or []:
+        cid = _field(group, "candidate_id", "")
+        if not cid:
+            continue
+        count = int(_field(group, "count", 0) or 0)
+        group_conf = _field(group, "confidence", "medium")
+        group_review = bool(_field(group, "needs_review", False))
+        entry = labels_by_id.get(cid)
+        label = (entry or {}).get("label")
+
+        if entry and label and label != _UNKNOWN_LABEL:
+            components.append(
+                {
+                    "name": label,
+                    "quantity": count,
+                    "unit": "EA",
+                    "provenance": "geometry",
+                    "confidence": _min_confidence(group_conf, entry.get("confidence")),
+                    "candidate_id": cid,
+                    "needs_review": group_review,
+                    "review_reason": (
+                        "symbol group has mixed text tags" if group_review else ""
+                    ),
+                }
+            )
+        else:
+            # Unlabeled / "unknown" label → the deterministic count is still
+            # emitted (flag-don't-guess), named by contained text or the ID.
+            texts = _field(group, "contained_texts", []) or []
+            name = " / ".join(t for t in texts if t) or cid
+            components.append(
+                {
+                    "name": name,
+                    "quantity": count,
+                    "unit": "EA",
+                    "provenance": "geometry",
+                    "confidence": "low",
+                    "candidate_id": cid,
+                    "needs_review": True,
+                    "review_reason": (
+                        "vision label unknown" if entry else "no vision label for symbol group"
+                    ),
+                }
+            )
+
+
+def _fuse_wall_classes(
+    bundle: dict, labels_by_id: Dict[str, dict], components: List[dict]
+) -> None:
+    """Wall thickness classes → LF components (LF from geometry only)."""
+    lf_by_class = bundle.get("wall_lf_by_class") or {}
+    for cls in sorted(lf_by_class):
+        lf = lf_by_class[cls]
+        cid = _wall_candidate_id(cls)
+        entry = labels_by_id.get(cid)
+        label = (entry or {}).get("label")
+        if entry and label and label != _UNKNOWN_LABEL:
+            components.append(
+                {
+                    "name": label,
+                    "quantity": round(float(lf), 1),
+                    "unit": "LF",
+                    "provenance": "geometry",
+                    "confidence": _min_confidence("high", entry.get("confidence")),
+                    "candidate_id": cid,
+                    "needs_review": False,
+                    "review_reason": "",
+                }
+            )
+        else:
+            components.append(
+                {
+                    "name": cid,
+                    "quantity": round(float(lf), 1),
+                    "unit": "LF",
+                    "provenance": "geometry",
+                    "confidence": "low",
+                    "candidate_id": cid,
+                    "needs_review": True,
+                    "review_reason": "unlabeled wall thickness class",
+                }
+            )
+
+
+def _fuse_rooms(
+    bundle: dict,
+    labels_by_id: Dict[str, dict],
+    components: List[dict],
+    rejected: List[dict],
+) -> None:
+    """Rooms → SF components; SF from the polygon regardless of label source.
+
+    Vision labels apply ONLY to rooms with ``label_source == 'none'`` — a
+    deterministic text-in-polygon binding is never overridden; a vision
+    attempt to relabel a text-bound room is audited in ``fusion_rejected``.
+    """
+    fpp = float(bundle.get("fpp") or 0.0)
+    for room in bundle.get("rooms") or []:
+        cid = _field(room, "candidate_id", "")
+        if not cid:
+            continue
+        label = _field(room, "label", "") or ""
+        source = _field(room, "label_source", "none") or "none"
+        room_conf = _field(room, "confidence", "medium")
+        area_pt2 = float(_field(room, "area_pt2", 0.0) or 0.0)
+
+        quantity: Optional[float]
+        if fpp > 0:
+            quantity = round(area_pt2 * fpp * fpp, 1)
+            no_scale = False
+        else:
+            quantity = None  # flag-don't-guess: no scale → no number
+            no_scale = True
+
+        entry = labels_by_id.get(cid)
+        confidence = room_conf
+        label_from_vision = False
+        if source == "none":
+            if entry and entry.get("label"):
+                label = entry["label"]
+                confidence = _min_confidence(room_conf, entry.get("confidence"))
+                label_from_vision = True
+        elif entry and entry.get("label") and entry["label"] != label:
+            rejected.append(
+                {
+                    "candidate_id": cid,
+                    "source": "room_labels",
+                    "answer": entry.get("label"),
+                    "reason": "label_override_blocked",
+                    "kept_label": label,
+                }
+            )
+
+        unlabeled = not label
+        needs_review = no_scale or unlabeled
+        reasons = []
+        if no_scale:
+            reasons.append("no scale bound (fpp missing)")
+        if unlabeled:
+            reasons.append("room unlabeled (vision fallback returned nothing)")
+        components.append(
+            {
+                "name": label or cid,
+                "quantity": quantity,
+                "unit": "SF",
+                "provenance": "geometry",
+                "confidence": "low" if needs_review else confidence,
+                "candidate_id": cid,
+                "label_source": "vision" if label_from_vision else source,
+                "needs_review": needs_review,
+                "review_reason": "; ".join(reasons),
+            }
+        )
+
+
+_ROW_NAME_KEYS = ("ITEM", "DESCRIPTION", "TYPE", "NAME")
+_ROW_QTY_KEYS = ("QTY", "QUANTITY", "COUNT")
+_ROW_UNIT_KEYS = ("UNIT", "UNITS", "UOM")
+
+
+def _row_lookup(row: dict, keys) -> Optional[str]:
+    """Case-insensitive first-match lookup across candidate column names."""
+    upper = {str(k).strip().upper(): v for k, v in row.items()}
+    for key in keys:
+        value = upper.get(key)
+        if value is not None and str(value).strip():
+            return str(value).strip()
+    return None
+
+
+def _fuse_schedules(bundle: dict, components: List[dict]) -> None:
+    """Schedule rows (tables.py) → components with schedule_table provenance.
+
+    Rows are grouped by their name column; an explicit QTY cell is parsed
+    verbatim (text-layer ground truth), otherwise each row counts as one
+    installed instance (e.g. one door per door-schedule row).
+    """
+    for sched in bundle.get("schedules") or []:
+        kind = str(_field(sched, "kind", "schedule") or "schedule")
+        table_conf = _field(sched, "confidence", "medium")
+        grouped: Dict[str, dict] = {}
+        order: List[str] = []
+        for row in _field(sched, "rows", []) or []:
+            if not isinstance(row, dict):
+                continue
+            name = _row_lookup(row, _ROW_NAME_KEYS) or "%s schedule item" % kind.title()
+            qty_text = _row_lookup(row, _ROW_QTY_KEYS)
+            try:
+                qty = float(qty_text) if qty_text is not None else 1.0
+            except ValueError:
+                qty = 1.0
+            unit = (_row_lookup(row, _ROW_UNIT_KEYS) or "EA").upper()
+            key = _norm_name(name)
+            slot = grouped.get(key)
+            if slot is None:
+                grouped[key] = {"name": name, "quantity": qty, "unit": unit}
+                order.append(key)
+            else:
+                slot["quantity"] += qty
+        for key in order:
+            slot = grouped[key]
+            quantity = slot["quantity"]
+            if quantity == int(quantity):
+                quantity = int(quantity)
+            components.append(
+                {
+                    "name": slot["name"],
+                    "quantity": quantity,
+                    "unit": slot["unit"],
+                    "provenance": "schedule_table",
+                    "confidence": table_conf,
+                    "schedule_kind": kind,
+                    "needs_review": False,
+                    "review_reason": "",
+                }
+            )
+
+
+def _fuse_footprint(bundle: dict, components: List[dict]) -> None:
+    """Printed overall dimensions (footprint) → text_layer components."""
+    footprint = bundle.get("footprint")
+    if not footprint:
+        return
+    confidence = _field(footprint, "confidence", "medium")
+    needs_review = bool(_field(footprint, "needs_review", False))
+    reason = _field(footprint, "review_reason", "") or ""
+    area_sf = _field(footprint, "area_sf", None)
+    perimeter_lf = _field(footprint, "perimeter_lf", None)
+    if area_sf:
+        components.append(
+            {
+                "name": "Building Footprint",
+                "quantity": area_sf,
+                "unit": "SF",
+                "provenance": "text_layer",
+                "confidence": confidence,
+                "needs_review": needs_review,
+                "review_reason": reason,
+            }
+        )
+    if perimeter_lf:
+        components.append(
+            {
+                "name": "Building Perimeter",
+                "quantity": perimeter_lf,
+                "unit": "LF",
+                "provenance": "text_layer",
+                "confidence": confidence,
+                "needs_review": needs_review,
+                "review_reason": reason,
+            }
+        )
+
+
+def fuse_sheet(
+    deterministic_bundle: dict,
+    vision_labels: dict,
+    registry: Optional[Dict[str, dict]] = None,
+) -> dict:
+    """Apply vision ID→label answers to deterministic candidates for a sheet.
+
+    Every quantity in the output comes from the deterministic side (group
+    counts, wall LF, room polygon SF, schedule cells, printed dimensions);
+    vision supplies ONLY semantics: which legend item a symbol group is,
+    which material a wall class is, what an unlabeled room is called, and
+    which region is the main plan. A vision answer whose candidate ID is not
+    in the registry is dropped and flagged in ``fusion_rejected``.
+
+    Args:
+        deterministic_bundle: Per-sheet deterministic candidates. Recognized
+            keys (all optional): ``symbol_groups`` (SymbolGroup dicts or
+            objects), ``walls`` + ``wall_lf_by_class`` ({"TC1": lf, ...}),
+            ``rooms`` (RoomPolygon), ``viewports`` (Viewport),
+            ``schedules`` (ScheduleTable), ``footprint`` (Footprint),
+            ``fpp`` (feet per PDF point) and ``sheet_name``.
+        vision_labels: Structured-output vision answers, keyed by the schema
+            field names: ``matches`` (symbol gallery), ``wall_class_labels``
+            + ``main_plan_region`` (semantic overlay pass) and
+            ``room_labels`` (room fallback). Underscore metadata
+            (``_cost_usd`` etc.) is carried through to the result.
+        registry: ``{candidate_id: {"bbox_pt": ..., "kind": ...}}``. When
+            None, built from the bundle via :func:`build_registry`.
+
+    Returns:
+        Extraction dict mirroring the analyze_drawing result shape:
+        ``components`` (every one with ``provenance``/``needs_review``),
+        ``fusion_rejected`` audit list, ``main_plan_region`` (when validly
+        answered) and the standard underscore metadata fields.
+    """
+    vision_labels = vision_labels or {}
+    if registry is None:
+        registry = build_registry(deterministic_bundle)
+
+    components: List[dict] = []
+    rejected: List[dict] = []
+
+    symbol_labels = _grounded_labels(
+        vision_labels.get("matches"), "symbol_id", "matches", registry, rejected
+    )
+    wall_labels = _grounded_labels(
+        vision_labels.get("wall_class_labels"),
+        "wall_class_id",
+        "wall_class_labels",
+        registry,
+        rejected,
+    )
+    room_labels = _grounded_labels(
+        vision_labels.get("room_labels"), "room_id", "room_labels", registry, rejected
+    )
+
+    _fuse_symbol_groups(deterministic_bundle, symbol_labels, components)
+    _fuse_wall_classes(deterministic_bundle, wall_labels, components)
+    _fuse_rooms(deterministic_bundle, room_labels, components, rejected)
+    _fuse_schedules(deterministic_bundle, components)
+    _fuse_footprint(deterministic_bundle, components)
+
+    result: dict = {
+        "components": components,
+        "fusion_rejected": rejected,
+        "_pass_type": "fusion",
+        "_source_sheet": deterministic_bundle.get("sheet_name", ""),
+        "_tokens_in": vision_labels.get("_tokens_in", 0),
+        "_tokens_out": vision_labels.get("_tokens_out", 0),
+        "_cost_usd": vision_labels.get("_cost_usd", 0),
+        "_model_used": vision_labels.get("_model_used", ""),
+    }
+
+    main_region = vision_labels.get("main_plan_region")
+    if main_region is not None:
+        if main_region in registry:
+            result["main_plan_region"] = main_region
+        else:
+            _reject_unknown_id(main_region, "main_plan_region", main_region, rejected)
+
+    if rejected:
+        logger.info(
+            "fuse_sheet[%s]: %d vision answer(s) rejected (%s)",
+            result["_source_sheet"],
+            len(rejected),
+            ", ".join(sorted({str(r.get("reason")) for r in rejected})),
+        )
+    return result
