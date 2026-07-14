@@ -10,12 +10,23 @@ from typing import Optional
 from flask import Blueprint, jsonify, request, Response
 from werkzeug.utils import secure_filename
 
-from bobbytailor.web.jobs_runtime import jobs, object_manifests, uploads
+from bobbytailor.web.jobs_runtime import jobs, object_manifests, register_job, uploads
 from bobbytailor.web.jobs_runtime import _pdf_job, _stackct_job
 
 logger = logging.getLogger(__name__)
 
 runs_bp = Blueprint("runs", __name__)
+
+
+def _job_conflict_response(active_job_id: str):
+    """409 for a second concurrent job (WR-06 single-active-job guard)."""
+    return jsonify({
+        "error": (
+            "Another takeoff job is already running. Wait for it to "
+            "finish or cancel it before starting a new one."
+        ),
+        "active_job_id": active_job_id,
+    }), 409
 
 
 def _safe_upload_name(filename, fallback: str = "upload.pdf") -> str:
@@ -84,7 +95,7 @@ def run_stackct():
     mode_detail = "analyze_only" if analyze_only else "full"
 
     job_id = str(uuid.uuid4())[:8]
-    jobs[job_id] = {
+    conflict = register_job(job_id, {
         "id": job_id, "type": "stackct", "status": "queued",
         "progress": 0, "log": [], "result": None, "error": None,
         "project": project_name, "mode": mode, "mode_detail": mode_detail,
@@ -94,7 +105,9 @@ def run_stackct():
         "sheets_completed": [],
         "linked_sheets_count": 0,
         "linked_sheets_suggested_count": 0,
-    }
+    })
+    if conflict:
+        return _job_conflict_response(conflict)
 
     t = threading.Thread(
         target=_stackct_job,
@@ -172,7 +185,7 @@ def run_pdf_from_upload():
         manifest_count = man.get("count", 0)
 
     job_id = str(uuid.uuid4())[:8]
-    jobs[job_id] = {
+    conflict = register_job(job_id, {
         "id": job_id, "type": "pdf", "status": "queued",
         "progress": 0, "log": [], "result": None, "error": None,
         "project": project_name,
@@ -182,7 +195,9 @@ def run_pdf_from_upload():
         "sheets_completed": [],
         "selected_pages": selected_pages,
         "object_manifest_count": manifest_count,
-    }
+    })
+    if conflict:
+        return _job_conflict_response(conflict)
 
     t = threading.Thread(
         target=_pdf_job,
@@ -276,14 +291,21 @@ def run_pdf():
     f.save(save_path)
 
     job_id = str(uuid.uuid4())[:8]
-    jobs[job_id] = {
+    conflict = register_job(job_id, {
         "id": job_id, "type": "pdf", "status": "queued",
         "progress": 0, "log": [], "result": None, "error": None,
         "project": project_name, "file": f.filename,
         "started_at": None,
         "current_sheet": {"index": 0, "total": 0, "name": None, "phase": None},
         "sheets_completed": []
-    }
+    })
+    if conflict:
+        # Remove the file this rejected request already saved.
+        try:
+            os.remove(save_path)
+        except OSError:
+            pass
+        return _job_conflict_response(conflict)
 
     t = threading.Thread(
         target=_pdf_job, args=(job_id, save_path, project_name), daemon=True

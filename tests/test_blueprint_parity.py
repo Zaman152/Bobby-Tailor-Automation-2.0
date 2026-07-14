@@ -208,6 +208,64 @@ def test_upload_filename_is_sanitized_on_disk(authed_client, tmp_path):
             os.remove(meta["save_path"])
 
 
+# ── Single-active-job guard (21-REVIEW WR-06) ───────────────────────────────
+
+def test_second_concurrent_job_rejected_with_409(authed_client):
+    """The scraper pipeline keeps per-run state on a shared singleton —
+    overlapping jobs would bleed learned context/manifest between projects.
+    A second job while one is queued/running must be refused with 409."""
+    import glob
+    import io
+    import os
+    from unittest import mock
+
+    from bobbytailor.web import jobs_runtime
+
+    created = []
+    try:
+        with mock.patch("bobbytailor.web.blueprints.runs._pdf_job"):
+            r1 = authed_client.post(
+                "/api/run/pdf",
+                data={"file": (io.BytesIO(b"%PDF-1.4"), "first.pdf")},
+                content_type="multipart/form-data",
+            )
+            assert r1.status_code == 200
+            first_id = r1.get_json()["job_id"]
+            created.append(first_id)
+
+            # First job still queued (worker mocked) → second is refused.
+            r2 = authed_client.post(
+                "/api/run/pdf",
+                data={"file": (io.BytesIO(b"%PDF-1.4"), "second.pdf")},
+                content_type="multipart/form-data",
+            )
+            assert r2.status_code == 409
+            assert r2.get_json()["active_job_id"] == first_id
+
+            # The StackCT endpoint honors the same guard.
+            r3 = authed_client.post(
+                "/api/run/stackct",
+                json={"mode": "specific", "project_id": 1, "project_name": "X"},
+            )
+            assert r3.status_code == 409
+
+            # A finished job frees the slot.
+            jobs_runtime.jobs[first_id]["status"] = "done"
+            r4 = authed_client.post(
+                "/api/run/pdf",
+                data={"file": (io.BytesIO(b"%PDF-1.4"), "third.pdf")},
+                content_type="multipart/form-data",
+            )
+            assert r4.status_code == 200
+            created.append(r4.get_json()["job_id"])
+    finally:
+        for jid in created:
+            jobs_runtime.jobs.pop(jid, None)
+        for pattern in ("*_first.pdf", "*_second.pdf", "*_third.pdf"):
+            for leftover in glob.glob(os.path.join("uploads", pattern)):
+                os.remove(leftover)
+
+
 def test_run_pdf_missing_or_uppercase_filename_handled(authed_client):
     import io
 

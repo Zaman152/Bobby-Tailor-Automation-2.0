@@ -28,6 +28,30 @@ object_manifests: dict = {}
 
 job_lock = threading.Lock()
 
+#: Job statuses that occupy the single run slot (WR-06).
+ACTIVE_JOB_STATUSES = ("queued", "running")
+
+
+def register_job(job_id: str, job: dict) -> Optional[str]:
+    """Atomically register *job* unless another job is active (21-REVIEW WR-06).
+
+    The scraper keeps per-run state on a shared module-level pipeline
+    singleton (LearnedContext, object manifest, RunSettings, schedules
+    cache). Two overlapping jobs would swap each other's learned context
+    mid-run — sheet analysis for project A silently picking up project B's
+    prompt hints, scale priors, and re_verify flags. One active job at a
+    time is enforced here, under ``job_lock``, at registration time.
+
+    Returns None when the job was registered, else the id of the currently
+    active (queued/running) job that holds the slot.
+    """
+    with job_lock:
+        for jid, existing in jobs.items():
+            if existing.get("status") in ACTIVE_JOB_STATUSES:
+                return jid
+        jobs[job_id] = job
+        return None
+
 def _run_async(coro):
     """Run an async coroutine from a sync thread."""
     loop = asyncio.new_event_loop()
