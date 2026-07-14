@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-05-PLAN.md — model routing v2 + render fidelity
-last_updated: "2026-07-14T12:40:20.272Z"
+stopped_at: Completed 21-06-PLAN.md — symbol clustering + generalized schedules
+last_updated: "2026-07-14T13:12:40.556Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-05: config-driven MODEL_ROUTING v2 (July 2026 slugs), PRICING refresh, 1568px render retarget + render_clip_crop"
+last_activity_desc: "Completed 21-06: Recipe D symbol clustering (style-partitioned union-find, dihedral min-hash) + 6-kind schedule extraction with bbox masks"
 progress:
   total_phases: 22
   completed_phases: 17
   total_plans: 100
-  completed_plans: 80
-  percent: 80
+  completed_plans: 81
+  percent: 77
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 5/18 complete (21-01, 21-02, 21-03, 21-04, 21-05)  
-Status: Wave 2 complete — 21-05 done (model routing v2 + render fidelity, 588 tests green); waves 3-10 next  
-Last activity: 2026-07-14 — Completed 21-05: MODEL_ROUTING v2 (config-driven July 2026 slugs), PRICING refresh, 1568px render retarget + render_clip_crop primitive
+Plan: 6/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06)  
+Status: Wave 3 in progress — 21-06 done (Recipe D symbol clustering + generalized schedules, 601 tests green)  
+Last activity: 2026-07-14 — Completed 21-06: style-partitioned Recipe D clustering (Crow 136 columns / 56 bollard-scale deterministic), 6-kind schedule extraction with bbox masks
 
-Progress: [████████░░] 80%
+Progress: [████████░░] 81%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [████████░░] 80%
 **Recent Trend:** Phase 3 executed in 3 sequential waves (03-01 → 03-02 → 03-03)
 | Phase 21-accuracy-learning-engine P04 | 15 min | 3 tasks | 4 files |
 | Phase 21-accuracy-learning-engine P05 | 18 min | 3 tasks | 8 files |
+| Phase 21-accuracy-learning-engine P06 | 25 min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -140,6 +141,9 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-05]: MODEL_ROUTING v2: legend/schedule structuring → CLAUDE_MODEL_DENSE; wildcard ('*', pass) rows for classify/semantic/legend/schedule/verify_retry; count/measure rows keep CLAUDE_MODEL_SCHEDULES
 - [Phase 21-05]: Whole-sheet renders target RENDER_TARGET_PX=1568 long edge; 8000px is a safety cap only; render_clip_crop is the sole zoom primitive for crops/tiles/galleries
 - [Phase 21-05]: conftest pins CLAUDE_MODEL_CLASSIFY to suffixed throwaway 'claude-haiku-4-5-classify' because its real default equals CLAUDE_MODEL — distinct pins keep routes distinguishable
+- [Phase 21-06]: Symbol union-find partitioned by path style class (stroke/fill/width) — endpoint proximity alone merges columns into the wall network; style separation makes CAD blocks enumerable (Crow 136 columns)
+- [Phase 21-06]: Near-duplicate signature merge via second coarse hash (1pt/2deg) + kind counts; MIN_CLUSTER_PRIMITIVES=2 excludes dash/tick noise from symbol groups
+- [Phase 21-06]: Schedule tables claimed by at most one kind (registry order); door kind delegates rows to schedule_extraction and locates bboxes with the same imported gates
 
 ### Pending Todos
 
@@ -283,6 +287,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T12:40:03.705Z
+Last session: 2026-07-14T13:12:22.096Z
 Stopped at: Completed 21-04-PLAN.md — durable learning store + distill
 Resume file: None

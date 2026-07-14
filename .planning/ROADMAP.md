@@ -831,7 +831,7 @@ Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
 6. All modules live in a structured package; `pytest` passes; app boots via blueprints; README documents the new layout
 7. `21-UAT.md` signed off for live-testing readiness
 
-**Plans:** 5/18 plans executed
+**Plans:** 6/18 plans executed
 
 Plans:
 **Wave 1**
@@ -847,7 +847,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 21-06-PLAN.md — deterministic/symbols.py clustering + tables.py generalized schedules (V3-ACC-01)
+- [x] 21-06-PLAN.md — deterministic/symbols.py clustering + tables.py generalized schedules (V3-ACC-01)
 - [ ] 21-07-PLAN.md — viewports.py + scale_solver.py: zero-calibration RANSAC solve + scale_truth gates (V3-ACC-02)
 - [ ] 21-08-PLAN.md — vision schemas (no-numbers), Set-of-Mark overlays, crop galleries, structured outputs (V3-ACC-01/04)
 - [ ] 21-09-PLAN.md — Verify endpoints feed the learning store in-request (V3-LEARN-01)
