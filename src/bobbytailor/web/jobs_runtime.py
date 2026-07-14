@@ -13,6 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from bobbytailor.stores import job_store
+
 logger = logging.getLogger(__name__)
 
 # In-memory job tracker
@@ -55,6 +57,11 @@ def _user_facing_job_error(error_code: str) -> str:
 def _persist_job_history(job_id: str, job_type: str) -> None:
     try:
         job_store.save_job_run(jobs[job_id], job_id=job_id, job_type=job_type)
+    except (NameError, ImportError, AttributeError):
+        # Wiring bugs (missing import / renamed API) must fail loudly —
+        # swallowing them silently disabled ALL job-history persistence
+        # once before (21-REVIEW CR-02).
+        raise
     except Exception:
         logger.exception("Failed to persist job run %s to history", job_id)
 

@@ -123,5 +123,98 @@ class JobHistoryApiTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 401)
 
 
+class PersistJobHistoryTests(unittest.TestCase):
+    """Regression: 21-REVIEW CR-02 — jobs_runtime must actually persist runs.
+
+    The 21-02 extraction of jobs_runtime.py dropped the job_store import, so
+    every _persist_job_history call raised NameError, silently swallowed by
+    the broad except — NO job run ever reached /api/jobs/history. These tests
+    prove persistence end-to-end through jobs_runtime itself.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db_path = Path(self.tmp.name) / "test_jobs.db"
+        self.patchers = [
+            mock.patch("bobbytailor.stores.job_store.STACKCT_DB_PATH", self.db_path),
+            mock.patch("bobbytailor.stores.job_store.JOB_HISTORY_RETENTION_DAYS", 0),
+        ]
+        for p in self.patchers:
+            p.start()
+        job_store._initialized = False
+
+    def tearDown(self):
+        for p in self.patchers:
+            p.stop()
+        job_store._initialized = False
+        self.tmp.cleanup()
+
+    def test_persist_job_history_writes_a_row(self):
+        from bobbytailor.web import jobs_runtime
+
+        job_id = "cr02unit"
+        jobs_runtime.jobs[job_id] = make_job(status="done")
+        try:
+            jobs_runtime._persist_job_history(job_id, "stackct")
+        finally:
+            jobs_runtime.jobs.pop(job_id, None)
+        row = job_store.get_job_run(job_id)
+        self.assertIsNotNone(row, "job run was not persisted to history")
+        self.assertEqual(row["outcome"], "success")
+        self.assertEqual(row["job_type"], "stackct")
+
+    def test_pdf_job_persists_history_on_success(self):
+        from bobbytailor.web import jobs_runtime
+
+        job_id = "cr02pdf"
+        jobs_runtime.jobs[job_id] = {
+            "id": job_id, "type": "pdf", "status": "queued",
+            "progress": 0, "log": [], "result": None, "error": None,
+            "project": "CR02 Project", "file": "x.pdf",
+            "started_at": None,
+            "current_sheet": {"index": 0, "total": 0, "name": None, "phase": None},
+            "sheets_completed": [],
+        }
+        fake_result = {"total_line_items": 3, "sheets_processed": 1}
+        try:
+            with mock.patch(
+                "bobbytailor.pipeline.pdf_analyzer.run_pdf_analysis",
+                return_value=fake_result,
+            ):
+                jobs_runtime._pdf_job(job_id, "/tmp/fake.pdf", "CR02 Project")
+            self.assertEqual(jobs_runtime.jobs[job_id]["status"], "done")
+        finally:
+            jobs_runtime.jobs.pop(job_id, None)
+        row = job_store.get_job_run(job_id)
+        self.assertIsNotNone(row, "finished PDF job never reached job history")
+        self.assertEqual(row["job_type"], "pdf")
+        self.assertEqual(row["outcome"], "success")
+
+    def test_pdf_job_persists_history_on_error(self):
+        from bobbytailor.web import jobs_runtime
+
+        job_id = "cr02err"
+        jobs_runtime.jobs[job_id] = {
+            "id": job_id, "type": "pdf", "status": "queued",
+            "progress": 0, "log": [], "result": None, "error": None,
+            "project": "CR02 Project", "file": "x.pdf",
+            "started_at": None,
+            "current_sheet": {"index": 0, "total": 0, "name": None, "phase": None},
+            "sheets_completed": [],
+        }
+        try:
+            with mock.patch(
+                "bobbytailor.pipeline.pdf_analyzer.run_pdf_analysis",
+                side_effect=RuntimeError("boom"),
+            ):
+                jobs_runtime._pdf_job(job_id, "/tmp/fake.pdf", "CR02 Project")
+            self.assertEqual(jobs_runtime.jobs[job_id]["status"], "error")
+        finally:
+            jobs_runtime.jobs.pop(job_id, None)
+        row = job_store.get_job_run(job_id)
+        self.assertIsNotNone(row, "failed PDF job never reached job history")
+        self.assertEqual(row["outcome"], "failed")
+
+
 if __name__ == "__main__":
     unittest.main()
