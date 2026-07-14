@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-13-PLAN.md — deterministic-first pipeline integration
-last_updated: "2026-07-14T17:41:18.958Z"
+stopped_at: Completed 21-14-PLAN.md — targeted-crop verify-retry loop
+last_updated: "2026-07-14T18:05:15.312Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-13: deterministic-first TakeoffPipeline — vector sheets measured by geometry/text, vision labels only; raster ensemble fallback; per-run budget guard; provenance/scale-confidence reporting (V3-ACC-01/03 integrated)"
+last_activity_desc: "Completed 21-14: targeted-crop verify-retry loop — flagged out-of-band quantities and ensemble disagreements arbitrated by bounded, budget-charged dense-model crop questions (V3-ACC-05); legacy env stub removed"
 progress:
   total_phases: 22
   completed_phases: 17
@@ -30,9 +30,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 13/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11, 21-12, 21-13)  
-Status: Wave 6 done — 21-13 (deterministic-first pipeline integration: vector/raster routing + RunSettings + budget threading + provenance reporting, 760 tests green)  
-Last activity: 2026-07-14 — Completed 21-13: deterministic-first TakeoffPipeline is the production path; vision labels, geometry measures (V3-ACC-01/03 integrated)
+Plan: 14/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11, 21-12, 21-13, 21-14)  
+Status: Wave 7 in progress — 21-14 (targeted-crop verify-retry: bounded budget-charged arbitration of out-of-band/ensemble-disagreement flags, 774 tests green)  
+Last activity: 2026-07-14 — Completed 21-14: verify_retry.py engine + pipeline wiring; ENABLE_VERIFY_RETRY stub replaced by settings.verify_retry_enabled (V3-ACC-05)
 
 Progress: [█████████░] 88%
 
@@ -61,6 +61,7 @@ Progress: [█████████░] 88%
 | Phase 21-accuracy-learning-engine P11 P11 | 16 min | 3 tasks | 5 files |
 | Phase 21-accuracy-learning-engine P12 P12 | 25 min | 3 tasks | 3 files |
 | Phase 21-accuracy-learning-engine P13 P13 | 40 min | 3 tasks | 5 files |
+| Phase 21-accuracy-learning-engine P14 P14 | 14 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -182,6 +183,9 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-13]: Deterministic ScheduleTables ride as _deterministic_schedules metadata (rows already fused as schedule_table components) — attaching as 'schedules' would double-count via calculator
 - [Phase 21-13]: select_main_plan is the measurement authority; vision main_plan_region kept only as cross-check (main_plan_region_vision on disagreement)
 - [Phase 21-13]: py3.9 + PEP 563 + spec-loaded modules: dataclasses in takeoff_pipeline built over real type-object __annotations__ (string annotations need sys.modules[cls.__module__] at decoration)
+- [Phase 21-14]: verify_retry answers are choice-enum grounded; symbol-anchored out-of-band flags get legend labels as choices (relabel path) — on vector sheets the deterministic count is exact, so the label is the suspect, never the number
+- [Phase 21-14]: Retry bound semantics: deny ('no') is definite (single attempt, flag kept unresolved); only 'unclear' consumes the second attempt, which widens the crop pad 0.25→0.75 for more context
+- [Phase 21-14]: Verify-retry merge-back: relabeled renames the component (quantity/unit untouched) and clears needs_review; confirmed downgrades the flag to a note; unresolved keeps the flag — retry_history mandatory on every touched item
 
 ### Pending Todos
 
@@ -325,6 +329,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T17:41:03.013Z
-Stopped at: Completed 21-13-PLAN.md — deterministic-first pipeline integration
+Last session: 2026-07-14T18:05:15.307Z
+Stopped at: Completed 21-14-PLAN.md — targeted-crop verify-retry loop
 Resume file: None

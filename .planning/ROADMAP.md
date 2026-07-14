@@ -831,7 +831,7 @@ Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
 6. All modules live in a structured package; `pytest` passes; app boots via blueprints; README documents the new layout
 7. `21-UAT.md` signed off for live-testing readiness
 
-**Plans:** 13/18 plans executed
+**Plans:** 14/18 plans executed
 
 Plans:
 **Wave 1**
@@ -867,7 +867,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 21-14-PLAN.md — Verify-retry loop with targeted crops (V3-ACC-05)
+- [x] 21-14-PLAN.md — Verify-retry loop with targeted crops (V3-ACC-05)
 - [ ] 21-15-PLAN.md — Plans-only contract + StackCT blob parity + companion demotion (V3-STRUCT-02, V3-LEARN-04)
 
 **Wave 8** *(blocked on Wave 7 completion)*
