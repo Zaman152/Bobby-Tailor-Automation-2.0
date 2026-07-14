@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-04-PLAN.md — durable learning store + distill
-last_updated: "2026-07-14T12:15:45.898Z"
+stopped_at: Completed 21-05-PLAN.md — model routing v2 + render fidelity
+last_updated: "2026-07-14T12:40:20.272Z"
 last_activity: 2026-07-14
-last_activity_desc: "Baseline re-verified on clean HEAD: 536 non-golden tests green; GitNexus reindexed"
+last_activity_desc: "Completed 21-05: config-driven MODEL_ROUTING v2 (July 2026 slugs), PRICING refresh, 1568px render retarget + render_clip_crop"
 progress:
   total_phases: 22
   completed_phases: 17
   total_plans: 100
-  completed_plans: 78
-  percent: 77
+  completed_plans: 80
+  percent: 80
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 4/18 complete (21-01, 21-02, 21-03, 21-04)  
-Status: Wave 2 in progress — 21-04 re-executed clean (learning store + distill, 549 tests green); 21-05 next, then waves 3-10  
-Last activity: 2026-07-14 — Completed 21-04: durable learning store (learning.db, 4 tables) + idempotent distill with conflict/decay
+Plan: 5/18 complete (21-01, 21-02, 21-03, 21-04, 21-05)  
+Status: Wave 2 complete — 21-05 done (model routing v2 + render fidelity, 588 tests green); waves 3-10 next  
+Last activity: 2026-07-14 — Completed 21-05: MODEL_ROUTING v2 (config-driven July 2026 slugs), PRICING refresh, 1568px render retarget + render_clip_crop primitive
 
-Progress: [████████░░] 78%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [████████░░] 78%
 
 **Recent Trend:** Phase 3 executed in 3 sequential waves (03-01 → 03-02 → 03-03)
 | Phase 21-accuracy-learning-engine P04 | 15 min | 3 tasks | 4 files |
+| Phase 21-accuracy-learning-engine P05 | 18 min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,10 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-04]: learning_vocabulary UNIQUE widened to (project_type, raw_pattern, canonical_name, unit) — §6 conflict/decay needs decayed old + new mappings to coexist; 2-col UNIQUE makes that unrepresentable
 - [Phase 21-04]: Distilled state is a pure function of the log: replay in id order, last_seen = correction created_at (never now), staleness decay fires at new-verified-run boundaries — incremental == full_rebuild under any batching
 - [Phase 21-04]: Assumptions distilled at BOTH exact (project_key) and type (project_key NULL) levels so learning transfers to new projects; retrieval precedence keeps exact rows winning
+- [Phase 21-05]: resolve_routed_model() is the single pure exact→wildcard MODEL_ROUTING lookup; name heuristics stay in pick_model_for_pass/_pick_model so the deferred import cannot recurse
+- [Phase 21-05]: MODEL_ROUTING v2: legend/schedule structuring → CLAUDE_MODEL_DENSE; wildcard ('*', pass) rows for classify/semantic/legend/schedule/verify_retry; count/measure rows keep CLAUDE_MODEL_SCHEDULES
+- [Phase 21-05]: Whole-sheet renders target RENDER_TARGET_PX=1568 long edge; 8000px is a safety cap only; render_clip_crop is the sole zoom primitive for crops/tiles/galleries
+- [Phase 21-05]: conftest pins CLAUDE_MODEL_CLASSIFY to suffixed throwaway 'claude-haiku-4-5-classify' because its real default equals CLAUDE_MODEL — distinct pins keep routes distinguishable
 
 ### Pending Todos
 
@@ -278,6 +283,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T12:15:45.892Z
+Last session: 2026-07-14T12:40:03.705Z
 Stopped at: Completed 21-04-PLAN.md — durable learning store + distill
 Resume file: None
