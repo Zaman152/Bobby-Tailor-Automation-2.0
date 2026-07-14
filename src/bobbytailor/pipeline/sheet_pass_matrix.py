@@ -20,7 +20,13 @@ import logging
 import re
 from typing import Optional
 
-from config import CLAUDE_MODEL, CLAUDE_MODEL_SCHEDULES
+from config import (
+    CLAUDE_MODEL,
+    CLAUDE_MODEL_CLASSIFY,
+    CLAUDE_MODEL_DENSE,
+    CLAUDE_MODEL_SCHEDULES,
+    CLAUDE_MODEL_SEMANTIC,
+)
 
 # Optional: fall back gracefully if _pick_model is not yet importable
 try:
@@ -47,26 +53,62 @@ PASS_MATRIX: dict[str, list[str]] = {
 }
 
 # ---------------------------------------------------------------------------
-# MODEL_ROUTING
-# Maps (sheet_type, pass_type) → model slug for passes that need Sonnet.
-# All entries not listed here use the default CLAUDE_MODEL (Haiku).
+# MODEL_ROUTING (v2 — 21-RESEARCH.md §5 routing table, July 2026 line-up)
+# Maps (sheet_type, pass_type) → model slug override.
+#
+# Key convention:
+#   - Exact (sheet_type, pass_type) rows win.
+#   - (WILDCARD_SHEET_TYPE, pass_type) rows apply to ANY sheet type running
+#     that pass — used for passes the vision package registers phase-wide
+#     (classify, semantic, legend, schedule, verify_retry).
+#   - No entry → caller uses the default CLAUDE_MODEL.
+#
+# Every slug is sourced from config (env-driven) — NEVER hardcode model
+# strings here (user decision, 21-CONTEXT.md). Escalation to
+# CLAUDE_MODEL_ESCALATION is NOT routed here: it is budget-gated behind
+# config.ESCALATION_ENABLED and applied by the ensemble layer (21-11).
 # ---------------------------------------------------------------------------
+WILDCARD_SHEET_TYPE = "*"
+
 MODEL_ROUTING: dict[tuple[str, str], str] = {
     # Elevation measure pass: complex facade geometry needs better model
     ("elevation",  "measure"):   CLAUDE_MODEL_SCHEDULES,
     # Detail sheets: distinguish dimension callouts from countable symbols (RC-6 fix)
     ("detail",     "count"):     CLAUDE_MODEL_SCHEDULES,
     ("detail",     "measure"):   CLAUDE_MODEL_SCHEDULES,
-    # Schedules: always Sonnet for table accuracy
-    ("schedule",   "schedule"):  CLAUDE_MODEL_SCHEDULES,
     # Roof/MEP measure: pipe/duct runs require length precision
     ("roof_plan",  "measure"):   CLAUDE_MODEL_SCHEDULES,
     ("mep_plan",   "measure"):   CLAUDE_MODEL_SCHEDULES,
-    ("floor_plan", "schedule"):  CLAUDE_MODEL_SCHEDULES,
     ("floor_plan", "count"):     CLAUDE_MODEL_SCHEDULES,
     ("floor_plan", "measure"):   CLAUDE_MODEL_SCHEDULES,
-    ("floor_plan", "legend"):    CLAUDE_MODEL_SCHEDULES,
+    # Dense small-text structuring → high-res vision class (RESEARCH §5:
+    # legend/schedule structuring fixes partial schedule rows)
+    ("schedule",   "schedule"):  CLAUDE_MODEL_DENSE,
+    ("floor_plan", "schedule"):  CLAUDE_MODEL_DENSE,
+    ("floor_plan", "legend"):    CLAUDE_MODEL_DENSE,
+    # Phase-wide pass routes consumed by the vision package (21-08/21-11/21-14)
+    (WILDCARD_SHEET_TYPE, "classify"):     CLAUDE_MODEL_CLASSIFY,
+    (WILDCARD_SHEET_TYPE, "semantic"):     CLAUDE_MODEL_SEMANTIC,
+    (WILDCARD_SHEET_TYPE, "legend"):       CLAUDE_MODEL_DENSE,
+    (WILDCARD_SHEET_TYPE, "schedule"):     CLAUDE_MODEL_DENSE,
+    (WILDCARD_SHEET_TYPE, "verify_retry"): CLAUDE_MODEL_DENSE,
 }
+
+
+def resolve_routed_model(sheet_type: str, pass_type: str) -> Optional[str]:
+    """Resolve a MODEL_ROUTING entry: exact key first, then wildcard row.
+
+    Pure table lookup — no name heuristics — so claude_analyzer._pick_model
+    can defer-import this single resolution function without recursing back
+    into the name-based fallback below.
+
+    Returns:
+        Model slug string, or None when no routing entry applies.
+    """
+    routed = MODEL_ROUTING.get((sheet_type, pass_type))
+    if routed:
+        return routed
+    return MODEL_ROUTING.get((WILDCARD_SHEET_TYPE, pass_type))
 
 # ---------------------------------------------------------------------------
 # Keyword sets for sheet-type classification
@@ -182,22 +224,28 @@ def pick_model_for_pass(
 ) -> Optional[str]:
     """Select the Claude model slug for a (sheet_type, pass_type) combination.
 
+    Single resolution function for all pass-routing consumers
+    (21-08 vision prompts, 21-11 ensemble, 21-14 verify-retry).
+
     Priority:
-      1. MODEL_ROUTING lookup — explicit per-pass Sonnet override.
+      1. MODEL_ROUTING lookup — exact (sheet_type, pass_type) key, then
+         (WILDCARD_SHEET_TYPE, pass_type) row via resolve_routed_model().
       2. _pick_model(sheet_name) from claude_analyzer — name-based heuristic
-         (returns Sonnet for E/M/P sheet codes and schedule-named sheets).
+         (returns the schedules model for E/M/P sheet codes and
+         schedule-named sheets).
       3. None — caller uses CLAUDE_MODEL default.
 
     Args:
         sheet_type:  Canonical sheet type (e.g. "elevation").
-        pass_type:   Pass name (e.g. "measure", "count", "schedule").
+        pass_type:   Pass name (e.g. "measure", "count", "schedule",
+                     "semantic", "verify_retry", "classify").
         sheet_name:  Optional sheet identifier for name-based heuristic fallback.
 
     Returns:
         Model slug string, or None to indicate "use default".
     """
-    # 1. Explicit routing table
-    routed = MODEL_ROUTING.get((sheet_type, pass_type))
+    # 1. Explicit routing table (exact key → wildcard row)
+    routed = resolve_routed_model(sheet_type, pass_type)
     if routed:
         return routed
 

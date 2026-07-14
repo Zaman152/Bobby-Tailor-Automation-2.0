@@ -21,10 +21,16 @@ import pytest
 # ensure tests run without ANTHROPIC_API_KEY or installed dependencies.
 # ---------------------------------------------------------------------------
 
-# Provide minimal config stubs before importing the module under test
+# Provide minimal config stubs before importing the module under test.
+# Values mirror the conftest.py env pins so assertions hold regardless of
+# whether the mock or the real config wins the import-order race.
 _CONFIG_MOCK = MagicMock()
 _CONFIG_MOCK.CLAUDE_MODEL = "claude-haiku-4-5"
 _CONFIG_MOCK.CLAUDE_MODEL_SCHEDULES = "claude-sonnet-4-5"
+_CONFIG_MOCK.CLAUDE_MODEL_SEMANTIC = "claude-sonnet-5"
+_CONFIG_MOCK.CLAUDE_MODEL_DENSE = "claude-opus-4-8"
+_CONFIG_MOCK.CLAUDE_MODEL_ESCALATION = "claude-fable-5"
+_CONFIG_MOCK.CLAUDE_MODEL_CLASSIFY = "claude-haiku-4-5-classify"
 
 _CA_MOCK = MagicMock()
 _CA_MOCK._pick_model.return_value = "claude-haiku-4-5"
@@ -48,9 +54,11 @@ _spec.loader.exec_module(_spm)
 
 PASS_MATRIX              = _spm.PASS_MATRIX
 MODEL_ROUTING            = _spm.MODEL_ROUTING
+WILDCARD_SHEET_TYPE      = _spm.WILDCARD_SHEET_TYPE
 classify_sheet_type_from_text = _spm.classify_sheet_type_from_text
 plan_passes              = _spm.plan_passes
 pick_model_for_pass      = _spm.pick_model_for_pass
+resolve_routed_model     = _spm.resolve_routed_model
 
 
 # ---------------------------------------------------------------------------
@@ -220,9 +228,12 @@ class TestPickModelForPass:
     # Read the model slugs straight from the module under test so the routing
     # invariants ("schedules model" vs "default model") hold regardless of
     # whether the mock or the real `config` won the import-order race. conftest
-    # guarantees the two values are distinct (Sonnet vs Haiku).
-    SONNET = _spm.CLAUDE_MODEL_SCHEDULES   # the "needs a stronger model" slug
-    HAIKU  = _spm.CLAUDE_MODEL             # the default slug
+    # guarantees all values are pairwise distinct.
+    SONNET   = _spm.CLAUDE_MODEL_SCHEDULES   # count/measure quality slug
+    HAIKU    = _spm.CLAUDE_MODEL             # the default slug
+    SEMANTIC = _spm.CLAUDE_MODEL_SEMANTIC    # semantic-labeling workhorse
+    DENSE    = _spm.CLAUDE_MODEL_DENSE       # dense small-text / arbitration
+    CLASSIFY = _spm.CLAUDE_MODEL_CLASSIFY    # cheap classification slug
 
     def test_elevation_measure_returns_sonnet(self):
         model = pick_model_for_pass("elevation", "measure")
@@ -236,9 +247,10 @@ class TestPickModelForPass:
         model = pick_model_for_pass("detail", "measure")
         assert model == self.SONNET
 
-    def test_schedule_schedule_returns_sonnet(self):
+    def test_schedule_schedule_returns_dense(self):
+        """v2: dense table structuring routes to the DENSE (Opus-class) slug."""
         model = pick_model_for_pass("schedule", "schedule")
-        assert model == self.SONNET
+        assert model == self.DENSE
 
     def test_roof_plan_measure_returns_sonnet(self):
         model = pick_model_for_pass("roof_plan", "measure")
@@ -276,3 +288,103 @@ class TestPickModelForPass:
         """MODEL_ROUTING applies even when sheet_name is empty."""
         model = pick_model_for_pass("floor_plan", "count", sheet_name="")
         assert model == self.SONNET
+
+
+# ---------------------------------------------------------------------------
+# MODEL_ROUTING v2 (21-05) — RESEARCH §5 routing table
+# ---------------------------------------------------------------------------
+
+class TestModelRoutingV2:
+    SONNET   = _spm.CLAUDE_MODEL_SCHEDULES
+    HAIKU    = _spm.CLAUDE_MODEL
+    SEMANTIC = _spm.CLAUDE_MODEL_SEMANTIC
+    DENSE    = _spm.CLAUDE_MODEL_DENSE
+    CLASSIFY = _spm.CLAUDE_MODEL_CLASSIFY
+
+    # -- dense small-text structuring (legend/schedule) → DENSE ------------
+
+    def test_floor_plan_schedule_returns_dense(self):
+        assert pick_model_for_pass("floor_plan", "schedule") == self.DENSE
+
+    def test_floor_plan_legend_returns_dense(self):
+        assert pick_model_for_pass("floor_plan", "legend") == self.DENSE
+
+    def test_legend_wildcard_covers_any_sheet_type(self):
+        """Legend pass on a sheet type without an exact row → wildcard DENSE."""
+        assert pick_model_for_pass("mep_plan", "legend") == self.DENSE
+
+    def test_schedule_wildcard_covers_any_sheet_type(self):
+        assert pick_model_for_pass("elevation", "schedule") == self.DENSE
+
+    # -- semantic labeling → SEMANTIC (wildcard row) ------------------------
+
+    @pytest.mark.parametrize("sheet_type", [
+        "floor_plan", "roof_plan", "mep_plan", "elevation", "civil_site",
+    ])
+    def test_semantic_pass_returns_semantic_slug(self, sheet_type):
+        assert pick_model_for_pass(sheet_type, "semantic") == self.SEMANTIC
+
+    # -- verify-retry arbitration → DENSE (wildcard row) --------------------
+
+    @pytest.mark.parametrize("sheet_type", ["floor_plan", "schedule", "detail"])
+    def test_verify_retry_returns_dense(self, sheet_type):
+        assert pick_model_for_pass(sheet_type, "verify_retry") == self.DENSE
+
+    # -- classification → CLASSIFY (wildcard row) ---------------------------
+
+    def test_classify_pass_returns_classify_slug(self):
+        assert pick_model_for_pass("floor_plan", "classify") == self.CLASSIFY
+
+    # -- fallback behavior ---------------------------------------------------
+
+    def test_unknown_pass_falls_back_to_default(self):
+        """No exact row, no wildcard row → None (caller uses CLAUDE_MODEL)."""
+        assert pick_model_for_pass("floor_plan", "nonexistent_pass") is None
+
+    def test_unknown_sheet_and_pass_falls_back_to_default(self):
+        assert pick_model_for_pass("unknown_type", "count") is None
+
+    def test_exact_key_beats_wildcard(self):
+        """(schedule, schedule) exact row resolves before the wildcard row."""
+        exact = MODEL_ROUTING[("schedule", "schedule")]
+        assert resolve_routed_model("schedule", "schedule") == exact
+
+    # -- resolve_routed_model (pure table lookup) ----------------------------
+
+    def test_resolve_routed_model_exact(self):
+        assert resolve_routed_model("elevation", "measure") == self.SONNET
+
+    def test_resolve_routed_model_wildcard(self):
+        assert resolve_routed_model("roof_plan", "semantic") == self.SEMANTIC
+
+    def test_resolve_routed_model_none(self):
+        assert resolve_routed_model("elevation", "count") is None
+
+    def test_resolve_routed_model_ignores_name_heuristic(self):
+        """Pure lookup — takes no sheet_name, cannot recurse into _pick_model."""
+        import inspect
+        params = inspect.signature(resolve_routed_model).parameters
+        assert list(params) == ["sheet_type", "pass_type"]
+
+    # -- structure invariants -------------------------------------------------
+
+    def test_routing_dict_shape_intact(self):
+        """dict[tuple[str, str], str-like] — _pick_model consumers unchanged."""
+        for key, value in MODEL_ROUTING.items():
+            assert isinstance(key, tuple) and len(key) == 2
+            assert isinstance(key[0], str) and isinstance(key[1], str)
+            assert value, "routing values must be truthy model slugs"
+
+    def test_no_hardcoded_model_literals_in_routing_source(self):
+        """Every MODEL_ROUTING value must come from config — no 'claude-'
+        string literal may appear inside the MODEL_ROUTING dict source."""
+        source = _MODULE_PATH.read_text()
+        start = source.index("MODEL_ROUTING: dict")
+        end = source.index("}", start)
+        routing_block = source[start:end]
+        assert '"claude-' not in routing_block
+        assert "'claude-" not in routing_block
+
+    def test_wildcard_rows_present_for_new_pass_types(self):
+        for pass_type in ("classify", "semantic", "legend", "schedule", "verify_retry"):
+            assert (WILDCARD_SHEET_TYPE, pass_type) in MODEL_ROUTING

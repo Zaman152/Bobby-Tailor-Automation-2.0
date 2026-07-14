@@ -45,6 +45,16 @@ os.environ.setdefault("TAKEOFF_ACCURACY_MODE", "standard")
 os.environ.setdefault("CLAUDE_MODEL", "claude-haiku-4-5")
 os.environ.setdefault("CLAUDE_MODEL_SCHEDULES", "claude-sonnet-4-5")
 
+# Phase 21 MODEL_ROUTING v2 slugs (21-05). Distinct throwaway values so routing
+# tests can tell every route apart (semantic vs dense vs classify vs default)
+# under any collection order. CLASSIFY gets a suffixed value because its real
+# default equals CLAUDE_MODEL — identical pins would make the routes
+# indistinguishable in assertions.
+os.environ.setdefault("CLAUDE_MODEL_SEMANTIC", "claude-sonnet-5")
+os.environ.setdefault("CLAUDE_MODEL_DENSE", "claude-opus-4-8")
+os.environ.setdefault("CLAUDE_MODEL_ESCALATION", "claude-fable-5")
+os.environ.setdefault("CLAUDE_MODEL_CLASSIFY", "claude-haiku-4-5-classify")
+
 
 def _ensure_real(name: str) -> None:
     """Import *name* into sys.modules if it is not already registered.

@@ -40,20 +40,23 @@ def _pick_model(
     """Choose the best Claude model for a given pass type and sheet context.
 
     Priority:
-      1. sheet_pass_matrix.MODEL_ROUTING lookup when sheet_type is provided
-         (explicit per-(sheet_type, pass_type) Sonnet overrides).
+      1. sheet_pass_matrix.resolve_routed_model() when sheet_type is provided —
+         exact (sheet_type, pass_type) MODEL_ROUTING entry, then the
+         (WILDCARD_SHEET_TYPE, pass_type) wildcard row (MODEL_ROUTING v2).
       2. Sheet-name keyword heuristic — MEP codes and schedule-named sheets
          route to CLAUDE_MODEL_SCHEDULES.
       3. Default CLAUDE_MODEL (Haiku) for everything else.
 
     The sheet_pass_matrix import is deferred inside the function to avoid a
-    circular dependency (sheet_pass_matrix imports _pick_model at module level).
+    circular dependency (sheet_pass_matrix imports _pick_model at module
+    level). resolve_routed_model is a pure table lookup (no name heuristics),
+    so delegating to it cannot recurse back into this function.
     """
     # 1. Routing table lookup when sheet_type is known
     if sheet_type:
         try:
-            from sheet_pass_matrix import MODEL_ROUTING  # deferred to avoid circular import
-            routed = MODEL_ROUTING.get((sheet_type, pass_type))
+            from sheet_pass_matrix import resolve_routed_model  # deferred to avoid circular import
+            routed = resolve_routed_model(sheet_type, pass_type)
             if routed:
                 return routed
         except ImportError:
