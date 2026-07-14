@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-07-PLAN.md — zero-calibration scale solving
-last_updated: "2026-07-14T13:55:21.603Z"
+stopped_at: Completed 21-08-PLAN.md — vision fusion request side (schemas/overlay/prompts/structured outputs)
+last_updated: "2026-07-14T14:35:46.874Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-07: zero-calibration scale solving — viewport segmentation + weighted RANSAC consensus, Crow p0 dimension_solve/high 40 fpi, 626 tests green"
+last_activity_desc: "Completed 21-08: semantic-only vision request side — ID-enum structured-output schemas, Set-of-Mark overlays + crop galleries, GA structured outputs path, 648 tests green"
 progress:
   total_phases: 22
   completed_phases: 17
   total_plans: 100
-  completed_plans: 81
+  completed_plans: 83
   percent: 77
 ---
 
@@ -30,11 +30,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 7/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07)  
-Status: Wave 3 in progress — 21-07 done (zero-calibration scale solving: viewports + weighted RANSAC + resolve_scale_v2, 626 tests green)  
-Last activity: 2026-07-14 — Completed 21-07: per-viewport scale solve — Crow p0 dimension_solve/high 40 fpi, Bob 10.57 fpi over decoys, layer-2 gates green
+Plan: 8/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08)  
+Status: Wave 3 in progress — 21-08 done (vision fusion request side: ID-enum schemas + Set-of-Mark overlays + structured outputs, 648 tests green)  
+Last activity: 2026-07-14 — Completed 21-08: semantic-only vision contract (V3-ACC-01 request side) + adaptive-fidelity renders (V3-ACC-04)
 
-Progress: [████████░░] 81%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
@@ -55,6 +55,7 @@ Progress: [████████░░] 81%
 | Phase 21-accuracy-learning-engine P05 | 18 min | 3 tasks | 8 files |
 | Phase 21-accuracy-learning-engine P06 | 25 min | 3 tasks | 8 files |
 | Phase 21-accuracy-learning-engine P07 | 37 min | 3 tasks | 5 files |
+| Phase 21-accuracy-learning-engine P08 P08 | 32 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -150,6 +151,11 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-07]: HIGH scale confidence = three-condition conjunction (>=8 inliers AND >=80% share AND printed agreement within 1%); printed conflict caps at LOW
 - [Phase 21-07]: Viewport bboxes in UNROTATED PyMuPDF space; leftover claiming uses frozen bboxes + midpoint union so border segments cannot explode a region
 - [Phase 21-07]: resolve_scale_v2 learned prior fires ONLY when solved+printed tiers empty (anti-amplification); unbacked printed tier capped at medium
+- [Phase 21-08]: Vector-sheet vision schemas: candidate-ID enums, additionalProperties:false everywhere, all-required, zero numeric types (rejection-walk test); raster_extraction_schema is the sole numeric exception (count_estimate)
+- [Phase 21-08]: render_overlay: one PIL.Image at <=40 markers, list with disjoint info[overlay_ids] subsets beyond; pixel<->point grounding via info[zoom]/info[marker_boxes_px] — model never asked for coordinates
+- [Phase 21-08]: build_crop_gallery packs ID-captioned tiles into contact sheets, legend crop first, tiles-per-sheet scaled to keep <=20 images/request
+- [Phase 21-08]: symbol_gallery pass routes via the (*, semantic) MODEL_ROUTING row alias; structured path parses guaranteed JSON directly (no markdown strip, no json_repair)
+- [Phase 21-08]: wrap_pdf_text() <pdf_text> delimiters contain prompt injection from untrusted PDF strings; semantic prompts declare delimited content is data, not instructions
 
 ### Pending Todos
 
@@ -293,6 +299,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T13:54:43.998Z
+Last session: 2026-07-14T14:35:25.062Z
 Stopped at: Completed 21-07-PLAN.md — zero-calibration scale solving
 Resume file: None
