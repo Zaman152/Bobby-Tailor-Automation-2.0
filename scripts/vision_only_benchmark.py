@@ -713,11 +713,31 @@ def run_vision(name: str, plans: Path, manifest: Optional[Path], run_tag: str = 
 
 
 def _load_rescore(path: Path):
-    """Load a saved result: full takeoff.json-style dict OR bare summary list."""
+    """Load a saved result: full takeoff.json-style dict OR bare summary list.
+
+    A previously written --report-json gate artifact is only usable when it
+    embeds the pipeline result (the "result" key, written by main()). A
+    rescore against the wrong artifact type must FAIL LOUDLY — scoring an
+    empty summary would print confidently wrong 0% numbers (WR-07).
+    """
     data = json.loads(path.read_text())
     if isinstance(data, dict) and "takeoff_summary" not in data and "score" in data:
-        # A previously written --report-json artifact: re-use its embedded result.
-        data = data.get("result") or data
+        embedded = data.get("result")
+        if not embedded:
+            print(
+                f"--rescore artifact {path} is a gate report WITHOUT an embedded "
+                "pipeline result — every row would score MISSING against an "
+                "empty summary. Pass the run's takeoff_result.json (or a "
+                "report JSON written by a version that embeds 'result')."
+            )
+            sys.exit(2)
+        data = embedded
+    if isinstance(data, dict) and "takeoff_summary" not in data:
+        print(
+            f"--rescore artifact {path} has no 'takeoff_summary' — this is not "
+            "a takeoff result. Pass takeoff_result.json or a bare summary list."
+        )
+        sys.exit(2)
     return data
 
 
@@ -867,6 +887,9 @@ def main() -> int:
             "score_run2": sc2,
             "reproducibility": repro,
             "gates": gates,
+            # Embedded pipeline result so --rescore of this artifact scores
+            # the REAL summary, never an empty one (WR-07).
+            "result": result,
         }, indent=2, default=str))
 
     print("\n" + text)

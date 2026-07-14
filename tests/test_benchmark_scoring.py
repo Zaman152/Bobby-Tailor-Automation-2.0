@@ -325,6 +325,46 @@ class TestCliPlumbing:
         assert proc.returncode == 2
         assert "Exactly one of --golden / --takeoff-pdf" in proc.stdout
 
+    def test_rescore_of_report_json_uses_embedded_result(self, tmp_path):
+        """WR-07: --report-json embeds the pipeline result, so rescoring the
+        gate artifact reproduces the original score instead of scoring an
+        empty summary."""
+        golden_csv, result_json = _write_cli_fixtures(tmp_path, geometry_acc_pass=True)
+        report_json = tmp_path / "report.json"
+        proc = _run_cli(tmp_path, golden_csv, result_json,
+                        "--report-json", str(report_json))
+        assert proc.returncode == 0, proc.stdout + proc.stderr
+        assert json.loads(report_json.read_text()).get("result"), (
+            "gate report must embed the pipeline result for rescoring"
+        )
+
+        proc2 = _run_cli(tmp_path, golden_csv, report_json,
+                         "--report-json", str(tmp_path / "report2.json"))
+        assert proc2.returncode == 0, proc2.stdout + proc2.stderr
+        rescore = json.loads((tmp_path / "report2.json").read_text())
+        assert rescore["score"]["geometry_text_qty_acc"] == 1.0
+
+    def test_rescore_of_gate_report_without_result_fails_loudly(self, tmp_path):
+        """WR-07: a gate artifact lacking the embedded result must exit 2 —
+        never fabricate a 0% score from an empty summary."""
+        golden_csv, _ = _write_cli_fixtures(tmp_path)
+        legacy_report = tmp_path / "legacy_report.json"
+        legacy_report.write_text(json.dumps({
+            "name": "Legacy", "score": {"overall_qty_acc": 0.9}, "gates": {},
+        }))
+        proc = _run_cli(tmp_path, golden_csv, legacy_report)
+        assert proc.returncode == 2, proc.stdout + proc.stderr
+        assert "takeoff_result.json" in proc.stdout
+
+    def test_rescore_of_wrong_dict_artifact_fails_loudly(self, tmp_path):
+        """WR-07: an arbitrary dict with no takeoff_summary is not a result."""
+        golden_csv, _ = _write_cli_fixtures(tmp_path)
+        wrong = tmp_path / "wrong.json"
+        wrong.write_text(json.dumps({"something": "else"}))
+        proc = _run_cli(tmp_path, golden_csv, wrong)
+        assert proc.returncode == 2, proc.stdout + proc.stderr
+        assert "takeoff_summary" in proc.stdout
+
 
 # ─── --takeoff-pdf ingestion (explicit ground truth, offline) ────────────────
 
