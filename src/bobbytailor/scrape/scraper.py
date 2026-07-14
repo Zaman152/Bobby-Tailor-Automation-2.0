@@ -783,8 +783,10 @@ async def run_project_scrape(project_id: int, project_name: str,
             build_deterministic_legends_from_run_dir,
             inject_project_legends,
         )
+        # Plans-only legends flow (V3-LEARN-04) — same code path as
+        # pdf_analyzer; the explicit object manifest is an optional dev input.
         det_legends = build_deterministic_legends_from_run_dir(
-            screenshots_dir, object_manifest, companion_present=False,
+            screenshots_dir, dev_manifest=object_manifest,
         )
         if det_legends:
             inject_project_legends(_successful_extracted, det_legends)
@@ -1142,8 +1144,9 @@ async def run_analyze_from_manifest(
         build_deterministic_legends_from_run_dir,
         inject_project_legends,
     )
+    # Plans-only legends flow (V3-LEARN-04) — same code path as pdf_analyzer.
     det_legends = build_deterministic_legends_from_run_dir(
-        screenshots_dir, object_manifest, companion_present=False,
+        screenshots_dir, dev_manifest=object_manifest,
     )
     if det_legends:
         inject_project_legends(_successful_extracted, det_legends)

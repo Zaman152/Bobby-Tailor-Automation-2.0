@@ -17,7 +17,6 @@ from cross_references import resolve_cross_references
 from reporter import generate_report
 from takeoff_pipeline import RunSettings, TakeoffPipeline
 from page_text_enrichment import enrich_components_from_page_text
-from companion_takeoff import find_companion_takeoff_pdf, extract_legend_schedules
 from config import RENDER_TARGET_PX, SCREENSHOTS_DIR
 
 logger = logging.getLogger(__name__)
@@ -259,6 +258,11 @@ def run_pdf_analysis(
 ) -> dict:
     """Run multi-pass extraction on a PDF via TakeoffPipeline.
 
+    Production input contract (V3-LEARN-04, LOCKED): the plans PDF is the ONLY
+    pipeline input. No sibling companion take-off or manifest file is ever
+    auto-discovered from the upload folder; ``manifest_path`` is an optional,
+    explicitly provided dev input.
+
     Pass 1 converts each page to an image (emits "converting" progress).
     Pass 2 delegates to TakeoffPipeline.run_project which handles:
       - sheet-type classification per page (from title-block text)
@@ -335,24 +339,22 @@ def run_pdf_analysis(
         if progress_callback:
             progress_callback(current, total_, sheet_name, phase="analyzing")
 
-    project_legends: list = []
-    companion = find_companion_takeoff_pdf(pdf_path)
-    if companion:
-        project_legends = extract_legend_schedules(companion)
-
+    # Plans-only production input contract (V3-LEARN-04, 21-CONTEXT LOCKED):
+    # the pipeline sees ONLY the plans PDF. Sibling `*takeoff*.pdf` files are
+    # NEVER auto-discovered — a human take-off is an evaluation-only input
+    # that benchmark scripts pass explicitly as the scoring reference
+    # (scripts/vision_only_benchmark.py). Likewise, object-manifest files are
+    # no longer auto-discovered from the plans PDF's folder: a manifest is an
+    # optional, explicitly uploaded dev input (manifest_path).
     from object_manifest import resolve_project_manifest
-    manifest = resolve_project_manifest(
-        project_name,
-        explicit_path=manifest_path or _find_manifest(pdf_path),
-    )
+    manifest = resolve_project_manifest(project_name, explicit_path=manifest_path)
     if manifest:
         logger.info("Using object manifest with %d objects", len(manifest))
 
     from plan_deterministic_legends import build_deterministic_legends
-    det_legends = build_deterministic_legends(
-        pdf_path, manifest=manifest, companion_present=bool(companion),
+    project_legends: list = build_deterministic_legends(
+        pdf_path, dev_manifest=manifest,
     )
-    project_legends.extend(det_legends)
 
     # Shared RunSettings (21-13): both entry points construct the pipeline
     # from the same env-driven settings — the parity foundation for 21-15
@@ -389,26 +391,3 @@ def run_pdf_analysis(
         project_name, all_extracted, all_estimates,
         cross_references=cross_refs, manifest=manifest,
     )
-
-
-def _find_manifest(pdf_path: str) -> Optional[str]:
-    """Auto-discover a sibling object manifest next to the plans PDF.
-
-    Looks for files whose name contains 'manifest' or 'objects' with a .json or
-    .csv extension in the same folder. Returns the first match, or None.
-    """
-    try:
-        folder = Path(pdf_path).resolve().parent
-    except Exception:
-        return None
-    candidates = []
-    for p in folder.iterdir():
-        if not p.is_file() or p.suffix.lower() not in (".json", ".csv"):
-            continue
-        stem = p.stem.lower()
-        if "manifest" in stem or "objects" in stem or stem.endswith("-scope"):
-            candidates.append(p)
-    if candidates:
-        logger.info("Auto-discovered object manifest: %s", candidates[0].name)
-        return str(candidates[0])
-    return None

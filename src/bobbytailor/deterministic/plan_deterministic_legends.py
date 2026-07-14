@@ -3,6 +3,11 @@
 Door schedules and building footprints are read from the PDF *text* layer — not
 vision. This module centralises that logic so upload/PDF analysis and StackCT
 screenshot runs share the same authoritative quantities.
+
+Production is plans-only (V3-LEARN-04, 21-CONTEXT LOCKED): the default call
+takes nothing but the plans PDF. Companion take-off awareness and the
+manifest-driven footprint legend are gated behind explicit ``dev_*`` kwargs —
+see benchmark scripts for ground-truth scoring.
 """
 from __future__ import annotations
 
@@ -15,14 +20,25 @@ logger = logging.getLogger(__name__)
 
 def build_deterministic_legends(
     pdf_path: str,
-    manifest=None,
-    companion_present: bool = False,
+    dev_manifest=None,
+    dev_companion_present: bool = False,
 ) -> List[dict]:
     """Return authoritative legend schedule dicts from a plans PDF.
 
-    When ``companion_present`` is True (companion take-off PDF beside the plans),
-    footprint is skipped — the companion already carries exact areas.
-    Door schedules are still extracted from the plans (type breakdown).
+    Production is plans-only; see benchmark scripts for ground-truth scoring.
+    The default call (``build_deterministic_legends(pdf_path)``) extracts door
+    schedules from the plans text layer only — footprint quantities on the
+    production path come from the 21-13 deterministic pipeline flow
+    (tables/schedules/room polygons/printed dims), not from this module.
+
+    Dev/benchmark-only kwargs:
+        dev_manifest: An object manifest mapping footprint areas onto item
+            names. Required for the footprint legend (it cannot exist without
+            item names to attach areas to), so the footprint branch only runs
+            when a manifest is supplied explicitly.
+        dev_companion_present: True when a companion take-off PDF is being
+            scored against (benchmark scenario) — skips the footprint legend
+            because the companion already carries exact areas.
     """
     legends: List[dict] = []
 
@@ -39,10 +55,10 @@ def build_deterministic_legends(
     except Exception as exc:  # noqa: BLE001
         logger.warning("Door-schedule extraction failed: %s", exc)
 
-    if not companion_present and manifest:
+    if not dev_companion_present and dev_manifest:
         try:
             from footprint_takeoff import extract_footprint_legend
-            fp_legend = extract_footprint_legend(pdf_path, manifest)
+            fp_legend = extract_footprint_legend(pdf_path, dev_manifest)
             if fp_legend:
                 legends.append(fp_legend)
                 logger.info(
@@ -88,22 +104,30 @@ def merge_page_pdfs(pdf_paths: List[Path], out_path: Path) -> Optional[str]:
 
 def build_deterministic_legends_from_run_dir(
     run_dir: Path,
-    manifest=None,
-    companion_present: bool = False,
+    dev_manifest=None,
+    dev_companion_present: bool = False,
 ) -> List[dict]:
-    """Build legends from per-page PDFs captured during a StackCT scrape."""
-    pdf_dir = run_dir / "pdfs"
-    if not pdf_dir.is_dir():
-        return []
-    page_pdfs = sorted(pdf_dir.glob("*.pdf"))
+    """Build legends from per-page PDF blobs captured during a StackCT scrape.
+
+    Production is plans-only; see benchmark scripts for ground-truth scoring.
+    Scans ``run_dir/blobs/`` (canonical since 21-15) with a fallback to the
+    legacy ``run_dir/pdfs/`` layout so resumed pre-21-15 runs keep working.
+    """
+    page_pdfs: List[Path] = []
+    for sub in ("blobs", "pdfs"):
+        pdf_dir = run_dir / sub
+        if pdf_dir.is_dir():
+            page_pdfs = sorted(pdf_dir.glob("*.pdf"))
+            if page_pdfs:
+                break
     if not page_pdfs:
         return []
     combined = run_dir / "_plans_combined.pdf"
     merged = merge_page_pdfs(page_pdfs, combined)
     if not merged:
         return []
-    return build_deterministic_legends(merged, manifest=manifest,
-                                       companion_present=companion_present)
+    return build_deterministic_legends(merged, dev_manifest=dev_manifest,
+                                       dev_companion_present=dev_companion_present)
 
 
 def inject_project_legends(all_extracted: List[dict], legends: List[dict]) -> None:

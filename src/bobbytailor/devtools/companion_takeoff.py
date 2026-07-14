@@ -1,6 +1,14 @@
 """
 Discover and parse companion quantity take-off PDFs uploaded alongside plan sets.
 
+DEV/BENCHMARK ONLY — never imported by production entry points.
+
+The production pipeline is plans-only (V3-LEARN-04, 21-CONTEXT LOCKED): a human
+take-off PDF is ground truth for EVALUATION, so letting the runtime pipeline
+discover it would fake the accuracy numbers. Only devtools/ and scripts/
+(e.g. scripts/vision_only_benchmark.py, which passes the take-off explicitly
+as the scoring reference) may import this module.
+
 Generic filename heuristics only — no project names or hardcoded quantities.
 """
 import logging

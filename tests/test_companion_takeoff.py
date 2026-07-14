@@ -1,7 +1,11 @@
-"""Tests for companion take-off PDF discovery and table parsing (no API)."""
+"""Tests for companion take-off PDF discovery and table parsing (no API).
+
+21-15: companion_takeoff is DEV/BENCHMARK ONLY — production entry points never
+import it, so these tests target the devtools package path explicitly.
+"""
 from pathlib import Path
 
-from companion_takeoff import (
+from bobbytailor.devtools.companion_takeoff import (
     _parse_legend_from_text,
     _table_to_rows,
     extract_legend_schedules,
