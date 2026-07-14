@@ -831,7 +831,7 @@ Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
 6. All modules live in a structured package; `pytest` passes; app boots via blueprints; README documents the new layout
 7. `21-UAT.md` signed off for live-testing readiness
 
-**Plans:** 11/18 plans executed
+**Plans:** 12/18 plans executed
 
 Plans:
 **Wave 1**
@@ -859,7 +859,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 21-12-PLAN.md — vision/fusion.py: provenance-ranked merge + record/replay harness (V3-ACC-01)
+- [x] 21-12-PLAN.md — vision/fusion.py: provenance-ranked merge + record/replay harness (V3-ACC-01)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 

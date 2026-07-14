@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-11-PLAN.md — ensemble voting + budget guard
-last_updated: "2026-07-14T16:18:43.703Z"
+stopped_at: Completed 21-12-PLAN.md — fusion layer + replay harness
+last_updated: "2026-07-14T16:54:06.857Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-11: ensemble voting + tiled dedup + BudgetGuard (V3-ACC-03, V3-PROD-02 guard half)"
+last_activity_desc: "Completed 21-12: vision labels bind to deterministic candidate IDs; geometry supplies every number (V3-ACC-01 core)"
 progress:
   total_phases: 22
   completed_phases: 17
   total_plans: 100
-  completed_plans: 86
-  percent: 86
+  completed_plans: 87
+  percent: 77
 ---
 
 # Project State
@@ -30,9 +30,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 11/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11)  
-Status: Wave 4 in progress — 21-11 done (ensemble voting N=3→5, tiled dedup, BudgetGuard hard cap, 706 tests green)  
-Last activity: 2026-07-14 — Completed 21-11: ensemble/self-consistency voting + per-run budget guard (V3-ACC-03, V3-PROD-02 guard half)
+Plan: 12/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11, 21-12)  
+Status: Wave 5 in progress — 21-12 done (fusion layer: PROVENANCE_RANK merge + ID-grounded fuse_sheet + ReplayAnalyzer, 740 tests green)  
+Last activity: 2026-07-14 — Completed 21-12: vision labels bind to deterministic candidate IDs; geometry supplies every number (V3-ACC-01 core)
 
 Progress: [█████████░] 86%
 
@@ -59,6 +59,7 @@ Progress: [█████████░] 86%
 | Phase 21-accuracy-learning-engine P09 | 9 min | 2 tasks | 3 files |
 | Phase 21-accuracy-learning-engine P10 P10 | 53 min | 3 tasks | 9 files |
 | Phase 21-accuracy-learning-engine P11 P11 | 16 min | 3 tasks | 5 files |
+| Phase 21-accuracy-learning-engine P12 P12 | 25 min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -172,6 +173,9 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-11]: Temperature-ignore probe compares metadata-stripped JSON fingerprints of first two dict samples, cached per probe_key; on ignore, later samples get nonzero prompt_variation
 - [Phase 21-11]: run_tiled_count NMS dedups only ≥2-tile-covered detections from different tiles within 1.5 coarse cells; tiled sum joins run_ensemble via extra_members (method 'tiled+vote')
 - [Phase 21-11]: ensemble_settings() is the single (ENSEMBLE_N, API_BUDGET_PER_RUN_USD) reader — 21-13 RunSettings must construct from it
+- [Phase 21-12]: merge_with_provenance hard no-overwrite guard checks provenance STRINGS (not rank arithmetic) — vision_ensemble can never displace a deterministic quantity/unit; discarded claims audited in fusion_rejected
+- [Phase 21-12]: fuse_sheet quantities are exclusively deterministic (group count, wall LF, polygon SF, schedule cells, printed dims); vision grounds via registry membership — out-of-set IDs dropped + flagged unknown_candidate_id; room vision labels apply only to label_source=='none' rooms
+- [Phase 21-12]: ReplayAnalyzer keys fixtures by SHA256(model, pass_type, prompt text, image_count); record mode gated by REPLAY_RECORD=1 (never CI); lazy-import results validated as real strings so sys.modules mock stubs degrade to deterministic 'unrouted' fallback
 
 ### Pending Todos
 
@@ -315,6 +319,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T16:18:43.698Z
+Last session: 2026-07-14T16:51:59.870Z
 Stopped at: Completed 21-11-PLAN.md — ensemble voting + budget guard
 Resume file: None
