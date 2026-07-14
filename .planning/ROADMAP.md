@@ -29,7 +29,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [ ] **Phase 17: Production Takeoff Pipeline** — Screenshot reuse, two-phase capture/analyze, resume, demo-grade job UX
 - [ ] **Phase 18: Linked Sheet Resolution** — Auto-follow drawing cross-refs; capture/analyze linked detail sheets
 - [ ] **Phase 20: Takeoff Measurement Precision** — Plan-type-agnostic accurate take-offs; ≥97% golden regression; shared PDF+StackCT pipeline
-- [x] **Phase 21: Accuracy & Learning Engine (v3)** — Plans-only production accuracy: vector-first measurement, auto scale detection v2, ensemble vision, persistent human-verified learning loop replacing manifests, package restructure, live-testing readiness (completed 2026-07-14)
+- [ ] **Phase 21: Accuracy & Learning Engine (v3)** — Plans-only production accuracy: vector-first measurement, auto scale detection v2, ensemble vision, persistent human-verified learning loop replacing manifests, package restructure, live-testing readiness (code complete 2026-07-15 — verification: human_needed; pending 21-UAT.md + live accuracy gate)
 
 ## Phase Details
 

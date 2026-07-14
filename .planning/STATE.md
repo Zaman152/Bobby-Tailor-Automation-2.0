@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
 Plan: 18/18 code complete (21-01 … 21-18)  
-Status: Wave 10 — 21-18 code complete (all imports on bobbytailor package paths, 33 root shims deleted, app.py = 5-line create_app entry, README/docs/DEPLOYMENT.md updated, 833 tests green shim-free); PENDING human checkpoints: 21-UAT.md sign-off (Task 3 of 21-18, includes the deferred 21-17 live gate run `bash scripts/accuracy_gate.sh` — spends API credits) + GitHub milestone push  
+Status: Code complete + reviewed (10/10 findings fixed) — verification human_needed; awaiting /gsd-verify-work 21 (UAT + live accuracy gate)
 Last activity: 2026-07-14 — Completed 21-18 Tasks 1-2: import migration, shim deletion, live-testing docs + UAT script (V3-STRUCT-01, V3-PROD-02)
 
 Progress: [█████████░] 88%
