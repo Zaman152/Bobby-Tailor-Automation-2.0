@@ -56,5 +56,31 @@
     ],
     "hatch_strokes": 20,
     "unique_shapes": 1
+  },
+  "floorplan": {
+    "pdf": "floorplan_synthetic.pdf",
+    "fpp": 0.1,
+    "wall_lf_by_thickness_in": {
+      "8.0": 277.333,
+      "6.0": 141.699
+    },
+    "curve_wall_lf": 9.032,
+    "opening_widths_ft": [
+      3.0,
+      3.0
+    ],
+    "room_areas_sf": {
+      "OFFICE": 1575.0,
+      "STORAGE": 1225.0,
+      "LOBBY": 1125.0,
+      "BREAK": 875.0
+    },
+    "room_count": 4,
+    "footprint_sf": 4893.78,
+    "footprint_dims_text": [
+      "80'-8\"",
+      "60'-8\""
+    ],
+    "hatch_strokes": 20
   }
 }

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 from typing import Optional
 
@@ -166,6 +167,144 @@ def generate_symbols_page() -> tuple[fitz.Document, dict]:
     return doc, truth
 
 
+# ── Floor-plan fixture (Recipes B & C, 21-10) ────────────────────────────────
+
+# Truth scale: 0.1 ft per point (1 pt = 0.1 ft).
+_FP_FPP = 0.1
+# Wall thicknesses in points: exterior 8" (0.6667 ft), interior 6" (0.5 ft).
+_FP_EXT_TH = 8.0 / 12.0 / _FP_FPP     # 6.6667 pt
+_FP_INT_TH = 6.0 / 12.0 / _FP_FPP     # 5.0 pt
+# Centerline rectangle of the exterior walls (80 ft x 60 ft).
+_FP_X0, _FP_X1 = 100.0, 900.0
+_FP_Y0, _FP_Y1 = 100.0, 700.0
+# Interior wall centerlines (asymmetric quadrants).
+_FP_XV = 550.0    # vertical interior wall
+_FP_YH = 450.0    # horizontal interior wall
+# Two 3'-0" door gaps (30 pt).
+_FP_DOOR_V = (560.0, 590.0)   # in the vertical wall (y-range)
+_FP_DOOR_H = (700.0, 730.0)   # in the horizontal wall (x-range)
+# Curved wall: concentric quarter arcs (island in the OFFICE room).
+_FP_ARC_CENTER = (200.0, 200.0)
+_FP_ARC_R_IN, _FP_ARC_R_OUT = 55.0, 60.0
+_BEZIER_K = 0.5522847498307936
+
+
+def generate_floorplan_page() -> tuple[fitz.Document, dict]:
+    """Build one floor-plan page with known wall/room/footprint ground truth.
+
+    Content (all lengths deterministic at fpp = 0.1 ft/pt):
+      * Exterior walls: 8" thick — outer/inner boundary rectangles drawn as
+        line pairs around the 80 ft x 60 ft centerline rectangle.
+      * Interior walls: 6" thick — one vertical + one horizontal line pair,
+        each broken by a 3'-0" door gap on BOTH faces.
+      * One curved wall: concentric quarter arcs (6" apart) as an island —
+        proves Bezier flattening + constant-offset arc pairing (Pitfall 6).
+      * A 20-stroke 45-degree hatch field in the STORAGE room — must collapse
+        (Pitfall 2), never become a wall class.
+      * Four room labels + overall dimension strings 80'-8" / 60'-8"
+        (outer-face extents) for the footprint cross-check.
+    """
+    doc = fitz.open()
+    page = doc.new_page(width=1000, height=800)
+
+    ho = _FP_EXT_TH / 2.0
+    hi = _FP_INT_TH / 2.0
+
+    def _line(x0: float, y0: float, x1: float, y1: float) -> None:
+        page.draw_line(fitz.Point(x0, y0), fitz.Point(x1, y1))
+
+    # Exterior walls: outer + inner face rectangles (line pairs).
+    xo0, xo1 = _FP_X0 - ho, _FP_X1 + ho
+    yo0, yo1 = _FP_Y0 - ho, _FP_Y1 + ho
+    xi0, xi1 = _FP_X0 + ho, _FP_X1 - ho
+    yi0, yi1 = _FP_Y0 + ho, _FP_Y1 - ho
+    _line(xo0, yo0, xo1, yo0)
+    _line(xo1, yo0, xo1, yo1)
+    _line(xo1, yo1, xo0, yo1)
+    _line(xo0, yo1, xo0, yo0)
+    _line(xi0, yi0, xi1, yi0)
+    _line(xi1, yi0, xi1, yi1)
+    _line(xi1, yi1, xi0, yi1)
+    _line(xi0, yi1, xi0, yi0)
+
+    # Interior vertical wall (6"), door gap on both faces.
+    for x in (_FP_XV - hi, _FP_XV + hi):
+        _line(x, yi0, x, _FP_DOOR_V[0])
+        _line(x, _FP_DOOR_V[1], x, yi1)
+    # Interior horizontal wall (6"), door gap on both faces.
+    for y in (_FP_YH - hi, _FP_YH + hi):
+        _line(xi0, y, _FP_DOOR_H[0], y)
+        _line(_FP_DOOR_H[1], y, xi1, y)
+
+    # Curved wall: concentric quarter arcs (0° → 90°), 6" apart.
+    cx, cy = _FP_ARC_CENTER
+    for radius in (_FP_ARC_R_IN, _FP_ARC_R_OUT):
+        k = _BEZIER_K * radius
+        page.draw_bezier(
+            fitz.Point(cx + radius, cy),
+            fitz.Point(cx + radius, cy + k),
+            fitz.Point(cx + k, cy + radius),
+            fitz.Point(cx, cy + radius),
+        )
+
+    # Hatch field in STORAGE (2.83 pt perpendicular spacing at 45°) — the
+    # stroke spacing sits inside the wall-thickness window, so an uncollapsed
+    # field WOULD pair into bogus walls (the test asserts it does not).
+    hatch_strokes = 20
+    for i in range(hatch_strokes):
+        x = 600.0 + i * 4.0
+        _line(x, 150.0, x + 30.0, 180.0)
+
+    # Room labels (word centers inside their faces).
+    page.insert_text(fitz.Point(300, 300), "OFFICE", fontsize=10)
+    page.insert_text(fitz.Point(700, 300), "STORAGE", fontsize=10)
+    page.insert_text(fitz.Point(300, 600), "LOBBY", fontsize=10)
+    page.insert_text(fitz.Point(700, 600), "BREAK", fontsize=10)
+
+    # Overall dimension strings — outer-face extents (80'-8" x 60'-8") for
+    # the footprint_takeoff cross-check.
+    page.insert_text(fitz.Point(480, 60), "80'-8\"", fontsize=10)
+    page.insert_text(fitz.Point(960, 400), "60'-8\"", fontsize=10, rotate=90)
+
+    # ── Ground truth (all real-feet at fpp = 0.1) ────────────────────────────
+    ext_lf = 2.0 * ((xi1 - xi0) + (yi1 - yi0)) * _FP_FPP
+    int_v_lf = (
+        (_FP_DOOR_V[0] - yi0) + (yi1 - _FP_DOOR_V[1])
+    ) * _FP_FPP
+    int_h_lf = (
+        (_FP_DOOR_H[0] - xi0) + (xi1 - _FP_DOOR_H[1])
+    ) * _FP_FPP
+    arc_lf = (
+        math.pi / 2.0 * ((_FP_ARC_R_IN + _FP_ARC_R_OUT) / 2.0) * _FP_FPP
+    )
+    room_areas = {
+        "OFFICE": (_FP_XV - _FP_X0) * (_FP_YH - _FP_Y0) * _FP_FPP * _FP_FPP,
+        "STORAGE": (_FP_X1 - _FP_XV) * (_FP_YH - _FP_Y0) * _FP_FPP * _FP_FPP,
+        "LOBBY": (_FP_XV - _FP_X0) * (_FP_Y1 - _FP_YH) * _FP_FPP * _FP_FPP,
+        "BREAK": (_FP_X1 - _FP_XV) * (_FP_Y1 - _FP_YH) * _FP_FPP * _FP_FPP,
+    }
+    footprint_sf = (
+        (xo1 - xo0) * (yo1 - yo0) * _FP_FPP * _FP_FPP
+    )
+
+    truth = {
+        "pdf": "floorplan_synthetic.pdf",
+        "fpp": _FP_FPP,
+        "wall_lf_by_thickness_in": {
+            "8.0": round(ext_lf, 3),
+            "6.0": round(int_v_lf + int_h_lf + arc_lf, 3),
+        },
+        "curve_wall_lf": round(arc_lf, 3),
+        "opening_widths_ft": [3.0, 3.0],
+        "room_areas_sf": {k: round(v, 2) for k, v in room_areas.items()},
+        "room_count": 4,
+        "footprint_sf": round(footprint_sf, 2),
+        "footprint_dims_text": ["80'-8\"", "60'-8\""],
+        "hatch_strokes": hatch_strokes,
+    }
+    return doc, truth
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -190,12 +329,18 @@ def main() -> None:
     sym_doc.save(sym_pdf_path)
     sym_doc.close()
 
+    fp_doc, fp_truth = generate_floorplan_page()
+    fp_pdf_path = out_dir / "floorplan_synthetic.pdf"
+    fp_doc.save(fp_pdf_path)
+    fp_doc.close()
+
     payload = {
         "pages": [{"page": 0, "dims": truth}],
         "symbols": sym_truth,
+        "floorplan": fp_truth,
     }
     truth_path.write_text(json.dumps(payload, indent=2) + "\n")
-    print(f"Wrote {pdf_path}, {sym_pdf_path} and {truth_path}")
+    print(f"Wrote {pdf_path}, {sym_pdf_path}, {fp_pdf_path} and {truth_path}")
 
 
 if __name__ == "__main__":
