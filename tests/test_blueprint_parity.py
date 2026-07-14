@@ -48,7 +48,9 @@ EXPECTED_PATHS = {
     "/api/reports/<run_folder>/verify",
     "/api/reports/<run_folder>/verify-batch",
     "/api/reports/<run_folder>/calibrate",
-    "/api/reports/<filename>",
+    # "/api/reports/<filename>" removed (21-REVIEW WR-03): the rule was
+    # structurally identical to "/api/reports/<run_folder>" and registered
+    # second, so it never matched a request — never a live route.
     "/settings",
     "/api/settings",
 }
@@ -77,6 +79,33 @@ def client():
     return app.test_client()
 
 
+def test_no_shadowed_duplicate_url_rules(client):
+    """WR-03 regression: two structurally identical URL rules mean the
+    later-registered one can never match — silent dead endpoint."""
+    import re
+
+    def shape(rule_str):
+        # Normalize variable NAMES but keep converter TYPES: <run_folder>
+        # and <filename> collide; <int:x> and <x> do not.
+        return re.sub(
+            r"<(?:([^:>]+):)?[^>]+>",
+            lambda m: "<%s>" % (m.group(1) or "string"),
+            rule_str,
+        )
+
+    seen = {}
+    for rule in client.application.url_map.iter_rules():
+        if rule.rule.startswith("/static"):
+            continue
+        for method in (rule.methods or set()) - {"HEAD", "OPTIONS"}:
+            key = (shape(rule.rule), method)
+            assert key not in seen, (
+                f"Shadowed duplicate URL rule: {rule.rule} [{method}] "
+                f"collides with {seen[key]}"
+            )
+            seen[key] = rule.rule
+
+
 def test_url_map_contains_expected_paths(client):
     rules = {
         str(rule.rule)
@@ -89,7 +118,9 @@ def test_url_map_contains_expected_paths(client):
         r for r in client.application.url_map.iter_rules()
         if not r.rule.startswith("/static")
     ]
-    assert len(non_static_rules) >= 40
+    # 40 pre-split registrations minus the dead shadowed legacy download
+    # rule removed in 21-REVIEW WR-03.
+    assert len(non_static_rules) >= 39
 
 
 @pytest.mark.parametrize("path", PROTECTED_API_GETS)

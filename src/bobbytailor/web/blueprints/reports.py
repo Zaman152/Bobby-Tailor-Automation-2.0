@@ -282,11 +282,10 @@ def serve_sheet_image(run_folder: str, relpath: str):
     return send_file(str(target), mimetype=mime, max_age=3600)
 
 
-@reports_bp.route("/api/reports/<filename>")
-def download_report_legacy(filename):
-    """Legacy flat-output download — kept for old reports still in the root output dir."""
-    path = Path(config.OUTPUT_DIR) / filename
-    if not path.exists() or not path.is_file():
-        return jsonify({"error": "Not found"}), 404
-    return send_file(str(path), as_attachment=True)
+# NOTE (21-REVIEW WR-03): the legacy flat-output download route
+# GET /api/reports/<filename> was removed. Its URL rule was structurally
+# identical to get_report's /api/reports/<run_folder> and registered second,
+# so Werkzeug could never match it — the endpoint was dead code since the
+# blueprint split. No template/JS caller uses a flat report download
+# (downloads go through /api/reports/<run_folder>/<filename>).
 
