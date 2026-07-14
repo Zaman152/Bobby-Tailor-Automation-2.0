@@ -17,8 +17,11 @@ Security invariants (ASVS L1, phase threat model):
       the ``learning_*`` tables. Endpoints call it, never raw SQL.
     * 100%% parameterized queries — every learned string is hostile input
       (humans type it; it flows back into prompts/aggregation).
-    * JSON values stored via ``json.dumps`` only; serialized values are
-      truncated at ``MAX_VALUE_LEN`` chars (payload-stuffing defense).
+    * JSON values stored via ``json.dumps`` only; values whose serialized
+      form exceeds ``MAX_VALUE_LEN`` chars are REJECTED with ``ValueError``
+      (payload-stuffing defense). Rejection, never truncation: a JSON
+      payload cut mid-token would be re-read as a raw-text scalar and could
+      silently become learned vocabulary (21-REVIEW WR-02).
 
 Connection/lock/init patterns follow ``stores/stackct_store.py`` (Row
 factory, WAL, module write lock) and ``stores/job_store.py`` (lazy
@@ -50,8 +53,10 @@ VALID_SCOPES = frozenset(
     {SCOPE_ITEM, SCOPE_SCALE, SCOPE_WALL_HEIGHT, SCOPE_NAME, SCOPE_MISSED_ITEM, SCOPE_UNIT}
 )
 
-#: Serialized JSON values (and item_pattern) are truncated at this length on
-#: write — defense against payload stuffing through the correction UI.
+#: Serialized JSON values (and item_pattern) longer than this are REJECTED
+#: on write — defense against payload stuffing through the correction UI.
+#: Rejected, never truncated: truncation corrupts the stored JSON mid-token
+#: and distillation would install the fragment as learned data (WR-02).
 MAX_VALUE_LEN = 2000
 
 SCHEMA_VERSION = "1"
@@ -208,17 +213,25 @@ def init_learning_schema() -> None:
     _ensure_schema()
 
 
-def _truncate(text: str) -> str:
-    return text if len(text) <= MAX_VALUE_LEN else text[:MAX_VALUE_LEN]
+def _check_len(text: str, field: str) -> str:
+    """Reject over-length payloads — never truncate (WR-02)."""
+    if len(text) > MAX_VALUE_LEN:
+        raise ValueError(
+            "%s exceeds MAX_VALUE_LEN (%d > %d chars) — correction rejected. "
+            "Oversized payloads are refused rather than truncated: a JSON "
+            "fragment cut mid-token would be silently installed as learned "
+            "data." % (field, len(text), MAX_VALUE_LEN)
+        )
+    return text
 
 
-def _serialize(value: Any) -> str:
-    """JSON-encode a correction value, capped at MAX_VALUE_LEN chars."""
-    return _truncate(json.dumps(value, default=str))
+def _serialize(value: Any, field: str = "value") -> str:
+    """JSON-encode a correction value; over-length payloads are rejected."""
+    return _check_len(json.dumps(value, default=str), field)
 
 
 def _deserialize(raw: Optional[str]) -> Any:
-    """Parse a stored JSON value; truncated/legacy payloads fall back to raw text."""
+    """Parse a stored JSON value; legacy/pre-fix payloads fall back to raw text."""
     if raw is None:
         return None
     try:
@@ -241,8 +254,9 @@ def record_correction(
     """Append one human correction to the durable log. Returns the row id.
 
     ``original_value``/``corrected_value``/``context`` are arbitrary
-    JSON-serializable payloads; they are stored via ``json.dumps`` and
-    truncated at MAX_VALUE_LEN. The row survives run-folder deletion —
+    JSON-serializable payloads; they are stored via ``json.dumps``. A payload
+    whose serialized form exceeds MAX_VALUE_LEN raises ``ValueError`` — it is
+    rejected, never truncated (WR-02). The row survives run-folder deletion —
     ``run_id`` is a plain string reference, never a filesystem dependency.
     """
     if scope not in VALID_SCOPES:
@@ -263,10 +277,10 @@ def record_correction(
         "project_type": project_type,
         "sheet_type": sheet_type,
         "scope": scope,
-        "item_pattern": _truncate(str(item_pattern)) if item_pattern is not None else None,
-        "original_value": _serialize(original_value) if original_value is not None else None,
-        "corrected_value": _serialize(corrected_value),
-        "context": _serialize(context) if context is not None else None,
+        "item_pattern": _check_len(str(item_pattern), "item_pattern") if item_pattern is not None else None,
+        "original_value": _serialize(original_value, "original_value") if original_value is not None else None,
+        "corrected_value": _serialize(corrected_value, "corrected_value"),
+        "context": _serialize(context, "context") if context is not None else None,
     }
     with _write_lock:
         conn = get_connection()

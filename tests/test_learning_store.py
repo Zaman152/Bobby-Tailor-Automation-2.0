@@ -350,14 +350,62 @@ def test_get_corrections_project_key_filter(learning_db):
     assert hits[0]["project_key"] == "proj-a"
 
 
-def test_oversized_values_truncated_at_cap(learning_db):
-    record(item_pattern="p" * 5000, corrected="A" * 5000)
+def test_oversized_values_rejected_never_truncated(learning_db):
+    """WR-02: over-length payloads raise ValueError — truncating JSON
+    mid-token would make distill install the fragment as learned data."""
+    with pytest.raises(ValueError):
+        record(corrected="A" * 5000)
+    with pytest.raises(ValueError):
+        record(item_pattern="p" * 5000, corrected="ok")
+    with pytest.raises(ValueError):
+        record(corrected="ok", context={"blob": "x" * 5000})
+
+    # Nothing was inserted by any rejected call.
+    conn = store.get_connection()
+    try:
+        n = conn.execute("SELECT COUNT(*) AS c FROM learning_corrections").fetchone()["c"]
+    finally:
+        conn.close()
+    assert n == 0
+
+    # A value at the cap is accepted and round-trips as VALID JSON.
+    ok_len = store.MAX_VALUE_LEN - 2  # json.dumps adds surrounding quotes
+    record(corrected="B" * ok_len)
+    rows = store.get_corrections()
+    assert rows[0]["corrected_value"] == "B" * ok_len
+
+
+def test_distill_rejects_oversized_canonical_name(learning_db):
+    """WR-02: a stuffed canonical_name (valid JSON, but absurdly long) must
+    never be installed into learning_vocabulary."""
+    record(
+        scope=store.SCOPE_NAME,
+        item_pattern="cmu wall",
+        corrected={"canonical_name": "Z" * 500, "unit": "SF"},
+    )
+    stats = distill()
+    assert stats["skipped"] >= 1
+    conn = store.get_connection()
+    try:
+        n = conn.execute("SELECT COUNT(*) AS c FROM learning_vocabulary").fetchone()["c"]
+    finally:
+        conn.close()
+    assert n == 0
+
+    # A sane mapping still distills normally afterwards.
+    record(
+        scope=store.SCOPE_NAME,
+        run_id="run-002",
+        item_pattern="cmu wall",
+        corrected={"canonical_name": "CMU Wall", "unit": "SF"},
+    )
+    distill()
     conn = store.get_connection()
     try:
         row = conn.execute(
-            "SELECT item_pattern, corrected_value FROM learning_corrections ORDER BY id DESC LIMIT 1"
+            "SELECT canonical_name FROM learning_vocabulary WHERE raw_pattern = ?",
+            ("cmu wall",),
         ).fetchone()
     finally:
         conn.close()
-    assert len(row["item_pattern"]) == store.MAX_VALUE_LEN
-    assert len(row["corrected_value"]) == store.MAX_VALUE_LEN
+    assert row is not None and row["canonical_name"] == "CMU Wall"

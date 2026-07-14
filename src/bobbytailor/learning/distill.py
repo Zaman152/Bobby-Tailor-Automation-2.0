@@ -43,6 +43,13 @@ MANIFEST_SCOPES = (store.SCOPE_ITEM, store.SCOPE_MISSED_ITEM)
 CONFIRM_INCREMENT = 1.0
 CONTRADICTION_DECAY = 0.5
 STALENESS_DECAY = 0.9
+
+#: Sanity caps on distilled vocabulary fields (21-REVIEW WR-02): a canonical
+#: name is a short human-facing item label — anything longer is a stuffed or
+#: corrupted payload and must never be installed as learned vocabulary
+#: (it would flow into prompt hints and aggregation renames).
+MAX_CANONICAL_NAME_LEN = 100
+MAX_UNIT_LEN = 20
 #: Rows untouched within a project_type's N most recent verified runs decay.
 STALENESS_RUN_WINDOW = 10
 
@@ -248,6 +255,18 @@ def _distill_vocabulary(conn: sqlite3.Connection, row: sqlite3.Row, stats: Dict[
     project_type = row["project_type"]
     canonical_name, unit = _vocab_mapping(conn, row, raw_pattern)
     seen_at = row["created_at"]
+
+    # WR-02 sanity gate: never install an over-length / empty mapping as
+    # canonical vocabulary — it would be rendered into prompt hints and used
+    # to rename aggregation buckets.
+    if not canonical_name or len(canonical_name) > MAX_CANONICAL_NAME_LEN or len(unit) > MAX_UNIT_LEN:
+        logger.warning(
+            "distill: rejected vocabulary mapping for correction id=%s — "
+            "canonical_name/unit failed sanity checks (len=%d/%d)",
+            row["id"], len(canonical_name or ""), len(unit or ""),
+        )
+        stats["skipped"] += 1
+        return
 
     # Contradiction: same (project_type, raw_pattern) key, different mapping
     # → decay the old rows (weight × 0.5); the asserted mapping then wins by
