@@ -15,7 +15,7 @@ from PIL import Image
 from calculator import resolve_spec_lookups
 from cross_references import resolve_cross_references
 from reporter import generate_report
-from takeoff_pipeline import TakeoffPipeline
+from takeoff_pipeline import RunSettings, TakeoffPipeline
 from page_text_enrichment import enrich_components_from_page_text
 from companion_takeoff import find_companion_takeoff_pdf, extract_legend_schedules
 from config import RENDER_TARGET_PX, SCREENSHOTS_DIR
@@ -354,7 +354,11 @@ def run_pdf_analysis(
     )
     project_legends.extend(det_legends)
 
-    pipeline = TakeoffPipeline()
+    # Shared RunSettings (21-13): both entry points construct the pipeline
+    # from the same env-driven settings — the parity foundation for 21-15
+    # (scraper's module-level singleton defaults to RunSettings.from_env()
+    # inside the constructor, so the two constructions are identical).
+    pipeline = TakeoffPipeline(settings=RunSettings.from_env())
     all_extracted, all_estimates, _project_type = pipeline.run_project(
         pipeline_pages,
         progress_callback=_progress,
