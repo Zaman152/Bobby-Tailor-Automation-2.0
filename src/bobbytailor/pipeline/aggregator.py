@@ -140,10 +140,11 @@ def _extract_spec_for_name(canonical: str, description: str) -> str:
 
 def normalize_item_name(description: str, item_type: str, unit: str, learned=None) -> tuple:
     d = (description or "").lower()
-    # Learned vocabulary FIRST (V3-LEARN-02): learning_vocabulary rows —
-    # distilled from prior human corrections — are consulted via an
-    # exact/normalized match BEFORE the static regex list, so a correction
-    # made once never recurs. On a miss the static ITEM_NAME_MAP below runs
+    # Learned vocabulary FIRST (V3-LEARN-02): the learned_vocabulary rows
+    # (learning_vocabulary table, distilled from prior human corrections)
+    # are consulted via an exact/normalized match BEFORE the static regex
+    # list, so a correction made once never recurs. On a miss the static
+    # ITEM_NAME_MAP below runs
     # unchanged: it is the cold-start floor and is never deleted, and its
     # carefully sequenced first-match-wins ordering (20-05/20-09 decisions)
     # is never disturbed by the learned lookup.
