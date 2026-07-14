@@ -29,7 +29,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [ ] **Phase 17: Production Takeoff Pipeline** — Screenshot reuse, two-phase capture/analyze, resume, demo-grade job UX
 - [ ] **Phase 18: Linked Sheet Resolution** — Auto-follow drawing cross-refs; capture/analyze linked detail sheets
 - [ ] **Phase 20: Takeoff Measurement Precision** — Plan-type-agnostic accurate take-offs; ≥97% golden regression; shared PDF+StackCT pipeline
-- [ ] **Phase 21: Accuracy & Learning Engine (v3)** — Plans-only production accuracy: vector-first measurement, auto scale detection v2, ensemble vision, persistent human-verified learning loop replacing manifests, package restructure, live-testing readiness
+- [x] **Phase 21: Accuracy & Learning Engine (v3)** — Plans-only production accuracy: vector-first measurement, auto scale detection v2, ensemble vision, persistent human-verified learning loop replacing manifests, package restructure, live-testing readiness (completed 2026-07-14)
 
 ## Phase Details
 
@@ -831,7 +831,7 @@ Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
 6. All modules live in a structured package; `pytest` passes; app boots via blueprints; README documents the new layout
 7. `21-UAT.md` signed off for live-testing readiness
 
-**Plans:** 17/18 plans executed
+**Plans:** 18/18 plans complete
 
 Plans:
 **Wave 1**
@@ -880,7 +880,7 @@ Plans:
 
 **Wave 10** *(blocked on Wave 9 completion)*
 
-- [ ] 21-18-PLAN.md — Shim removal, import migration, docs, 21-UAT.md sign-off (V3-PROD-02, V3-STRUCT-01)
+- [x] 21-18-PLAN.md — Shim removal, import migration, docs, 21-UAT.md sign-off (V3-PROD-02, V3-STRUCT-01)
 
 Research: `.planning/phases/21-accuracy-learning-engine/21-RESEARCH.md`
 Context: `.planning/phases/21-accuracy-learning-engine/21-CONTEXT.md`

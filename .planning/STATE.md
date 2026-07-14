@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-16-PLAN.md — learning retrieval & injection + anti-amplification guardrail
-last_updated: "2026-07-14T20:00:01.621Z"
+stopped_at: 21-18 Tasks 1-2 complete (shim-free package + live-testing docs); PENDING Task 3 human checkpoint (21-UAT.md sign-off)
+last_updated: "2026-07-14T20:39:56.302Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-17 Tasks 1-2: explicit --takeoff-pdf ground truth, planted-decoy isolation, gate thresholds, learning-isolated one-command gate (V3-PROD-01)"
+last_activity_desc: "Completed 21-18 Tasks 1-2: import migration to bobbytailor package paths, 33 root shims deleted, README/DEPLOYMENT docs, 21-UAT.md (V3-STRUCT-01, V3-PROD-02)"
 progress:
   total_phases: 22
   completed_phases: 17
@@ -30,9 +30,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 17/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11, 21-12, 21-13, 21-14, 21-15, 21-16, 21-17)  
-Status: Wave 9 — 21-17 code complete (plans-only accuracy gate: provenance-split scoring, repro check, accuracy_gate.sh; 833 tests green); PENDING human checkpoint: live gate run (`bash scripts/accuracy_gate.sh`, spends API credits)  
-Last activity: 2026-07-14 — Completed 21-17 Tasks 1-2: explicit --takeoff-pdf ground truth, planted-decoy isolation, gate thresholds, learning-isolated one-command gate (V3-PROD-01)
+Plan: 18/18 code complete (21-01 … 21-18)  
+Status: Wave 10 — 21-18 code complete (all imports on bobbytailor package paths, 33 root shims deleted, app.py = 5-line create_app entry, README/docs/DEPLOYMENT.md updated, 833 tests green shim-free); PENDING human checkpoints: 21-UAT.md sign-off (Task 3 of 21-18, includes the deferred 21-17 live gate run `bash scripts/accuracy_gate.sh` — spends API credits) + GitHub milestone push  
+Last activity: 2026-07-14 — Completed 21-18 Tasks 1-2: import migration, shim deletion, live-testing docs + UAT script (V3-STRUCT-01, V3-PROD-02)
 
 Progress: [█████████░] 88%
 
@@ -65,6 +65,7 @@ Progress: [█████████░] 88%
 | Phase 21-accuracy-learning-engine P15 P15 | 27 min | 3 tasks | 9 files |
 | Phase 21-accuracy-learning-engine P16 | 38 min | 3 tasks | 8 files |
 | Phase 21-accuracy-learning-engine P17 | 20 min | 2 tasks | 3 files |
+| Phase 21-accuracy-learning-engine P18 | 36 min | 2 tasks | 113 files |
 
 ## Accumulated Context
 
@@ -199,6 +200,9 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-17]: Planted-decoy isolation: benchmark plants a sentinel sibling take-off, asserts the devtools finder sees it, and asserts the pipeline result is leakage-free (regression tripwire for companion auto-discovery)
 - [Phase 21-17]: Gate semantics: uncertifiable metrics (geometry_text_qty_acc=None) FAIL; vision_qty_share counts any vision_ensemble involvement over quantity-bearing rows; flagged (needs_review/fusion_rejected) counts as covered for silent-miss detection
 - [Phase 21-17]: accuracy_gate.sh pins LEARNING_DB_PATH to a fresh temp DB per run (cold-pipeline scores); --with-learning is tracking-only learned-assisted, never gating; cost baseline record-on-absent with >2x warning
+- [Phase 21-18]: Shim deletion executed migration-first: all src/tests/scripts imports moved to absolute bobbytailor paths and proven green (833 tests) BEFORE deleting the 33 root shims; root app.py is a 5-line create_app() gunicorn entry
+- [Phase 21-18]: Parity/takeoff-pipeline spec-load mocks are scoped (temp-alias sys.modules key + restore) and conftest pre-imports all stub-targeted real modules — fixes the 21-08/21-16 test-order pollution class (previously-failing forced orders now pass)
+- [Phase 21-18]: 21-UAT.md documents Crow main-plan scale expectation as 1 in = 40 ft per the 21-07 geometric proof (roadmap's ~20 fpi text is the stale research figure)
 
 ### Pending Todos
 
@@ -342,6 +346,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T19:59:12.425Z
+Last session: 2026-07-14T20:39:40.403Z
 Stopped at: Completed 21-16-PLAN.md — learning retrieval & injection + anti-amplification guardrail
 Resume file: None
