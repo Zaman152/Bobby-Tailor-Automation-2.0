@@ -10,7 +10,7 @@ import threading
 from datetime import datetime
 from typing import Any, Optional
 
-from config import JOB_HISTORY_RETENTION_DAYS, STACKCT_DB_PATH
+from bobbytailor.config import JOB_HISTORY_RETENTION_DAYS, STACKCT_DB_PATH
 
 logger = logging.getLogger(__name__)
 

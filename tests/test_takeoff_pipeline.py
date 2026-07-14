@@ -29,13 +29,14 @@ _CONFIG_MOCK.CLAUDE_MODEL = "claude-haiku-4-5"
 _CONFIG_MOCK.CLAUDE_MODEL_SCHEDULES = "claude-sonnet-4-5"
 _CONFIG_MOCK.ANTHROPIC_API_KEY = "test-key"
 
-sys.modules.setdefault("config", _CONFIG_MOCK)
+sys.modules.setdefault("bobbytailor.config", _CONFIG_MOCK)
 sys.modules.setdefault("anthropic", MagicMock())
 
 import importlib.util, pathlib
 
-# Phase 21 (V3-STRUCT-01): real modules live under src/bobbytailor/; root-level
-# files are import shims, so load the real sources directly.
+# Phase 21 (V3-STRUCT-01): modules live under src/bobbytailor/. Spec-load the
+# real sources under isolated names so mocks bind without touching the
+# canonical package modules.
 _SRC_ROOT = pathlib.Path(__file__).parent.parent / "src" / "bobbytailor"
 _SRC_FILES = {
     "claude_analyzer": _SRC_ROOT / "vision" / "claude_analyzer.py",
@@ -54,8 +55,11 @@ def _load(name: str):
 # merge_passes does no API calls so it's safe to load with mocked anthropic/config.
 _real_ca = _load("claude_analyzer")
 
-# Replace the claude_analyzer module in sys.modules with a mock that keeps the
-# real merge_passes but stubs out analyze_drawing (avoid real API calls).
+# Bind a claude_analyzer mock into the spec-loaded modules: real merge_passes,
+# stubbed analyze_drawing (avoid real API calls). The package key is aliased
+# ONLY while the spec loads execute, then restored — a permanent substitution
+# would leak the mock into every later-collected test module (the 21-08/21-16
+# test-order pollution class).
 _CA_MOCK = MagicMock()
 _CA_MOCK._pick_model.return_value = "claude-haiku-4-5"
 _CA_MOCK.analyze_drawing.return_value = {"components": [], "measurements": []}
@@ -63,10 +67,17 @@ _CA_MOCK.merge_passes = _real_ca.merge_passes  # real implementation; not a Magi
 _CA_MOCK._merge_schedule_lists = _real_ca._merge_schedule_lists
 _CA_MOCK.apply_accuracy_rules = _real_ca.apply_accuracy_rules
 
-sys.modules["claude_analyzer"] = _CA_MOCK
-
-_spm = _load("sheet_pass_matrix")
-_tp  = _load("takeoff_pipeline")
+_PKG_CA = "bobbytailor.vision.claude_analyzer"
+_prev_real_ca = sys.modules.get(_PKG_CA)
+sys.modules[_PKG_CA] = _CA_MOCK
+try:
+    _spm = _load("sheet_pass_matrix")
+    _tp  = _load("takeoff_pipeline")
+finally:
+    if _prev_real_ca is not None:
+        sys.modules[_PKG_CA] = _prev_real_ca
+    else:
+        sys.modules.pop(_PKG_CA, None)
 
 TakeoffPipeline = _tp.TakeoffPipeline
 merge_passes    = _real_ca.merge_passes  # test the canonical implementation directly
@@ -362,7 +373,7 @@ class TestQuantityVerifier:
     """QuantityVerifier flags out-of-range quantities but does not raise."""
 
     def _verifier(self):
-        from takeoff_pipeline import QuantityVerifier  # type: ignore[attr-defined]
+        from bobbytailor.pipeline.takeoff_pipeline import QuantityVerifier  # type: ignore[attr-defined]
         return _tp.QuantityVerifier()
 
     def test_in_range_ea_returns_no_flags(self):

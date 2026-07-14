@@ -41,7 +41,7 @@ def learning_db(tmp_path, monkeypatch):
 @pytest.fixture()
 def run_dir(tmp_path, monkeypatch):
     """Tmp OUTPUT_DIR with a seeded run folder (takeoff.json + calibration)."""
-    import config
+    from bobbytailor import config
 
     out = tmp_path / "output"
     run = out / RUN
@@ -68,7 +68,7 @@ def run_dir(tmp_path, monkeypatch):
     }
     (run / "takeoff.json").write_text(json.dumps(report), encoding="utf-8")
 
-    from scale_recalc import recompute
+    from bobbytailor.deterministic.scale_recalc import recompute
     raw = {"footprint_pt2": 720 * 360, "total_linework_pt": 1000.0,
            "long_run_pt": 600.0, "width_pt": 720.0, "height_pt": 360.0}
     calib = {"project_name": "Endpoint Proj", "run_folder": RUN,
@@ -86,7 +86,7 @@ def run_dir(tmp_path, monkeypatch):
 @pytest.fixture()
 def client(run_dir, learning_db):
     """Authenticated Flask test client (CSRF disabled per existing pattern)."""
-    from auth import get_admin
+    from bobbytailor.web.auth import get_admin
 
     # create_app() runs init_admin(), populating the singleton get_admin()
     # returns — so build the app BEFORE resolving the admin user.

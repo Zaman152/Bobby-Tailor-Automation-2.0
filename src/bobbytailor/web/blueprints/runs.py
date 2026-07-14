@@ -55,7 +55,7 @@ def run_stackct():
 
     # Validate page_ids belong to folder when both provided
     if not analyze_only and mode == "specific" and project_id and page_ids and folder_id is not None:
-        import stackct_store as _store
+        from bobbytailor.stores import stackct_store as _store
         _store.init_db()
         allowed = {
             p["page_id"]
@@ -110,7 +110,7 @@ def upload_pdf():
     save_path = os.path.join("uploads", f"{upload_id}_{f.filename}")
     f.save(save_path)
 
-    from pdf_analyzer import get_pdf_metadata
+    from bobbytailor.pipeline.pdf_analyzer import get_pdf_metadata
     meta = get_pdf_metadata(save_path)
 
     uploads[upload_id] = {
@@ -185,7 +185,7 @@ def run_pdf_from_upload():
 @runs_bp.route("/api/pdf/manifest/template", methods=["GET"])
 def object_manifest_template():
     """Download a CSV template the user can fill in and upload as an object manifest."""
-    from object_manifest import template_csv
+    from bobbytailor.devtools.object_manifest import template_csv
     from flask import Response
     return Response(
         template_csv(),
@@ -201,7 +201,7 @@ def upload_object_manifest():
     The manifest lists the objects expected in the project with their canonical
     name + unit (no quantities). Returns a manifest_id to pass to /api/pdf/run.
     """
-    from object_manifest import load_manifest
+    from bobbytailor.devtools.object_manifest import load_manifest
 
     manifest_id = str(uuid.uuid4())[:8]
     save_path = os.path.join("uploads", f"manifest_{manifest_id}")

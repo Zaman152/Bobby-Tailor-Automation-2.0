@@ -1,5 +1,5 @@
 """Tests for scraper filename sanitization and error helpers."""
-from scraper import _safe_sheet_filename, ERROR_ALL_SHEETS_FAILED
+from bobbytailor.scrape.scraper import _safe_sheet_filename, ERROR_ALL_SHEETS_FAILED
 
 
 def test_safe_sheet_filename_replaces_slash():

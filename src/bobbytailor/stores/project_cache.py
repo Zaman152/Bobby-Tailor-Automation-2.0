@@ -8,8 +8,8 @@ import logging
 import threading
 from datetime import datetime
 
-import stackct_store as store
-from stackct_sync import (
+from bobbytailor.stores import stackct_store as store
+from bobbytailor.scrape.stackct_sync import (
     get_browser_lock,
     sync_project_plan_sets,
     sync_project_plans,

@@ -69,20 +69,20 @@ class TestTwoPhaseOrdering:
         mock_browser.close = AsyncMock(return_value=None)
         mock_browser.page = None
 
-        with patch("scraper.StackCTBrowser", return_value=mock_browser), \
-             patch("scraper.SCREENSHOTS_DIR", str(tmp_path)), \
-             patch("scraper.REUSE_SCREENSHOTS", False), \
-             patch("scraper.find_screenshot_paths", return_value={}), \
-             patch("scraper._pipeline.run_sheet", side_effect=_fake_analyze), \
-             patch("scraper.apply_estimation_tables", return_value=[]), \
-             patch("scraper.resolve_cross_references", return_value={}), \
-             patch("scraper.resolve_spec_lookups", return_value=[]), \
-             patch("scraper.generate_report", return_value={
+        with patch("bobbytailor.scrape.scraper.StackCTBrowser", return_value=mock_browser), \
+             patch("bobbytailor.scrape.scraper.SCREENSHOTS_DIR", str(tmp_path)), \
+             patch("bobbytailor.scrape.scraper.REUSE_SCREENSHOTS", False), \
+             patch("bobbytailor.scrape.scraper.find_screenshot_paths", return_value={}), \
+             patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=_fake_analyze), \
+             patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]), \
+             patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value={}), \
+             patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]), \
+             patch("bobbytailor.scrape.scraper.generate_report", return_value={
                  "sheets_processed": len(pages),
                  "total_line_items": 0,
                  "total_calculated_items": 0,
              }):
-            from scraper import run_project_scrape
+            from bobbytailor.scrape.scraper import run_project_scrape
             asyncio.run(run_project_scrape(
                 project_id=1,
                 project_name="TestProject",

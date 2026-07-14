@@ -113,7 +113,7 @@ class ReplayAnalyzer:
         # poison the SHA256 key derivation.
         if output_schema is not None:
             try:
-                from sheet_pass_matrix import pick_model_for_pass
+                from bobbytailor.pipeline.sheet_pass_matrix import pick_model_for_pass
 
                 routing_pass = "semantic" if pass_type == "symbol_gallery" else pass_type
                 model = pick_model_for_pass(sheet_type or "", routing_pass, sheet_name)
@@ -122,7 +122,7 @@ class ReplayAnalyzer:
             except Exception:  # noqa: BLE001 — routing unavailable → heuristic
                 pass
         try:
-            from claude_analyzer import _pick_model
+            from bobbytailor.vision.claude_analyzer import _pick_model
 
             model = _pick_model(sheet_name, pass_type, sheet_type=sheet_type)
             if isinstance(model, str) and model:
@@ -140,7 +140,7 @@ class ReplayAnalyzer:
     ) -> str:
         """The exact user-message text the real analyzer would send."""
         try:
-            from claude_analyzer import _build_user_message
+            from bobbytailor.vision.claude_analyzer import _build_user_message
 
             prompt = _build_user_message(sheet_name, pass_type, sheet_type, user_hint)
             if isinstance(prompt, str):  # guard against sys.modules mock stubs
@@ -182,7 +182,7 @@ class ReplayAnalyzer:
         if self.record:
             real = self._real
             if real is None:
-                from claude_analyzer import analyze_drawing as real  # lazy — record only
+                from bobbytailor.vision.claude_analyzer import analyze_drawing as real  # lazy — record only
 
             response = real(
                 screenshot_path,

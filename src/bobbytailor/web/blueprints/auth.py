@@ -4,7 +4,7 @@ import logging
 from flask import Blueprint, redirect, render_template, request, url_for
 from flask_login import current_user, login_user, logout_user, login_required
 
-from auth import bcrypt, get_admin, limiter
+from bobbytailor.web.auth import bcrypt, get_admin, limiter
 
 logger = logging.getLogger(__name__)
 

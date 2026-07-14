@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from capture_manifest import PageEntry, RunManifest, manifest_path
+from bobbytailor.scrape.capture_manifest import PageEntry, RunManifest, manifest_path
 
 
 # ---------------------------------------------------------------------------
@@ -90,11 +90,11 @@ def _make_run_manifest(
 def _common_patches(n_pages: int = 1):
     """Return list of context managers patching all external calls."""
     return [
-        patch("scraper._pipeline.run_sheet", side_effect=_fake_analyze),
-        patch("scraper.apply_estimation_tables", return_value=[]),
-        patch("scraper.resolve_cross_references", return_value={}),
-        patch("scraper.resolve_spec_lookups", return_value=[]),
-        patch("scraper.generate_report", return_value={
+        patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=_fake_analyze),
+        patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+        patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value={}),
+        patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]),
+        patch("bobbytailor.scrape.scraper.generate_report", return_value={
             "sheets_processed": n_pages,
             "total_line_items": 0,
             "total_calculated_items": 0,
@@ -125,13 +125,13 @@ class TestFullPipeline:
         mock_browser = _build_mock_browser(pages)
         patches = _common_patches(len(pages))
 
-        with patch("scraper.StackCTBrowser", return_value=mock_browser), \
-             patch("scraper.SCREENSHOTS_DIR", str(tmp_path)), \
-             patch("scraper.REUSE_SCREENSHOTS", False), \
-             patch("scraper.find_screenshot_paths", return_value={}), \
+        with patch("bobbytailor.scrape.scraper.StackCTBrowser", return_value=mock_browser), \
+             patch("bobbytailor.scrape.scraper.SCREENSHOTS_DIR", str(tmp_path)), \
+             patch("bobbytailor.scrape.scraper.REUSE_SCREENSHOTS", False), \
+             patch("bobbytailor.scrape.scraper.find_screenshot_paths", return_value={}), \
              patches[0], patches[1], patches[2], patches[3], patches[4]:
 
-            from scraper import run_project_scrape
+            from bobbytailor.scrape.scraper import run_project_scrape
             return asyncio.run(run_project_scrape(
                 project_id=1,
                 project_name="IntegTest",
@@ -168,14 +168,14 @@ class TestFullPipeline:
         mock_browser = _build_mock_browser(pages)
         patches = _common_patches(len(pages))
 
-        with patch("scraper.StackCTBrowser", return_value=mock_browser), \
-             patch("scraper.SCREENSHOTS_DIR", str(tmp_path)), \
-             patch("scraper.REUSE_SCREENSHOTS", False), \
-             patch("scraper.find_screenshot_paths", return_value={}), \
-             patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
+        with patch("bobbytailor.scrape.scraper.StackCTBrowser", return_value=mock_browser), \
+             patch("bobbytailor.scrape.scraper.SCREENSHOTS_DIR", str(tmp_path)), \
+             patch("bobbytailor.scrape.scraper.REUSE_SCREENSHOTS", False), \
+             patch("bobbytailor.scrape.scraper.find_screenshot_paths", return_value={}), \
+             patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
 
-            from scraper import run_project_scrape
+            from bobbytailor.scrape.scraper import run_project_scrape
             asyncio.run(run_project_scrape(project_id=1, project_name="IntegTest"))
 
         assert call_count["n"] == 3
@@ -197,13 +197,13 @@ class TestPartialFailure:
         mock_browser = _build_mock_browser(pages)
         patches = _common_patches(3)
 
-        with patch("scraper.StackCTBrowser", return_value=mock_browser), \
-             patch("scraper.SCREENSHOTS_DIR", str(tmp_path)), \
-             patch("scraper.REUSE_SCREENSHOTS", False), \
-             patch("scraper.find_screenshot_paths", return_value={}), \
+        with patch("bobbytailor.scrape.scraper.StackCTBrowser", return_value=mock_browser), \
+             patch("bobbytailor.scrape.scraper.SCREENSHOTS_DIR", str(tmp_path)), \
+             patch("bobbytailor.scrape.scraper.REUSE_SCREENSHOTS", False), \
+             patch("bobbytailor.scrape.scraper.find_screenshot_paths", return_value={}), \
              patches[0], patches[1], patches[2], patches[3], patches[4]:
 
-            from scraper import run_project_scrape
+            from bobbytailor.scrape.scraper import run_project_scrape
             result = asyncio.run(run_project_scrape(
                 project_id=2,
                 project_name="SlashTest",
@@ -230,21 +230,21 @@ class TestPartialFailure:
         mock_browser.download_drawing_image = AsyncMock(side_effect=_partial_download)
         mock_browser.page = None  # prevent navigation-decision fallback
 
-        with patch("scraper.StackCTBrowser", return_value=mock_browser), \
-             patch("scraper.SCREENSHOTS_DIR", str(tmp_path)), \
-             patch("scraper.REUSE_SCREENSHOTS", False), \
-             patch("scraper.find_screenshot_paths", return_value={}), \
-             patch("scraper._pipeline.run_sheet", side_effect=_fake_analyze), \
-             patch("scraper.apply_estimation_tables", return_value=[]), \
-             patch("scraper.resolve_cross_references", return_value={}), \
-             patch("scraper.resolve_spec_lookups", return_value=[]), \
-             patch("scraper.generate_report", return_value={
+        with patch("bobbytailor.scrape.scraper.StackCTBrowser", return_value=mock_browser), \
+             patch("bobbytailor.scrape.scraper.SCREENSHOTS_DIR", str(tmp_path)), \
+             patch("bobbytailor.scrape.scraper.REUSE_SCREENSHOTS", False), \
+             patch("bobbytailor.scrape.scraper.find_screenshot_paths", return_value={}), \
+             patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=_fake_analyze), \
+             patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]), \
+             patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value={}), \
+             patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]), \
+             patch("bobbytailor.scrape.scraper.generate_report", return_value={
                  "sheets_processed": 2,
                  "total_line_items": 0,
                  "total_calculated_items": 0,
              }):
 
-            from scraper import run_project_scrape
+            from bobbytailor.scrape.scraper import run_project_scrape
             result = asyncio.run(run_project_scrape(
                 project_id=3,
                 project_name="PartialTest",
@@ -267,7 +267,7 @@ class TestAnalyzeOnlyFromManifest:
     def _run_analyze(self, run_dir: Path, **kwargs) -> dict:
         patches = _common_patches()
         with patches[0], patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             return asyncio.run(run_analyze_from_manifest(
                 screenshots_dir=run_dir, **kwargs
             ))
@@ -287,9 +287,9 @@ class TestAnalyzeOnlyFromManifest:
         mock_browser_cls = MagicMock()
         patches = _common_patches(len(pages))
 
-        with patch("scraper.StackCTBrowser", mock_browser_cls), \
+        with patch("bobbytailor.scrape.scraper.StackCTBrowser", mock_browser_cls), \
              patches[0], patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=run_dir))
 
         mock_browser_cls.assert_not_called()
@@ -306,9 +306,9 @@ class TestAnalyzeOnlyFromManifest:
             return _fake_analyze(image_path, sheet_name)
 
         patches = _common_patches(3)
-        with patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
+        with patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=run_dir))
 
         assert call_count["n"] == 3
@@ -338,13 +338,13 @@ class TestReuseScreenshots:
         mock_browser = _build_mock_browser(pages)
         patches = _common_patches(len(pages))
 
-        with patch("scraper.StackCTBrowser", return_value=mock_browser), \
-             patch("scraper.SCREENSHOTS_DIR", str(tmp_path / "runs")), \
-             patch("scraper.REUSE_SCREENSHOTS", True), \
-             patch("scraper.find_screenshot_paths", return_value=cache_map), \
+        with patch("bobbytailor.scrape.scraper.StackCTBrowser", return_value=mock_browser), \
+             patch("bobbytailor.scrape.scraper.SCREENSHOTS_DIR", str(tmp_path / "runs")), \
+             patch("bobbytailor.scrape.scraper.REUSE_SCREENSHOTS", True), \
+             patch("bobbytailor.scrape.scraper.find_screenshot_paths", return_value=cache_map), \
              patches[0], patches[1], patches[2], patches[3], patches[4]:
 
-            from scraper import run_project_scrape
+            from bobbytailor.scrape.scraper import run_project_scrape
             result = asyncio.run(run_project_scrape(
                 project_id=1,
                 project_name="ReuseTest",
@@ -360,13 +360,13 @@ class TestReuseScreenshots:
         mock_browser = _build_mock_browser(pages)
         patches = _common_patches(len(pages))
 
-        with patch("scraper.StackCTBrowser", return_value=mock_browser), \
-             patch("scraper.SCREENSHOTS_DIR", str(tmp_path)), \
-             patch("scraper.REUSE_SCREENSHOTS", False), \
-             patch("scraper.find_screenshot_paths") as mock_find, \
+        with patch("bobbytailor.scrape.scraper.StackCTBrowser", return_value=mock_browser), \
+             patch("bobbytailor.scrape.scraper.SCREENSHOTS_DIR", str(tmp_path)), \
+             patch("bobbytailor.scrape.scraper.REUSE_SCREENSHOTS", False), \
+             patch("bobbytailor.scrape.scraper.find_screenshot_paths") as mock_find, \
              patches[0], patches[1], patches[2], patches[3], patches[4]:
 
-            from scraper import run_project_scrape
+            from bobbytailor.scrape.scraper import run_project_scrape
             asyncio.run(run_project_scrape(project_id=1, project_name="NoReuseTest"))
 
         mock_find.assert_not_called()
@@ -388,13 +388,13 @@ class TestReuseScreenshots:
         runs_dir = tmp_path / "runs"
         runs_dir.mkdir()
 
-        with patch("scraper.StackCTBrowser", return_value=mock_browser), \
-             patch("scraper.SCREENSHOTS_DIR", str(runs_dir)), \
-             patch("scraper.REUSE_SCREENSHOTS", True), \
-             patch("scraper.find_screenshot_paths", return_value=cache_map), \
+        with patch("bobbytailor.scrape.scraper.StackCTBrowser", return_value=mock_browser), \
+             patch("bobbytailor.scrape.scraper.SCREENSHOTS_DIR", str(runs_dir)), \
+             patch("bobbytailor.scrape.scraper.REUSE_SCREENSHOTS", True), \
+             patch("bobbytailor.scrape.scraper.find_screenshot_paths", return_value=cache_map), \
              patches[0], patches[1], patches[2], patches[3], patches[4]:
 
-            from scraper import run_project_scrape
+            from bobbytailor.scrape.scraper import run_project_scrape
             asyncio.run(run_project_scrape(project_id=1, project_name="CopyTest"))
 
         # The run folder should contain a .jpg file (copied from cache)

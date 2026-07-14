@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from capture_manifest import PageEntry, RunManifest, manifest_path
+from bobbytailor.scrape.capture_manifest import PageEntry, RunManifest, manifest_path
 
 
 # ---------------------------------------------------------------------------

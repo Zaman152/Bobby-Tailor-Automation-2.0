@@ -36,14 +36,15 @@ _CA_MOCK = MagicMock()
 _CA_MOCK._pick_model.return_value = "claude-haiku-4-5"
 
 # Patch at sys.modules level so the import inside sheet_pass_matrix resolves
-sys.modules.setdefault("config", _CONFIG_MOCK)
-sys.modules.setdefault("claude_analyzer", _CA_MOCK)
+sys.modules.setdefault("bobbytailor.config", _CONFIG_MOCK)
+sys.modules.setdefault("bobbytailor.vision.claude_analyzer", _CA_MOCK)
 
 # Now import the module under test (after stubs are in place)
 import importlib.util, pathlib
 
-# Phase 21 (V3-STRUCT-01): real module lives under src/bobbytailor/pipeline/;
-# the root-level sheet_pass_matrix.py is an import shim.
+# Phase 21 (V3-STRUCT-01): the real module lives under src/bobbytailor/pipeline/.
+# Spec-load it under an isolated name so the stubs above bind without touching
+# the canonical package module.
 _MODULE_PATH = (
     pathlib.Path(__file__).parent.parent
     / "src" / "bobbytailor" / "pipeline" / "sheet_pass_matrix.py"

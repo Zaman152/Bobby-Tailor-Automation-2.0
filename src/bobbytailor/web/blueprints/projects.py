@@ -20,7 +20,7 @@ def get_projects():
     Response may include from_cache, stale, syncing.
     Legacy projects_cache.json is no longer read on this path.
     """
-    from project_cache import get_projects as _get
+    from bobbytailor.stores.project_cache import get_projects as _get
     force = request.args.get("refresh") == "1"
     result = _get(force_refresh=force)
     return jsonify(result)
@@ -29,7 +29,7 @@ def get_projects():
 @projects_bp.route("/api/projects/refresh", methods=["POST"])
 def refresh_projects():
     """Force StackCT project catalog sync into SQLite."""
-    from stackct_sync import sync_projects
+    from bobbytailor.scrape.stackct_sync import sync_projects
     result = sync_projects(force=True)
     return jsonify(result)
 
@@ -37,14 +37,14 @@ def refresh_projects():
 @projects_bp.route("/api/projects/sheet-counts")
 def get_sheet_counts():
     """Return sheet counts per project_id from SQLite (no browser when DB warm)."""
-    from project_cache import get_all_sheet_counts as _counts
+    from bobbytailor.stores.project_cache import get_all_sheet_counts as _counts
     return jsonify(_counts())
 
 
 @projects_bp.route("/api/projects/<int:project_id>/sync-plan-sets", methods=["POST"])
 def sync_plan_sets_route(project_id):
     """Warm plan-set (folder) index for a project into SQLite."""
-    from stackct_sync import sync_project_plan_sets
+    from bobbytailor.scrape.stackct_sync import sync_project_plan_sets
     force = request.args.get("force") == "1"
     count_sheets = request.args.get("counts") == "1"
     return jsonify(
@@ -59,7 +59,7 @@ def get_plan_sets_route(project_id):
     Query: ?refresh=1 — full sync with per-folder sheet counts (slow)
            ?wait=1 — block until fast folder list is ready (Preview Plans)
     """
-    from project_cache import get_project_plan_sets as _get
+    from bobbytailor.stores.project_cache import get_project_plan_sets as _get
     force = request.args.get("refresh") == "1"
     wait = request.args.get("wait") == "1"
     return jsonify(_get(project_id, force_refresh=force, wait=wait))
@@ -68,7 +68,7 @@ def get_plan_sets_route(project_id):
 @projects_bp.route("/api/projects/<int:project_id>/plan-sets/<int:folder_id>/plans")
 def get_folder_plans(project_id, folder_id):
     """Return drawing pages for one plan set (DB-first). Query: ?refresh=1"""
-    from project_cache import get_project_plans as _get_plans
+    from bobbytailor.stores.project_cache import get_project_plans as _get_plans
     force = request.args.get("refresh") == "1"
     background = request.args.get("background") == "1"
     return jsonify(
@@ -82,7 +82,7 @@ def get_folder_plans(project_id, folder_id):
 
 
 def _stackct_project_name(project_id: int) -> str:
-    import stackct_store as store
+    from bobbytailor.stores import stackct_store as store
 
     store.init_db()
     for p in store.list_projects():
@@ -94,8 +94,8 @@ def _stackct_project_name(project_id: int) -> str:
 @projects_bp.route("/api/projects/<int:project_id>/sheet-previews")
 def sheet_previews(project_id):
     """Map page_id → preview_url (if HD screenshot exists) and stackct_url."""
-    from project_cache import get_project_plans as _get_plans
-    from sheet_preview import build_sheet_preview_payload
+    from bobbytailor.stores.project_cache import get_project_plans as _get_plans
+    from bobbytailor.scrape.sheet_preview import build_sheet_preview_payload
 
     folder_id = request.args.get("folder_id", type=int)
     if folder_id is None:
@@ -113,8 +113,8 @@ def sheet_previews(project_id):
 @projects_bp.route("/api/projects/<int:project_id>/sheet-preview/<int:page_id>")
 def serve_sheet_preview(project_id, page_id):
     """Serve an HD drawing image from a prior takeoff run (JPEG or PNG)."""
-    from project_cache import get_project_plans as _get_plans
-    from sheet_preview import resolve_screenshot_path
+    from bobbytailor.stores.project_cache import get_project_plans as _get_plans
+    from bobbytailor.scrape.sheet_preview import resolve_screenshot_path
 
     folder_id = request.args.get("folder_id", type=int)
     if folder_id is None:
@@ -133,7 +133,7 @@ def serve_sheet_preview(project_id, page_id):
 @projects_bp.route("/api/projects/<int:project_id>/sync-plans", methods=["POST"])
 def sync_plans(project_id):
     """Warm plan list for one folder into SQLite. Requires folder_id in JSON or query."""
-    from stackct_sync import sync_project_plans
+    from bobbytailor.scrape.stackct_sync import sync_project_plans
     force = request.args.get("force") == "1"
     body = request.get_json(silent=True) or {}
     folder_id = body.get("folder_id")
@@ -155,7 +155,7 @@ def get_plans(project_id):
             "error": "folder_id required. Use GET /api/projects/<id>/plan-sets first.",
             "hint": "/api/projects/{}/plan-sets".format(project_id),
         }), 400
-    from project_cache import get_project_plans as _get_plans
+    from bobbytailor.stores.project_cache import get_project_plans as _get_plans
     force = request.args.get("refresh") == "1"
     background = request.args.get("background") == "1"
     return jsonify(

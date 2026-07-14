@@ -20,8 +20,8 @@ import fitz
 import pytest
 from PIL import Image
 
-import pdf_analyzer
-from pdf_analyzer import (
+from bobbytailor.pipeline import pdf_analyzer
+from bobbytailor.pipeline.pdf_analyzer import (
     _MAX_IMAGE_LONG_SIDE_PX,
     _effective_render_scale,
     _page_to_image,

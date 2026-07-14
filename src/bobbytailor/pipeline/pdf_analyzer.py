@@ -12,12 +12,12 @@ from typing import Optional, Union
 
 from PIL import Image
 
-from calculator import resolve_spec_lookups
-from cross_references import resolve_cross_references
-from reporter import generate_report
-from takeoff_pipeline import RunSettings, TakeoffPipeline
-from page_text_enrichment import enrich_components_from_page_text
-from config import RENDER_TARGET_PX, SCREENSHOTS_DIR
+from bobbytailor.pipeline.calculator import resolve_spec_lookups
+from bobbytailor.pipeline.cross_references import resolve_cross_references
+from bobbytailor.pipeline.reporter import generate_report
+from bobbytailor.pipeline.takeoff_pipeline import RunSettings, TakeoffPipeline
+from bobbytailor.pipeline.page_text_enrichment import enrich_components_from_page_text
+from bobbytailor.config import RENDER_TARGET_PX, SCREENSHOTS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -221,7 +221,7 @@ def get_pdf_metadata(pdf_path: str) -> dict:
     """Extract page count, file size, sheet names, and optional type hints."""
     # Optional sheet-type classifier from Phase 20-00; skip gracefully if absent
     try:
-        from sheet_pass_matrix import classify_sheet_type_from_text  # type: ignore
+        from bobbytailor.pipeline.sheet_pass_matrix import classify_sheet_type_from_text  # type: ignore
         _classify = classify_sheet_type_from_text
     except ImportError:
         _classify = None
@@ -315,7 +315,7 @@ def run_pdf_analysis(
             img_path = _page_to_image(pdf_path, i, str(img_dir))
             sheet_type_hint = None
             try:
-                from sheet_pass_matrix import classify_sheet_type_from_text
+                from bobbytailor.pipeline.sheet_pass_matrix import classify_sheet_type_from_text
                 sheet_type_hint = classify_sheet_type_from_text(title_block_text)
             except ImportError:
                 pass
@@ -346,12 +346,12 @@ def run_pdf_analysis(
     # (scripts/vision_only_benchmark.py). Likewise, object-manifest files are
     # no longer auto-discovered from the plans PDF's folder: a manifest is an
     # optional, explicitly uploaded dev input (manifest_path).
-    from object_manifest import resolve_project_manifest
+    from bobbytailor.devtools.object_manifest import resolve_project_manifest
     manifest = resolve_project_manifest(project_name, explicit_path=manifest_path)
     if manifest:
         logger.info("Using object manifest with %d objects", len(manifest))
 
-    from plan_deterministic_legends import build_deterministic_legends
+    from bobbytailor.deterministic.plan_deterministic_legends import build_deterministic_legends
     project_legends: list = build_deterministic_legends(
         pdf_path, dev_manifest=manifest,
     )

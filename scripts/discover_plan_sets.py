@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from browser import StackCTBrowser  # noqa: E402
+from bobbytailor.scrape.browser import StackCTBrowser  # noqa: E402
 
 
 DISCOVER_JS = """() => {

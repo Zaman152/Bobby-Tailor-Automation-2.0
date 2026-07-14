@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 
-from config import SCREENSHOTS_DIR
+from bobbytailor.config import SCREENSHOTS_DIR
 
 _SHEET_FILE_RE = re.compile(r"^\d{3}_(.+)\.(png|jpg|jpeg)$", re.IGNORECASE)
 _DEBUG_PAGE_RE = re.compile(r"^_debug_(\d+)\.(png|jpg|jpeg)$", re.IGNORECASE)

@@ -9,9 +9,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from linked_sheets import collect_unresolved_refs, match_ref_to_page
-from capture_manifest import PageEntry, RunManifest
-from scraper import _discover_and_add_linked_sheets
+from bobbytailor.scrape.linked_sheets import collect_unresolved_refs, match_ref_to_page
+from bobbytailor.scrape.capture_manifest import PageEntry, RunManifest
+from bobbytailor.scrape.scraper import _discover_and_add_linked_sheets
 
 
 # ---------------------------------------------------------------------------
@@ -310,22 +310,22 @@ class TestIntegrationLinkedSheets:
             mpath = tmppath / "manifest.json"
 
             with (
-                patch("scraper.stackct_store.get_plans", return_value=catalog),
+                patch("bobbytailor.scrape.scraper.stackct_store.get_plans", return_value=catalog),
                 patch(
-                    "scraper._capture_sheet_screenshot",
+                    "bobbytailor.scrape.scraper._capture_sheet_screenshot",
                     new=AsyncMock(return_value=(True, None)),
                 ),
                 patch(
-                    "scraper._pipeline.run_sheet",
+                    "bobbytailor.scrape.scraper._pipeline.run_sheet",
                     return_value={
                         "measurements": [],
                         "components": [],
                         "_source_sheet": "C-4 - CIVIL SITE PLAN",
                     },
                 ),
-                patch("scraper.apply_estimation_tables", return_value=[]),
-                patch("scraper.AUTO_INCLUDE_LINKED_SHEETS", True),
-                patch("scraper.MAX_LINKED_SHEETS", 10),
+                patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+                patch("bobbytailor.scrape.scraper.AUTO_INCLUDE_LINKED_SHEETS", True),
+                patch("bobbytailor.scrape.scraper.MAX_LINKED_SHEETS", 10),
             ):
                 new_extracted, linked_meta = asyncio.run(
                     _discover_and_add_linked_sheets(
@@ -385,18 +385,18 @@ class TestIntegrationLinkedSheets:
             mpath = tmppath / "manifest.json"
 
             with (
-                patch("scraper.stackct_store.get_plans", return_value=catalog),
+                patch("bobbytailor.scrape.scraper.stackct_store.get_plans", return_value=catalog),
                 patch(
-                    "scraper._capture_sheet_screenshot",
+                    "bobbytailor.scrape.scraper._capture_sheet_screenshot",
                     new=AsyncMock(return_value=(True, None)),
                 ),
                 patch(
-                    "scraper._pipeline.run_sheet",
+                    "bobbytailor.scrape.scraper._pipeline.run_sheet",
                     return_value={"measurements": [], "components": []},
                 ),
-                patch("scraper.apply_estimation_tables", return_value=[]),
-                patch("scraper.AUTO_INCLUDE_LINKED_SHEETS", True),
-                patch("scraper.MAX_LINKED_SHEETS", 1),
+                patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+                patch("bobbytailor.scrape.scraper.AUTO_INCLUDE_LINKED_SHEETS", True),
+                patch("bobbytailor.scrape.scraper.MAX_LINKED_SHEETS", 1),
             ):
                 new_extracted, linked_meta = asyncio.run(
                     _discover_and_add_linked_sheets(
@@ -446,9 +446,9 @@ class TestIntegrationLinkedSheets:
             mpath = tmppath / "manifest.json"
 
             with (
-                patch("scraper.stackct_store.get_plans", return_value=catalog),
-                patch("scraper.AUTO_INCLUDE_LINKED_SHEETS", False),
-                patch("scraper.MAX_LINKED_SHEETS", 10),
+                patch("bobbytailor.scrape.scraper.stackct_store.get_plans", return_value=catalog),
+                patch("bobbytailor.scrape.scraper.AUTO_INCLUDE_LINKED_SHEETS", False),
+                patch("bobbytailor.scrape.scraper.MAX_LINKED_SHEETS", 10),
             ):
                 new_extracted, linked_meta = asyncio.run(
                     _discover_and_add_linked_sheets(
@@ -487,7 +487,7 @@ class TestIntegrationLinkedSheets:
             tmppath = Path(tmpdir)
             mpath = tmppath / "manifest.json"
 
-            with patch("scraper.stackct_store.get_plans", return_value=[]):
+            with patch("bobbytailor.scrape.scraper.stackct_store.get_plans", return_value=[]):
                 new_extracted, linked_meta = asyncio.run(
                     _discover_and_add_linked_sheets(
                         browser=browser,

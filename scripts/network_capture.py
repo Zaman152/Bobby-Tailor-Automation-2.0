@@ -13,8 +13,8 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from browser import StackCTBrowser
-import stackct_store as store
+from bobbytailor.scrape.browser import StackCTBrowser
+from bobbytailor.stores import stackct_store as store
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 

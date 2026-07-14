@@ -1,5 +1,5 @@
 """Tests for the deterministic scale recompute engine."""
-import scale_recalc as sr
+from bobbytailor.deterministic import scale_recalc as sr
 
 
 def _raw():

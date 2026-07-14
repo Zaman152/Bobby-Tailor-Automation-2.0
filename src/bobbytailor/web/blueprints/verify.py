@@ -30,7 +30,7 @@ from typing import Optional
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
-import config
+from bobbytailor import config
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,7 @@ def _plausibility_warning(corrected_value) -> Optional[str]:
     except (TypeError, ValueError):
         return None
     try:
-        from takeoff_pipeline import QuantityVerifier
+        from bobbytailor.pipeline.takeoff_pipeline import QuantityVerifier
         rule = QuantityVerifier._RULES.get(unit)
     except Exception:  # noqa: BLE001 - plausibility is advisory, never fatal
         return None
@@ -312,7 +312,7 @@ def get_scale_calibration(run_folder: str):
     if tk.is_file():
         try:
             report = json.loads(tk.read_text(encoding="utf-8"))
-            from reporter import enrich_scale_calibration
+            from bobbytailor.pipeline.reporter import enrich_scale_calibration
             calib = enrich_scale_calibration(calib, report)
         except (json.JSONDecodeError, OSError):
             pass
@@ -355,7 +355,7 @@ def update_scale_calibration(run_folder: str):
         for s in (calib.get("sheets") or [])
     }
 
-    from scale_recalc import apply_overrides
+    from bobbytailor.deterministic.scale_recalc import apply_overrides
     calib = apply_overrides(calib, overrides)
 
     try:
@@ -446,8 +446,8 @@ def _rebuild_summary(run_folder: str) -> dict:
     Rewrites takeoff.json's ``takeoff_summary`` + takeoff_summary.csv. Returns the
     rebuilt summary list.
     """
-    import takeoff_measurements as tm
-    from reporter import _write_takeoff_summary_csv
+    from bobbytailor.deterministic import takeoff_measurements as tm
+    from bobbytailor.pipeline.reporter import _write_takeoff_summary_csv
     import copy
 
     sub = Path(config.OUTPUT_DIR) / run_folder
@@ -543,7 +543,7 @@ def save_measurements(run_folder: str):
     if not sub.is_dir():
         return jsonify({"error": "Not found"}), 404
 
-    import takeoff_measurements as tm
+    from bobbytailor.deterministic import takeoff_measurements as tm
     data = request.json or {}
     incoming = data.get("measurements")
     if not isinstance(incoming, list):
@@ -808,7 +808,7 @@ def calibrate_scale(run_folder: str):
     """
     if "/" in run_folder or ".." in run_folder:
         return jsonify({"error": "Invalid path"}), 400
-    import takeoff_measurements as tm
+    from bobbytailor.deterministic import takeoff_measurements as tm
     data = request.json or {}
     try:
         p1 = data["p1"]; p2 = data["p2"]; real_feet = float(data["real_feet"])

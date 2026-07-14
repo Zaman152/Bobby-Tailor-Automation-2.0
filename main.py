@@ -11,8 +11,8 @@ import argparse
 import logging
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from scraper import run_all_projects, run_project_scrape
-from config import RUN_SCHEDULE
+from bobbytailor.scrape.scraper import run_all_projects, run_project_scrape
+from bobbytailor.config import RUN_SCHEDULE
 
 logging.basicConfig(
     level=logging.INFO,

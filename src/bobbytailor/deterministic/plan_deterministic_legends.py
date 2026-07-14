@@ -43,7 +43,7 @@ def build_deterministic_legends(
     legends: List[dict] = []
 
     try:
-        from schedule_extraction import extract_door_legend_from_pdf
+        from bobbytailor.deterministic.schedule_extraction import extract_door_legend_from_pdf
         door_legend = extract_door_legend_from_pdf(pdf_path)
         if door_legend:
             legends.append(door_legend)
@@ -57,7 +57,7 @@ def build_deterministic_legends(
 
     if not dev_companion_present and dev_manifest:
         try:
-            from footprint_takeoff import extract_footprint_legend
+            from bobbytailor.deterministic.footprint_takeoff import extract_footprint_legend
             fp_legend = extract_footprint_legend(pdf_path, dev_manifest)
             if fp_legend:
                 legends.append(fp_legend)

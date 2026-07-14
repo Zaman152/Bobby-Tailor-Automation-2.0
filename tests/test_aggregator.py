@@ -1,5 +1,5 @@
 """Aggregator consolidation tests."""
-from aggregator import aggregate_takeoff, normalize_item_name
+from bobbytailor.pipeline.aggregator import aggregate_takeoff, normalize_item_name
 
 
 def test_aggregate_flooring_two_sheets():

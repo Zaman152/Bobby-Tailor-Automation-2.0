@@ -18,8 +18,8 @@ import pytest
 from pathlib import Path
 from typing import List, Dict
 
-from calculator import apply_estimation_tables
-from aggregator import aggregate_takeoff
+from bobbytailor.pipeline.calculator import apply_estimation_tables
+from bobbytailor.pipeline.aggregator import aggregate_takeoff
 
 FIXTURES = Path(__file__).parent / "fixtures" / "generalization"
 EXPECTED = FIXTURES / "expected"
@@ -353,7 +353,7 @@ def test_content_first_vct_on_industrial_profile():
 
 def _agg(description: str, item_type: str = "general", unit: str = "ea") -> str:
     """Helper: run normalize_item_name and return canonical name."""
-    from aggregator import normalize_item_name
+    from bobbytailor.pipeline.aggregator import normalize_item_name
     name, _ = normalize_item_name(description, item_type, unit)
     return name
 

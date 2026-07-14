@@ -59,16 +59,26 @@ _CONFIG.REUSE_SCREENSHOTS = False
 _CONFIG.AUTO_INCLUDE_LINKED_SHEETS = False
 _CONFIG.MAX_LINKED_SHEETS = 0
 
-sys.modules.setdefault("config", _CONFIG)
+sys.modules.setdefault("bobbytailor.config", _CONFIG)
 sys.modules.setdefault("anthropic", MagicMock())
 
-for _m in ["linked_sheets", "stackct_store", "browser", "capture_manifest",
-           "sheet_preview", "cross_references", "reporter"]:
+# Solo-run hermeticity: stub heavy/env-dependent dependencies so this file can
+# run without playwright/.env. Under full-suite collection the real modules are
+# pre-registered by conftest.py, so every setdefault below is a no-op.
+for _m in [
+    "bobbytailor.scrape.linked_sheets",
+    "bobbytailor.stores.stackct_store",
+    "bobbytailor.scrape.browser",
+    "bobbytailor.scrape.capture_manifest",
+    "bobbytailor.scrape.sheet_preview",
+    "bobbytailor.pipeline.cross_references",
+    "bobbytailor.pipeline.reporter",
+]:
     sys.modules.setdefault(_m, MagicMock())
 
 
-# Phase 21 (V3-STRUCT-01): real modules live under src/bobbytailor/; root-level
-# files are import shims. Load/inspect the real sources directly.
+# Phase 21 (V3-STRUCT-01): real modules live under src/bobbytailor/. Load and
+# inspect the real sources directly under isolated spec names.
 _SRC_ROOT = pathlib.Path(__file__).parent.parent / "src" / "bobbytailor"
 _SRC_FILES = {
     "claude_analyzer": _SRC_ROOT / "vision" / "claude_analyzer.py",
@@ -93,7 +103,8 @@ def _load(name: str):
 _real_ca = _load("claude_analyzer")
 
 # Mock for analyze_drawing; real merge/accuracy helpers preserved so the
-# pipeline's module-level `from claude_analyzer import (...)` binds real impls.
+# pipeline's module-level `from bobbytailor.vision.claude_analyzer import (...)`
+# binds real impls.
 _CA_MOCK = MagicMock()
 _CA_MOCK.merge_passes = _real_ca.merge_passes
 _CA_MOCK._merge_schedule_lists = _real_ca._merge_schedule_lists
@@ -101,16 +112,29 @@ _CA_MOCK.apply_accuracy_rules = _real_ca.apply_accuracy_rules
 _CA_MOCK._SCHEDULE_LEGEND_USER_HINT = _real_ca._SCHEDULE_LEGEND_USER_HINT
 _CA_MOCK.analyze_drawing.return_value = {"components": [], "measurements": []}
 _CA_MOCK.make_navigation_decision.return_value = {"action": "wait"}
-sys.modules["claude_analyzer"] = _CA_MOCK
 
-_spm = _load("sheet_pass_matrix")
-_tp = _load("takeoff_pipeline")
+# Bind _CA_MOCK into the spec-loaded pipeline modules ONLY: temporarily alias
+# the package key while executing the spec loads, then restore. This keeps the
+# session-wide sys.modules clean (the historical permanent substitution leaked
+# the mock into every test module collected after this one — the 21-08/21-16
+# test-order pollution class).
+_PKG_CA = "bobbytailor.vision.claude_analyzer"
+_prev_real_ca = sys.modules.get(_PKG_CA)
+sys.modules[_PKG_CA] = _CA_MOCK
+try:
+    _spm = _load("sheet_pass_matrix")
+    _tp = _load("takeoff_pipeline")
+finally:
+    if _prev_real_ca is not None:
+        sys.modules[_PKG_CA] = _prev_real_ca
+    else:
+        sys.modules.pop(_PKG_CA, None)
 TakeoffPipeline = _tp.TakeoffPipeline
-sys.modules.setdefault("takeoff_pipeline", _tp)
+sys.modules.setdefault("bobbytailor.pipeline.takeoff_pipeline", _tp)
 
 # Load calculator (no external deps)
 _calc = _load("calculator")
-sys.modules.setdefault("calculator", _calc)
+sys.modules.setdefault("bobbytailor.pipeline.calculator", _calc)
 
 
 # ===========================================================================
@@ -123,13 +147,16 @@ class TestNoPipelineBypass:
     def test_scraper_does_not_import_analyze_drawing(self):
         """scraper.py must not import analyze_drawing at the top level."""
         src = _SRC_FILES["scraper"].read_text()
-        assert "from claude_analyzer import analyze_drawing" not in src
+        # Substring matches both the legacy flat form and the 21-18 package
+        # form ("from bobbytailor.vision.claude_analyzer import analyze_drawing").
+        assert "claude_analyzer import analyze_drawing" not in src
         assert "import analyze_drawing" not in src
 
     def test_pdf_analyzer_does_not_import_analyze_drawing(self):
         """pdf_analyzer.py must not import analyze_drawing."""
         src = _SRC_FILES["pdf_analyzer"].read_text()
-        assert "from claude_analyzer import analyze_drawing" not in src
+        assert "claude_analyzer import analyze_drawing" not in src
+        assert "import analyze_drawing" not in src
 
     def test_scraper_has_pipeline_import(self):
         """scraper.py must import TakeoffPipeline."""
@@ -151,7 +178,7 @@ class TestPdfAnalyzerUsesPipeline:
 
     def test_calls_run_project_not_analyze_drawing(self, tmp_path):
         """Patch TakeoffPipeline in pdf_analyzer; verify run_project is called."""
-        import pdf_analyzer
+        from bobbytailor.pipeline import pdf_analyzer
 
         floor_result = {
             "_sheet_name": "A2.1",
@@ -171,14 +198,14 @@ class TestPdfAnalyzerUsesPipeline:
         _CA_MOCK.analyze_drawing.reset_mock()
 
         with (
-            patch("pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
-            patch("pdf_analyzer.fitz") as mock_fitz,
-            patch("pdf_analyzer._page_to_image", return_value="/tmp/a2_1.png"),
-            patch("pdf_analyzer._sheet_name_from_doc", return_value="A2.1"),
-            patch("pdf_analyzer.get_title_block_text", return_value="LEVEL 1 FLOOR PLAN"),
-            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
-            patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
-            patch("pdf_analyzer.generate_report", return_value={"report": "ok"}),
+            patch("bobbytailor.pipeline.pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
+            patch("bobbytailor.pipeline.pdf_analyzer.fitz") as mock_fitz,
+            patch("bobbytailor.pipeline.pdf_analyzer._page_to_image", return_value="/tmp/a2_1.png"),
+            patch("bobbytailor.pipeline.pdf_analyzer._sheet_name_from_doc", return_value="A2.1"),
+            patch("bobbytailor.pipeline.pdf_analyzer.get_title_block_text", return_value="LEVEL 1 FLOOR PLAN"),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.generate_report", return_value={"report": "ok"}),
         ):
             # Minimal fitz.open mock
             mock_doc = MagicMock()
@@ -194,20 +221,20 @@ class TestPdfAnalyzerUsesPipeline:
 
     def test_run_project_receives_page_dicts_with_image_path(self, tmp_path):
         """pipeline.run_project must be given a list of page dicts with image_path."""
-        import pdf_analyzer
+        from bobbytailor.pipeline import pdf_analyzer
 
         mock_pipeline = MagicMock()
         mock_pipeline.run_project.return_value = ([], [], "auto")
 
         with (
-            patch("pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
-            patch("pdf_analyzer.fitz") as mock_fitz,
-            patch("pdf_analyzer._page_to_image", return_value="/tmp/p.png"),
-            patch("pdf_analyzer._sheet_name_from_doc", return_value="A2.1"),
-            patch("pdf_analyzer.get_title_block_text", return_value=""),
-            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
-            patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
-            patch("pdf_analyzer.generate_report", return_value={}),
+            patch("bobbytailor.pipeline.pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
+            patch("bobbytailor.pipeline.pdf_analyzer.fitz") as mock_fitz,
+            patch("bobbytailor.pipeline.pdf_analyzer._page_to_image", return_value="/tmp/p.png"),
+            patch("bobbytailor.pipeline.pdf_analyzer._sheet_name_from_doc", return_value="A2.1"),
+            patch("bobbytailor.pipeline.pdf_analyzer.get_title_block_text", return_value=""),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.generate_report", return_value={}),
         ):
             mock_doc = MagicMock()
             mock_doc.__len__ = MagicMock(return_value=2)
@@ -224,20 +251,20 @@ class TestPdfAnalyzerUsesPipeline:
 
     def test_title_block_text_forwarded_to_pipeline(self, tmp_path):
         """title_block_text from get_title_block_text must appear in each page dict."""
-        import pdf_analyzer
+        from bobbytailor.pipeline import pdf_analyzer
 
         mock_pipeline = MagicMock()
         mock_pipeline.run_project.return_value = ([], [], "auto")
 
         with (
-            patch("pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
-            patch("pdf_analyzer.fitz") as mock_fitz,
-            patch("pdf_analyzer._page_to_image", return_value="/tmp/p.png"),
-            patch("pdf_analyzer._sheet_name_from_doc", return_value="A2.1"),
-            patch("pdf_analyzer.get_title_block_text", return_value="LEVEL 2 FLOOR PLAN"),
-            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
-            patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
-            patch("pdf_analyzer.generate_report", return_value={}),
+            patch("bobbytailor.pipeline.pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
+            patch("bobbytailor.pipeline.pdf_analyzer.fitz") as mock_fitz,
+            patch("bobbytailor.pipeline.pdf_analyzer._page_to_image", return_value="/tmp/p.png"),
+            patch("bobbytailor.pipeline.pdf_analyzer._sheet_name_from_doc", return_value="A2.1"),
+            patch("bobbytailor.pipeline.pdf_analyzer.get_title_block_text", return_value="LEVEL 2 FLOOR PLAN"),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.generate_report", return_value={}),
         ):
             mock_doc = MagicMock()
             mock_doc.__len__ = MagicMock(return_value=1)
@@ -311,16 +338,16 @@ class TestScraperUsesPipeline:
         _CA_MOCK.analyze_drawing.reset_mock()
 
         with (
-            patch("scraper.RunManifest") as mock_rm,
-            patch("scraper._pipeline", mock_pipeline),
-            patch("scraper.apply_estimation_tables", return_value=[]),
-            patch("scraper._detect_project_type", return_value="auto"),
-            patch("scraper.resolve_spec_lookups", return_value=[]),
-            patch("scraper.resolve_cross_references", return_value=[]),
-            patch("scraper.generate_report", return_value={"report": "ok"}),
+            patch("bobbytailor.scrape.scraper.RunManifest") as mock_rm,
+            patch("bobbytailor.scrape.scraper._pipeline", mock_pipeline),
+            patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+            patch("bobbytailor.scrape.scraper._detect_project_type", return_value="auto"),
+            patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.scrape.scraper.generate_report", return_value={"report": "ok"}),
         ):
             mock_rm.load.return_value = fake_manifest
-            import scraper
+            from bobbytailor.scrape import scraper
             _fresh_loop().run_until_complete(
                 scraper.run_analyze_from_manifest(manifest_path_override=mpath)
             )
@@ -342,16 +369,16 @@ class TestScraperUsesPipeline:
         mock_pipeline.run_sheet.return_value = civil_result
 
         with (
-            patch("scraper.RunManifest") as mock_rm,
-            patch("scraper._pipeline", mock_pipeline),
-            patch("scraper.apply_estimation_tables", return_value=[]),
-            patch("scraper._detect_project_type", return_value="auto"),
-            patch("scraper.resolve_spec_lookups", return_value=[]),
-            patch("scraper.resolve_cross_references", return_value=[]),
-            patch("scraper.generate_report", return_value={"report": "ok"}),
+            patch("bobbytailor.scrape.scraper.RunManifest") as mock_rm,
+            patch("bobbytailor.scrape.scraper._pipeline", mock_pipeline),
+            patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+            patch("bobbytailor.scrape.scraper._detect_project_type", return_value="auto"),
+            patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.scrape.scraper.generate_report", return_value={"report": "ok"}),
         ):
             mock_rm.load.return_value = fake_manifest
-            import scraper
+            from bobbytailor.scrape import scraper
             _fresh_loop().run_until_complete(
                 scraper.run_analyze_from_manifest(manifest_path_override=mpath)
             )
@@ -380,16 +407,16 @@ class TestScraperUsesPipeline:
             return {"report": "ok"}
 
         with (
-            patch("scraper.RunManifest") as mock_rm,
-            patch("scraper._pipeline", mock_pipeline),
-            patch("scraper.apply_estimation_tables", return_value=[]),
-            patch("scraper._detect_project_type", return_value="auto"),
-            patch("scraper.resolve_spec_lookups", return_value=[]),
-            patch("scraper.resolve_cross_references", return_value=[]),
-            patch("scraper.generate_report", side_effect=_mock_report),
+            patch("bobbytailor.scrape.scraper.RunManifest") as mock_rm,
+            patch("bobbytailor.scrape.scraper._pipeline", mock_pipeline),
+            patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+            patch("bobbytailor.scrape.scraper._detect_project_type", return_value="auto"),
+            patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.scrape.scraper.generate_report", side_effect=_mock_report),
         ):
             mock_rm.load.return_value = fake_manifest
-            import scraper
+            from bobbytailor.scrape import scraper
             _fresh_loop().run_until_complete(
                 scraper.run_analyze_from_manifest(manifest_path_override=mpath)
             )
@@ -554,8 +581,8 @@ class TestRunSettingsParity:
     """Both entry points construct identical RunSettings via from_env()."""
 
     def test_both_entry_points_receive_identical_settings(self, tmp_path):
-        import pdf_analyzer
-        import scraper
+        from bobbytailor.pipeline import pdf_analyzer
+        from bobbytailor.scrape import scraper
 
         sentinel = _parity_settings(pdf_analyzer.RunSettings)
 
@@ -566,17 +593,17 @@ class TestRunSettingsParity:
         with (
             patch.object(pdf_analyzer.RunSettings, "from_env",
                          MagicMock(return_value=sentinel)),
-            patch("pdf_analyzer.TakeoffPipeline",
+            patch("bobbytailor.pipeline.pdf_analyzer.TakeoffPipeline",
                   return_value=mock_pipeline) as tp_ctor,
-            patch("pdf_analyzer.fitz") as mock_fitz,
-            patch("pdf_analyzer._page_to_image", return_value="/tmp/p.png"),
-            patch("pdf_analyzer._sheet_name_from_doc", return_value="A1.1"),
-            patch("pdf_analyzer.get_title_block_text", return_value="FLOOR PLAN"),
-            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
-            patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
-            patch("pdf_analyzer.generate_report", return_value={}),
-            patch("object_manifest.resolve_project_manifest", return_value=None),
-            patch("plan_deterministic_legends.build_deterministic_legends",
+            patch("bobbytailor.pipeline.pdf_analyzer.fitz") as mock_fitz,
+            patch("bobbytailor.pipeline.pdf_analyzer._page_to_image", return_value="/tmp/p.png"),
+            patch("bobbytailor.pipeline.pdf_analyzer._sheet_name_from_doc", return_value="A1.1"),
+            patch("bobbytailor.pipeline.pdf_analyzer.get_title_block_text", return_value="FLOOR PLAN"),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.generate_report", return_value={}),
+            patch("bobbytailor.devtools.object_manifest.resolve_project_manifest", return_value=None),
+            patch("bobbytailor.deterministic.plan_deterministic_legends.build_deterministic_legends",
                   return_value=[]),
         ):
             mock_doc = MagicMock()
@@ -601,15 +628,15 @@ class TestRunSettingsParity:
         with (
             patch.object(scraper.RunSettings, "from_env",
                          MagicMock(return_value=sentinel)),
-            patch("scraper.RunManifest") as mock_rm,
-            patch("scraper._pipeline", mock_sc_pipeline),
-            patch("scraper.apply_estimation_tables", return_value=[]),
-            patch("scraper._detect_project_type", return_value="auto"),
-            patch("scraper.resolve_spec_lookups", return_value=[]),
-            patch("scraper.resolve_cross_references", return_value=[]),
-            patch("scraper.generate_report", return_value={"report": "ok"}),
-            patch("object_manifest.resolve_project_manifest", return_value=None),
-            patch("plan_deterministic_legends.build_deterministic_legends_from_run_dir",
+            patch("bobbytailor.scrape.scraper.RunManifest") as mock_rm,
+            patch("bobbytailor.scrape.scraper._pipeline", mock_sc_pipeline),
+            patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+            patch("bobbytailor.scrape.scraper._detect_project_type", return_value="auto"),
+            patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.scrape.scraper.generate_report", return_value={"report": "ok"}),
+            patch("bobbytailor.devtools.object_manifest.resolve_project_manifest", return_value=None),
+            patch("bobbytailor.deterministic.plan_deterministic_legends.build_deterministic_legends_from_run_dir",
                   return_value=[]),
         ):
             mock_rm.load.return_value = _fake_scraper_manifest()
@@ -631,7 +658,7 @@ class TestDeterministicCallSiteParity:
     """A vector page fires extract_dimension_samples + fuse_sheet on BOTH paths."""
 
     def test_pdf_path_reaches_deterministic_call_sites(self, tmp_path):
-        import pdf_analyzer
+        from bobbytailor.pipeline import pdf_analyzer
 
         vector_pdf = _make_vector_pdf(tmp_path / "plans.pdf")
         sentinel = _parity_settings(pdf_analyzer.RunSettings)
@@ -647,16 +674,16 @@ class TestDeterministicCallSiteParity:
                 "extract_dimension_samples": dim_spy,
                 "fuse_sheet": fuse_spy,
             }),
-            patch("pdf_analyzer._page_to_image",
+            patch("bobbytailor.pipeline.pdf_analyzer._page_to_image",
                   return_value=str(tmp_path / "sheet.png")),
-            patch("pdf_analyzer._sheet_name_from_doc", return_value="A1.1"),
-            patch("pdf_analyzer.get_title_block_text",
+            patch("bobbytailor.pipeline.pdf_analyzer._sheet_name_from_doc", return_value="A1.1"),
+            patch("bobbytailor.pipeline.pdf_analyzer.get_title_block_text",
                   return_value="FLOOR PLAN LEVEL 1"),
-            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
-            patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
-            patch("pdf_analyzer.generate_report", return_value={"report": "ok"}),
-            patch("object_manifest.resolve_project_manifest", return_value=None),
-            patch("plan_deterministic_legends.build_deterministic_legends",
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.generate_report", return_value={"report": "ok"}),
+            patch("bobbytailor.devtools.object_manifest.resolve_project_manifest", return_value=None),
+            patch("bobbytailor.deterministic.plan_deterministic_legends.build_deterministic_legends",
                   return_value=[]),
         ):
             pdf_analyzer.run_pdf_analysis(vector_pdf, "Determinism PDF")
@@ -665,7 +692,7 @@ class TestDeterministicCallSiteParity:
         assert fuse_spy.called, "PDF path never reached fuse_sheet"
 
     def test_stackct_path_reaches_deterministic_call_sites(self, tmp_path):
-        import scraper
+        from bobbytailor.scrape import scraper
 
         run_dir, mpath = _build_scraper_run_dir(tmp_path, with_blob=True)
         sentinel = _parity_settings(scraper.RunSettings)
@@ -684,15 +711,15 @@ class TestDeterministicCallSiteParity:
                     "extract_dimension_samples": dim_spy,
                     "fuse_sheet": fuse_spy,
                 }),
-                patch("scraper.RunManifest") as mock_rm,
-                patch("scraper.apply_estimation_tables", return_value=[]),
-                patch("scraper._detect_project_type", return_value="auto"),
-                patch("scraper.resolve_spec_lookups", return_value=[]),
-                patch("scraper.resolve_cross_references", return_value=[]),
-                patch("scraper.generate_report", return_value={"report": "ok"}),
-                patch("object_manifest.resolve_project_manifest",
+                patch("bobbytailor.scrape.scraper.RunManifest") as mock_rm,
+                patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+                patch("bobbytailor.scrape.scraper._detect_project_type", return_value="auto"),
+                patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]),
+                patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value=[]),
+                patch("bobbytailor.scrape.scraper.generate_report", return_value={"report": "ok"}),
+                patch("bobbytailor.devtools.object_manifest.resolve_project_manifest",
                       return_value=None),
-                patch("plan_deterministic_legends."
+                patch("bobbytailor.deterministic.plan_deterministic_legends."
                       "build_deterministic_legends_from_run_dir",
                       return_value=[]),
             ):
@@ -710,7 +737,7 @@ class TestDeterministicCallSiteParity:
 
     def test_stackct_blob_threads_pdf_kwargs_into_run_sheet(self, tmp_path):
         """A retained blob makes the scraper pass pdf_path/page_index to run_sheet."""
-        import scraper
+        from bobbytailor.scrape import scraper
 
         run_dir, mpath = _build_scraper_run_dir(tmp_path, with_blob=True)
         floor_result = {
@@ -722,15 +749,15 @@ class TestDeterministicCallSiteParity:
         mock_pipeline.run_sheet.return_value = floor_result
 
         with (
-            patch("scraper.RunManifest") as mock_rm,
-            patch("scraper._pipeline", mock_pipeline),
-            patch("scraper.apply_estimation_tables", return_value=[]),
-            patch("scraper._detect_project_type", return_value="auto"),
-            patch("scraper.resolve_spec_lookups", return_value=[]),
-            patch("scraper.resolve_cross_references", return_value=[]),
-            patch("scraper.generate_report", return_value={"report": "ok"}),
-            patch("object_manifest.resolve_project_manifest", return_value=None),
-            patch("plan_deterministic_legends."
+            patch("bobbytailor.scrape.scraper.RunManifest") as mock_rm,
+            patch("bobbytailor.scrape.scraper._pipeline", mock_pipeline),
+            patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+            patch("bobbytailor.scrape.scraper._detect_project_type", return_value="auto"),
+            patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.scrape.scraper.generate_report", return_value={"report": "ok"}),
+            patch("bobbytailor.devtools.object_manifest.resolve_project_manifest", return_value=None),
+            patch("bobbytailor.deterministic.plan_deterministic_legends."
                   "build_deterministic_legends_from_run_dir", return_value=[]),
         ):
             mock_rm.load.return_value = _fake_scraper_manifest()
@@ -753,8 +780,8 @@ class TestLearningCallSiteParity:
     """The learning seam is shared identically by both entry points (21-16)."""
 
     def test_learning_seam_exists_and_is_shared(self):
-        import pdf_analyzer
-        import scraper
+        from bobbytailor.pipeline import pdf_analyzer
+        from bobbytailor.scrape import scraper
 
         # RunSettings — the seam both paths construct — carries the learning
         # toggle for the 21-16 runtime retrieval.
@@ -783,7 +810,7 @@ class TestCompanionIsolation:
 
     def test_sibling_takeoff_pdf_never_opened(self, tmp_path):
         import fitz as real_fitz
-        import pdf_analyzer
+        from bobbytailor.pipeline import pdf_analyzer
         import bobbytailor.devtools.companion_takeoff as devtools_companion
 
         # Plans PDF (the ONLY legitimate pipeline input)
@@ -819,13 +846,13 @@ class TestCompanionIsolation:
             patch.object(real_fitz, "open", spying_open),
             patch.object(devtools_companion, "find_companion_takeoff_pdf",
                          discovery_spy),
-            patch("pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
-            patch("pdf_analyzer._page_to_image",
+            patch("bobbytailor.pipeline.pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
+            patch("bobbytailor.pipeline.pdf_analyzer._page_to_image",
                   return_value=str(tmp_path / "p.png")),
-            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
-            patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
-            patch("pdf_analyzer.generate_report", return_value={"report": "ok"}),
-            patch("object_manifest.resolve_project_manifest", return_value=None),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_cross_references", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("bobbytailor.pipeline.pdf_analyzer.generate_report", return_value={"report": "ok"}),
+            patch("bobbytailor.devtools.object_manifest.resolve_project_manifest", return_value=None),
         ):
             # NOTE: plan_deterministic_legends stays REAL — the full plans-only
             # legends flow runs and must still never touch the sibling.
@@ -838,8 +865,8 @@ class TestCompanionIsolation:
         discovery_spy.assert_not_called()
 
     def test_companion_discovery_absent_from_production_namespaces(self):
-        import pdf_analyzer
-        import scraper
+        from bobbytailor.pipeline import pdf_analyzer
+        from bobbytailor.scrape import scraper
 
         assert not hasattr(pdf_analyzer, "find_companion_takeoff_pdf")
         assert not hasattr(scraper, "find_companion_takeoff_pdf")

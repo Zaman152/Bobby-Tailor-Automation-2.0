@@ -33,11 +33,11 @@ from bobbytailor.vision.overlay import (
     render_overlay,
 )
 
-# Bind to the PACKAGE module explicitly: test_pipeline_parity.py replaces
-# sys.modules["claude_analyzer"] with a MagicMock at import time (session-wide),
-# so the root name is unreliable under full-suite collection order. The package
-# path always holds the real module; the root-shim contract itself is exercised
-# order-robustly in test_root_shim_and_pipeline_import_contracts below.
+# Bind to the package module — the single canonical import path since the
+# 21-18 shim deletion. test_pipeline_parity scopes its claude_analyzer mock to
+# its own spec loads (key restored afterward), so this is the real module under
+# any collection order; the contract is exercised in
+# test_package_and_pipeline_import_contracts below.
 import bobbytailor.vision.claude_analyzer as claude_analyzer
 
 
@@ -322,7 +322,7 @@ def test_analyze_drawing_structured_path_routes_via_pick_model_for_pass(monkeypa
     stub = _StubClient(payload)
     monkeypatch.setattr(claude_analyzer, "client", stub)
 
-    from sheet_pass_matrix import pick_model_for_pass
+    from bobbytailor.pipeline.sheet_pass_matrix import pick_model_for_pass
     expected = pick_model_for_pass("floor_plan", "verify_retry", "") or claude_analyzer.CLAUDE_MODEL
 
     result = claude_analyzer.analyze_drawing(
@@ -356,36 +356,28 @@ def test_analyze_drawing_error_path_keeps_zero_cost_convention(monkeypatch):
     assert result["_tokens_in"] == 0
 
 
-# ── Import contracts (21-01 root shim + 20-00/20-03 pipeline contracts) ──────
+# ── Import contracts (21-18 package paths + 20-00/20-03 pipeline contracts) ──
 
 
-def test_root_shim_and_pipeline_import_contracts():
+def test_package_and_pipeline_import_contracts():
     import importlib
-    import sys
 
-    # Re-import the root shim from a clean slate so this test is immune to
-    # test_pipeline_parity's session-wide sys.modules["claude_analyzer"]
-    # substitution, then restore whatever was there for later tests.
-    previous = sys.modules.pop("claude_analyzer", None)
-    try:
-        shim = importlib.import_module("claude_analyzer")
-        # 21-01 contract: the shim aliases sys.modules to the package module.
-        assert shim is claude_analyzer
-        # Prompt constants remain importable through the shim after relocation.
-        assert "MEASURE PASS ADDENDUM" in shim.EXTRACTION_PROMPT
-        assert shim.SEMANTIC_LABELING_PROMPT is claude_analyzer.SEMANTIC_LABELING_PROMPT
-    finally:
-        if previous is not None:
-            sys.modules["claude_analyzer"] = previous
-        else:
-            sys.modules.pop("claude_analyzer", None)
+    # 21-18 contract: the root shims are gone; the package path is the single
+    # canonical import path and holds the REAL module (test_pipeline_parity
+    # scopes its claude_analyzer mock to its own spec loads and restores the
+    # key, so this must hold under any collection order).
+    mod = importlib.import_module("bobbytailor.vision.claude_analyzer")
+    assert mod is claude_analyzer
+    # Prompt constants remain importable through the package path.
+    assert "MEASURE PASS ADDENDUM" in mod.EXTRACTION_PROMPT
+    assert mod.SEMANTIC_LABELING_PROMPT is claude_analyzer.SEMANTIC_LABELING_PROMPT
 
     # takeoff_pipeline contracts (20-00/20-03): analyze_drawing injectable +
     # canonical merge_passes re-export stay intact after the prompt refactor.
-    # Functional (not identity) assertions: test_pipeline_parity swaps in a
-    # fresh exec copy of takeoff_pipeline session-wide, so object identity
+    # Functional (not identity) assertions: test_pipeline_parity spec-loads a
+    # fresh exec copy of takeoff_pipeline for its own use, so object identity
     # across module copies is not order-stable — behavior is the contract.
-    import takeoff_pipeline
+    from bobbytailor.pipeline import takeoff_pipeline
     assert takeoff_pipeline.merge_passes.__name__ == "merge_passes"
     merged = takeoff_pipeline.merge_passes(
         {"components": [{"name": "Bollard", "quantity": 28, "unit": "ea",

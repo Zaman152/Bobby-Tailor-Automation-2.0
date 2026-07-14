@@ -91,7 +91,7 @@ def resolve_scale(
     #     ground truth; the vision-supplied scale string is only a fallback hint.
     #     Mangled readings (e.g. 1/8 collapsed to "18") are rejected by the ladder
     #     snap instead of producing a wildly wrong feet-per-inch.
-    from scale_extraction import dominant_scale
+    from bobbytailor.deterministic.scale_extraction import dominant_scale
     fpi, conf, detail = dominant_scale(page, scale_text)
     if fpi:
         return ScaleResult(
@@ -117,7 +117,7 @@ def _collect_printed_scales(text: str) -> List[Tuple[float, int]]:
     Delegates to the ladder-snapping text extractor so collapsed stacked fractions
     (e.g. "1/8" read as "18") are recovered/rejected rather than trusted blindly.
     """
-    from scale_extraction import extract_scales_from_text
+    from bobbytailor.deterministic.scale_extraction import extract_scales_from_text
     return extract_scales_from_text(text)
 
 
@@ -237,7 +237,7 @@ def _measure_single(sc: ScaleResult, segs, pw, ph, trim_pct: float) -> GeometryM
         return GeometryMeasurement(sc.to_dict(), None, None, None,
                                    "none", True, raw.to_dict(),
                                    page_width_pt=pw, page_height_pt=ph)
-    from scale_recalc import recompute  # local import avoids cycle
+    from bobbytailor.deterministic.scale_recalc import recompute  # local import avoids cycle
     vals = recompute(raw.to_dict(), fpp * POINTS_PER_INCH)
     # AUTO-ACCEPT: when the scale was read cleanly and snapped to the standard
     # ladder (high confidence), the conversion is exact, so the measured quantity
@@ -263,7 +263,7 @@ def _measure_viewports(callouts, segs, pw, ph, trim_pct: float) -> Optional[Geom
     measured with ITS OWN scale, and the dominant (largest real-area) viewport —
     the main plan that drives most quantities — populates the top-level fields.
     """
-    from scale_recalc import recompute  # local import avoids cycle
+    from bobbytailor.deterministic.scale_recalc import recompute  # local import avoids cycle
 
     buckets: List[List] = [[] for _ in callouts]
     for s in segs:
@@ -358,7 +358,7 @@ def measure_geometry(
 
     # Multi-scale sheet: bind geometry to per-viewport scales.
     try:
-        from scale_extraction import extract_scale_callouts
+        from bobbytailor.deterministic.scale_extraction import extract_scale_callouts
         callouts = extract_scale_callouts(page)
     except Exception:
         callouts = []

@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import Optional, Tuple
 import anthropic
-from config import ANTHROPIC_API_KEY, CLAUDE_MODEL, CLAUDE_MODEL_SCHEDULES
+from bobbytailor.config import ANTHROPIC_API_KEY, CLAUDE_MODEL, CLAUDE_MODEL_SCHEDULES
 
 # Pass prompts relocated to bobbytailor.vision.prompts (21-08). Imported back
 # and re-exported here so the root shim (`claude_analyzer`) and the package
@@ -70,7 +70,7 @@ def _pick_model(
     # 1. Routing table lookup when sheet_type is known
     if sheet_type:
         try:
-            from sheet_pass_matrix import resolve_routed_model  # deferred to avoid circular import
+            from bobbytailor.pipeline.sheet_pass_matrix import resolve_routed_model  # deferred to avoid circular import
             routed = resolve_routed_model(sheet_type, pass_type)
             if routed:
                 return routed
@@ -279,7 +279,7 @@ def analyze_drawing(
             model = None
             if output_schema is not None:
                 try:
-                    from sheet_pass_matrix import pick_model_for_pass  # deferred (circular-dep avoidance)
+                    from bobbytailor.pipeline.sheet_pass_matrix import pick_model_for_pass  # deferred (circular-dep avoidance)
                     # Crop galleries belong to the semantic-labeling routing
                     # row (RESEARCH §5: "overlay + crop galleries" → Sonnet).
                     routing_pass = "semantic" if pass_type == "symbol_gallery" else pass_type

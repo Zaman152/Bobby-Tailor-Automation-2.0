@@ -1,5 +1,5 @@
 """Cross-reference resolution tests."""
-from cross_references import find_detail_in_extraction, resolve_cross_references
+from bobbytailor.pipeline.cross_references import find_detail_in_extraction, resolve_cross_references
 
 
 def test_find_detail_in_schedule():

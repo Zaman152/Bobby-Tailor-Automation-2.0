@@ -1,7 +1,7 @@
 """Tests for HD screenshot → sheet matching."""
 from pathlib import Path
 
-from sheet_preview import _normalize_sheet_key, _match_png_to_page_id, find_screenshot_paths
+from bobbytailor.scrape.sheet_preview import _normalize_sheet_key, _match_png_to_page_id, find_screenshot_paths
 
 
 def test_normalize_sheet_key():
@@ -25,7 +25,7 @@ def test_match_debug_page_id(tmp_path):
 
 
 def test_find_screenshot_paths_project_prefix(tmp_path, monkeypatch):
-    import sheet_preview as sp
+    from bobbytailor.scrape import sheet_preview as sp
 
     proj_dir = tmp_path / "My_Project_20260101_120000"
     proj_dir.mkdir()
@@ -38,7 +38,7 @@ def test_find_screenshot_paths_project_prefix(tmp_path, monkeypatch):
 
 
 def test_find_screenshot_paths_jpg_extension(tmp_path, monkeypatch):
-    import sheet_preview as sp
+    from bobbytailor.scrape import sheet_preview as sp
 
     proj_dir = tmp_path / "My_Project_20260101_120000"
     proj_dir.mkdir()

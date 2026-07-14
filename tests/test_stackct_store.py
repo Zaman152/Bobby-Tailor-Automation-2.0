@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import stackct_store as store
+from bobbytailor.stores import stackct_store as store
 
 
 class StackctStoreTests(unittest.TestCase):
@@ -13,8 +13,8 @@ class StackctStoreTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.db_path = Path(self.tmp.name) / "test_stackct.db"
         self.patchers = [
-            mock.patch("stackct_store.STACKCT_DB_PATH", self.db_path),
-            mock.patch("stackct_store.OUTPUT_DIR", self.tmp.name),
+            mock.patch("bobbytailor.stores.stackct_store.STACKCT_DB_PATH", self.db_path),
+            mock.patch("bobbytailor.stores.stackct_store.OUTPUT_DIR", self.tmp.name),
         ]
         for p in self.patchers:
             p.start()

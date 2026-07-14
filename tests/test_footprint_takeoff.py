@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from footprint_takeoff import (
+from bobbytailor.deterministic.footprint_takeoff import (
     Footprint,
     _parse_feet,
     _axis_dims,
@@ -124,9 +124,9 @@ def test_crow_footprint_matches_golden():
 
 # ── Legend conversion + authoritative override ──────────────────────────────────
 
-from footprint_takeoff import footprint_to_legend
-from object_manifest import Manifest, ManifestEntry
-from aggregator import aggregate_takeoff
+from bobbytailor.deterministic.footprint_takeoff import footprint_to_legend
+from bobbytailor.devtools.object_manifest import Manifest, ManifestEntry
+from bobbytailor.pipeline.aggregator import aggregate_takeoff
 
 
 def _crow_manifest():

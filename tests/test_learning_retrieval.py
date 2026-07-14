@@ -14,7 +14,7 @@ pattern). Pipeline runs use canned analyzers — zero API calls.
 import fitz
 import pytest
 
-from aggregator import aggregate_takeoff
+from bobbytailor.pipeline.aggregator import aggregate_takeoff
 from bobbytailor.deterministic.scale_solver import (
     Viewport,
     ViewportScale,
@@ -34,7 +34,7 @@ from bobbytailor.pipeline.takeoff_pipeline import (
     _learned_scale_prior,
     _resolve_wall_height,
 )
-from calculator import apply_estimation_tables
+from bobbytailor.pipeline.calculator import apply_estimation_tables
 
 PROJECT_KEY = "crow-cass-white-road"
 PROJECT_TYPE = "industrial"
@@ -213,7 +213,7 @@ def test_learned_lookup_never_reorders_static_map(learning_db):
     """A learned miss leaves ITEM_NAME_MAP first-match-wins order untouched."""
     seed_name_correction(raw="something unrelated", canonical="X", unit="EA")
     ctx = load_learned_context(PROJECT_KEY, PROJECT_TYPE)
-    from aggregator import normalize_item_name
+    from bobbytailor.pipeline.aggregator import normalize_item_name
 
     # 20-05 decision pair: CMU Paint must still win over CMU Wall.
     assert normalize_item_name("cmu paint at loading dock", "", "sf", learned=ctx) \

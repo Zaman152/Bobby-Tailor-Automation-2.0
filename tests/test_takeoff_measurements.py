@@ -1,7 +1,7 @@
 """Exactness tests for the real-world takeoff measurement engine."""
 import math
 
-import takeoff_measurements as tm
+from bobbytailor.deterministic import takeoff_measurements as tm
 
 
 def test_polyline_length():

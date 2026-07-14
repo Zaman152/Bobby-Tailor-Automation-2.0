@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import List, Optional
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
-from config import (
+from bobbytailor.config import (
     STACKCT_EMAIL, STACKCT_PASSWORD,
     STACKCT_LOGIN_URL, STACKCT_PROJECTS_URL,
     HEADLESS, PAGE_LOAD_TIMEOUT,

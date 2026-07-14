@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from object_manifest import (
+from bobbytailor.devtools.object_manifest import (
     Manifest,
     ManifestEntry,
     discover_manifest_path,
@@ -13,7 +13,7 @@ from object_manifest import (
     resolve_project_manifest,
     template_csv,
 )
-from aggregator import aggregate_takeoff
+from bobbytailor.pipeline.aggregator import aggregate_takeoff
 
 
 # ── Loading ──────────────────────────────────────────────────────────────────

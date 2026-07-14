@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
-from config import OUTPUT_DIR, STACKCT_CACHE_TTL_HOURS, STACKCT_DB_PATH
+from bobbytailor.config import OUTPUT_DIR, STACKCT_CACHE_TTL_HOURS, STACKCT_DB_PATH
 
 logger = logging.getLogger(__name__)
 

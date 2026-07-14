@@ -1,6 +1,6 @@
 """Phase 2: manifest-driven targeted counting + tiled recount."""
-from object_manifest import Manifest, ManifestEntry
-from takeoff_pipeline import TakeoffPipeline, _build_count_hint
+from bobbytailor.devtools.object_manifest import Manifest, ManifestEntry
+from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline, _build_count_hint
 
 
 def _manifest():

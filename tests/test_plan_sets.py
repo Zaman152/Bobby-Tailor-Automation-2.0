@@ -4,7 +4,7 @@ Test plan set discovery and deduplication rules (from 14-DISCOVERY audit).
 No live browser — unit tests for normalize_plan_sets function.
 """
 import pytest
-from browser import normalize_plan_sets
+from bobbytailor.scrape.browser import normalize_plan_sets
 
 
 class TestPlanSetDedupe:

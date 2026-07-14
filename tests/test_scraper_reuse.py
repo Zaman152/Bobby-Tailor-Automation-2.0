@@ -37,9 +37,9 @@ class TestScreenshotReuse:
 
         dest = tmp_path / "run" / "001_Sheet_42.jpg"
 
-        with patch("scraper.find_screenshot_paths", return_value=cache_map), \
-             patch("scraper.REUSE_SCREENSHOTS", True), \
-             patch("scraper._capture_sheet_screenshot") as mock_capture, \
+        with patch("bobbytailor.scrape.scraper.find_screenshot_paths", return_value=cache_map), \
+             patch("bobbytailor.scrape.scraper.REUSE_SCREENSHOTS", True), \
+             patch("bobbytailor.scrape.scraper._capture_sheet_screenshot") as mock_capture, \
              patch("shutil.copy2") as mock_copy:
 
             # Simulate the reuse branch inline (mirrors scraper logic)
@@ -77,11 +77,11 @@ class TestScreenshotReuse:
 
     def test_reuse_false_skips_cache_lookup(self):
         """When REUSE_SCREENSHOTS=False the cache map stays empty."""
-        with patch("scraper.REUSE_SCREENSHOTS", False), \
-             patch("scraper.find_screenshot_paths") as mock_find:
+        with patch("bobbytailor.scrape.scraper.REUSE_SCREENSHOTS", False), \
+             patch("bobbytailor.scrape.scraper.find_screenshot_paths") as mock_find:
 
             # Simulate the guard in run_project_scrape
-            import scraper
+            from bobbytailor.scrape import scraper
             cached_screenshots: dict[int, Path] = {}
             if scraper.REUSE_SCREENSHOTS:  # patched to False
                 cached_screenshots = scraper.find_screenshot_paths(0, "proj", [])

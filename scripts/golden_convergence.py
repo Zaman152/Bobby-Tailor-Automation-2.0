@@ -35,7 +35,7 @@ def _score_fixture(name: str, golden_csv: Path, plans_pdf: Path) -> dict:
     if not plans_pdf.exists():
         return {"name": name, "status": "skipped", "score": None, "reason": "PDF absent"}
 
-    from pdf_analyzer import run_pdf_analysis
+    from bobbytailor.pipeline.pdf_analyzer import run_pdf_analysis
     from tests.golden_validator import GoldenValidator
 
     try:

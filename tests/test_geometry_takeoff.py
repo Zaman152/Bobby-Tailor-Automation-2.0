@@ -1,7 +1,7 @@
 """Tests for the vector-geometry measurement engine (scale + length/area math)."""
 import types
 
-from geometry_takeoff import resolve_scale, measure_geometry, POINTS_PER_INCH
+from bobbytailor.deterministic.geometry_takeoff import resolve_scale, measure_geometry, POINTS_PER_INCH
 
 
 class _P:

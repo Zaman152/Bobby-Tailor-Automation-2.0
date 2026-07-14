@@ -9,7 +9,7 @@ import threading
 from datetime import datetime
 from typing import Optional
 
-import stackct_store as store
+from bobbytailor.stores import stackct_store as store
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ def get_browser_lock() -> threading.Lock:
 
 
 async def _fetch_projects_from_browser() -> list[dict]:
-    from browser import StackCTBrowser
+    from bobbytailor.scrape.browser import StackCTBrowser
 
     b = StackCTBrowser()
     await b.start()
@@ -35,7 +35,7 @@ async def _fetch_projects_from_browser() -> list[dict]:
 async def _fetch_plan_sets_from_browser(
     project_id: int, *, count_sheets: bool = False
 ) -> list[dict]:
-    from browser import StackCTBrowser
+    from bobbytailor.scrape.browser import StackCTBrowser
 
     b = StackCTBrowser()
     await b.start()
@@ -49,7 +49,7 @@ async def _fetch_plan_sets_from_browser(
 async def _fetch_plans_in_folder_from_browser(
     project_id: int, folder_id: int
 ) -> list[dict]:
-    from browser import StackCTBrowser
+    from bobbytailor.scrape.browser import StackCTBrowser
 
     b = StackCTBrowser()
     await b.start()

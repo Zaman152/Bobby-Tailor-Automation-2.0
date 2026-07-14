@@ -13,9 +13,11 @@ os.environ.setdefault(
     "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxnRp2./WyH1K8LK7xJQZHQKHQKHQ",
 )
 
-import job_store
-from app import app
-from auth import get_admin
+from bobbytailor.stores import job_store
+from bobbytailor.web.app import create_app
+from bobbytailor.web.auth import get_admin
+
+app = create_app()
 
 from tests.test_job_store import make_job
 
@@ -25,9 +27,9 @@ class JobHistoryApiTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.db_path = Path(self.tmp.name) / "test_jobs.db"
         self.patchers = [
-            mock.patch("job_store.STACKCT_DB_PATH", self.db_path),
-            mock.patch("config.STACKCT_DB_PATH", self.db_path),
-            mock.patch("job_store.JOB_HISTORY_RETENTION_DAYS", 0),
+            mock.patch("bobbytailor.stores.job_store.STACKCT_DB_PATH", self.db_path),
+            mock.patch("bobbytailor.config.STACKCT_DB_PATH", self.db_path),
+            mock.patch("bobbytailor.stores.job_store.JOB_HISTORY_RETENTION_DAYS", 0),
             mock.patch("flask_login.utils._get_user", return_value=get_admin()),
         ]
         for p in self.patchers:

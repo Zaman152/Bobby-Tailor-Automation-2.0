@@ -6,7 +6,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
-import job_store
+from bobbytailor.stores import job_store
 from bobbytailor.web.jobs_runtime import jobs
 
 logger = logging.getLogger(__name__)

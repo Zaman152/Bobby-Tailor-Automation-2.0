@@ -20,7 +20,7 @@ import logging
 import re
 from typing import Optional
 
-from config import (
+from bobbytailor.config import (
     CLAUDE_MODEL,
     CLAUDE_MODEL_CLASSIFY,
     CLAUDE_MODEL_DENSE,
@@ -30,7 +30,7 @@ from config import (
 
 # Optional: fall back gracefully if _pick_model is not yet importable
 try:
-    from claude_analyzer import _pick_model as _ca_pick_model
+    from bobbytailor.vision.claude_analyzer import _pick_model as _ca_pick_model
 except ImportError:
     def _ca_pick_model(sheet_name: str) -> str:  # type: ignore[misc]
         return CLAUDE_MODEL
@@ -209,7 +209,7 @@ def plan_passes(sheet_type: str, title_block_text: str = "") -> list[str]:
     passes = list(PASS_MATRIX[sheet_type])
     if sheet_type == "floor_plan":
         try:
-            from accuracy_config import is_high_accuracy_mode
+            from bobbytailor.pipeline.accuracy_config import is_high_accuracy_mode
             if is_high_accuracy_mode() and "legend" not in passes:
                 passes.append("legend")
         except ImportError:

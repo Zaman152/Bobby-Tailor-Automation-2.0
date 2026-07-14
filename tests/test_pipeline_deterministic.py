@@ -403,7 +403,7 @@ def test_budget_exhaustion_mid_run_flags_remaining(tmp_path):
 def test_run_settings_from_env_honors_ensemble_n_and_budget(monkeypatch):
     """ENSEMBLE_N / API_BUDGET_PER_RUN_USD flow through ensemble_settings()
     (the single reader — 21-11 decision) into RunSettings."""
-    import config
+    from bobbytailor import config
 
     monkeypatch.setattr(config, "ENSEMBLE_N", 7, raising=False)
     monkeypatch.setattr(config, "API_BUDGET_PER_RUN_USD", 3.5, raising=False)

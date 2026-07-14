@@ -1,7 +1,7 @@
 """Tests for drawing scale extraction (Phase 4a)."""
 import pytest
 
-from scale_utils import parse_scale, ScaleInfo
+from bobbytailor.deterministic.scale_utils import parse_scale, ScaleInfo
 
 
 def test_architectural_quarter_inch():

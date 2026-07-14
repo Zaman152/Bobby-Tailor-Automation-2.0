@@ -13,7 +13,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from config import OUTPUT_DIR
+from bobbytailor.config import OUTPUT_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def generate_report(project_name: str,
     calculated_items = _normalize_calculated(all_estimates)
 
     specification_tables = _collect_specification_tables(all_extracted)
-    from aggregator import aggregate_takeoff
+    from bobbytailor.pipeline.aggregator import aggregate_takeoff
     takeoff_summary = aggregate_takeoff(calculated_items, manifest=manifest, learned=learned)
 
     # Aggregate API usage across all sheets
@@ -409,7 +409,7 @@ def _flatten_raw_extractions(all_extracted: list) -> List[Dict[str, Any]]:
 def _parsed_scale(scale_text):
     """Parse a sheet's printed scale notation into a usable ratio (or None)."""
     try:
-        from scale_utils import parse_scale
+        from bobbytailor.deterministic.scale_utils import parse_scale
         s = parse_scale(scale_text)
         return s.to_dict() if s else None
     except Exception:  # noqa: BLE001 - scale parsing is best-effort metadata

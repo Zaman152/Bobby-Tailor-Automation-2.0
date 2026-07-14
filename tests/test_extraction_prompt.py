@@ -1,5 +1,5 @@
 """Smoke tests for Masterv2 v2.1 extraction prompt."""
-from claude_analyzer import EXTRACTION_PROMPT
+from bobbytailor.vision.claude_analyzer import EXTRACTION_PROMPT
 
 
 def test_prompt_has_v21_keys():

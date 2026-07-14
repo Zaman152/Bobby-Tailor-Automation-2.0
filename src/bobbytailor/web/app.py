@@ -10,8 +10,8 @@ from flask_login import current_user
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.exceptions import HTTPException
 
-from auth import bcrypt, init_admin, limiter, login_manager
-from config import OUTPUT_DIR
+from bobbytailor.web.auth import bcrypt, init_admin, limiter, login_manager
+from bobbytailor.config import OUTPUT_DIR
 from bobbytailor.web.blueprints import (
     auth_bp,
     jobs_bp,
@@ -65,20 +65,20 @@ def create_app() -> Flask:
     os.makedirs("output/screenshots", exist_ok=True)
     os.makedirs("uploads", exist_ok=True)
 
-    import stackct_store
-    import job_store
+    from bobbytailor.stores import stackct_store
+    from bobbytailor.stores import job_store
 
     stackct_store.init_db()
     job_store.init_schema()
 
-    from project_cache import prefetch_in_background
+    from bobbytailor.stores.project_cache import prefetch_in_background
 
     prefetch_in_background()
 
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
-        from config import STACKCT_CACHE_TTL_HOURS
-        from stackct_sync import sync_projects_if_stale
+        from bobbytailor.config import STACKCT_CACHE_TTL_HOURS
+        from bobbytailor.scrape.stackct_sync import sync_projects_if_stale
 
         scheduler = BackgroundScheduler(daemon=True)
         scheduler.add_job(

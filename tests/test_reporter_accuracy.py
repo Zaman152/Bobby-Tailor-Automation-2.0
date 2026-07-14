@@ -4,13 +4,13 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
-from reporter import generate_report
+from bobbytailor.pipeline.reporter import generate_report
 
 
 @contextmanager
 def _isolated_output_dir():
     with tempfile.TemporaryDirectory() as tmp:
-        import config
+        from bobbytailor import config
         old = config.OUTPUT_DIR
         config.OUTPUT_DIR = tmp
         try:
@@ -159,7 +159,7 @@ def test_generate_report_includes_takeoff_summary_and_cross_refs():
     cross_refs = [{"from_sheet": "A1", "resolution_status": "target_sheet_not_found"}]
 
     with tempfile.TemporaryDirectory() as tmp:
-        import config
+        from bobbytailor import config
         old = config.OUTPUT_DIR
         config.OUTPUT_DIR = tmp
         try:
@@ -198,7 +198,7 @@ def test_summary_txt_includes_linkage_sections():
     }]
 
     with tempfile.TemporaryDirectory() as tmp:
-        import config
+        from bobbytailor import config
         old = config.OUTPUT_DIR
         config.OUTPUT_DIR = tmp
         try:

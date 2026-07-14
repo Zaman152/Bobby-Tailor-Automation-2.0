@@ -8,8 +8,8 @@ from typing import Optional
 from flask import Blueprint, jsonify, send_file
 from flask_login import login_required
 
-import config
-from config import MAX_PREVIEW_ROWS
+from bobbytailor import config
+from bobbytailor.config import MAX_PREVIEW_ROWS
 
 logger = logging.getLogger(__name__)
 

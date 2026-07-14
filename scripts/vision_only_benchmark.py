@@ -674,7 +674,7 @@ def _assert_no_ground_truth_leakage(result: dict, decoy: Path) -> None:
 
 def run_vision(name: str, plans: Path, manifest: Optional[Path], run_tag: str = "") -> tuple:
     from bobbytailor.devtools.companion_takeoff import find_companion_takeoff_pdf
-    from pdf_analyzer import run_pdf_analysis
+    from bobbytailor.pipeline.pdf_analyzer import run_pdf_analysis
 
     with tempfile.TemporaryDirectory(prefix="vision_only_") as tmp:
         isolated = Path(tmp) / plans.name

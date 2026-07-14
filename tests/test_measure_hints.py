@@ -1,7 +1,7 @@
 """Phase 4: measurement hint + manifest-driven wall height."""
-from object_manifest import Manifest, ManifestEntry
-from takeoff_pipeline import _build_measure_hint, _manifest_wall_height
-from calculator import _calculate_from_room
+from bobbytailor.devtools.object_manifest import Manifest, ManifestEntry
+from bobbytailor.pipeline.takeoff_pipeline import _build_measure_hint, _manifest_wall_height
+from bobbytailor.pipeline.calculator import _calculate_from_room
 
 
 def _manifest():

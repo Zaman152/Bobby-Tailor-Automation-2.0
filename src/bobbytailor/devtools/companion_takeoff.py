@@ -189,7 +189,7 @@ def _map_columns(header_row: List[Optional[str]]) -> Dict[str, int]:
 
 
 def _parse_qty(raw) -> Optional[float]:
-    from calculator import _parse_numeric
+    from bobbytailor.pipeline.calculator import _parse_numeric
     if raw is None:
         return None
     return _parse_numeric(str(raw).strip())

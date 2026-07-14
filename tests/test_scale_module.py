@@ -17,8 +17,12 @@ os.environ.setdefault(
     "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxnRp2./WyH1K8LK7xJQZHQKHQKHQ",
 )
 
-import config
-from reporter import generate_report, enrich_scale_calibration
+from bobbytailor import config
+from bobbytailor.pipeline.reporter import generate_report, enrich_scale_calibration
+
+# Lazily created Flask app shared by the endpoint tests below (21-18: the root
+# app.py shim that used to provide a ready-made `app` instance is gone).
+_APP = None
 
 
 def _extracted_with_geometry():
@@ -29,7 +33,7 @@ def _extracted_with_geometry():
         "width_pt": 720.0,
         "height_pt": 360.0,
     }
-    from scale_recalc import recompute
+    from bobbytailor.deterministic.scale_recalc import recompute
     return [{
         "_source_sheet": "A2.1",
         "_sheet_name": "A2.1",
@@ -136,14 +140,14 @@ class ScaleCalibrationReporterTests(unittest.TestCase):
 
 class ScaleEndpointTests(unittest.TestCase):
     def setUp(self):
-        from auth import get_admin
+        from bobbytailor.web.auth import get_admin
         self.tmp = tempfile.TemporaryDirectory()
         self.run = "Endpoint_Proj_20260101_000000"
         self.run_dir = Path(self.tmp.name) / self.run
         self.run_dir.mkdir(parents=True)
         raw = {"footprint_pt2": 720 * 360, "total_linework_pt": 1000.0,
                "long_run_pt": 600.0, "width_pt": 720.0, "height_pt": 360.0}
-        from scale_recalc import recompute
+        from bobbytailor.deterministic.scale_recalc import recompute
         calib = {"project_name": "Endpoint Proj", "run_folder": self.run,
                  "sheets": [{
                      "sheet": "A2.1", "page_id": 3, "type": "floor_plan",
@@ -153,16 +157,22 @@ class ScaleEndpointTests(unittest.TestCase):
                      "raw": raw, "measured": recompute(raw, 48)}]}
         (self.run_dir / "scale_calibration.json").write_text(json.dumps(calib))
 
-        import app as app_module
+        from bobbytailor.web.app import create_app
+
+        # One app per test class run (module-level singleton keeps thread/
+        # scheduler startup from repeating for every test method).
+        global _APP
+        if _APP is None:
+            _APP = create_app()
         self.patchers = [
-            mock.patch("config.OUTPUT_DIR", self.tmp.name),
+            mock.patch("bobbytailor.config.OUTPUT_DIR", self.tmp.name),
             mock.patch("flask_login.utils._get_user", return_value=get_admin()),
         ]
         for p in self.patchers:
             p.start()
-        app_module.app.config["TESTING"] = True
-        app_module.app.config["WTF_CSRF_ENABLED"] = False
-        self.client = app_module.app.test_client()
+        _APP.config["TESTING"] = True
+        _APP.config["WTF_CSRF_ENABLED"] = False
+        self.client = _APP.test_client()
 
     def tearDown(self):
         for p in self.patchers:
@@ -187,7 +197,7 @@ class ScaleEndpointTests(unittest.TestCase):
         self.assertEqual(s["feet_per_inch"], 24)
         self.assertEqual(s["scale_source"], "user_verified")
         # area scales with the square of the scale: 24 vs 48 → 1/4 the footprint
-        from scale_recalc import recompute
+        from bobbytailor.deterministic.scale_recalc import recompute
         raw = s["raw"]
         self.assertEqual(s["measured"]["footprint_sf"],
                          recompute(raw, 24)["footprint_sf"])

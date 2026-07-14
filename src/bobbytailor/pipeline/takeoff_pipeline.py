@@ -34,22 +34,23 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import tempfile
 from dataclasses import asdict, dataclass
 from typing import Callable, List, Optional
 
 import fitz
 
-from sheet_pass_matrix import (
+from bobbytailor.pipeline.sheet_pass_matrix import (
     classify_sheet_type_from_text,
     plan_passes,
     pick_model_for_pass,
 )
-from accuracy_config import count_tiling_enabled, count_tiling_grid
+from bobbytailor.pipeline.accuracy_config import count_tiling_enabled, count_tiling_grid
 
 # Module-level imports make these symbols patchable in tests:
 #   unittest.mock.patch("takeoff_pipeline.analyze_drawing", ...)
-from claude_analyzer import (  # noqa: F401 (re-exported for patching)
+from bobbytailor.vision.claude_analyzer import (  # noqa: F401 (re-exported for patching)
     _SCHEDULE_LEGEND_USER_HINT,
     _merge_schedule_lists,
     analyze_drawing,
@@ -701,8 +702,12 @@ class TakeoffPipeline:
         if analyzer is not None:
             self._analyzer = analyzer
         else:
-            # Use the module-level name so it can be patched by tests
-            import takeoff_pipeline as _self_module
+            # Use the module-level name so it can be patched by tests.
+            # sys.modules[__name__] resolves to THIS module object under both
+            # the package import (bobbytailor.pipeline.takeoff_pipeline) and
+            # the spec-loaded test pattern (test_pipeline_parity._load), so
+            # patching either module's analyze_drawing attribute is honored.
+            _self_module = sys.modules[__name__]
             self._analyzer = _self_module.analyze_drawing
         self._settings = settings if settings is not None else RunSettings.from_env()
         # Optional object manifest, set by run_project; drives targeted counting.
@@ -1000,7 +1005,7 @@ class TakeoffPipeline:
 
         if full_page_text:
             try:
-                from page_text_enrichment import enrich_components_from_page_text
+                from bobbytailor.pipeline.page_text_enrichment import enrich_components_from_page_text
                 merged = enrich_components_from_page_text(merged, full_page_text)
             except ImportError:
                 pass
@@ -1798,7 +1803,7 @@ class TakeoffPipeline:
     def _measure_geometry_safe(self, pdf_path, page_index, scale_text):
         """Run the vector-geometry measurement for a sheet; never fatal."""
         try:
-            from geometry_takeoff import measure_geometry
+            from bobbytailor.deterministic.geometry_takeoff import measure_geometry
             doc = fitz.open(pdf_path)
             try:
                 page = doc[page_index]
@@ -1856,7 +1861,7 @@ class TakeoffPipeline:
             ``takeoff_pipeline`` and ``calculator``.
         """
         # Lazy import — calculator does not import takeoff_pipeline.
-        from calculator import apply_estimation_tables, _detect_project_type  # noqa: PLC0415
+        from bobbytailor.pipeline.calculator import apply_estimation_tables, _detect_project_type  # noqa: PLC0415
 
         # Optional object manifest — used by targeted counting/measurement passes.
         self._manifest = manifest
@@ -2090,7 +2095,7 @@ class TakeoffPipeline:
         region: str = "right",
     ) -> str:
         """Render a plan margin band where quantity takeoff legends often appear."""
-        from pdf_analyzer import _effective_render_scale
+        from bobbytailor.pipeline.pdf_analyzer import _effective_render_scale
 
         doc = fitz.open(pdf_path)
         try:
@@ -2214,7 +2219,7 @@ class TakeoffPipeline:
         cols: int, rows: int, cx: int, ry: int,
     ) -> str:
         """Render one (cx, ry) tile of a grid over the page to a temp PNG."""
-        from pdf_analyzer import _effective_render_scale
+        from bobbytailor.pipeline.pdf_analyzer import _effective_render_scale
 
         doc = fitz.open(pdf_path)
         try:
@@ -2234,7 +2239,7 @@ class TakeoffPipeline:
     @staticmethod
     def _render_pdf_page(pdf_path: str, page_index: int, scale: float) -> str:
         """Render one PDF page to a temporary PNG at *scale* for hi-res schedule reads."""
-        from pdf_analyzer import _effective_render_scale  # avoid duplicating API limit logic
+        from bobbytailor.pipeline.pdf_analyzer import _effective_render_scale  # avoid duplicating API limit logic
 
         doc = fitz.open(pdf_path)
         try:

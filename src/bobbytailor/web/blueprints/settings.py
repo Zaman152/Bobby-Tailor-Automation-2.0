@@ -16,14 +16,14 @@ def settings_page():
 @settings_bp.route("/api/settings", methods=["GET"])
 def api_get_settings():
     """Return current settings with secrets redacted."""
-    from settings import get_settings
+    from bobbytailor.web.settings import get_settings
     return jsonify(get_settings())
 
 
 @settings_bp.route("/api/settings", methods=["PUT"])
 def api_update_settings():
     """Update settings — partial updates supported."""
-    from settings import get_settings, update_settings
+    from bobbytailor.web.settings import get_settings, update_settings
     data = request.get_json() or {}
     if not data:
         return jsonify({"error": "No settings provided"}), 400

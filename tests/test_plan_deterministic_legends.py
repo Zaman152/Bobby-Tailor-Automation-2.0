@@ -9,7 +9,7 @@ import inspect
 import json
 from pathlib import Path
 
-from plan_deterministic_legends import (
+from bobbytailor.deterministic.plan_deterministic_legends import (
     build_deterministic_legends,
     build_deterministic_legends_from_run_dir,
     inject_project_legends,
@@ -64,8 +64,8 @@ def test_signatures_have_no_companion_present_param():
 
 def _patch_extractors(monkeypatch, calls):
     """Stub the lazy-imported door + footprint extractors with recorders."""
-    import footprint_takeoff
-    import schedule_extraction
+    from bobbytailor.deterministic import footprint_takeoff
+    from bobbytailor.deterministic import schedule_extraction
 
     def fake_door(pdf_path):
         calls.append(("door", pdf_path))

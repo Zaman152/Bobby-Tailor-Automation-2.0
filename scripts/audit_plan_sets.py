@@ -9,7 +9,7 @@ from typing import List, Optional
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from browser import StackCTBrowser  # noqa: E402
+from bobbytailor.scrape.browser import StackCTBrowser  # noqa: E402
 
 # Child folders under "Plans" — exclude system roots
 SKIP_NAMES = frozenset({
@@ -105,7 +105,7 @@ async def audit_project(b, project_id: int, project_name: str) -> dict:
 
 
 async def main(project_ids: Optional[List[int]] = None):
-    from stackct_store import init_db, list_projects
+    from bobbytailor.stores.stackct_store import init_db, list_projects
 
     init_db()
     projects = list_projects()

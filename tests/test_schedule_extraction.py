@@ -9,7 +9,7 @@ import os
 
 import pytest
 
-from schedule_extraction import (
+from bobbytailor.deterministic.schedule_extraction import (
     _tag_tokens,
     _tag_column,
     _material_columns,

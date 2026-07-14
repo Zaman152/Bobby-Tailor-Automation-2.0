@@ -150,7 +150,7 @@ def test_golden_validator_logic():
 )
 def test_crow_cass_golden():
     """End-to-end regression: Crow Cass PDF → GoldenValidator ≥97% accuracy."""
-    from pdf_analyzer import run_pdf_analysis
+    from bobbytailor.pipeline.pdf_analyzer import run_pdf_analysis
 
     result = run_pdf_analysis(
         str(CROW_PDF),
@@ -177,7 +177,7 @@ def test_crow_cass_golden():
 )
 def test_bobs_discount_golden():
     """End-to-end regression: Bob's Discount PDF → GoldenValidator ≥97% accuracy."""
-    from pdf_analyzer import run_pdf_analysis
+    from bobbytailor.pipeline.pdf_analyzer import run_pdf_analysis
 
     result = run_pdf_analysis(
         str(BOBS_PDF),

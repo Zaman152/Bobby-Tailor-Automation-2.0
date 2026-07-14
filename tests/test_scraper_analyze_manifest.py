@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from capture_manifest import PageEntry, RunManifest, manifest_path
+from bobbytailor.scrape.capture_manifest import PageEntry, RunManifest, manifest_path
 
 
 # ---------------------------------------------------------------------------
@@ -88,11 +88,11 @@ def _make_manifest(
 def _common_patches():
     """Return context managers patching all external calls."""
     return [
-        patch("scraper._pipeline.run_sheet", side_effect=_fake_analyze),
-        patch("scraper.apply_estimation_tables", return_value=[]),
-        patch("scraper.resolve_cross_references", return_value={}),
-        patch("scraper.resolve_spec_lookups", return_value=[]),
-        patch("scraper.generate_report", return_value={
+        patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=_fake_analyze),
+        patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]),
+        patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value={}),
+        patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]),
+        patch("bobbytailor.scrape.scraper.generate_report", return_value={
             "sheets_processed": 1,
             "total_line_items": 0,
             "total_calculated_items": 0,
@@ -109,7 +109,7 @@ class TestRunAnalyzeFromManifest:
     def _run(self, screenshots_dir: Path, **kwargs) -> dict:
         patches = _common_patches()
         with patches[0], patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             return asyncio.run(
                 run_analyze_from_manifest(screenshots_dir=screenshots_dir, **kwargs)
             )
@@ -123,15 +123,15 @@ class TestRunAnalyzeFromManifest:
         """StackCTBrowser must never be instantiated."""
         screenshots_dir, _ = _make_manifest(tmp_path, [{"page_id": 10}])
         mock_browser_cls = MagicMock()
-        with patch("scraper.StackCTBrowser", mock_browser_cls), \
-             patch("scraper._pipeline.run_sheet", side_effect=_fake_analyze), \
-             patch("scraper.apply_estimation_tables", return_value=[]), \
-             patch("scraper.resolve_cross_references", return_value={}), \
-             patch("scraper.resolve_spec_lookups", return_value=[]), \
-             patch("scraper.generate_report", return_value={"sheets_processed": 1,
+        with patch("bobbytailor.scrape.scraper.StackCTBrowser", mock_browser_cls), \
+             patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=_fake_analyze), \
+             patch("bobbytailor.scrape.scraper.apply_estimation_tables", return_value=[]), \
+             patch("bobbytailor.scrape.scraper.resolve_cross_references", return_value={}), \
+             patch("bobbytailor.scrape.scraper.resolve_spec_lookups", return_value=[]), \
+             patch("bobbytailor.scrape.scraper.generate_report", return_value={"sheets_processed": 1,
                                                             "total_line_items": 0,
                                                             "total_calculated_items": 0}):
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
 
         mock_browser_cls.assert_not_called()
@@ -139,12 +139,12 @@ class TestRunAnalyzeFromManifest:
     def test_missing_manifest_returns_error(self, tmp_path: Path):
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
-        from scraper import run_analyze_from_manifest
+        from bobbytailor.scrape.scraper import run_analyze_from_manifest
         result = asyncio.run(run_analyze_from_manifest(screenshots_dir=empty_dir))
         assert result.get("error") == "manifest_not_found"
 
     def test_no_dir_returns_error(self):
-        from scraper import run_analyze_from_manifest
+        from bobbytailor.scrape.scraper import run_analyze_from_manifest
         result = asyncio.run(run_analyze_from_manifest())
         assert result.get("error") == "analyze_manifest_no_dir"
 
@@ -152,7 +152,7 @@ class TestRunAnalyzeFromManifest:
         screenshots_dir, mpath = _make_manifest(tmp_path, [{"page_id": 20}])
         patches = _common_patches()
         with patches[0], patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             result = asyncio.run(
                 run_analyze_from_manifest(manifest_path_override=mpath)
             )
@@ -181,9 +181,9 @@ class TestSkipAlreadyAnalyzed:
             return _fake_analyze(image_path, sheet_name)
 
         patches = _common_patches()
-        with patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
+        with patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
 
         assert call_count["n"] == 0, "analyze_drawing must NOT be called for cached pages"
@@ -201,9 +201,9 @@ class TestSkipAlreadyAnalyzed:
             return _fake_analyze(image_path, sheet_name)
 
         patches = _common_patches()
-        with patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
+        with patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
 
         assert call_count["n"] == 1
@@ -223,9 +223,9 @@ class TestSkipAlreadyAnalyzed:
             return _fake_analyze(image_path, sheet_name)
 
         patches = _common_patches()
-        with patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
+        with patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             asyncio.run(
                 run_analyze_from_manifest(screenshots_dir=screenshots_dir, force=True)
             )
@@ -244,9 +244,9 @@ class TestSkipAlreadyAnalyzed:
             return _fake_analyze(image_path, sheet_name)
 
         patches = _common_patches()
-        with patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
+        with patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
 
         assert call_count["n"] == 1, "Failed pages must be retried"
@@ -263,9 +263,9 @@ class TestSkipAlreadyAnalyzed:
             return _fake_analyze(image_path, sheet_name)
 
         patches = _common_patches()
-        with patch("scraper._pipeline.run_sheet", side_effect=counting_analyze), \
+        with patch("bobbytailor.scrape.scraper._pipeline.run_sheet", side_effect=counting_analyze), \
              patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
 
         assert call_count["n"] == 1
@@ -284,7 +284,7 @@ class TestAnalysisCache:
 
         patches = _common_patches()
         with patches[0], patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
 
         assert cache_file.exists(), "Analysis cache JSON must be written after success"
@@ -296,12 +296,12 @@ class TestAnalysisCache:
         cache_file = screenshots_dir / "42_analysis.json"
 
         patches = _common_patches()
-        with patch("scraper._pipeline.run_sheet", return_value={"error": "bad_response"}), \
+        with patch("bobbytailor.scrape.scraper._pipeline.run_sheet", return_value={"error": "bad_response"}), \
              patches[1], patches[2], patches[3], \
-             patch("scraper.generate_report", return_value={"sheets_processed": 0,
+             patch("bobbytailor.scrape.scraper.generate_report", return_value={"sheets_processed": 0,
                                                             "total_line_items": 0,
                                                             "total_calculated_items": 0}):
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
 
         assert not cache_file.exists(), "Cache must not be written when analysis errors"
@@ -323,7 +323,7 @@ class TestMissingScreenshot:
         if shot.exists():
             shot.unlink()
 
-        from scraper import run_analyze_from_manifest
+        from bobbytailor.scrape.scraper import run_analyze_from_manifest
         result = asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
         # Result should be ERROR_ALL_SHEETS_FAILED (all failed = no successful sheets)
         assert "error" in result
@@ -341,11 +341,11 @@ class TestMissingScreenshot:
             shot.unlink()
 
         patches = _common_patches()
-        with patch("scraper.generate_report", return_value={"sheets_processed": 1,
+        with patch("bobbytailor.scrape.scraper.generate_report", return_value={"sheets_processed": 1,
                                                             "total_line_items": 0,
                                                             "total_calculated_items": 0}), \
              patches[0], patches[1], patches[2], patches[3]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             result = asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
 
         # Should complete without crashing, partial=True
@@ -364,9 +364,9 @@ class TestManifestUpdates:
         )
         patches = _common_patches()
         with patches[0], patches[1], patches[2], patches[3], patches[4]:
-            from scraper import run_analyze_from_manifest
+            from bobbytailor.scrape.scraper import run_analyze_from_manifest
             asyncio.run(run_analyze_from_manifest(screenshots_dir=screenshots_dir))
 
-        from capture_manifest import RunManifest
+        from bobbytailor.scrape.capture_manifest import RunManifest
         updated = RunManifest.load(mpath)
         assert updated.pages[0].analysis_status == "ok"

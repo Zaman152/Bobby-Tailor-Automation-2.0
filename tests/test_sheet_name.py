@@ -93,7 +93,7 @@ def _make_doc(title_block_words=None, full_text="", width=816, height=1056):
 # ---------------------------------------------------------------------------
 # Import after potential fitz stub registration
 # ---------------------------------------------------------------------------
-from pdf_analyzer import (  # noqa: E402
+from bobbytailor.pipeline.pdf_analyzer import (  # noqa: E402
     SHEET_ID_NOISE_PATTERNS,
     _is_noise_sheet_candidate,
     _sheet_name_from_doc,

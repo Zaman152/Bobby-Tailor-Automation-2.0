@@ -16,23 +16,23 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Callable, List, Dict, Any
-from config import OUTPUT_DIR, SCREENSHOTS_DIR, REUSE_SCREENSHOTS, AUTO_INCLUDE_LINKED_SHEETS, MAX_LINKED_SHEETS
-from linked_sheets import collect_unresolved_refs, match_ref_to_page
-import stackct_store
-from browser import StackCTBrowser
-from capture_manifest import PageEntry, RunManifest, manifest_path
-from sheet_preview import find_screenshot_paths
-from claude_analyzer import make_navigation_decision
-from calculator import apply_estimation_tables, resolve_spec_lookups, _detect_project_type
-from takeoff_pipeline import (
+from bobbytailor.config import OUTPUT_DIR, SCREENSHOTS_DIR, REUSE_SCREENSHOTS, AUTO_INCLUDE_LINKED_SHEETS, MAX_LINKED_SHEETS
+from bobbytailor.scrape.linked_sheets import collect_unresolved_refs, match_ref_to_page
+from bobbytailor.stores import stackct_store
+from bobbytailor.scrape.browser import StackCTBrowser
+from bobbytailor.scrape.capture_manifest import PageEntry, RunManifest, manifest_path
+from bobbytailor.scrape.sheet_preview import find_screenshot_paths
+from bobbytailor.vision.claude_analyzer import make_navigation_decision
+from bobbytailor.pipeline.calculator import apply_estimation_tables, resolve_spec_lookups, _detect_project_type
+from bobbytailor.pipeline.takeoff_pipeline import (
     RunSettings,
     TakeoffPipeline,
     VECTOR_MIN_DRAWING_ITEMS,
     VECTOR_MIN_WORDS,
     _resolve_wall_height,
 )
-from cross_references import resolve_cross_references
-from reporter import generate_report
+from bobbytailor.pipeline.cross_references import resolve_cross_references
+from bobbytailor.pipeline.reporter import generate_report
 
 logger = logging.getLogger(__name__)
 
@@ -560,7 +560,7 @@ async def run_project_scrape(project_id: int, project_name: str,
     # the `manifests/` dir by project name. Drives canonical naming + the
     # completeness guarantee so StackCT runs match the names a user expects and
     # never silently drop an expected object.
-    from object_manifest import resolve_project_manifest
+    from bobbytailor.devtools.object_manifest import resolve_project_manifest
     object_manifest = resolve_project_manifest(project_name, object_manifest_path)
     if object_manifest:
         log(
@@ -935,7 +935,7 @@ async def run_project_scrape(project_id: int, project_name: str,
         _project_type = _detect_project_type(_successful_extracted)
         logger.info("run_project_scrape: project_type=%r for %d sheets", _project_type, len(_successful_extracted))
 
-        from plan_deterministic_legends import (
+        from bobbytailor.deterministic.plan_deterministic_legends import (
             build_deterministic_legends_from_run_dir,
             inject_project_legends,
         )
@@ -1122,7 +1122,7 @@ async def run_analyze_from_manifest(
     # with run_project_scrape and pdf_analyzer.run_pdf_analysis.
     _pipeline.load_learning(project_name)
 
-    from object_manifest import resolve_project_manifest
+    from bobbytailor.devtools.object_manifest import resolve_project_manifest
     object_manifest = resolve_project_manifest(project_name, object_manifest_path)
     if object_manifest:
         log(f"Object manifest active — {len(object_manifest)} object(s)")
@@ -1318,7 +1318,7 @@ async def run_analyze_from_manifest(
         _project_type, len(_successful_extracted),
     )
 
-    from plan_deterministic_legends import (
+    from bobbytailor.deterministic.plan_deterministic_legends import (
         build_deterministic_legends_from_run_dir,
         inject_project_legends,
     )

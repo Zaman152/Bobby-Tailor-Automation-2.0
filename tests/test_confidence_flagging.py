@@ -2,9 +2,9 @@
 import csv
 from pathlib import Path
 
-from calculator import _calculate_from_component, _calculate_from_measurement, _calculate_from_room
-from reporter import _normalize_calculated, _write_takeoff_summary_csv, _write_calculated_csv
-from aggregator import aggregate_takeoff
+from bobbytailor.pipeline.calculator import _calculate_from_component, _calculate_from_measurement, _calculate_from_room
+from bobbytailor.pipeline.reporter import _normalize_calculated, _write_takeoff_summary_csv, _write_calculated_csv
+from bobbytailor.pipeline.aggregator import aggregate_takeoff
 
 
 def _summary_from(estimates):

@@ -8,7 +8,7 @@ import os
 
 import pytest
 
-from scale_extraction import (
+from bobbytailor.deterministic.scale_extraction import (
     snap_fpi,
     extract_scales_from_text,
     extract_scales_from_page,
@@ -121,7 +121,7 @@ def test_moxy_per_sheet_scales():
 def test_extracted_scales_are_all_on_ladder():
     """Every recovered page scale must be a valid ladder value (never mangled)."""
     import fitz
-    from scale_extraction import feet_per_inch_ladder
+    from bobbytailor.deterministic.scale_extraction import feet_per_inch_ladder
     ladder = set(round(v, 4) for v in feet_per_inch_ladder())
     doc = fitz.open(MOXY)
     try:

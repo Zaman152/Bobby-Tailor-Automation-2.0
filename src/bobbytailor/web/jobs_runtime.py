@@ -139,7 +139,7 @@ def _resolve_manifest_dir(
     Tries explicit *manifest_dir* first (absolute or relative to SCREENSHOTS_DIR),
     then auto-discovers the most-recent run folder for *project_name*.
     """
-    from config import SCREENSHOTS_DIR as _SCREENSHOTS_DIR
+    from bobbytailor.config import SCREENSHOTS_DIR as _SCREENSHOTS_DIR
 
     base = Path(_SCREENSHOTS_DIR)
 
@@ -173,7 +173,7 @@ def _stackct_job(job_id: str, mode: str, project_id: Optional[int], project_name
                  analyze_only: bool = False, manifest_dir: Optional[str] = None,
                  object_manifest_path: Optional[str] = None):
     """Background thread for StackCT scraping."""
-    from scraper import run_all_projects, run_project_scrape, run_analyze_from_manifest
+    from bobbytailor.scrape.scraper import run_all_projects, run_project_scrape, run_analyze_from_manifest
 
     def log(msg_or_entry):
         """Accept either plain string or structured entry dict."""
@@ -290,7 +290,7 @@ def _pdf_job(job_id: str, pdf_path: str, project_name: str,
              selected_pages: Optional[list] = None,
              manifest_path: Optional[str] = None):
     """Background thread for PDF analysis."""
-    from pdf_analyzer import run_pdf_analysis
+    from bobbytailor.pipeline.pdf_analyzer import run_pdf_analysis
 
     def log(msg_or_entry):
         if isinstance(msg_or_entry, dict):

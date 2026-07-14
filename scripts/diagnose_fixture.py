@@ -43,7 +43,7 @@ def main() -> int:
     key = sys.argv[1] if len(sys.argv) > 1 else "crow"
     pdf, golden, name = FIXTURES[key]
 
-    from pdf_analyzer import run_pdf_analysis
+    from bobbytailor.pipeline.pdf_analyzer import run_pdf_analysis
     from tests.golden_validator import GoldenValidator
 
     print(f"=== Running {name} ===", flush=True)

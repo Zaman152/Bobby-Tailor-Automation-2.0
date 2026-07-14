@@ -1,19 +1,23 @@
 """
 Session-level module registration to prevent sys.modules pollution.
 
-test_pipeline_parity.py sets up module-level stubs via sys.modules.setdefault()
-at import time. If real modules are already registered in sys.modules before
-those stubs are applied, setdefault() becomes a no-op and the real modules are
-preserved for all other test modules in the same pytest session.
+test_pipeline_parity.py (and test_takeoff_pipeline.py / test_sheet_pass_matrix.py)
+set up module-level stubs via sys.modules.setdefault() at import time for
+solo-run hermeticity. If the real modules are already registered in sys.modules
+before those stubs are applied, setdefault() becomes a no-op and the real
+modules are preserved for all other test modules in the same pytest session.
 
-Root cause: when pytest collects test_pipeline_parity.py first (alphabetical),
-its module-level code runs sys.modules.setdefault("capture_manifest", MagicMock()).
-Later, test_scraper_pipeline.py does `from capture_manifest import RunManifest, ...`
-and gets MagicMock attributes. RunManifest(…) returns a MagicMock whose .pages
-attribute is non-iterable, so scraper sees zero pages and returns all_sheets_failed.
+Root cause example: when pytest collects test_pipeline_parity.py before a real
+module is imported, its sys.modules.setdefault(
+"bobbytailor.scrape.capture_manifest", MagicMock()) wins. Later,
+test_scraper_pipeline.py does
+`from bobbytailor.scrape.capture_manifest import RunManifest, ...` and gets
+MagicMock attributes. RunManifest(…) returns a MagicMock whose .pages attribute
+is non-iterable, so scraper sees zero pages and returns all_sheets_failed.
 
-Fix: conftest.py is loaded before any test file; pre-importing capture_manifest
-ensures the real class is in sys.modules before parity stubs can displace it.
+Fix: conftest.py is loaded before any test file; pre-importing every module the
+stub blocks target ensures the real modules are in sys.modules before any stub
+can displace them.
 """
 from __future__ import annotations
 
@@ -90,11 +94,23 @@ def _ensure_real(name: str) -> None:
             pass
 
 
-# Pre-register modules that test_pipeline_parity stubs at module level via
-# sys.modules.setdefault(). Both are pure-Python with only stdlib dependencies,
-# so these imports are always safe in any test environment.
-#
-#   capture_manifest — needed by test_scraper_pipeline.py and test_scraper_*.py
-#   linked_sheets    — needed by test_linked_sheets.py
-_ensure_real("capture_manifest")
-_ensure_real("linked_sheets")
+# Pre-register the real package modules that test_pipeline_parity /
+# test_takeoff_pipeline / test_sheet_pass_matrix stub at module level via
+# sys.modules.setdefault() (solo-run hermeticity). Pre-importing the real
+# modules here makes every one of those setdefault() calls a no-op under
+# full-suite collection, so no stub can leak into other test modules
+# regardless of collection order. _ensure_real swallows import errors, so
+# environment-dependent modules (config crash-fails on missing env vars,
+# browser needs playwright) degrade gracefully to the stubs when absent.
+for _name in (
+    "bobbytailor.config",
+    "bobbytailor.vision.claude_analyzer",
+    "bobbytailor.scrape.capture_manifest",
+    "bobbytailor.scrape.linked_sheets",
+    "bobbytailor.scrape.browser",
+    "bobbytailor.scrape.sheet_preview",
+    "bobbytailor.stores.stackct_store",
+    "bobbytailor.pipeline.cross_references",
+    "bobbytailor.pipeline.reporter",
+):
+    _ensure_real(_name)

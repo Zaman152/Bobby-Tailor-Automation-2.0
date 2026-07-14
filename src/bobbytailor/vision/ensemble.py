@@ -294,7 +294,7 @@ def ensemble_settings() -> dict:
         ``{"n": ENSEMBLE_N, "budget_usd": API_BUDGET_PER_RUN_USD}`` read from
         config (env-driven, conftest-pinned in tests).
     """
-    import config  # deferred: same module object as bobbytailor.config (21-01 shim)
+    from bobbytailor import config  # deferred: read env-derived settings at call time
 
     return {
         "n": int(getattr(config, "ENSEMBLE_N", 3)),
