@@ -17,8 +17,16 @@ logger = logging.getLogger(__name__)
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
+# USD per 1M tokens — July 2026 Anthropic price table (21-RESEARCH.md §5).
+# Legacy slugs are KEPT so cached reports from older runs still cost out correctly.
 PRICING = {
+    # Current line-up (verified July 2026)
     "claude-haiku-4-5":   {"in": 1.0,  "out": 5.0},
+    # Sonnet 5 price rises to $3/$15 on 2026-09-01 — update then
+    "claude-sonnet-5":    {"in": 2.0,  "out": 10.0},
+    "claude-opus-4-8":    {"in": 5.0,  "out": 25.0},
+    "claude-fable-5":     {"in": 10.0, "out": 50.0},
+    # Legacy slugs (pre-July-2026 runs reference these)
     "claude-sonnet-4-6":  {"in": 3.0,  "out": 15.0},
     "claude-opus-4-7":    {"in": 5.0,  "out": 25.0},
 }
@@ -503,6 +511,8 @@ def analyze_drawing(
 
         # Capture usage and calculate cost
         usage = response.usage
+        # Unknown slugs default to the Sonnet steady-state rate (conservative
+        # over-estimate for the budget guard; matches Sonnet 5 post-2026-09-01).
         p = PRICING.get(model, {"in": 3.0, "out": 15.0})
         input_tokens = usage.input_tokens
         output_tokens = usage.output_tokens

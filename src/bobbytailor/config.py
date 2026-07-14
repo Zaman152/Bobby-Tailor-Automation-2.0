@@ -24,6 +24,29 @@ CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5")
 # tabular text matters. Falls back to CLAUDE_MODEL if unset.
 CLAUDE_MODEL_SCHEDULES = os.getenv("CLAUDE_MODEL_SCHEDULES", CLAUDE_MODEL)
 
+# Phase 21 model routing (July 2026 line-up — see 21-RESEARCH.md §5).
+# All slugs are env-driven; never hardcode model names in routing logic.
+#   claude-sonnet-5     → $2 / $10   (workhorse; $3/$15 from 2026-09-01)
+#   claude-opus-4-8     → $5 / $25   (high-res vision class — dense tables/legends)
+#   claude-fable-5      → $10 / $50  (frontier; escalation only, budget-gated)
+#   claude-haiku-4-5    → $1 / $5    (classification, cheap ensemble members)
+# Semantic labeling passes on floor/roof/MEP plans (overlay + crop galleries).
+CLAUDE_MODEL_SEMANTIC = os.getenv("CLAUDE_MODEL_SEMANTIC", "claude-sonnet-5")
+# Dense small-text structuring: legend/schedule passes + verify-retry arbitration.
+CLAUDE_MODEL_DENSE = os.getenv("CLAUDE_MODEL_DENSE", "claude-opus-4-8")
+# Escalation on repeated ensemble disagreement — only used when ESCALATION_ENABLED.
+CLAUDE_MODEL_ESCALATION = os.getenv("CLAUDE_MODEL_ESCALATION", "claude-fable-5")
+# Cheap classification passes (sheet-type triage).
+CLAUDE_MODEL_CLASSIFY = os.getenv("CLAUDE_MODEL_CLASSIFY", "claude-haiku-4-5")
+
+# Escalation gate: Fable 5 is budget-gated OFF by default (cost abuse guard).
+ESCALATION_ENABLED = os.getenv("ESCALATION_ENABLED", "false").lower() in ("1", "true", "yes")
+
+# Whole-sheet render long-edge target in pixels. Claude downscales standard
+# vision input to ~1568px long edge — rendering larger wastes tokens without
+# adding model-visible detail. Detail zooms use render_clip_crop() instead.
+RENDER_TARGET_PX = int(os.getenv("RENDER_TARGET_PX", "1568"))
+
 # StackCT URLs
 STACKCT_BASE_URL = "https://go.stackct.com"
 STACKCT_LOGIN_URL = "https://id.stackct.com/u/login/identifier"
