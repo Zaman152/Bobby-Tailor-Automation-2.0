@@ -831,7 +831,7 @@ Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
 6. All modules live in a structured package; `pytest` passes; app boots via blueprints; README documents the new layout
 7. `21-UAT.md` signed off for live-testing readiness
 
-**Plans:** 12/18 plans executed
+**Plans:** 13/18 plans executed
 
 Plans:
 **Wave 1**
@@ -863,7 +863,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 21-13-PLAN.md — Pipeline integration: RunSettings, deterministic-first flow, provenance reporting (V3-ACC-01/03)
+- [x] 21-13-PLAN.md — Pipeline integration: RunSettings, deterministic-first flow, provenance reporting (V3-ACC-01/03)
 
 **Wave 7** *(blocked on Wave 6 completion)*
 

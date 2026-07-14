@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-12-PLAN.md — fusion layer + replay harness
-last_updated: "2026-07-14T16:54:06.857Z"
+stopped_at: Completed 21-13-PLAN.md — deterministic-first pipeline integration
+last_updated: "2026-07-14T17:41:18.958Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-12: vision labels bind to deterministic candidate IDs; geometry supplies every number (V3-ACC-01 core)"
+last_activity_desc: "Completed 21-13: deterministic-first TakeoffPipeline — vector sheets measured by geometry/text, vision labels only; raster ensemble fallback; per-run budget guard; provenance/scale-confidence reporting (V3-ACC-01/03 integrated)"
 progress:
   total_phases: 22
   completed_phases: 17
   total_plans: 100
-  completed_plans: 87
+  completed_plans: 88
   percent: 77
 ---
 
@@ -30,11 +30,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 12/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11, 21-12)  
-Status: Wave 5 in progress — 21-12 done (fusion layer: PROVENANCE_RANK merge + ID-grounded fuse_sheet + ReplayAnalyzer, 740 tests green)  
-Last activity: 2026-07-14 — Completed 21-12: vision labels bind to deterministic candidate IDs; geometry supplies every number (V3-ACC-01 core)
+Plan: 13/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11, 21-12, 21-13)  
+Status: Wave 6 done — 21-13 (deterministic-first pipeline integration: vector/raster routing + RunSettings + budget threading + provenance reporting, 760 tests green)  
+Last activity: 2026-07-14 — Completed 21-13: deterministic-first TakeoffPipeline is the production path; vision labels, geometry measures (V3-ACC-01/03 integrated)
 
-Progress: [█████████░] 86%
+Progress: [█████████░] 88%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [█████████░] 86%
 | Phase 21-accuracy-learning-engine P10 P10 | 53 min | 3 tasks | 9 files |
 | Phase 21-accuracy-learning-engine P11 P11 | 16 min | 3 tasks | 5 files |
 | Phase 21-accuracy-learning-engine P12 P12 | 25 min | 3 tasks | 3 files |
+| Phase 21-accuracy-learning-engine P13 P13 | 40 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -176,6 +177,11 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-12]: merge_with_provenance hard no-overwrite guard checks provenance STRINGS (not rank arithmetic) — vision_ensemble can never displace a deterministic quantity/unit; discarded claims audited in fusion_rejected
 - [Phase 21-12]: fuse_sheet quantities are exclusively deterministic (group count, wall LF, polygon SF, schedule cells, printed dims); vision grounds via registry membership — out-of-set IDs dropped + flagged unknown_candidate_id; room vision labels apply only to label_source=='none' rooms
 - [Phase 21-12]: ReplayAnalyzer keys fixtures by SHA256(model, pass_type, prompt text, image_count); record mode gated by REPLAY_RECORD=1 (never CI); lazy-import results validated as real strings so sys.modules mock stubs degrade to deterministic 'unrouted' fallback
+- [Phase 21-13]: Deterministic-first routing scope: floor_plan/civil_site/roof_plan + schedule sheets; elevations/details/MEP keep legacy vision passes (wall pairing on elevations = bogus geometry-provenance LF)
+- [Phase 21-13]: Budget charging convention: every vision call site charges the per-run BudgetGuard with the completed call's _cost_usd; a refused charge discards the result — ledger only holds paid-and-accepted work
+- [Phase 21-13]: Deterministic ScheduleTables ride as _deterministic_schedules metadata (rows already fused as schedule_table components) — attaching as 'schedules' would double-count via calculator
+- [Phase 21-13]: select_main_plan is the measurement authority; vision main_plan_region kept only as cross-check (main_plan_region_vision on disagreement)
+- [Phase 21-13]: py3.9 + PEP 563 + spec-loaded modules: dataclasses in takeoff_pipeline built over real type-object __annotations__ (string annotations need sys.modules[cls.__module__] at decoration)
 
 ### Pending Todos
 
@@ -319,6 +325,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T16:51:59.870Z
-Stopped at: Completed 21-11-PLAN.md — ensemble voting + budget guard
+Last session: 2026-07-14T17:41:03.013Z
+Stopped at: Completed 21-13-PLAN.md — deterministic-first pipeline integration
 Resume file: None
