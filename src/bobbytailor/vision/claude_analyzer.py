@@ -151,6 +151,43 @@ def encode_image(filepath: str) -> Tuple[str, str]:
         return base64.standard_b64encode(raw).decode("utf-8"), media_type
 
 
+def encode_pil_image(img) -> Tuple[str, str]:
+    """Encode an in-memory PIL image to base64 PNG (JPEG fallback if large).
+
+    Companion to :func:`encode_image` for overlay/gallery renders that never
+    touch disk. Applies the same 3.6 MB raw-size guard so the base64 payload
+    stays under the Anthropic 5 MB limit.
+    """
+    import io
+    buf = io.BytesIO()
+    img.save(buf, "PNG", optimize=True)
+    raw = buf.getvalue()
+    raw_limit = int(3.6 * 1024 * 1024)
+    if len(raw) <= raw_limit:
+        return base64.standard_b64encode(raw).decode("utf-8"), "image/png"
+    # Oversized PNG → JPEG quality 90 (overlay renders are photographic-free,
+    # so 90 keeps marker text crisp while dropping well under the limit).
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=90, optimize=True)
+    data = buf.getvalue()
+    logger.info(f"  Compressed in-memory image: {len(raw):,} → {len(data):,} bytes (PNG→JPEG)")
+    return base64.standard_b64encode(data).decode("utf-8"), "image/jpeg"
+
+
+def _image_content_block(image) -> dict:
+    """Build one API image block from a file path or an in-memory PIL image."""
+    if isinstance(image, (str, Path)):
+        data, media_type = encode_image(str(image))
+    else:
+        data, media_type = encode_pil_image(image)
+    return {
+        "type": "image",
+        "source": {"type": "base64", "media_type": media_type, "data": data},
+    }
+
+
 def analyze_drawing(
     screenshot_path: str,
     sheet_name: str = "",
@@ -158,17 +195,33 @@ def analyze_drawing(
     model_override: Optional[str] = None,
     sheet_type: Optional[str] = None,
     user_hint: Optional[str] = None,
+    output_schema: Optional[dict] = None,
+    images: Optional[list] = None,
 ) -> dict:
     """Send a drawing screenshot to Claude for vision-based extraction.
 
     Args:
-        screenshot_path: Absolute path to the sheet image file.
+        screenshot_path: Absolute path to the sheet image file. May be ""
+                         when *images* supplies the visual content instead.
         sheet_name:      Sheet identifier used for logging and model selection.
         pass_type:       Which extraction pass to run:
-                           "measure"  — full EXTRACTION_PROMPT (default; backward compat)
-                           "count"    — COUNT_PROMPT (discrete EA symbols only)
-                           "schedule" — SCHEDULE_PROMPT (tables/schedules only)
-        model_override:  When set, use this model slug directly; bypasses _pick_model.
+                           "measure"        — full EXTRACTION_PROMPT (default; backward compat)
+                           "count"          — COUNT_PROMPT (discrete EA symbols only)
+                           "schedule"       — SCHEDULE_PROMPT (tables/schedules only)
+                           "legend"         — LEGEND_PROMPT (takeoff legend only)
+                           "semantic"       — SEMANTIC_LABELING_PROMPT (overlay ID labeling)
+                           "symbol_gallery" — SYMBOL_GALLERY_PROMPT (crop gallery matching)
+                           "verify_retry"   — VERIFY_RETRY_PROMPT (narrow arbitration)
+        model_override:  When set, use this model slug directly; bypasses routing.
+        output_schema:   Structured-outputs JSON schema (bobbytailor.vision.schemas).
+                         When given, the request uses the GA structured-outputs
+                         path (``output_config.format = json_schema`` — no beta
+                         header) and the response is parsed as guaranteed JSON
+                         (no markdown stripping, no regex repair).
+        images:          Optional list of image inputs (file paths or PIL
+                         images, e.g. overlay renders / gallery contact
+                         sheets). When given, these are sent as multiple image
+                         blocks INSTEAD of *screenshot_path*.
 
     Returns:
         Structured extraction dict.  On error, returns a dict with "error" key.
@@ -182,25 +235,67 @@ def analyze_drawing(
         system_prompt = SCHEDULE_PROMPT
     elif pass_type == "legend":
         system_prompt = LEGEND_PROMPT
+    elif pass_type == "semantic":
+        system_prompt = SEMANTIC_LABELING_PROMPT
+    elif pass_type == "symbol_gallery":
+        system_prompt = SYMBOL_GALLERY_PROMPT
+    elif pass_type == "verify_retry":
+        system_prompt = VERIFY_RETRY_PROMPT
     else:
         system_prompt = EXTRACTION_PROMPT  # "measure" or unknown → full extraction
 
     try:
-        image_data, media_type = encode_image(screenshot_path)
+        # Visual content: explicit image list (overlays/galleries) wins over
+        # the single screenshot path. >20 images drops the per-image
+        # resolution cap from 8000px to 2000px (RESEARCH §5) — warn loudly;
+        # overlay.build_crop_gallery already enforces the budget upstream.
+        if images:
+            if len(images) > 20:
+                logger.warning(
+                    f"  {len(images)} images in one request exceeds the 20-image "
+                    "full-resolution budget — per-image cap drops to 2000px"
+                )
+            image_blocks = [_image_content_block(img) for img in images]
+        else:
+            image_data, media_type = encode_image(screenshot_path)
+            image_blocks = [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": image_data,
+                    },
+                }
+            ]
 
-        # Model selection: explicit override wins; otherwise routing heuristic
+        # Model selection: explicit override wins; structured/semantic passes
+        # route via pick_model_for_pass (21-05 single resolver — deferred
+        # import to avoid the circular dependency with sheet_pass_matrix);
+        # everything else keeps the _pick_model heuristic chain.
         if model_override:
             model = model_override
         else:
-            model = _pick_model(sheet_name, pass_type, sheet_type=sheet_type)
+            model = None
+            if output_schema is not None:
+                try:
+                    from sheet_pass_matrix import pick_model_for_pass  # deferred (circular-dep avoidance)
+                    # Crop galleries belong to the semantic-labeling routing
+                    # row (RESEARCH §5: "overlay + crop galleries" → Sonnet).
+                    routing_pass = "semantic" if pass_type == "symbol_gallery" else pass_type
+                    model = pick_model_for_pass(sheet_type or "", routing_pass, sheet_name)
+                except ImportError:
+                    model = None
+            if not model:
+                model = _pick_model(sheet_name, pass_type, sheet_type=sheet_type)
         if model != CLAUDE_MODEL:
             logger.info(f"  Using {model} for sheet (pass={pass_type})")
 
-        # System prompt with cache_control: cached after first call per-prompt,
-        # saving ~90% on repeated drawing analyses.
-        response = client.messages.create(
+        request_kwargs = dict(
             model=model,
             max_tokens=16000,  # complex schedules/floor plans can produce 10k+ tokens of JSON
+            # System prompt with cache_control: cached after first call
+            # per-prompt, saving ~90% on repeated drawing analyses.
             system=[
                 {
                     "type": "text",
@@ -211,15 +306,7 @@ def analyze_drawing(
             messages=[
                 {
                     "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": image_data,
-                            },
-                        },
+                    "content": image_blocks + [
                         {
                             "type": "text",
                             "text": _build_user_message(
@@ -230,6 +317,15 @@ def analyze_drawing(
                 }
             ],
         )
+        if output_schema is not None:
+            # Structured outputs GA path (RESEARCH §3): grammar-constrained
+            # sampling — the response is guaranteed schema-valid JSON. No
+            # beta header required on the GA path.
+            request_kwargs["output_config"] = {
+                "format": {"type": "json_schema", "schema": output_schema}
+            }
+
+        response = client.messages.create(**request_kwargs)
 
         # Capture usage and calculate cost
         usage = response.usage
@@ -242,12 +338,14 @@ def analyze_drawing(
 
         raw_text = response.content[0].text.strip()
 
-        # Strip markdown if present
-        if raw_text.startswith("```"):
-            raw_text = raw_text.split("```")[1]
-            if raw_text.startswith("json"):
-                raw_text = raw_text[4:]
-
+        if output_schema is None:
+            # Freeform path — strip markdown fences if present
+            if raw_text.startswith("```"):
+                raw_text = raw_text.split("```")[1]
+                if raw_text.startswith("json"):
+                    raw_text = raw_text[4:]
+        # Structured path: response is guaranteed-JSON — parse directly,
+        # no markdown stripping and (below) no regex repair.
         extracted = json.loads(raw_text)
         extracted["_tokens_in"] = input_tokens
         extracted["_tokens_out"] = output_tokens
@@ -265,7 +363,9 @@ def analyze_drawing(
 
     except json.JSONDecodeError as e:
         logger.warning(f"Claude returned invalid JSON ({e}); attempting repair")
-        if _JSON_REPAIR_AVAILABLE:
+        # No regex/JSON repair on the structured-outputs path — the schema
+        # guarantees valid JSON, so a parse failure there is a real error.
+        if _JSON_REPAIR_AVAILABLE and output_schema is None:
             try:
                 repaired = _repair_json(raw_text, return_objects=True)
                 if isinstance(repaired, dict):
