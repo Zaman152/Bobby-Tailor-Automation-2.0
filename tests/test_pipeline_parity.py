@@ -10,6 +10,17 @@ Tests confirm:
   3. scraper.run_analyze_from_manifest calls TakeoffPipeline.run_sheet per page.
   4. plan_passes() is the sole pass-list authority: same sheet_type → same passes
      in both entry points (guaranteed by TakeoffPipeline.run_sheet delegation).
+
+21-15 (V3-STRUCT-02 + V3-LEARN-04) extensions:
+  5. RunSettings parity — both entry points construct RunSettings.from_env()
+     and hand the identical settings to the pipeline.
+  6. Deterministic call-site parity — a vector page reaches
+     extract_dimension_samples + fuse_sheet from BOTH entry-point flows.
+  7. Learning call-site parity — the learning seam (RunSettings.learning_enabled;
+     retrieval hook once 21-16 lands) is shared identically by both paths.
+  8. Companion isolation — a sibling `*Take offs.pdf` beside the plans PDF is
+     NEVER opened by the production path, and find_companion_takeoff_pdf is
+     absent from production module namespaces (plans-only LOCKED contract).
 """
 
 from __future__ import annotations
@@ -445,3 +456,399 @@ class TestPassParity:
         # scraper uses _pipeline.run_sheet
         assert "_pipeline.run_sheet" in scraper_src
         assert "TakeoffPipeline" in scraper_src
+
+
+# ===========================================================================
+# 5–8. 21-15 extensions: RunSettings / deterministic / learning parity +
+#      plans-only companion isolation
+# ===========================================================================
+
+def _make_vector_pdf(path, n_lines: int = 220) -> str:
+    """Write a synthetic VECTOR plan page (≥200 drawing paths → is_vector)."""
+    import fitz
+
+    doc = fitz.open()
+    page = doc.new_page(width=1224, height=792)
+    page.insert_text((40, 40), "FLOOR PLAN LEVEL 1")
+    for i in range(n_lines):
+        y = 60.0 + (i % 300) * 2.0
+        page.draw_line((40, y), (1100, y))
+    doc.save(str(path))
+    doc.close()
+    return str(path)
+
+
+def _parity_settings(RunSettingsCls, **overrides):
+    """A distinctive, fully explicit RunSettings for parity assertions."""
+    values = dict(
+        deterministic_enabled=True,
+        ensemble_n=2,
+        learning_enabled=True,
+        budget_usd=7.77,
+        verify_retry_enabled=False,
+        raster_force=False,
+    )
+    values.update(overrides)
+    return RunSettingsCls(**values)
+
+
+def _fused_stub() -> dict:
+    """Minimal fuse_sheet-shaped result the fusion/merge layer accepts."""
+    return {
+        "components": [],
+        "measurements": [],
+        "rooms": [],
+        "schedules": [],
+        "_tokens_in": 0,
+        "_tokens_out": 0,
+        "_cost_usd": 0.0,
+    }
+
+
+def _fake_scraper_manifest(sheet_name: str = "A1.1", page_id: int = 1001):
+    """MagicMock RunManifest with one captured page (scraper test double)."""
+    page_entry = MagicMock()
+    page_entry.page_id = page_id
+    page_entry.sheet_name = sheet_name
+    page_entry.capture_status = "ok"
+    page_entry.analysis_status = "pending"
+    page_entry.screenshot_rel = f"001_{sheet_name}.jpg"
+
+    fake_manifest = MagicMock()
+    fake_manifest.project_name = "Parity Test"
+    fake_manifest.folder_id = None
+    fake_manifest.pages = [page_entry]
+    fake_manifest.save = MagicMock()
+    return fake_manifest
+
+
+def _build_scraper_run_dir(tmp_path, sheet_name: str = "A1.1",
+                           page_id: int = 1001, with_blob: bool = True):
+    """Run folder with manifest.json, screenshot, and (optionally) a vector blob."""
+    run_dir = tmp_path / "run_001"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / f"001_{sheet_name}.jpg").write_bytes(b"fake-jpg" * 200)
+    if with_blob:
+        blob_dir = run_dir / "blobs"
+        blob_dir.mkdir(parents=True, exist_ok=True)
+        _make_vector_pdf(blob_dir / f"{page_id}.pdf")
+    manifest_data = {
+        "project_id": 1,
+        "project_name": "Parity Test",
+        "folder_id": None,
+        "pages": [{
+            "page_id": page_id,
+            "sheet_name": sheet_name,
+            "screenshot_rel": f"001_{sheet_name}.jpg",
+            "capture_status": "ok",
+            "analysis_status": "pending",
+            "source": "main",
+        }],
+    }
+    mpath = run_dir / "manifest.json"
+    mpath.write_text(json.dumps(manifest_data))
+    return run_dir, mpath
+
+
+class TestRunSettingsParity:
+    """Both entry points construct identical RunSettings via from_env()."""
+
+    def test_both_entry_points_receive_identical_settings(self, tmp_path):
+        import pdf_analyzer
+        import scraper
+
+        sentinel = _parity_settings(pdf_analyzer.RunSettings)
+
+        # ── PDF entry point: TakeoffPipeline(settings=from_env()) ──────────
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_project.return_value = ([], [], "auto")
+
+        with (
+            patch.object(pdf_analyzer.RunSettings, "from_env",
+                         MagicMock(return_value=sentinel)),
+            patch("pdf_analyzer.TakeoffPipeline",
+                  return_value=mock_pipeline) as tp_ctor,
+            patch("pdf_analyzer.fitz") as mock_fitz,
+            patch("pdf_analyzer._page_to_image", return_value="/tmp/p.png"),
+            patch("pdf_analyzer._sheet_name_from_doc", return_value="A1.1"),
+            patch("pdf_analyzer.get_title_block_text", return_value="FLOOR PLAN"),
+            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
+            patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("pdf_analyzer.generate_report", return_value={}),
+            patch("object_manifest.resolve_project_manifest", return_value=None),
+            patch("plan_deterministic_legends.build_deterministic_legends",
+                  return_value=[]),
+        ):
+            mock_doc = MagicMock()
+            mock_doc.__len__ = MagicMock(return_value=1)
+            mock_fitz.open.return_value = mock_doc
+            pdf_analyzer.run_pdf_analysis("/fake.pdf", "Settings Parity")
+
+        assert tp_ctor.call_args is not None
+        pdf_settings = tp_ctor.call_args.kwargs.get("settings")
+        assert pdf_settings is sentinel
+
+        # ── StackCT entry point: singleton refreshed via from_env() ────────
+        run_dir, mpath = _build_scraper_run_dir(tmp_path, with_blob=False)
+        floor_result = {
+            "_sheet_type": "floor_plan", "_sheet_name": "A1.1",
+            "_passes_run": ["count", "measure"], "_skipped": False,
+            "components": [], "measurements": [], "rooms": [], "schedules": [],
+        }
+        mock_sc_pipeline = MagicMock()
+        mock_sc_pipeline.run_sheet.return_value = floor_result
+
+        with (
+            patch.object(scraper.RunSettings, "from_env",
+                         MagicMock(return_value=sentinel)),
+            patch("scraper.RunManifest") as mock_rm,
+            patch("scraper._pipeline", mock_sc_pipeline),
+            patch("scraper.apply_estimation_tables", return_value=[]),
+            patch("scraper._detect_project_type", return_value="auto"),
+            patch("scraper.resolve_spec_lookups", return_value=[]),
+            patch("scraper.resolve_cross_references", return_value=[]),
+            patch("scraper.generate_report", return_value={"report": "ok"}),
+            patch("object_manifest.resolve_project_manifest", return_value=None),
+            patch("plan_deterministic_legends.build_deterministic_legends_from_run_dir",
+                  return_value=[]),
+        ):
+            mock_rm.load.return_value = _fake_scraper_manifest()
+            _fresh_loop().run_until_complete(
+                scraper.run_analyze_from_manifest(manifest_path_override=mpath)
+            )
+
+        # The scraper run assigned the SAME settings object to its pipeline.
+        assert mock_sc_pipeline.settings is sentinel
+        assert pdf_settings is mock_sc_pipeline.settings
+
+    def test_settings_construction_is_from_env_in_both_sources(self):
+        """Source-level: both entry points contain RunSettings.from_env()."""
+        assert "RunSettings.from_env()" in _SRC_FILES["pdf_analyzer"].read_text()
+        assert "RunSettings.from_env()" in _SRC_FILES["scraper"].read_text()
+
+
+class TestDeterministicCallSiteParity:
+    """A vector page fires extract_dimension_samples + fuse_sheet on BOTH paths."""
+
+    def test_pdf_path_reaches_deterministic_call_sites(self, tmp_path):
+        import pdf_analyzer
+
+        vector_pdf = _make_vector_pdf(tmp_path / "plans.pdf")
+        sentinel = _parity_settings(pdf_analyzer.RunSettings)
+
+        dim_spy = MagicMock(return_value=[])
+        fuse_spy = MagicMock(return_value=_fused_stub())
+        run_sheet_globals = pdf_analyzer.TakeoffPipeline.run_sheet.__globals__
+
+        with (
+            patch.object(pdf_analyzer.RunSettings, "from_env",
+                         MagicMock(return_value=sentinel)),
+            patch.dict(run_sheet_globals, {
+                "extract_dimension_samples": dim_spy,
+                "fuse_sheet": fuse_spy,
+            }),
+            patch("pdf_analyzer._page_to_image",
+                  return_value=str(tmp_path / "sheet.png")),
+            patch("pdf_analyzer._sheet_name_from_doc", return_value="A1.1"),
+            patch("pdf_analyzer.get_title_block_text",
+                  return_value="FLOOR PLAN LEVEL 1"),
+            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
+            patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("pdf_analyzer.generate_report", return_value={"report": "ok"}),
+            patch("object_manifest.resolve_project_manifest", return_value=None),
+            patch("plan_deterministic_legends.build_deterministic_legends",
+                  return_value=[]),
+        ):
+            pdf_analyzer.run_pdf_analysis(vector_pdf, "Determinism PDF")
+
+        assert dim_spy.called, "PDF path never reached extract_dimension_samples"
+        assert fuse_spy.called, "PDF path never reached fuse_sheet"
+
+    def test_stackct_path_reaches_deterministic_call_sites(self, tmp_path):
+        import scraper
+
+        run_dir, mpath = _build_scraper_run_dir(tmp_path, with_blob=True)
+        sentinel = _parity_settings(scraper.RunSettings)
+
+        dim_spy = MagicMock(return_value=[])
+        fuse_spy = MagicMock(return_value=_fused_stub())
+        pipeline = scraper._pipeline  # real TakeoffPipeline singleton
+        run_sheet_globals = type(pipeline).run_sheet.__globals__
+        prior_settings = pipeline.settings
+
+        try:
+            with (
+                patch.object(scraper.RunSettings, "from_env",
+                             MagicMock(return_value=sentinel)),
+                patch.dict(run_sheet_globals, {
+                    "extract_dimension_samples": dim_spy,
+                    "fuse_sheet": fuse_spy,
+                }),
+                patch("scraper.RunManifest") as mock_rm,
+                patch("scraper.apply_estimation_tables", return_value=[]),
+                patch("scraper._detect_project_type", return_value="auto"),
+                patch("scraper.resolve_spec_lookups", return_value=[]),
+                patch("scraper.resolve_cross_references", return_value=[]),
+                patch("scraper.generate_report", return_value={"report": "ok"}),
+                patch("object_manifest.resolve_project_manifest",
+                      return_value=None),
+                patch("plan_deterministic_legends."
+                      "build_deterministic_legends_from_run_dir",
+                      return_value=[]),
+            ):
+                mock_rm.load.return_value = _fake_scraper_manifest()
+                _fresh_loop().run_until_complete(
+                    scraper.run_analyze_from_manifest(
+                        manifest_path_override=mpath
+                    )
+                )
+        finally:
+            pipeline.settings = prior_settings
+
+        assert dim_spy.called, "StackCT path never reached extract_dimension_samples"
+        assert fuse_spy.called, "StackCT path never reached fuse_sheet"
+
+    def test_stackct_blob_threads_pdf_kwargs_into_run_sheet(self, tmp_path):
+        """A retained blob makes the scraper pass pdf_path/page_index to run_sheet."""
+        import scraper
+
+        run_dir, mpath = _build_scraper_run_dir(tmp_path, with_blob=True)
+        floor_result = {
+            "_sheet_type": "floor_plan", "_sheet_name": "A1.1",
+            "_passes_run": ["count", "measure"], "_skipped": False,
+            "components": [], "measurements": [], "rooms": [], "schedules": [],
+        }
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_sheet.return_value = floor_result
+
+        with (
+            patch("scraper.RunManifest") as mock_rm,
+            patch("scraper._pipeline", mock_pipeline),
+            patch("scraper.apply_estimation_tables", return_value=[]),
+            patch("scraper._detect_project_type", return_value="auto"),
+            patch("scraper.resolve_spec_lookups", return_value=[]),
+            patch("scraper.resolve_cross_references", return_value=[]),
+            patch("scraper.generate_report", return_value={"report": "ok"}),
+            patch("object_manifest.resolve_project_manifest", return_value=None),
+            patch("plan_deterministic_legends."
+                  "build_deterministic_legends_from_run_dir", return_value=[]),
+        ):
+            mock_rm.load.return_value = _fake_scraper_manifest()
+            _fresh_loop().run_until_complete(
+                scraper.run_analyze_from_manifest(manifest_path_override=mpath)
+            )
+
+        kwargs = mock_pipeline.run_sheet.call_args.kwargs
+        assert kwargs.get("pdf_path", "").endswith("blobs/1001.pdf")
+        assert kwargs.get("page_index") == 0
+
+    def test_pdf_path_threads_pdf_kwargs_into_run_project_pages(self):
+        """pdf_analyzer page dicts carry pdf_path/page_index (deterministic input)."""
+        src = _SRC_FILES["pdf_analyzer"].read_text()
+        assert '"pdf_path": pdf_path' in src
+        assert '"page_index": i' in src
+
+
+class TestLearningCallSiteParity:
+    """The learning seam is shared identically by both entry points (21-16)."""
+
+    def test_learning_seam_exists_and_is_shared(self):
+        import pdf_analyzer
+        import scraper
+
+        # RunSettings — the seam both paths construct — carries the learning
+        # toggle for the 21-16 runtime retrieval.
+        for mod in (pdf_analyzer, scraper):
+            settings = mod.RunSettings.from_env()
+            assert hasattr(settings, "learning_enabled"), mod.__name__
+
+        # Once the retrieval hook lands on the shared pipeline module (21-16),
+        # both entry points MUST resolve the exact same callable — the shared
+        # TakeoffPipeline.run_sheet is the single call site. hasattr-guarded so
+        # this test strengthens automatically after 21-16.
+        pdf_tp_mod = sys.modules[pdf_analyzer.TakeoffPipeline.__module__]
+        scr_tp_mod = sys.modules[type(scraper._pipeline).__module__]
+        for hook in (
+            "retrieve_learning_hints",
+            "apply_learning_hints",
+            "learning_retrieval",
+        ):
+            assert hasattr(pdf_tp_mod, hook) == hasattr(scr_tp_mod, hook), hook
+            if hasattr(pdf_tp_mod, hook):
+                assert getattr(pdf_tp_mod, hook) is getattr(scr_tp_mod, hook), hook
+
+
+class TestCompanionIsolation:
+    """LOCKED: the production path can never see a sibling take-off PDF."""
+
+    def test_sibling_takeoff_pdf_never_opened(self, tmp_path):
+        import fitz as real_fitz
+        import pdf_analyzer
+        import bobbytailor.devtools.companion_takeoff as devtools_companion
+
+        # Plans PDF (the ONLY legitimate pipeline input)
+        plans = tmp_path / "Isolation Project-Plans.pdf"
+        _make_vector_pdf(plans, n_lines=10)
+
+        # Ground-truth sibling the production path must NEVER read
+        takeoff = tmp_path / "Isolation Project-Take offs.pdf"
+        doc = real_fitz.open()
+        page = doc.new_page(width=612, height=792)
+        page.insert_text((30, 40), "Bollards")
+        page.insert_text((30, 60), "28 EA")
+        doc.save(str(takeoff))
+        doc.close()
+
+        opened: list = []
+        real_open = real_fitz.open
+
+        def spying_open(*args, **kwargs):
+            if args:
+                opened.append(str(args[0]))
+            return real_open(*args, **kwargs)
+
+        mock_pipeline = MagicMock()
+        mock_pipeline.run_project.return_value = ([], [], "auto")
+
+        discovery_spy = MagicMock(
+            wraps=devtools_companion.find_companion_takeoff_pdf
+        )
+
+        with (
+            # Global fitz.open spy — catches ANY module reading the sibling.
+            patch.object(real_fitz, "open", spying_open),
+            patch.object(devtools_companion, "find_companion_takeoff_pdf",
+                         discovery_spy),
+            patch("pdf_analyzer.TakeoffPipeline", return_value=mock_pipeline),
+            patch("pdf_analyzer._page_to_image",
+                  return_value=str(tmp_path / "p.png")),
+            patch("pdf_analyzer.resolve_cross_references", return_value=[]),
+            patch("pdf_analyzer.resolve_spec_lookups", return_value=[]),
+            patch("pdf_analyzer.generate_report", return_value={"report": "ok"}),
+            patch("object_manifest.resolve_project_manifest", return_value=None),
+        ):
+            # NOTE: plan_deterministic_legends stays REAL — the full plans-only
+            # legends flow runs and must still never touch the sibling.
+            pdf_analyzer.run_pdf_analysis(str(plans), "Isolation Project")
+
+        assert opened, "expected the plans PDF to be opened via fitz"
+        assert all("Take offs" not in p for p in opened), (
+            f"PRODUCTION PATH READ THE GROUND-TRUTH TAKE-OFF: {opened}"
+        )
+        discovery_spy.assert_not_called()
+
+    def test_companion_discovery_absent_from_production_namespaces(self):
+        import pdf_analyzer
+        import scraper
+
+        assert not hasattr(pdf_analyzer, "find_companion_takeoff_pdf")
+        assert not hasattr(scraper, "find_companion_takeoff_pdf")
+        assert not hasattr(pdf_analyzer, "extract_legend_schedules")
+
+        # Source-level: companion discovery is confined to devtools/ + scripts/.
+        for name in ("pdf_analyzer", "scraper"):
+            src = _SRC_FILES[name].read_text()
+            assert "find_companion_takeoff_pdf" not in src, name
+            assert "companion_takeoff" not in src.replace(
+                "companion_takeoff_legend", ""
+            ), name
