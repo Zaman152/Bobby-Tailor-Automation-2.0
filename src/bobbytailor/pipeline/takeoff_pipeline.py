@@ -22,6 +22,12 @@ Phase notes:
            the semantic labeler only (fuse_sheet). Raster sheets fall back
            to an ensemble-voted vision estimate (run_ensemble). One
            BudgetGuard per run is threaded through EVERY vision call site.
+  - 21-14: targeted-crop verify-retry (V3-ACC-05). QuantityVerifier flags
+           and ensemble disagreements get a bounded (<=2 attempts,
+           budget-charged) narrow crop question to the dense model via
+           vision/verify_retry.py before human review — resolving semantics
+           or confirming flags, never suppressing them. Replaces the legacy
+           env-flag logging stub with settings.verify_retry_enabled.
 """
 
 from __future__ import annotations
@@ -81,6 +87,10 @@ from bobbytailor.vision.ensemble import (
     vote,
 )
 from bobbytailor.vision.fusion import build_registry, fuse_sheet, merge_with_provenance
+
+# Verify-retry arbitration (21-14): module-level import so tests can patch
+# `takeoff_pipeline.retry_flagged_items` (patchability convention, 20-00).
+from bobbytailor.vision.verify_retry import retry_flagged_items
 from bobbytailor.vision.schemas import (
     raster_extraction_schema,
     semantic_labeling_schema,
@@ -200,6 +210,11 @@ _DETERMINISTIC_SHEET_TYPES = _PLAN_SHEET_TYPES + ("schedule",)
 
 # Viewport kinds masked out of measurement (matches scale_solver._MASK_KINDS).
 _MASK_VIEWPORT_KINDS = ("title_block", "legend", "schedule")
+
+# review_reason markers identifying ensemble-disagreement flags (needs_review
+# set by a vote) — these join the verify-retry queue alongside the
+# out-of-band QuantityVerifier flags (21-14, RESEARCH §3 handoff 3).
+_ENSEMBLE_DISAGREEMENT_MARKERS = ("ensemble", "no_majority", "disagree")
 
 
 def is_vector_sheet(page) -> bool:
@@ -481,10 +496,12 @@ class QuantityVerifier:
     range are flagged for review but never suppressed — report generation
     always proceeds.
 
-    Enable optional re-query to Claude for flagged items by setting the
-    ``ENABLE_VERIFY_RETRY`` environment variable to ``"1"``.  The retry
-    is a best-effort logging aid only; the original extraction is preserved
-    regardless.
+    Flags feed the targeted-crop verify-retry loop (21-14, V3-ACC-05,
+    ``bobbytailor.vision.verify_retry``) when
+    ``RunSettings.verify_retry_enabled`` is set: out-of-band values get a
+    bounded, budget-charged narrow crop question to the dense model before
+    human review. The original extraction is preserved regardless; a flag is
+    never removed without a recorded resolution + retry history.
 
     Rules are intentionally loose to catch only egregious outliers.
     Do NOT embed project-specific quantity thresholds (individual client
@@ -548,12 +565,6 @@ class QuantityVerifier:
                     "  flagged: %r qty=%s %s (allowed %s–%s)",
                     f["item"], f["qty"], f["unit"],
                     f["rule"]["min"], f["rule"]["max"],
-                )
-            if os.environ.get("ENABLE_VERIFY_RETRY") == "1":
-                logger.info(
-                    "QuantityVerifier: ENABLE_VERIFY_RETRY=1 set — "
-                    "%d item(s) flagged on %r (log only, no re-query in this build)",
-                    len(flags), sheet_name,
                 )
 
         return flags
@@ -1159,6 +1170,7 @@ class TakeoffPipeline:
         symbols = bundle.get("symbol_groups") or []
 
         registry = build_registry(bundle)
+        legend_labels = _legend_labels_from_schedules(schedules)
 
         # ── Semantic vision passes (labels only — budget-guarded) ─────────
         vision_labels: dict = {}
@@ -1201,7 +1213,6 @@ class TakeoffPipeline:
                 )
 
         if symbols and not budget_exhausted:
-            legend_labels = _legend_labels_from_schedules(schedules)
             if legend_labels:
                 try:
                     legend_rect = _legend_crop_rect(viewports, schedules)
@@ -1242,10 +1253,23 @@ class TakeoffPipeline:
         fused = fuse_sheet(bundle, vision_labels, registry)
         merged = merge_with_provenance([fused])
 
-        # QuantityVerifier on the fused result (flags feed 21-14 verify-retry).
+        # QuantityVerifier on the fused result → targeted-crop verify-retry
+        # (21-14, V3-ACC-05): out-of-band quantities and ensemble
+        # disagreements get a bounded narrow crop question to the dense model
+        # before human review — flags resolve or persist, never vanish.
         verifier_flags = QuantityVerifier().verify(merged, sheet_name=sheet_name)
         if verifier_flags:
             merged["_verifier_flags"] = verifier_flags
+        if self._settings.verify_retry_enabled:
+            self._verify_retry_pass(
+                merged,
+                page,
+                registry,
+                sheet_name=sheet_name,
+                resolved_type=resolved_type,
+                legend_labels=legend_labels,
+                guard=guard,
+            )
 
         # ── Result metadata (additive keys only) ──────────────────────────
         merged["measurement_mode"] = "vector"
@@ -1300,6 +1324,141 @@ class TakeoffPipeline:
         merged["_passes_run"] = passes_run
         merged["_budget"] = _budget_state(guard)
         return merged
+
+    def _verify_retry_pass(
+        self,
+        merged: dict,
+        page,
+        registry: dict,
+        *,
+        sheet_name: str,
+        resolved_type: str,
+        legend_labels: List[str],
+        guard: Optional[BudgetGuard],
+    ) -> None:
+        """Post-fusion targeted-crop verify-retry (21-14, V3-ACC-05).
+
+        Builds the retry queue from the QuantityVerifier's out-of-band flags
+        plus any ensemble-disagreement components (``needs_review`` from a
+        vote), hands it to :func:`retry_flagged_items` (module-level import
+        — patchable) with the run BudgetGuard, then merges resolutions back:
+
+        - ``relabeled`` → the component is renamed (SEMANTICS only — its
+          deterministic quantity/unit are untouched) and un-flagged with the
+          retry history attached;
+        - ``confirmed`` → the flag is downgraded to a note (``needs_review``
+          cleared where it was set) with the retry history attached;
+        - ``unresolved`` → the flag persists exactly as before, now carrying
+          its retry history (flag, never suppress).
+        """
+        components = [
+            c for c in merged.get("components") or [] if isinstance(c, dict)
+        ]
+
+        def _find_component(item_name, candidate_id=None) -> Optional[dict]:
+            if candidate_id:
+                for comp in components:
+                    if comp.get("candidate_id") == candidate_id:
+                        return comp
+            norm = str(item_name or "").strip().lower()
+            if not norm:
+                return None
+            for comp in components:
+                if str(comp.get("name") or "").strip().lower() == norm:
+                    return comp
+            return None
+
+        queue: List[dict] = []
+        queued = set()
+
+        # 1. Out-of-band QuantityVerifier flags. On vector sheets the
+        # deterministic count of a symbol group is exact, so an out-of-band
+        # value on a symbol-anchored item usually means the LABEL is wrong —
+        # those flags get the plausible legend labels as their choice set
+        # (relabel path); everything else gets the confirm/deny question.
+        for flag in merged.get("_verifier_flags") or []:
+            rec = dict(flag)
+            rec.setdefault("flag_type", "out_of_band")
+            comp = _find_component(rec.get("item"), rec.get("candidate_id"))
+            if comp is not None and not rec.get("candidate_id"):
+                rec["candidate_id"] = comp.get("candidate_id")
+            cid = rec.get("candidate_id")
+            kind = (registry.get(cid) or {}).get("kind") if cid else None
+            if kind == "symbol_group" and legend_labels:
+                rec["choices"] = list(legend_labels)
+            queue.append(rec)
+            queued.add(str(rec.get("item") or "").strip().lower())
+
+        # 2. Ensemble-disagreement components (needs_review set by a vote)
+        # also enter the retry queue (RESEARCH §3 handoff 3).
+        for comp in components:
+            if not comp.get("needs_review"):
+                continue
+            reason = str(comp.get("review_reason") or "").lower()
+            if not any(m in reason for m in _ENSEMBLE_DISAGREEMENT_MARKERS):
+                continue
+            key = str(comp.get("name") or "").strip().lower()
+            if not key or key in queued:
+                continue
+            queue.append(
+                {
+                    "sheet": sheet_name,
+                    "item": comp.get("name"),
+                    "qty": comp.get("quantity"),
+                    "unit": comp.get("unit"),
+                    "flag_type": "ensemble_disagreement",
+                    "candidate_id": comp.get("candidate_id"),
+                }
+            )
+            queued.add(key)
+
+        if not queue:
+            return
+
+        try:
+            updated = retry_flagged_items(
+                queue,
+                page,
+                registry,
+                self._analyzer,
+                guard,
+                sheet_type=resolved_type,
+            )
+        except Exception as exc:  # noqa: BLE001 — arbitration is additive
+            logger.warning(
+                "run_sheet: %r — verify-retry pass failed: %s", sheet_name, exc
+            )
+            return
+
+        verifier_flags: List[dict] = []
+        for rec in updated:
+            comp = _find_component(rec.get("item"), rec.get("candidate_id"))
+            history = rec.get("retry_history")
+            resolution = rec.get("resolution")
+            if comp is not None and history:
+                # retry_history is mandatory on any changed item — a flag can
+                # never be altered without its recorded resolution trail.
+                comp["retry_history"] = list(history)
+                comp["resolution"] = resolution
+                if resolution == "relabeled" and rec.get("new_label"):
+                    # Semantics only: the name changes; the deterministic
+                    # quantity/unit are NEVER touched by a retry.
+                    comp["name"] = rec["new_label"]
+                    comp["needs_review"] = False
+                    comp["review_reason"] = "relabeled by verify-retry"
+                elif resolution == "confirmed" and comp.get("needs_review"):
+                    # Flag downgraded to a note — the reason is kept for
+                    # audit, review is no longer required.
+                    comp["needs_review"] = False
+                    comp["review_reason"] = _append_reason(
+                        comp.get("review_reason"), "confirmed by verify-retry"
+                    )
+            if rec.get("flag_type") == "out_of_band":
+                verifier_flags.append(rec)
+
+        if merged.get("_verifier_flags"):
+            merged["_verifier_flags"] = verifier_flags
+        merged["_verify_retry"] = updated
 
     def _run_sheet_raster(
         self,

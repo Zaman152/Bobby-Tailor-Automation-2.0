@@ -4,7 +4,7 @@ analyzers only, ZERO real API calls.
 Engine tests (``-k engine``) pin the bounded/grounded/budget-charged
 contract of ``retry_flagged_items``; pipeline tests pin the takeoff_pipeline
 wiring (queue construction, resolution merge-back, flag-never-suppress) and
-the removal of the old ``ENABLE_VERIFY_RETRY`` env stub from source.
+the removal of the legacy env-flag verify-retry logging stub from source.
 """
 from __future__ import annotations
 
@@ -260,3 +260,293 @@ class TestRetryEngine:
         assert results[1]["retry_history"] == []
         # Remaining flag untouched — never reached.
         assert "resolution" not in results[2] and "retry_history" not in results[2]
+
+
+# ---------------------------------------------------------------------------
+# Pipeline wiring — QuantityVerifier flags routed to the retry loop
+# ---------------------------------------------------------------------------
+
+
+def _make_vector_pdf(tmp_path: Path) -> Path:
+    """A one-page PDF with enough vector paths to classify as vector."""
+    doc = fitz.open()
+    page = doc.new_page(width=612, height=792)
+    for i in range(250):
+        y = 10 + (i % 70) * 10.0
+        x = 10 + (i // 70) * 140.0
+        page.draw_line(fitz.Point(x, y), fitz.Point(x + 100, y))
+    for bbox in SYM_BBOXES.values():
+        page.draw_rect(fitz.Rect(bbox))
+    path = tmp_path / "vector.pdf"
+    doc.save(str(path))
+    doc.close()
+    return path
+
+
+LEGEND_ROWS = [{"ITEM": "Bollard"}, {"ITEM": "Stair"}, {"ITEM": "Ladder"}]
+
+
+def _canned_bundle(legend_rows=None) -> dict:
+    schedules = []
+    if legend_rows:
+        schedules = [
+            {
+                "name": "LEGEND",
+                "rows": list(legend_rows),
+                "bbox_pt": (0.0, 0.0, 0.0, 0.0),
+                "page_index": 0,
+            }
+        ]
+    return {
+        "symbol_groups": [],
+        "walls": [],
+        "wall_lf_by_class": {},
+        "rooms": [],
+        "viewports": [],
+        "schedules": schedules,
+        "footprint": None,
+        "fpp": 0.05,
+        "sheet_name": "A1",
+        "_viewports_with_scales": [],
+        "_main_plan_region": None,
+        "_scale_result": None,
+    }
+
+
+class PipelineRetryStub(RetryStub):
+    """RetryStub that also answers (ignores) any non-retry pass cleanly."""
+
+    def __call__(self, screenshot_path, sheet_name="", pass_type="measure", **kwargs):
+        if pass_type != "verify_retry":
+            return {"components": [], "measurements": [], "_cost_usd": 0.0}
+        return super().__call__(
+            screenshot_path, sheet_name, pass_type=pass_type, **kwargs
+        )
+
+
+def _run_vector_sheet(
+    monkeypatch,
+    tmp_path,
+    analyzer,
+    fused_components,
+    registry,
+    legend_rows=None,
+    settings=None,
+):
+    """Run the deterministic-first vector flow with canned bundle/fusion."""
+    pdf = _make_vector_pdf(tmp_path)
+    bundle = _canned_bundle(legend_rows)
+    monkeypatch.setattr(
+        TakeoffPipeline,
+        "_deterministic_bundle",
+        lambda self, *a, **k: {
+            k2: (list(v) if isinstance(v, list) else v) for k2, v in bundle.items()
+        },
+    )
+    monkeypatch.setattr(tp, "build_registry", lambda b: dict(registry))
+    monkeypatch.setattr(
+        tp,
+        "fuse_sheet",
+        lambda b, v, r: {
+            "components": [dict(c) for c in fused_components],
+            "measurements": [],
+            "fusion_rejected": [],
+        },
+    )
+    pipeline = TakeoffPipeline(analyzer=analyzer, settings=settings or RunSettings())
+    return pipeline.run_sheet(
+        image_path="A1.png",
+        sheet_name="A1",
+        sheet_type="floor_plan",
+        pdf_path=str(pdf),
+        page_index=0,
+    )
+
+
+def _oob_component(name: str, cid: str, qty=99999) -> dict:
+    return {
+        "name": name,
+        "quantity": qty,
+        "unit": "ea",
+        "confidence": "high",
+        "provenance": "geometry",
+        "candidate_id": cid,
+        "needs_review": False,
+        "review_reason": "",
+    }
+
+
+class TestPipelineWiring:
+    def test_out_of_band_retry_relabels_one_and_keeps_one_flagged(
+        self, monkeypatch, tmp_path
+    ):
+        """Canned fused result with 2 out-of-band items; the stub relabels
+        one and leaves one unresolved → final result has 1 renamed item with
+        retry_history and 1 still-flagged item (plan test b)."""
+
+        def answer(hint, i):
+            if "Ladder" in hint:
+                return "Stair"  # relabel: wrong semantics explained the flag
+            return "unclear"  # Bollard: cannot settle → stays flagged
+
+        stub = PipelineRetryStub(answer)
+        result = _run_vector_sheet(
+            monkeypatch,
+            tmp_path,
+            stub,
+            fused_components=[
+                _oob_component("Ladder", "SYM-1", qty=99999),
+                _oob_component("Bollard", "SYM-2", qty=88888),
+            ],
+            registry=_registry(),
+            legend_rows=LEGEND_ROWS,
+        )
+
+        components = {c["name"]: c for c in result["components"]}
+        # Relabeled: renamed, quantity UNCHANGED, retry_history attached.
+        assert "Stair" in components and "Ladder" not in components
+        stair = components["Stair"]
+        assert stair["quantity"] == 99999  # semantics only — never the number
+        assert stair["resolution"] == "relabeled"
+        assert len(stair["retry_history"]) == 1
+        assert stair["needs_review"] is False
+
+        # Unresolved: flag kept with the retry history attached.
+        bollard = components["Bollard"]
+        assert bollard["resolution"] == "unresolved"
+        assert len(bollard["retry_history"]) == 2
+
+        flags = {f["item"]: f for f in result["_verifier_flags"]}
+        assert flags["Ladder"]["resolution"] == "relabeled"
+        assert flags["Ladder"]["new_label"] == "Stair"
+        assert flags["Bollard"]["resolution"] == "unresolved"
+        # Full audit trail also persisted run-wide.
+        assert len(result["_verify_retry"]) == 2
+        # 1 relabel call + 2 bounded attempts for the unresolved item.
+        assert len(stub.calls) == 3
+
+    def test_ensemble_disagreement_flags_enter_retry_queue(
+        self, monkeypatch, tmp_path
+    ):
+        """needs_review-from-vote components join the retry queue and a
+        confirmation downgrades the flag to a note (plan test d)."""
+        stub = PipelineRetryStub(lambda hint, i: "yes")
+        result = _run_vector_sheet(
+            monkeypatch,
+            tmp_path,
+            stub,
+            fused_components=[
+                {
+                    "name": "Column",
+                    "quantity": 10,
+                    "unit": "ea",
+                    "confidence": "low",
+                    "provenance": "vision_ensemble",
+                    "candidate_id": "SYM-3",
+                    "needs_review": True,
+                    "review_reason": "raster vision estimate (ensemble not unanimous)",
+                },
+            ],
+            registry=_registry(),
+        )
+
+        assert len(stub.calls) == 1
+        assert "Column" in (stub.calls[0]["user_hint"] or "")
+        column = next(c for c in result["components"] if c["name"] == "Column")
+        assert column["resolution"] == "confirmed"
+        assert len(column["retry_history"]) == 1
+        assert column["needs_review"] is False
+        assert "confirmed by verify-retry" in column["review_reason"]
+        assert result["_verify_retry"][0]["flag_type"] == "ensemble_disagreement"
+
+    def test_budget_exhausted_skips_retry_items_stay_flagged(
+        self, monkeypatch, tmp_path
+    ):
+        """Budget exhausted → the retry pass issues zero calls and the flags
+        persist untouched (plan test c)."""
+        stub = PipelineRetryStub(lambda hint, i: "yes")
+        result = _run_vector_sheet(
+            monkeypatch,
+            tmp_path,
+            stub,
+            fused_components=[_oob_component("Ladder", "SYM-1")],
+            registry=_registry(),
+            legend_rows=LEGEND_ROWS,
+            settings=RunSettings(budget_usd=0.0),
+        )
+
+        retry_calls = [c for c in stub.calls if c["pass_type"] == "verify_retry"]
+        assert retry_calls == []
+        # The flag is still there — never suppressed on budget exhaustion.
+        flags = result["_verifier_flags"]
+        assert len(flags) == 1 and flags[0]["item"] == "Ladder"
+        assert "retry_history" not in flags[0]
+        ladder = next(c for c in result["components"] if c["name"] == "Ladder")
+        assert "retry_history" not in ladder
+
+    def test_verify_retry_disabled_setting_skips_pass(self, monkeypatch, tmp_path):
+        stub = PipelineRetryStub(lambda hint, i: "yes")
+        result = _run_vector_sheet(
+            monkeypatch,
+            tmp_path,
+            stub,
+            fused_components=[_oob_component("Ladder", "SYM-1")],
+            registry=_registry(),
+            legend_rows=LEGEND_ROWS,
+            settings=RunSettings(verify_retry_enabled=False),
+        )
+
+        assert [c for c in stub.calls if c["pass_type"] == "verify_retry"] == []
+        assert "_verify_retry" not in result
+        assert len(result["_verifier_flags"]) == 1  # flag intact
+
+    def test_retry_flagged_items_is_module_level_patchable(
+        self, monkeypatch, tmp_path
+    ):
+        """The pipeline calls the module-level name so tests can patch
+        `takeoff_pipeline.retry_flagged_items` (patchability convention)."""
+        seen = {}
+
+        def spy(flags, page, registry, analyze_call, budget=None, **kwargs):
+            seen["flags"] = [dict(f) for f in flags]
+            seen["registry"] = dict(registry)
+            seen["budget"] = budget
+            return [dict(f) for f in flags]
+
+        monkeypatch.setattr(tp, "retry_flagged_items", spy)
+        stub = PipelineRetryStub(lambda hint, i: "yes")
+        _run_vector_sheet(
+            monkeypatch,
+            tmp_path,
+            stub,
+            fused_components=[_oob_component("Ladder", "SYM-1")],
+            registry=_registry(),
+            legend_rows=LEGEND_ROWS,
+        )
+
+        assert seen["flags"], "the retry queue must reach retry_flagged_items"
+        rec = seen["flags"][0]
+        assert rec["flag_type"] == "out_of_band"
+        assert rec["candidate_id"] == "SYM-1"
+        # Symbol-anchored out-of-band flags carry the plausible legend labels.
+        assert rec["choices"] == ["Bollard", "Stair", "Ladder"]
+        assert seen["budget"] is not None
+        assert "SYM-1" in seen["registry"]
+
+
+# ---------------------------------------------------------------------------
+# Source hygiene — the legacy env-flag stub is gone
+# ---------------------------------------------------------------------------
+
+
+def test_legacy_env_stub_gone_from_source():
+    """The old env-flag logging stub must not survive anywhere under src/
+    (the needle is built dynamically so this file never matches itself)."""
+    needle = "ENABLE_" + "VERIFY_RETRY"
+    src_root = Path(__file__).resolve().parents[1] / "src"
+    offenders = [
+        str(path)
+        for path in src_root.rglob("*.py")
+        if needle in path.read_text(encoding="utf-8", errors="ignore")
+    ]
+    assert offenders == [], "legacy verify-retry env stub still present: %r" % offenders
