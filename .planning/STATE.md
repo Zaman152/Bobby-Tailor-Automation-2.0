@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-15-PLAN.md — plans-only entry points + blob retention
-last_updated: "2026-07-14T18:45:19.144Z"
+stopped_at: Completed 21-16-PLAN.md — learning retrieval & injection + anti-amplification guardrail
+last_updated: "2026-07-14T19:35:42.311Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-15: plans-only entry points — companion auto-discovery killed, StackCT blob retention + vector probe, RunSettings parity, isolation tests (V3-STRUCT-02, V3-LEARN-04)"
+last_activity_desc: "Completed 21-16: learning retrieval + three injection seams + anti-amplification guardrail (V3-LEARN-02/03/04); 806 tests green"
 progress:
   total_phases: 22
   completed_phases: 17
   total_plans: 100
-  completed_plans: 90
+  completed_plans: 91
   percent: 77
 ---
 
@@ -30,9 +30,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 15/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11, 21-12, 21-13, 21-14, 21-15)  
-Status: Wave 7 in progress — 21-15 (plans-only entry points: companion auto-discovery killed, blob retention + vector probe, RunSettings parity, 789 tests green)  
-Last activity: 2026-07-14 — Completed 21-15: plans-only production contract test-enforced; StackCT vector-capable via retained blobs (V3-STRUCT-02, V3-LEARN-04)
+Plan: 16/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11, 21-12, 21-13, 21-14, 21-15, 21-16)  
+Status: Wave 8 in progress — 21-16 (learning loop closed: retrieval + prompt/aggregation/calculator injection, anti-amplification guardrail, repeat-run test; 806 tests green)  
+Last activity: 2026-07-14 — Completed 21-16: learned context retrieved per run and injected at three seams; geometry/text_layer HIGH quantities structurally unpoisonable (V3-LEARN-02/03/04)
 
 Progress: [█████████░] 88%
 
@@ -63,6 +63,7 @@ Progress: [█████████░] 88%
 | Phase 21-accuracy-learning-engine P13 P13 | 40 min | 3 tasks | 5 files |
 | Phase 21-accuracy-learning-engine P14 P14 | 14 min | 2 tasks | 3 files |
 | Phase 21-accuracy-learning-engine P15 P15 | 27 min | 3 tasks | 9 files |
+| Phase 21-accuracy-learning-engine P16 | 38 min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -191,6 +192,9 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21]: 21-15: StackCT blobs live at {run_dir}/blobs/{page_id}.pdf with _page_blob_path legacy pdfs/ fallback; REUSE_SCREENSHOTS also reuses cached blobs; PageEntry.is_vector stores the runtime probe — Vector data must reach the deterministic engine on cached and resumed runs
 - [Phase 21]: 21-15: Scraper keeps _pipeline singleton but refreshes RunSettings.from_env() per run via new TakeoffPipeline.settings setter — settings-identical to pdf_analyzer — Preserves scraper._pipeline test patch seam while enforcing V3-STRUCT-02 parity
 - [Phase 21]: 21-15: Parity tests spy run_sheet.__globals__ via patch.dict and use a global fitz.open spy for companion isolation — Robust to spec-load vs package-import dual module objects in the parity harness
+- [Phase 21-16]: Two-stage learned retrieval: project_type inferred from latest prior correction at run start, refreshed after _detect_project_type — repeat runs get type-level vocabulary in prompts with zero manifests
+- [Phase 21-16]: apply_learned_quantity_flags enforced on every run_sheet exit path: re_verify flags only, never substitution; geometry/text_layer HIGH protected even under the §6 identical-input exception (dormant in production)
+- [Phase 21-16]: Aggregation naming precedence: companion legend > manifest > learned_vocabulary > static ITEM_NAME_MAP; learned-named rows marked source=learned, quantity provenance untouched
 
 ### Pending Todos
 
@@ -334,6 +338,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T18:45:03.755Z
-Stopped at: Completed 21-15-PLAN.md — plans-only entry points + blob retention
+Last session: 2026-07-14T19:35:42.304Z
+Stopped at: Completed 21-16-PLAN.md — learning retrieval & injection + anti-amplification guardrail
 Resume file: None

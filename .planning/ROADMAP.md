@@ -831,7 +831,7 @@ Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
 6. All modules live in a structured package; `pytest` passes; app boots via blueprints; README documents the new layout
 7. `21-UAT.md` signed off for live-testing readiness
 
-**Plans:** 15/18 plans executed
+**Plans:** 16/18 plans executed
 
 Plans:
 **Wave 1**
@@ -872,7 +872,7 @@ Plans:
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 21-16-PLAN.md — Learning retrieval + 3-seam injection + anti-amplification guardrail (V3-LEARN-02/03/04)
+- [x] 21-16-PLAN.md — Learning retrieval + 3-seam injection + anti-amplification guardrail (V3-LEARN-02/03/04)
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
