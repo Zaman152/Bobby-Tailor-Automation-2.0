@@ -831,7 +831,7 @@ Context: `.planning/phases/20-takeoff-measurement-precision/20-CONTEXT.md`
 6. All modules live in a structured package; `pytest` passes; app boots via blueprints; README documents the new layout
 7. `21-UAT.md` signed off for live-testing readiness
 
-**Plans:** 16/18 plans executed
+**Plans:** 17/18 plans executed
 
 Plans:
 **Wave 1**
@@ -876,7 +876,7 @@ Plans:
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
-- [ ] 21-17-PLAN.md — Accuracy gate: provenance-split benchmark, reproducibility, accuracy_gate.sh (V3-PROD-01)
+- [x] 21-17-PLAN.md — Accuracy gate: provenance-split benchmark, reproducibility, accuracy_gate.sh (V3-PROD-01)
 
 **Wave 10** *(blocked on Wave 9 completion)*
 

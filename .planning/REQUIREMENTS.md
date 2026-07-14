@@ -164,7 +164,7 @@
 - [x] **V3-LEARN-04**: Manifest independence — companion take-off and manifest files optional dev inputs only; plans-only path reaches target accuracy without them
 - [ ] **V3-STRUCT-01**: Package restructure — modules organized into structured package (pipeline/vision/scale/deterministic/learning/scrape/web) with Flask blueprints; tests green
 - [x] **V3-STRUCT-02**: Entry-point parity — PDF and StackCT paths share identical pipeline behavior with parity test
-- [ ] **V3-PROD-01**: Plans-only accuracy gate — vision_only_benchmark as CI-invocable gate; item-found ≥95%; zero silent misses
+- [x] **V3-PROD-01**: Plans-only accuracy gate — vision_only_benchmark as CI-invocable gate; item-found ≥95%; zero silent misses
 - [x] **V3-PROD-02**: Live-testing readiness — flagged-subset human review workflow, per-run API cost budget guard, structured error recovery, deployment docs
 
 ## v2 Requirements
@@ -314,7 +314,7 @@
 | V3-LEARN-04 | Phase 21 | Complete |
 | V3-STRUCT-01 | Phase 21 | Pending |
 | V3-STRUCT-02 | Phase 21 | Complete |
-| V3-PROD-01 | Phase 21 | Pending |
+| V3-PROD-01 | Phase 21 | Complete |
 | V3-PROD-02 | Phase 21 | Complete |
 
 **Coverage:**
