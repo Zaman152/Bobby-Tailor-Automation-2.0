@@ -155,7 +155,7 @@
 
 - [x] **V3-ACC-01**: Vector-first measurement — SF/LF/areas from PDF vector geometry + text layer; vision labels semantics, never guesses numbers when geometry exists
 - [x] **V3-ACC-02**: Auto scale detection v2 — per-viewport binding, area-weighted dominant scale, cross-validated against dimension strings; per-sheet confidence recorded
-- [ ] **V3-ACC-03**: Ensemble extraction — N-run self-consistency voting for EA counts and vision quantities; tiled counting with dedup; disagreement flags needs_review
+- [x] **V3-ACC-03**: Ensemble extraction — N-run self-consistency voting for EA counts and vision quantities; tiled counting with dedup; disagreement flags needs_review
 - [x] **V3-ACC-04**: Model upgrade & adaptive fidelity — strongest Claude vision models routed by sheet complexity; adaptive DPI/tiling for dense sheets
 - [ ] **V3-ACC-05**: Verify-retry loop implemented — out-of-band quantities re-queried with targeted crops before flagging (replaces ENABLE_VERIFY_RETRY stub)
 - [x] **V3-LEARN-01**: Correction store — human-verified overrides persisted to SQLite keyed by project_type/sheet_type/item pattern; survives run deletion
@@ -165,7 +165,7 @@
 - [ ] **V3-STRUCT-01**: Package restructure — modules organized into structured package (pipeline/vision/scale/deterministic/learning/scrape/web) with Flask blueprints; tests green
 - [ ] **V3-STRUCT-02**: Entry-point parity — PDF and StackCT paths share identical pipeline behavior with parity test
 - [ ] **V3-PROD-01**: Plans-only accuracy gate — vision_only_benchmark as CI-invocable gate; item-found ≥95%; zero silent misses
-- [ ] **V3-PROD-02**: Live-testing readiness — flagged-subset human review workflow, per-run API cost budget guard, structured error recovery, deployment docs
+- [x] **V3-PROD-02**: Live-testing readiness — flagged-subset human review workflow, per-run API cost budget guard, structured error recovery, deployment docs
 
 ## v2 Requirements
 
@@ -305,7 +305,7 @@
 | HIST-06 | Phase 19 | Complete |
 | V3-ACC-01 | Phase 21 | Complete |
 | V3-ACC-02 | Phase 21 | Complete |
-| V3-ACC-03 | Phase 21 | Pending |
+| V3-ACC-03 | Phase 21 | Complete |
 | V3-ACC-04 | Phase 21 | Complete |
 | V3-ACC-05 | Phase 21 | Pending |
 | V3-LEARN-01 | Phase 21 | Complete |
@@ -315,7 +315,7 @@
 | V3-STRUCT-01 | Phase 21 | Pending |
 | V3-STRUCT-02 | Phase 21 | Pending |
 | V3-PROD-01 | Phase 21 | Pending |
-| V3-PROD-02 | Phase 21 | Pending |
+| V3-PROD-02 | Phase 21 | Complete |
 
 **Coverage:**
 

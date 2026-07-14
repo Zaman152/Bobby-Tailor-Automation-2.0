@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 21
 current_phase_name: Accuracy & Learning Engine v3
 status: executing
-stopped_at: Completed 21-10-PLAN.md — wall & room measurement engines (Recipes B/C)
-last_updated: "2026-07-14T15:55:49.235Z"
+stopped_at: Completed 21-11-PLAN.md — ensemble voting + budget guard
+last_updated: "2026-07-14T16:18:43.703Z"
 last_activity: 2026-07-14
-last_activity_desc: "Completed 21-10: wall LF-by-class + room polygonize + footprint dual-method cross-check (V3-ACC-01 measure half)"
+last_activity_desc: "Completed 21-11: ensemble voting + tiled dedup + BudgetGuard (V3-ACC-03, V3-PROD-02 guard half)"
 progress:
   total_phases: 22
   completed_phases: 17
   total_plans: 100
-  completed_plans: 85
-  percent: 85
+  completed_plans: 86
+  percent: 86
 ---
 
 # Project State
@@ -30,11 +30,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 10/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10)  
-Status: Wave 4 in progress — 21-10 done (Recipe B/C wall+room engines, Crow footprint anchor 0.02%, 681 tests green)  
-Last activity: 2026-07-14 — Completed 21-10: wall LF-by-class + room polygonize + footprint dual-method cross-check (V3-ACC-01 measure half)
+Plan: 11/18 complete (21-01, 21-02, 21-03, 21-04, 21-05, 21-06, 21-07, 21-08, 21-09, 21-10, 21-11)  
+Status: Wave 4 in progress — 21-11 done (ensemble voting N=3→5, tiled dedup, BudgetGuard hard cap, 706 tests green)  
+Last activity: 2026-07-14 — Completed 21-11: ensemble/self-consistency voting + per-run budget guard (V3-ACC-03, V3-PROD-02 guard half)
 
-Progress: [█████████░] 85%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [█████████░] 85%
 | Phase 21-accuracy-learning-engine P08 P08 | 32 min | 3 tasks | 5 files |
 | Phase 21-accuracy-learning-engine P09 | 9 min | 2 tasks | 3 files |
 | Phase 21-accuracy-learning-engine P10 P10 | 53 min | 3 tasks | 9 files |
+| Phase 21-accuracy-learning-engine P11 P11 | 16 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -166,6 +167,11 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-10]: Wall opening gaps need corroboration (both faces broken OR door-leaf perpendicular segment) — dashed linework otherwise floods opening_gap_widths and poisons the 3'-0" door_check
 - [Phase 21-10]: WallSegment.centerline_pt spans chain end-to-end (openings included) so rooms polygonize closes across doors; length_pt is material-only for honest LF
 - [Phase 21-10]: Crow p0 office pods are single dashed outlines (not wall pairs) — unclosed/unlabeled rooms are vision-fallback territory; footprint anchor 397,692 vs 397,600 SF (0.02%)
+- [Phase 21-11]: vote() accepts on whole-band (max−min ≤ tol) OR strict-majority-within-tolerance-of-median — 5-sample escalation passes on 3-of-5 agreement; 3-way disagreement still flags needs_review
+- [Phase 21-11]: BudgetGuard.charge() refuses (never accumulates) charges past the cap; run_ensemble aborts to current-best flagged needs_review reason=budget_exhausted — never a silent partial
+- [Phase 21-11]: Temperature-ignore probe compares metadata-stripped JSON fingerprints of first two dict samples, cached per probe_key; on ignore, later samples get nonzero prompt_variation
+- [Phase 21-11]: run_tiled_count NMS dedups only ≥2-tile-covered detections from different tiles within 1.5 coarse cells; tiled sum joins run_ensemble via extra_members (method 'tiled+vote')
+- [Phase 21-11]: ensemble_settings() is the single (ENSEMBLE_N, API_BUDGET_PER_RUN_USD) reader — 21-13 RunSettings must construct from it
 
 ### Pending Todos
 
@@ -309,6 +315,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T15:55:19.944Z
-Stopped at: Completed 21-10-PLAN.md — wall & room measurement engines (Recipes B/C)
+Last session: 2026-07-14T16:18:43.698Z
+Stopped at: Completed 21-11-PLAN.md — ensemble voting + budget guard
 Resume file: None
