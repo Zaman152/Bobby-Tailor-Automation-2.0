@@ -81,7 +81,7 @@ completed: 2026-07-14
 2. **Task 2: Move route groups into 7 blueprints** - `346ca87` (feat)
 3. **Task 3: Route/auth/CSRF parity gate + full suite** - `052e33f` (test)
 
-**Plan metadata:** pending (docs commit)
+**Plan metadata:** `f3026a0` (docs: complete plan)
 
 ## Files Created/Modified
 

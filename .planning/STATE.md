@@ -11,9 +11,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 5/18 complete (21-01, 21-02, 21-03, 21-04, 21-05)  
-Status: 21-02 complete — Flask create_app() factory + 7 blueprints + jobs_runtime; parity tests green  
-Last activity: 2026-07-14 — Completed 21-02-PLAN.md (app.py structural split)
+Plan: 3/18 complete (21-01, 21-02, 21-03)  
+Status: 21-04/21-05 prior attempt rejected (uncommitted low-quality work, stashed) — re-executing wave 2 remainder then waves 3-10  
+Last activity: 2026-07-14 — Baseline re-verified on clean HEAD: 536 non-golden tests green; GitNexus reindexed
 
 Progress: Phase 16 complete; Phase 15 still to execute for full premium shell
 
