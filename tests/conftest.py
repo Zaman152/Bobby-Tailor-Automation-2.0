@@ -20,6 +20,7 @@ from __future__ import annotations
 import importlib
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 # Phase 21 transition (V3-STRUCT-01): modules live in src/bobbytailor/ with
@@ -36,6 +37,17 @@ except ImportError:
 
 # Keep unit tests on 3-pass floor_plan unless explicitly testing high-accuracy mode.
 os.environ.setdefault("TAKEOFF_ACCURACY_MODE", "standard")
+
+# Phase 21 learning store (21-09): the verify/scale/measurements endpoints now
+# capture corrections into the learning DB in-request. LEARNING_DB_PATH is read
+# once at bobbytailor.learning.store import time, so isolate the WHOLE test
+# session onto a throwaway DB — endpoint tests must never touch the real
+# output/learning.db. Tests needing per-test isolation additionally monkeypatch
+# store.LEARNING_DB_PATH (see tests/test_learning_store.py fixture).
+os.environ.setdefault(
+    "LEARNING_DB_PATH",
+    os.path.join(tempfile.mkdtemp(prefix="bt-test-learning-"), "learning.db"),
+)
 
 # Make model routing deterministic regardless of test import order. Some test
 # modules mock `config` via sys.modules.setdefault(); if the real config is
