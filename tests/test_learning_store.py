@@ -330,6 +330,26 @@ def test_missing_corrected_value_rejected(learning_db):
         )
 
 
+def test_get_corrections_project_key_filter(learning_db):
+    """WR-01: project_key filters at the query level, not post-hoc in Python."""
+    record(project_key="proj-a", item_pattern="bollards",
+           corrected={"quantity": 28, "unit": "EA"})
+    for i in range(5):
+        record(project_key="proj-b", run_id="rb-%d" % i,
+               item_pattern="other-%d" % i, corrected={"quantity": i, "unit": "EA"})
+
+    hits = store.get_corrections(project_key="proj-a")
+    assert len(hits) == 1
+    assert hits[0]["project_key"] == "proj-a"
+    assert hits[0]["item_pattern"] == "bollards"
+
+    # A limit smaller than the other project's row count still returns
+    # proj-a rows — recency of OTHER projects cannot evict them.
+    hits = store.get_corrections(project_key="proj-a", limit=2)
+    assert len(hits) == 1
+    assert hits[0]["project_key"] == "proj-a"
+
+
 def test_oversized_values_truncated_at_cap(learning_db):
     record(item_pattern="p" * 5000, corrected="A" * 5000)
     conn = store.get_connection()

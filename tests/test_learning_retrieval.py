@@ -173,6 +173,39 @@ def test_context_infers_project_type_on_repeat_run(learning_db):
     assert ctx.render_prompt_hint() is not None
 
 
+def test_project_corrections_survive_global_log_churn(learning_db, monkeypatch):
+    """WR-01 regression: OTHER projects' activity must never evict this
+    project's corrections from the retrieval window — the re_verify
+    guardrail flags and project_type inference must survive a global log
+    far larger than the scan limit."""
+    import bobbytailor.learning.retrieval as retrieval_mod
+
+    # This project's (older) correction …
+    seed_quantity_correction()
+
+    # … then flood the log with MANY newer corrections from another project,
+    # well past a (shrunk) scan limit.
+    monkeypatch.setattr(retrieval_mod, "_CORRECTIONS_SCAN_LIMIT", 5)
+    for i in range(10):
+        store.record_correction(
+            run_id="noise-%d" % i,
+            project_key="other-busy-project",
+            project_type="hotel",
+            sheet_type="floor_plan",
+            scope=store.SCOPE_ITEM,
+            item_pattern="noise item %d" % i,
+            corrected_value={"quantity": i + 1, "unit": "EA"},
+        )
+
+    ctx = load_learned_context(PROJECT_KEY, project_type=None)
+    # Type inference still finds THIS project's prior correction …
+    assert ctx.project_type == PROJECT_TYPE
+    # … and the guardrail input (quantity correction) was not silently lost.
+    assert "cmu wall" in ctx.quantity_corrections
+    # The other project's corrections never leak into this project's flags.
+    assert not any(k.startswith("noise item") for k in ctx.quantity_corrections)
+
+
 # ---------------------------------------------------------------------------
 # 2. Vocabulary application in aggregation (V3-LEARN-02)
 # ---------------------------------------------------------------------------

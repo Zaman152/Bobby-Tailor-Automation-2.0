@@ -269,8 +269,15 @@ def load_learned_context(
     # Corrections serve two purposes: project_type inference for repeat runs
     # (ANY scope counts — a project verified only via renames/scale fixes
     # must still recover its type) and the project-scoped quantity-correction
-    # flags (scope 'item' only — guardrail input).
-    recent_corrections = store.get_corrections(limit=_CORRECTIONS_SCAN_LIMIT)
+    # flags (scope 'item' only — guardrail input). Scoped to THIS project at
+    # the query level (WR-01): a busy global log must never push an older
+    # project's corrections out of the scan window and silently drop its
+    # re_verify guardrail flags or type inference.
+    recent_corrections = (
+        store.get_corrections(project_key=project_key, limit=_CORRECTIONS_SCAN_LIMIT)
+        if project_key
+        else []
+    )
     if not project_type:
         project_type = _infer_project_type(project_key, recent_corrections)
     project_type = str(project_type or "").strip()

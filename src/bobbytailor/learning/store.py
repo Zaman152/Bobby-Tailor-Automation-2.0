@@ -95,6 +95,9 @@ CREATE TABLE IF NOT EXISTS learning_corrections (
   context TEXT                        -- JSON: page, viewport, provenance, confidence at time of correction
 );
 CREATE INDEX IF NOT EXISTS ix_corr_lookup ON learning_corrections(project_type, sheet_type, scope, item_pattern);
+-- project-scoped retrieval (guardrail flags + project_type inference must
+-- not degrade as the GLOBAL log grows — 21-REVIEW WR-01)
+CREATE INDEX IF NOT EXISTS ix_corr_project ON learning_corrections(project_key);
 
 -- distilled, retrievable state (rebuilt/updated from corrections)
 CREATE TABLE IF NOT EXISTS learning_vocabulary (
@@ -293,15 +296,23 @@ def get_corrections(
     item_pattern: Optional[str] = None,
     run_id: Optional[str] = None,
     limit: int = 500,
+    project_key: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Query the append-only log by the ix_corr_lookup key (all filters optional).
 
+    ``project_key`` filters at the SQL level (ix_corr_project index) so a
+    project's corrections never fall out of the recency window because of
+    OTHER projects' activity (21-REVIEW WR-01).
+
     Returned dicts carry parsed ``original_value``/``corrected_value``/
-    ``context`` (JSON-decoded; raw text fallback for truncated payloads).
+    ``context`` (JSON-decoded; raw text fallback for legacy payloads).
     """
     _ensure_schema()
     clauses: List[str] = []
     params: List[Any] = []
+    if project_key is not None:
+        clauses.append("project_key = ?")
+        params.append(project_key)
     if project_type is not None:
         clauses.append("project_type = ?")
         params.append(project_type)
