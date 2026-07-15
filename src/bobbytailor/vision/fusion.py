@@ -797,6 +797,125 @@ def deterministic_symbol_name(group) -> Optional[str]:
     return None
 
 
+# ── Bollard co-located 2×-dedup ──────────────────────────────────────────────
+#
+# A bollard is often drawn as TWO concentric marks (pipe + cap), so the
+# deterministic clusterer counts each physical bollard twice (Crow: 56 marks →
+# 28 bollards). When a cluster binds to a bollard object, near-coincident
+# instance pairs are collapsed into one count. Conservative: it merges ONLY
+# instances whose centres are within a small radius (a fraction of the marker
+# size — never the inter-bollard spacing), and it is applied ONLY to
+# bollard-type bindings so column grids and other symbols are never affected.
+
+_BOLLARD_NAME_RE = re.compile(r"bollard", re.IGNORECASE)
+
+
+def _is_bollard_name(name) -> bool:
+    """True when a bound symbol name is a bollard (dedup applies only to these)."""
+    return bool(name) and bool(_BOLLARD_NAME_RE.search(str(name)))
+
+
+# Only collapse when the co-location is SYSTEMATIC (each physical object drawn
+# as ~2+ coincident marks). A ring/grid with a few incidentally-shared corners
+# has a multiplicity near 1.0 and is left untouched — the dedup fires only on
+# the concentric pipe+cap doubling signature.
+_DEDUP_MIN_MULTIPLICITY = 1.5
+
+
+def _dedup_colocated_count(group, raw_count: int) -> int:
+    """Collapse SYSTEMATICALLY co-located marks (concentric pipe+cap) to one count.
+
+    Two instances whose centres lie within a small radius (0.75× the median
+    marker size, floored at 0.5 pt) map to the same location. The collapse is
+    applied ONLY when the resulting multiplicity (raw ÷ locations) is ≥
+    :data:`_DEDUP_MIN_MULTIPLICITY` — i.e. each object really was drawn as ~2+
+    coincident marks (Crow: 56 marks → 28 bollards). Incidental corner overlaps
+    (multiplicity ≈ 1) leave the count unchanged.
+    """
+    centroids = _instance_centroids(group)
+    if len(centroids) < 2:
+        return raw_count
+    widths, heights = _instance_dims(group)
+    sizes = [max(w, h) for w, h in zip(widths, heights)]
+    med = _median(sizes) if sizes else 0.0
+    radius = max(med * 0.75, 0.5) if med > 0 else 0.5
+    r2 = radius * radius
+    kept: List[Tuple[float, float]] = []
+    for cx, cy in centroids:
+        if any((cx - kx) ** 2 + (cy - ky) ** 2 <= r2 for kx, ky in kept):
+            continue
+        kept.append((cx, cy))
+    deduped = len(kept)
+    if deduped <= 0:
+        return raw_count
+    n = len(centroids)
+    if n / float(deduped) < _DEDUP_MIN_MULTIPLICITY:
+        return raw_count  # not a systematic duplication — leave the count as-is
+    return max(1, min(deduped, raw_count))
+
+
+# ── Noise-cluster filter (gridlines / dimensions / drafting tokens) ──────────
+#
+# A symbol cluster whose contained text is purely gridline bubbles (bay labels
+# "1 / 2 / 3"), dimension strings ("48' - 4\"", "0\" - 60'"), or drafting / sheet
+# tokens (TYP, SS, DW, SCALE, sheet ids like A-101) is a drafting annotation,
+# NOT a countable object — it must never become an EA take-off line item. The
+# filter is keyed on the DESCRIPTION content, not the count, so real object
+# clusters (columns / bollards, which are named before the text fallback) are
+# never dropped.
+
+_NOISE_STOP_TOKENS = frozenset(
+    {
+        "SS", "DW", "TYP", "SIM", "NTS", "SCALE", "EQ", "OC", "UNO", "AFF",
+        "DIA", "DN", "UP", "REF", "CL", "FT", "IN",
+    }
+)
+# A feet-inch dimension string: "48'-4\"", "0\" - 60'", "350'", "1136'-0\"".
+_DIMENSION_TOKEN_RE = re.compile(r"^\d{1,4}'?\s*-?\s*\d{0,2}\"?$")
+# A sheet reference id: "A-101", "S1", "A101".
+_SHEET_ID_RE = re.compile(r"^[A-Z]{1,3}-?\d{1,4}[A-Z]?$")
+# A single gridline bubble label: "1", "12", "H", "G".
+_GRID_LABEL_RE = re.compile(r"^[A-Z0-9]{1,3}$")
+
+
+def _is_noise_token(tok: str) -> bool:
+    """True when a single text token is drafting noise (never a real object)."""
+    t = (tok or "").strip()
+    if not t:
+        return True
+    if not any(ch.isalnum() for ch in t):
+        return True  # pure punctuation ("-", "/")
+    up = t.upper().strip(".:")
+    if up in _NOISE_STOP_TOKENS:
+        return True
+    if t.replace(".", "").replace(",", "").isdigit():
+        return True  # pure number (gridline bubble)
+    if _DIMENSION_TOKEN_RE.match(t):
+        return True  # feet-inch dimension string
+    if _SHEET_ID_RE.match(up):
+        return True  # sheet reference id
+    if _GRID_LABEL_RE.match(up):
+        return True  # single gridline bubble label
+    return False
+
+
+def _is_noise_cluster(contained_texts) -> bool:
+    """True when EVERY text token in a cluster is drafting noise.
+
+    A cluster with no text is NOT noise (it may be a real unlabeled object —
+    kept flagged for review); only clusters whose text is entirely gridline /
+    dimension / drafting tokens are dropped.
+    """
+    tokens: List[str] = []
+    for txt in contained_texts or []:
+        for piece in re.split(r"[\s/]+", str(txt)):
+            if piece.strip():
+                tokens.append(piece.strip())
+    if not tokens:
+        return False
+    return all(_is_noise_token(t) for t in tokens)
+
+
 def _fuse_symbol_groups(
     bundle: dict,
     labels_by_id: Dict[str, dict],
@@ -821,10 +940,11 @@ def _fuse_symbol_groups(
         label = (entry or {}).get("label")
 
         if entry and label and label != _UNKNOWN_LABEL:
+            qty = _dedup_colocated_count(group, count) if _is_bollard_name(label) else count
             components.append(
                 {
                     "name": label,
-                    "quantity": count,
+                    "quantity": qty,
                     "unit": "EA",
                     "provenance": "geometry",
                     "confidence": _min_confidence(group_conf, entry.get("confidence")),
@@ -845,10 +965,11 @@ def _fuse_symbol_groups(
         lib_bind = library_bindings.get(cid)
         if lib_bind:
             lib_name, lib_hint = lib_bind
+            qty = _dedup_colocated_count(group, count) if _is_bollard_name(lib_name) else count
             components.append(
                 {
                     "name": lib_name,
-                    "quantity": count,
+                    "quantity": qty,
                     "unit": "EA",
                     "provenance": "geometry",
                     "confidence": "medium",
@@ -889,10 +1010,23 @@ def _fuse_symbol_groups(
             )
             continue
 
-        # No deterministic signal either → the deterministic count is STILL
-        # emitted (flag-don't-guess, never dropped), named by contained text or
-        # the candidate ID so distinct unknown groups stay distinguishable.
+        # No deterministic signal either. Before naming the cluster by its
+        # contained text, drop it when that text is PURE drafting noise —
+        # gridline bubbles ("1 / 2 / 3"), dimension strings ("48' - 4\"") or
+        # sheet/drafting tokens (TYP, SS, DW, SCALE, A-101). These are
+        # annotations, never countable objects, so they must not become EA line
+        # items (Crow: ~60 junk gridline/dimension clusters). Keyed on the text
+        # content, not the count — real object clusters are named above.
         texts = _field(group, "contained_texts", []) or []
+        if _is_noise_cluster(texts):
+            logger.debug(
+                "fuse_sheet: dropped noise cluster %s (texts=%r)", cid, texts
+            )
+            continue
+
+        # A genuine unknown cluster → the deterministic count is STILL emitted
+        # (flag-don't-guess, never dropped), named by contained text or the
+        # candidate ID so distinct unknown groups stay distinguishable.
         name = " / ".join(t for t in texts if t) or cid
         components.append(
             {

@@ -653,3 +653,100 @@ def test_replay_analyzer_injectable_into_takeoff_pipeline(tmp_path, monkeypatch)
     analyzer = ReplayAnalyzer(tmp_path / "replay")
     pipeline = TakeoffPipeline(analyzer=analyzer)
     assert pipeline._analyzer is analyzer  # the 20-00 injection seam, preserved
+
+
+# ── Bollard 2×-dedup + noise-cluster filter (offline) ────────────────────────
+
+
+def _sym_group(cid, count, boxes, texts=None, rep=None):
+    return {
+        "candidate_id": cid,
+        "count": count,
+        "instance_bboxes_pt": boxes,
+        "representative_bbox_pt": rep or (boxes[0] if boxes else (0.0, 0.0, 6.0, 6.0)),
+        "contained_texts": texts or [],
+        "confidence": "medium",
+    }
+
+
+def _concentric_pairs(n_locations, step=25.0, origin=(100.0, 100.0)):
+    """Each physical object drawn as TWO concentric marks (pipe + cap)."""
+    ox, oy = origin
+    boxes = []
+    for i in range(n_locations):
+        cx, cy = ox + i * step, oy
+        boxes.append((cx - 2.0, cy - 2.0, cx + 2.0, cy + 2.0))   # pipe
+        boxes.append((cx - 3.0, cy - 3.0, cx + 3.0, cy + 3.0))   # cap
+    return boxes
+
+
+def _grid(cols, rows, step=30.0, size=6.0, origin=(500.0, 500.0)):
+    ox, oy = origin
+    return [
+        (ox + c * step, oy + r * step, ox + c * step + size, oy + r * step + size)
+        for r in range(rows) for c in range(cols)
+    ]
+
+
+def test_bollard_concentric_pairs_dedup_56_to_28():
+    boxes = _concentric_pairs(28)          # 56 marks, 28 physical bollards
+    group = _sym_group("SYM-1", 56, boxes)
+    bundle = {"symbol_groups": [group], "sheet_name": "S1"}
+    labels = {"matches": [{"symbol_id": "SYM-1", "label": "Bollards", "confidence": "high"}]}
+    result = fuse_sheet(bundle, labels)
+    boll = [c for c in result["components"] if c["name"] == "Bollards"][0]
+    assert boll["quantity"] == 28
+    assert boll["unit"] == "EA"
+
+
+def test_column_grid_not_deduped():
+    boxes = _grid(12, 11)                   # 132 columns on a regular grid
+    group = _sym_group("SYM-1", 132, boxes)
+    bundle = {"symbol_groups": [group], "sheet_name": "S1"}
+    labels = {"matches": [{"symbol_id": "SYM-1", "label": "Columns", "confidence": "high"}]}
+    result = fuse_sheet(bundle, labels)
+    cols = [c for c in result["components"] if c["name"] == "Columns"][0]
+    assert cols["quantity"] == 132          # dedup applies only to bollard bindings
+
+
+def test_noise_clusters_excluded_from_takeoff():
+    noise = [
+        _sym_group("SYM-1", 6, _grid(3, 2), texts=["1", "2", "3", "4"]),
+        _sym_group("SYM-2", 4, _grid(2, 2, origin=(50.0, 50.0)), texts=["0\" - 60'"]),
+        _sym_group("SYM-3", 5, _grid(1, 5, origin=(80.0, 80.0)), texts=["TYP."]),
+        _sym_group("SYM-4", 3, _grid(1, 3, origin=(120.0, 10.0)), texts=["SS"]),
+        _sym_group("SYM-5", 4, _grid(2, 2, origin=(300.0, 5.0)), texts=["A-101"]),
+    ]
+    bundle = {"symbol_groups": noise, "sheet_name": "S1"}
+    result = fuse_sheet(bundle, {"matches": []})
+    names = {c["name"] for c in result["components"]}
+    # None of the drafting-noise clusters became a take-off line item.
+    assert not any(n in names for n in ("1 / 2 / 3 / 4", "0\" - 60'", "TYP.", "SS", "A-101"))
+    assert result["components"] == []
+
+
+def test_real_object_cluster_with_text_is_retained():
+    # A genuine object whose nearby text is a real word is NOT noise → kept flagged.
+    group = _sym_group("SYM-1", 4, _grid(2, 2), texts=["PUMP"])
+    result = fuse_sheet({"symbol_groups": [group], "sheet_name": "S1"}, {"matches": []})
+    names = {c["name"] for c in result["components"]}
+    assert "PUMP" in names
+
+
+def test_noise_and_real_clusters_coexist():
+    groups = [
+        _sym_group("SYM-1", 6, _grid(3, 2, origin=(0.0, 0.0)), texts=["1", "2", "3"]),
+        _sym_group("SYM-2", 132, _grid(12, 11)),   # columns (labeled below)
+        _sym_group("SYM-3", 56, _concentric_pairs(28, origin=(2000.0, 2000.0))),  # bollards
+    ]
+    bundle = {"symbol_groups": groups, "sheet_name": "S1"}
+    labels = {"matches": [
+        {"symbol_id": "SYM-2", "label": "Columns", "confidence": "high"},
+        {"symbol_id": "SYM-3", "label": "Bollards", "confidence": "high"},
+    ]}
+    result = fuse_sheet(bundle, labels)
+    by_name = {c["name"]: c for c in result["components"]}
+    assert "Columns" in by_name and "Bollards" in by_name
+    assert by_name["Columns"]["quantity"] == 132
+    assert by_name["Bollards"]["quantity"] == 28
+    assert "1 / 2 / 3" not in by_name       # gridline-bubble noise dropped
