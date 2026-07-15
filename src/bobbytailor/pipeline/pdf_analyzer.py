@@ -399,4 +399,5 @@ def run_pdf_analysis(
         project_name, all_extracted, all_estimates,
         cross_references=cross_refs, manifest=manifest,
         learned=pipeline.learned_context,
+        library=getattr(pipeline, "_project_vocabulary", None),
     )

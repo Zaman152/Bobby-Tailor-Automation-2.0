@@ -26,7 +26,8 @@ def generate_report(project_name: str,
                     linked_sheets: Optional[list] = None,
                     manifest=None,
                     screenshots_dir: Optional[str] = None,
-                    learned=None) -> dict:
+                    learned=None,
+                    library=None) -> dict:
     """
     Build the final takeoff report.
 
@@ -68,7 +69,9 @@ def generate_report(project_name: str,
 
     specification_tables = _collect_specification_tables(all_extracted)
     from bobbytailor.pipeline.aggregator import aggregate_takeoff
-    takeoff_summary = aggregate_takeoff(calculated_items, manifest=manifest, learned=learned)
+    takeoff_summary = aggregate_takeoff(
+        calculated_items, manifest=manifest, learned=learned, library=library,
+    )
 
     # Aggregate API usage across all sheets
     total_cost = sum(d.get("_cost_usd", 0) for d in all_extracted)

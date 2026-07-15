@@ -2237,12 +2237,51 @@ class TakeoffPipeline:
             "run_project: project wall height → %.1f ft (source=%s)",
             wall_height_ft, wall_height_source,
         )
+        # Deterministic component library FIRST (API-free, plans-only naming
+        # authority): the plan's own ABBREVIATION key + keynotes/general notes
+        # yield stable, run-to-run-identical object NAMES + aliases (Doors-HM,
+        # Ladder, Guard Rail, ...) straight from the printed text. This is the
+        # authoritative naming source that replaces the deleted manifest.
+        deterministic_library: list = []
+        try:
+            from bobbytailor.deterministic.component_library import (  # noqa: PLC0415
+                harvest_component_library,
+                merge_with_vocabulary,
+                library_labels,
+            )
+            deterministic_library = harvest_component_library([plan_text])
+        except Exception as exc:  # noqa: BLE001 — library harvest is additive-only
+            logger.warning("run_project: component-library harvest failed: %s", exc)
+            deterministic_library = []
+
+        llm_objects: list = []
         if self._analyzer is not None:
             vocab_page = self._select_vocabulary_page(pages)
             if vocab_page is not None:
-                self._build_project_vocabulary(
+                llm_objects = self._build_project_vocabulary(
                     vocab_page["image_path"], plan_text, self._run_budget
-                )
+                ) or []
+
+        # Merge: deterministic entries are AUTHORITATIVE for names/aliases; the
+        # LLM vocab fills a missing measure-basis and contributes object types
+        # the printed text missed. Additive: an empty library ⇒ prior behavior.
+        try:
+            merged = merge_with_vocabulary(deterministic_library, llm_objects)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("run_project: vocabulary merge failed: %s", exc)
+            merged = llm_objects or deterministic_library
+        if merged:
+            self._project_vocabulary = merged
+            try:
+                self._project_vocab_labels = library_labels(merged)
+            except Exception:  # noqa: BLE001
+                pass
+            logger.info(
+                "run_project: merged vocabulary → %d object type(s) "
+                "(%d deterministic, %d llm), %d candidate label(s)",
+                len(self._project_vocabulary), len(deterministic_library),
+                len(llm_objects), len(self._project_vocab_labels),
+            )
 
         total = len(pages)
         all_extracted: list[dict] = []

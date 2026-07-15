@@ -103,3 +103,54 @@ def test_mobilization_not_double_counted():
     mob = [r for r in out if r["item"] == "Mobilization"]
     assert len(mob) == 1
     assert mob[0]["quantity"] == 1
+
+
+# ── Component-library alias resolution (manifest-resolve replacement) ──────────
+
+
+def test_library_resolves_detected_name_via_alias():
+    """A detected raw description binds to the plan's own library name+unit."""
+    library = [
+        {"name": "Doors-HM", "aliases": ["Hollow Metal Door"], "basis": "count",
+         "unit": "EA", "source": "abbreviation"},
+    ]
+    items = [
+        {"description": "exterior hollow metal door", "item_type": "component",
+         "calculated_quantity": 3, "calculated_unit": "EA", "source_sheet": "A6"},
+    ]
+    out = aggregate_takeoff(items, library=library)
+    names = {r["item"] for r in out if r["item"] != "Mobilization"}
+    assert "Doors-HM" in names
+    hm = next(r for r in out if r["item"] == "Doors-HM")
+    assert hm["quantity"] == 3
+    assert hm["source"] == "library"
+
+
+def test_library_absent_leaves_naming_unchanged():
+    """Empty/omitted library ⇒ prior static-map naming (additive-only)."""
+    items = [
+        {"description": "guard rail along ramp", "item_type": "component",
+         "calculated_quantity": 40, "calculated_unit": "LF", "source_sheet": "C1"},
+    ]
+    base = aggregate_takeoff(items)
+    with_empty = aggregate_takeoff(items, library=[])
+    assert [r["item"] for r in base] == [r["item"] for r in with_empty]
+
+
+def test_unnamed_geometry_still_flagged_after_library_merge():
+    """Nothing skipped: a needs_review component the library can't name is
+    still emitted and stays flagged for human review."""
+    library = [
+        {"name": "Doors-HM", "aliases": ["Hollow Metal Door"], "basis": "count",
+         "unit": "EA", "source": "abbreviation"},
+    ]
+    items = [
+        {"description": "unlabeled symbol cluster", "item_type": "component",
+         "calculated_quantity": 7, "calculated_unit": "EA", "source_sheet": "A9",
+         "needs_review": True, "review_reason": "no label bound"},
+    ]
+    out = aggregate_takeoff(items, library=library)
+    rows = [r for r in out if r["item"] != "Mobilization"]
+    assert len(rows) == 1
+    assert rows[0]["quantity"] == 7
+    assert rows[0]["needs_review"] is True

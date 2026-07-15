@@ -200,7 +200,25 @@ def _inject_standard_line_items(buckets: Dict[str, Dict]) -> None:
         })
 
 
-def aggregate_takeoff(calculated_items: List[Dict], manifest=None, learned=None) -> List[Dict]:
+def _resolve_library_name(description: str, library) -> Optional[tuple]:
+    """Resolve a raw description to a component-library ``(name, unit)`` via aliases.
+
+    Thin wrapper over :func:`component_library.resolve_library_name` — imported
+    lazily and fully guarded so a missing/empty library (or any error) falls
+    through to the existing naming path unchanged (additive-only).
+    """
+    if not library:
+        return None
+    try:
+        from bobbytailor.deterministic.component_library import resolve_library_name
+        return resolve_library_name(description, library)
+    except Exception:  # noqa: BLE001 — library resolution must never break naming
+        return None
+
+
+def aggregate_takeoff(
+    calculated_items: List[Dict], manifest=None, learned=None, library=None,
+) -> List[Dict]:
     """Consolidate per-sheet items into project-level totals.
 
     When ``manifest`` (an :class:`object_manifest.Manifest`) is supplied, detected
@@ -212,7 +230,15 @@ def aggregate_takeoff(calculated_items: List[Dict], manifest=None, learned=None)
     When ``learned`` (a :class:`bobbytailor.learning.retrieval.LearnedContext`)
     is supplied, learning_vocabulary mappings distilled from prior human
     corrections are consulted before the static ITEM_NAME_MAP (V3-LEARN-02).
-    Naming precedence: companion legend > manifest > learned > static map.
+
+    When ``library`` (the deterministic component library from
+    :func:`component_library.harvest_component_library`, merged with the LLM
+    vocabulary) is supplied, a detected item's raw text is resolved to the
+    plan's own printed name via the library's aliases — the manifest-resolve
+    replacement under plans-only. Additive: an empty library leaves naming
+    unchanged.
+
+    Naming precedence: companion legend > manifest > learned > library > static.
     Rows whose NAME came from learned vocabulary carry ``source: "learned"``
     — the naming provenance marker only; quantities are summed from the
     underlying items untouched (quantity provenance is never altered here).
@@ -287,19 +313,32 @@ def aggregate_takeoff(calculated_items: List[Dict], manifest=None, learned=None)
                 canonical_unit = (entry.unit or unit or "").strip().upper()
                 bucket_source = "manifest"
             else:
-                canonical_name, canonical_unit = normalize_item_name(
-                    desc, itype, unit, learned=learned,
-                )
-                # Item provenance "learned": the NAME/unit came from
-                # learning_vocabulary (aggregation marks the naming origin;
-                # the summed quantity keeps its own provenance untouched).
+                # Learned corrections take precedence over the library; both
+                # precede the static map. normalize_item_name already checks
+                # learned first, so consult learned explicitly to know whether
+                # the name came from a human correction.
                 learned_hit = None
                 if learned is not None:
                     try:
                         learned_hit = learned.lookup_name(desc)
                     except Exception:  # noqa: BLE001
                         learned_hit = None
-                bucket_source = "learned" if learned_hit is not None else "vision"
+                if learned_hit is not None:
+                    canonical_name, canonical_unit = normalize_item_name(
+                        desc, itype, unit, learned=learned,
+                    )
+                    bucket_source = "learned"
+                else:
+                    lib_hit = _resolve_library_name(desc, library)
+                    if lib_hit is not None:
+                        canonical_name = lib_hit[0]
+                        canonical_unit = (lib_hit[1] or unit or "").strip().upper()
+                        bucket_source = "library"
+                    else:
+                        canonical_name, canonical_unit = normalize_item_name(
+                            desc, itype, unit, learned=learned,
+                        )
+                        bucket_source = "vision"
             # Suppress non-legend duplicates of any legend-backed item. Matches exact
             # canonical names and base-vs-spec variants (e.g. vision "Columns" when
             # the legend reports "Columns-H-35'") so the authoritative legend isn't

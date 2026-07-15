@@ -1035,6 +1035,7 @@ async def run_project_scrape(project_id: int, project_name: str,
             manifest=object_manifest,
             screenshots_dir=str(screenshots_dir),
             learned=_pipeline.learned_context,
+            library=getattr(_pipeline, "_project_vocabulary", None),
         )
 
         if sheets_failed or sheets_skipped or _cancelled:
@@ -1430,6 +1431,7 @@ async def run_analyze_from_manifest(
         cross_references=cross_refs,
         manifest=object_manifest,
         learned=_pipeline.learned_context,
+        library=getattr(_pipeline, "_project_vocabulary", None),
     )
 
     if sheets_failed or sheets_skipped or _cancelled:
