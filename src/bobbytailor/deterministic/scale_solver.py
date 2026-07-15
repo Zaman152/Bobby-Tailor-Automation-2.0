@@ -305,19 +305,29 @@ def resolve_scale_v2(
     override_feet_per_inch: Optional[float] = None,
     learned_prior: Optional[float] = None,
     scale_text: Optional[str] = None,
+    printed_scales: Optional[dict] = None,
+    main_plan_scale=None,
 ) -> ScaleResult:
     """Resolve the sheet scale via the v2 priority chain (Pitfall 11).
 
     Returns the EXISTING ``ScaleResult`` contract from ``geometry_takeoff``
     (downstream ``scale_recalc``/calibration UI/reporter consume the dict
-    shape unchanged); ``method`` values extended with ``dimension_solve`` and
-    ``learned_prior``.
+    shape unchanged); ``method`` values extended with ``printed_label``,
+    ``dimension_solve`` and ``learned_prior``.
 
-    Chain: (1) explicit override -> (2) dimension-solved main-plan viewport ->
-    (3) printed notation (demoted; confidence capped at medium when it stands
-    alone) -> (4) learned prior (ONLY when tiers 2-3 are unavailable — the
-    anti-amplification rule: a learned prior NEVER outranks a solved or
-    printed scale) -> (5) none.
+    Chain: (1) explicit override -> (2) PRINTED SCALE LABEL read off the
+    drawing (``printed_scale`` module — the plan's own printed scale is the
+    primary source) -> (3) dimension-solved main-plan viewport -> (4) printed
+    notation heuristic (demoted; confidence capped at medium when it stands
+    alone) -> (5) learned prior (ONLY when the higher tiers are unavailable —
+    the anti-amplification rule) -> (6) none.
+
+    ``printed_scales`` is ``{region_id: PrintedScale}`` from
+    ``printed_scale.match_scales_to_viewports``; ``main_plan_scale`` is the
+    ``PrintedScale`` from ``printed_scale.identify_main_plan_scale`` used when
+    no printed label is matched to the selected main region. The RANSAC solve
+    is retained as a CROSS-CHECK: a disagreement > 5% keeps the printed value
+    but flags ``needs_review`` in the detail string.
     """
     # (1) Explicit override — most reliable.
     if override_feet_per_inch and override_feet_per_inch > 0:
@@ -328,9 +338,46 @@ def resolve_scale_v2(
             detail="%g ft per inch (supplied)" % override_feet_per_inch,
         )
 
-    # (2) Dimension-solved main-plan viewport scale.
     vws = list(viewports_with_scales or [])
     main_id = select_main_plan(vws)
+
+    # (2) Printed scale LABEL — the drawing prints its own scale; read it and
+    # use it as the primary per-viewport scale. Prefer the label matched to the
+    # selected main-plan region, else the identified main-plan label.
+    printed_label = None
+    if printed_scales and main_id is not None and main_id in printed_scales:
+        printed_label = printed_scales[main_id]
+    elif main_plan_scale is not None:
+        printed_label = main_plan_scale
+    label_fpp = getattr(printed_label, "feet_per_point", None) if printed_label else None
+    if printed_label is not None and label_fpp and label_fpp > 0:
+        detail = "printed label %s = %.3f ft/in" % (
+            getattr(printed_label, "scale_text", ""),
+            getattr(printed_label, "feet_per_inch", label_fpp * POINTS_PER_INCH),
+        )
+        solved_fpp = None
+        for vp, vs in vws:
+            if vp.region_id == main_id and vs.fpp:
+                solved_fpp = vs.fpp
+                break
+        if solved_fpp and solved_fpp > 0:
+            delta = abs(solved_fpp - label_fpp) / label_fpp
+            if delta > 0.05:
+                detail += (
+                    "; RANSAC cross-check %.2f ft/in disagrees %.1f%% — "
+                    "printed value kept, needs_review"
+                    % (solved_fpp * POINTS_PER_INCH, delta * 100)
+                )
+            else:
+                detail += "; RANSAC cross-check agrees (%.1f%%)" % (delta * 100)
+        return ScaleResult(
+            feet_per_point=label_fpp,
+            confidence="high",
+            method="printed_label",
+            detail=detail,
+        )
+
+    # (3) Dimension-solved main-plan viewport scale.
     if main_id is not None:
         for vp, vs in vws:
             if vp.region_id != main_id or not vs.fpp:
@@ -350,7 +397,7 @@ def resolve_scale_v2(
                 detail=detail,
             )
 
-    # (3) Printed scale notation — demoted to a cross-check tier. Without a
+    # (4) Printed scale notation heuristic — demoted to a cross-check tier. Without a
     # dimension solve backing it, confidence is capped at medium (Pitfall 11:
     # printed scale lies on half-size prints / NTS / mislabeled details).
     try:
@@ -366,7 +413,7 @@ def resolve_scale_v2(
             detail=detail + " (printed notation only — unverified by dimensions)",
         )
 
-    # (4) Learned prior — last resort, never outranks solved/printed.
+    # (5) Learned prior — last resort, never outranks solved/printed.
     if learned_prior and learned_prior > 0:
         return ScaleResult(
             feet_per_point=learned_prior / POINTS_PER_INCH,
@@ -378,7 +425,7 @@ def resolve_scale_v2(
             ),
         )
 
-    # (5) Nothing — flag, don't guess.
+    # (6) Nothing — flag, don't guess.
     return ScaleResult(feet_per_point=None, confidence="none", method="none")
 
 

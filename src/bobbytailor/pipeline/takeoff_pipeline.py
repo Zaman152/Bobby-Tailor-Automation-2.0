@@ -68,6 +68,11 @@ from bobbytailor.deterministic.scale_extraction import (
     dominant_scale,
     extract_scales_from_text,
 )
+from bobbytailor.deterministic.printed_scale import (
+    extract_printed_scales,
+    identify_main_plan_scale,
+    match_scales_to_viewports,
+)
 from bobbytailor.deterministic.scale_solver import (
     resolve_scale_v2,
     select_main_plan,
@@ -1414,10 +1419,27 @@ class TakeoffPipeline:
             )
 
         main_id = select_main_plan(viewports_with_scales)
+
+        # PRIMARY scale source: the drawing's OWN printed scale label. Read the
+        # printed labels, bind each to its viewport, and identify the main-plan
+        # label. Fully additive — any failure yields empty results and the
+        # RANSAC path below behaves exactly as before.
+        printed_scales_by_region: dict = {}
+        main_plan_printed = None
+        try:
+            printed_list = extract_printed_scales(page)
+            printed_scales_by_region = match_scales_to_viewports(
+                printed_list, viewports
+            )
+            main_plan_printed = identify_main_plan_scale(printed_list)
+        except Exception as exc:  # noqa: BLE001 — printed scale is additive
+            logger.debug("printed-scale reading failed on %r: %s", sheet_name, exc)
+
         # Learned-context injection point 3a (RESEARCH §6): the learned
         # scale prior feeds resolve_scale_v2, which ranks it LAST (21-07) —
-        # it fires only when the solved AND printed tiers are empty, so a
-        # learned scale can never displace deterministic evidence.
+        # it fires only when the printed, solved AND printed-heuristic tiers
+        # are empty, so a learned scale can never displace deterministic
+        # evidence.
         scale = resolve_scale_v2(
             page,
             viewports_with_scales,
@@ -1425,6 +1447,8 @@ class TakeoffPipeline:
             learned_prior=_learned_scale_prior(
                 getattr(self, "_learned_context", None), sheet_name
             ),
+            printed_scales=printed_scales_by_region,
+            main_plan_scale=main_plan_printed,
         )
         fpp = float(scale.feet_per_point or 0.0)
 
