@@ -95,8 +95,14 @@ MODEL_ROUTING: dict[tuple[str, str], str] = {
     (WILDCARD_SHEET_TYPE, "vocabulary"):   CLAUDE_MODEL_SEMANTIC,
     # AI naming-convention pass (plans-only autonomous naming): reads the plan's
     # own notes/details/abbreviations/schedules and reports THIS plan's naming
-    # library (name/aliases/basis/binding_hint/variant) → semantic model (Sonnet).
-    (WILDCARD_SHEET_TYPE, "naming_conventions"): CLAUDE_MODEL_SEMANTIC,
+    # library (name/aliases/basis/binding_hint/variant). This is the project's
+    # ONE reader / manifest-builder — the #1 generalization surface — so it runs
+    # on the DENSE model (Opus 4.8), NOT the semantic Sonnet row. Per-sheet
+    # labeling stays on Sonnet; geometry stays deterministic. The pass runs ONCE
+    # per project on lean, distilled naming text, so the Opus cost is bounded and
+    # acceptable in exchange for a reliably valid naming manifest on ANY plan
+    # (Sonnet returned invalid_json → no manifest → 8% accuracy on Bob's).
+    (WILDCARD_SHEET_TYPE, "naming_conventions"): CLAUDE_MODEL_DENSE,
     (WILDCARD_SHEET_TYPE, "legend"):       CLAUDE_MODEL_DENSE,
     (WILDCARD_SHEET_TYPE, "schedule"):     CLAUDE_MODEL_DENSE,
     (WILDCARD_SHEET_TYPE, "verify_retry"): CLAUDE_MODEL_DENSE,

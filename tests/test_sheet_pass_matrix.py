@@ -331,6 +331,24 @@ class TestModelRoutingV2:
     def test_verify_retry_returns_dense(self, sheet_type):
         assert pick_model_for_pass(sheet_type, "verify_retry") == self.DENSE
 
+    # -- AI naming/reading pass → DENSE (Opus) on ANY sheet type -------------
+    # The project's ONE reader / manifest-builder must run on Opus so it emits a
+    # valid naming manifest on every plan (the #1 generalization surface).
+
+    @pytest.mark.parametrize("sheet_type", [
+        "floor_plan", "roof_plan", "mep_plan", "elevation", "civil_site",
+        "detail", "schedule", "", "unknown_type",
+    ])
+    def test_naming_conventions_routes_to_dense_opus(self, sheet_type):
+        assert pick_model_for_pass(sheet_type, "naming_conventions") == self.DENSE
+
+    def test_naming_conventions_resolve_routed_model_is_dense(self):
+        assert resolve_routed_model("floor_plan", "naming_conventions") == self.DENSE
+
+    def test_naming_conventions_not_semantic(self):
+        """Regression: the reader pass must NOT resolve to the Sonnet row."""
+        assert pick_model_for_pass("floor_plan", "naming_conventions") != self.SEMANTIC
+
     # -- classification → CLASSIFY (wildcard row) ---------------------------
 
     def test_classify_pass_returns_classify_slug(self):
