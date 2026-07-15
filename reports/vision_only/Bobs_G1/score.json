@@ -1,0 +1,33 @@
+{
+  "overall_qty": 0.08333333333333333,
+  "name_found_rate": 0.08333333333333333,
+  "qty_acc_when_found": 1.0,
+  "count_qty": 0.14285714285714285,
+  "count_found": 0.14285714285714285,
+  "measured_qty": 0.0,
+  "measured_found": 0.0,
+  "n_total": 12,
+  "n_count": 7,
+  "n_measured": 5,
+  "geometry_text_qty_acc": null,
+  "n_geometry_text": 0,
+  "vision_qty_share": 0.0,
+  "n_quantity_bearing": 8,
+  "provenance_counts": {
+    "unknown": 4,
+    "deterministic": 4
+  },
+  "silent_misses": [
+    "Gas Piping",
+    "Bollards",
+    "Canopy",
+    "Exterior Painting - CMU Wall",
+    "Exterior Painting-EIFS - ALT",
+    "Lift",
+    "Lintels",
+    "Door Frame - HM",
+    "Doors -HM",
+    "Doors -WD",
+    "Ladder - H 24'"
+  ]
+}

@@ -131,3 +131,30 @@ A **deterministic-geometry-first + vision-as-labeler** takeoff engine. 844 offli
 **Target:** 100% autonomous on any plan for everything the plan itself contains; the learning loop
 carries the estimator-specific naming residual to ~100% over a few uses. Validated by re-running on a
 second real project (Bob's Discount / Moxy / Chelsea) to confirm generalization.
+
+## 8. Generalization test (2026-07-15) — DECISIVE: the pipeline does NOT yet generalize
+
+Ran the exact same pipeline plans-only on **Bob's Discount** (7-page set) vs its take-off. Result:
+**8% overall, only Mobilization passed** (vs Crow's 67% name-found after tuning). The gains on Crow
+were partly **Crow-specific fitting**. Three concrete, general failures:
+
+1. **AI naming pass is fragile** — on Bob's it sent ~35k tokens of plan text and the model returned
+   `invalid_json`; the voted naming library fell back to a thin deterministic set. The naming schema/
+   output needs to be robust (chunking, smaller/stricter schema, retry-on-invalid, or a smaller text
+   digest) — not one giant prompt.
+2. **No measurable floor plan** — Bob's "plans" set is title + schedules + a civil elevation
+   (`C402.4`); no `floor_plan` sheet, so the entire vector-geometry engine (walls/rooms/footprint/
+   symbols) never ran. The pipeline assumes a single measurable floor plan (Crow's shape). Real plan
+   sets vary: schedule-heavy, civil-heavy, multi-sheet architectural. The engine must handle **all
+   sheet compositions**, not just one floor plan.
+3. **Schedules skipped / format-specific** — Bob's door schedule format differs from Crow's
+   type+Count parser; its schedules were classified "non-takeoff" (FLOORING LEGEND, RCP LEGEND, PAINT
+   COLORS) and skipped. Schedule extraction is fitted to Crow's formats.
+
+**Honest conclusion:** the *architecture* (geometry measures, AI reads the plan's naming, fusion
+binds, learning accumulates) is validated on Crow, but the *implementation is not general* — it is
+tuned to one plan's structure. Reaching "100% on any plan" is a substantial multi-session program:
+robust/chunked naming extraction, sheet-composition-agnostic measurement (schedule + civil + multi-
+plan, not just one floor plan), per-format schedule parsing, the learning loop, then re-validation
+across Crow + Bob's + Moxy + Chelsea. This is the real state; the earlier Crow numbers should NOT be
+read as "the app works."

@@ -1,0 +1,220 @@
+[
+  {
+    "item": "Columns",
+    "quantity": 168.0,
+    "quantity_fmt": "168",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0005.png"
+    ],
+    "item_type": "columns",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0005.png",
+        "qty": 168.0,
+        "description": "Truck dock order package column spacing",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Concrete Slab",
+    "quantity": 2.2,
+    "quantity_fmt": "2.2",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0007.png"
+    ],
+    "item_type": "concrete_slab",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0007.png",
+        "qty": 2.2,
+        "description": "Tilt-up concrete",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "EXISTING ALUMINUM GUTTER SYSTEM",
+    "quantity": 33.4,
+    "quantity_fmt": "33.4",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0004.png",
+      "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0007.png"
+    ],
+    "item_type": "component",
+    "line_count": 2,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); wall class named by naming library (hint bind) \u2014 verify"
+    ],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0004.png",
+        "qty": 30.5,
+        "description": "EXISTING ALUMINUM GUTTER SYSTEM",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0007.png",
+        "qty": 2.9,
+        "description": "EXISTING ALUMINUM GUTTER SYSTEM",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Keyed note reference symbol (circled num",
+    "quantity": 18.0,
+    "quantity_fmt": "18",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0005.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0005.png",
+        "qty": 18.0,
+        "description": "Keyed note reference symbol (circled numbers 1-18)",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Keynote schedule item",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0004.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0004.png",
+        "qty": 4.0,
+        "description": "Keynote schedule item",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Mobilization",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "standard_line_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": 1.0,
+        "description": "Mobilization (standard estimating line item)",
+        "formula": "standard_line_item"
+      }
+    ]
+  },
+  {
+    "item": "New construction diamond indicator symbo",
+    "quantity": 35.0,
+    "quantity_fmt": "35",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0005.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0005.png",
+        "qty": 35.0,
+        "description": "New construction diamond indicator symbol",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Wall Framing",
+    "quantity": 148.86,
+    "quantity_fmt": "148.9",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0005.png",
+      "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0007.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 3,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0005.png",
+        "qty": 120.0,
+        "description": "Wall finish repair dimension",
+        "formula": "ceil(144lf \u00d7 12 / 16\" OC) + 1 = 109; \u00d7 1.1 waste = 120"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0005.png",
+        "qty": 26.0,
+        "description": "Existing brick veneer or wall course removal indicator (diamond symbol)",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G1_20260715_172329/page_0007.png",
+        "qty": 2.86,
+        "description": "Metal stud partition",
+        "formula": "count \u00d7 1.1"
+      }
+    ]
+  }
+]
