@@ -215,6 +215,62 @@ def verify_retry_schema(choices: List[str]) -> dict:
     }
 
 
+def vocabulary_schema() -> dict:
+    """Schema for the autonomous project-vocabulary pass (hybrid naming).
+
+    Replaces the deleted hand-authored manifest: an estimator-style read of
+    the drawing PLUS its keynotes / general notes / abbreviations / schedule
+    headers, producing the list of distinct object TYPES a take-off would
+    quantify. This pass NAMES candidate object types only — it feeds the
+    symbol-gallery candidate list so geometry symbol clusters can bind to a
+    real object name. It MUST NOT emit any quantity: like every vector-path
+    schema it carries zero numeric properties (``measure`` is a string enum
+    describing HOW the type is quantified, never HOW MUCH).
+
+    Shape::
+
+        {"objects": [
+            {"name": str, "measure": "count"|"area"|"length",
+             "unit": str, "aliases": [str, ...]},
+            ...
+        ]}
+
+    Returns:
+        JSON schema dict (semantic path — no numeric properties).
+    """
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["objects"],
+        "properties": {
+            "objects": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["name", "measure", "unit", "aliases"],
+                    "properties": {
+                        # Distinct object type name (e.g. "Column", "Bollard").
+                        "name": {"type": "string"},
+                        # HOW the type is quantified — a string enum, never a
+                        # number (semantic discipline).
+                        "measure": {"enum": ["count", "area", "length"]},
+                        # Unit label as a string (e.g. "ea", "sf", "lf") —
+                        # read as text, never computed.
+                        "unit": {"type": "string"},
+                        # Common aliases / abbreviations for the type
+                        # (e.g. "HM" for "Hollow Metal").
+                        "aliases": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+
 def raster_extraction_schema() -> dict:
     """Schema for the raster fallback path — the ONLY schema with numbers.
 

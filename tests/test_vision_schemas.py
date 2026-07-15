@@ -25,6 +25,7 @@ from bobbytailor.vision.schemas import (
     semantic_labeling_schema,
     symbol_gallery_schema,
     verify_retry_schema,
+    vocabulary_schema,
 )
 from bobbytailor.vision.overlay import (
     MAX_IMAGES_PER_REQUEST,
@@ -93,6 +94,7 @@ _VECTOR_BUILDERS = [
     pytest.param(legend_structuring_schema, id="legend_structuring"),
     pytest.param(lambda: verify_retry_schema(["ladder", "stair", "neither"]),
                  id="verify_retry"),
+    pytest.param(vocabulary_schema, id="vocabulary"),
 ]
 
 
