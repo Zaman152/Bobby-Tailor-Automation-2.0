@@ -1,0 +1,102 @@
+====================================================================================
+VISION-ONLY BENCHMARK — Crow N1
+====================================================================================
+Overall quantity accuracy: 27%   Name/found rate: 67%   Qty acc when found: 40%
+  Counts (EA)   n= 8  found=75%  qty_ok=38%
+  Measured(SF/LF) n= 7  found=57%  qty_ok=14%
+  Provenance split: geometry/text qty acc=25% (n=4)  vision qty share=0% of 78 quantity-bearing rows
+  Provenance classes: deterministic=57, unknown=21
+  SILENT MISSES (5): CASS WHITE; Exposed Structure; Internal Tilt up walls; Ladder-H-20'; Lift
+  [plans-only] runtime=546s  cost=$0.3597  sheets=4
+
+STATUS    ITEM                                  GOLDEN            AI    ERR%  CAT  PROV
+------------------------------------------------------------------------------------
+MISSING   CASS WHITE                        397,556.00             —       —  measured  unknown
+FAIL_QTY  Bollards≈Bollard                       28.00         56.00   100.0  count  deterministic
+FAIL_QTY  CMU Wall≈Wall Framing               2,204.33      2,784.57    26.3  measured  deterministic
+FAIL_QTY  Columns-H-35'≈Columns                 132.00        136.00     3.0  count  deterministic
+MISSING   Exposed Structure                 395,673.42             —       —  measured  unknown
+MISSING   Internal Tilt up walls            108,442.66             —       —  measured  unknown
+MISSING   Ladder-H-20'                            1.00             —       —  count  unknown
+MISSING   Lift                                    1.00             —       —  count  unknown
+PASS      Mobilization                            1.00          1.00     0.0  count  unknown
+PASS      Sealed Concrete≈Concrete Pad      395,673.42    397,600.00     0.5  measured  deterministic
+FAIL_QTY  Stairs≈Stair                           10.00          3.00    70.0  count  unknown
+FAIL_QTY  Guard Rail≈Guardrail                  420.35          7.70    98.2  measured  unknown
+FAIL_QTY  Hand Rail≈Handrail                    438.80          1.58    99.6  measured  unknown
+PASS      Door Frames-HM                         29.00         29.00     0.0  count  unknown
+PASS      Doors-HM                               29.00         29.00     0.0  count  unknown
+
+EXTRA items AI produced not in golden:
+  + 0" - 350' / SCALE:             7.0 EA
+  + 0" - 60' / 4" - 48' / 54' - 0" / 55' - 0 56.0 EA
+  + 1 / 10 / 11 / 12 / 2 / 3 / 4 / 5 / 6 / 7 54.0 EA
+  + 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / B /  12.0 EA
+  + 1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / G 43.0 EA
+  + 1/2" / 3/4"                    11.0 EA
+  + 10 / 11 / 12                   16.0 EA
+  + 10 / 11 / 12 / 13 / 14 / 15 / 16 / 17 /  13.0 EA
+  + 2 1/2" / 2 1/4"                3.0 EA
+  + 3/4"                           3.0 EA
+  + 4                              279.5 SF
+  + A / C / D / H                  4.0 EA
+  + A-201                          4.0 EA
+  + Building Footprint             397600.0 SF
+  + Building Perimeter             2972.0 LF
+  + Canopy                         397600.0 SF
+  + DW                             12.0 EA
+  + Dock Leveler                   0.0 EA
+  + Electrical Panels              1.0 EA
+  + Fire Riser                     1.0 EA
+  + Flooring                       4.4 SQ_FT
+  + Metal Roof Deck                397600.0 SF
+  + ROOM-3                         11.1 SF
+  + ROOM-4                         11.0 SF
+  + ROOM-5                         10.7 SF
+  + ROOM-6                         10.6 SF
+  + Roof Hatch                     397600.0 EA
+  + Roof Insulation                417480.0 SF
+  + S.C.C.P.                       82281.35 SF
+  + SS                             13.0 EA
+  + SYM-10                         14.0 EA
+  + SYM-11                         14.0 EA
+  + SYM-12                         14.0 EA
+  + SYM-19                         10.0 EA
+  + SYM-20                         10.0 EA
+  + SYM-21                         8.0 EA
+  + SYM-22                         8.0 EA
+  + SYM-23                         8.0 EA
+  + SYM-24                         8.0 EA
+  + SYM-26                         6.0 EA
+  + SYM-27                         6.0 EA
+  + SYM-28                         5.0 EA
+  + SYM-29                         5.0 EA
+  + SYM-30                         5.0 EA
+  + SYM-31                         5.0 EA
+  + SYM-32                         5.0 EA
+  + SYM-33                         4.0 EA
+  + SYM-34                         4.0 EA
+  + SYM-35                         4.0 EA
+  + SYM-36                         4.0 EA
+  + SYM-37                         4.0 EA
+  + SYM-39                         4.0 EA
+  + SYM-40                         4.0 EA
+  + SYM-41                         4.0 EA
+  + SYM-43                         3.0 EA
+  + SYM-44                         3.0 EA
+  + SYM-45                         3.0 EA
+  + SYM-46                         3.0 EA
+  + SYM-6                          41.0 EA
+  + SYM-7                          39.0 EA
+  + SYM-9                          15.0 EA
+  + TPO Roof Membrane              397600.0 SF
+  + TYP.                           11.0 EA
+  + Vapor Barrier                  397600.0 SF
+------------------------------------------------------------------------------------
+GATE CHECKS
+  FAIL  geometry_text_qty_acc    value=0.25  required >= 0.97
+  FAIL  overall_qty              value=0.26666666666666666  required >= 0.9
+  FAIL  item_found_rate          value=0.6666666666666666  required >= 0.95
+  FAIL  silent_misses            value=['CASS WHITE', 'Exposed Structure', 'Internal Tilt up walls', "Ladder-H-20'", 'Lift']  required == 0 (every golden category present or flagged)
+  PASS  vision_qty_share         value=0.0  required <= 0.05 (vision-provenance quantities ~0 on vector fixtures)
+  GATE VERDICT: FAILED
