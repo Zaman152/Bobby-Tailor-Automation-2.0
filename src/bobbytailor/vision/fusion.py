@@ -680,10 +680,78 @@ def _is_small_marker(group) -> bool:
     return med <= 0.06 * span
 
 
+# A structural column grid or a bollard ring is inherently a 2-D array of
+# marks. A cluster whose instances lie on a SINGLE line (all at one Y, or one X)
+# is a linear ANNOTATION — a dimension-tick strip or a grid-bubble row — never a
+# 2-D object array, even when its count coincidentally matches an object total.
+# (Crow ground truth §10: the 136-count "column" cluster is 136 ticks all at
+# Y=1863.2 — a coincidence, not columns.) The MINOR-axis spread must exceed a
+# few marker sizes, so a genuine grid/ring passes and a collinear strip fails.
+_MARKER_2D_MIN_MINOR_FACTOR = 3.0   # minor-axis span ≥ this × the marker size …
+_MARKER_2D_MIN_MINOR_PT = 6.0       # … and at least this many points, absolutely
+
+
+def _minor_axis_span(group) -> Optional[float]:
+    """Minor-axis (narrower) span of the instance centres, in points.
+
+    Returns ``None`` when fewer than two centres are known — the spread cannot
+    be judged, so callers must fall back to their unknown-case behaviour rather
+    than treat absence of data as evidence either way.
+    """
+    centroids = _instance_centroids(group)
+    if len(centroids) < 2:
+        return None
+    xs = [c[0] for c in centroids]
+    ys = [c[1] for c in centroids]
+    return min(max(xs) - min(xs), max(ys) - min(ys))
+
+
+def _min_2d_span_pt(group) -> float:
+    """The minor-axis span threshold separating a 2-D array from a collinear strip."""
+    widths, heights = _instance_dims(group)
+    marker = _median([max(w, h) for w, h in zip(widths, heights)]) if widths else 0.0
+    return max(_MARKER_2D_MIN_MINOR_FACTOR * marker, _MARKER_2D_MIN_MINOR_PT)
+
+
+def _is_2d_distributed(group) -> bool:
+    """True when instance centres spread across 2-D (a real grid/ring), not a
+    single collinear row/column of marks (dimension ticks, grid bubbles).
+
+    Positive-evidence test: unknown spread (too few centres) → False. Guards the
+    count-only grid/ring bindings, which must not CREATE a columns/bollards
+    binding without proof of a 2-D layout (flag-don't-guess §10).
+    """
+    minor = _minor_axis_span(group)
+    return minor is not None and minor >= _min_2d_span_pt(group)
+
+
+def _is_collinear_strip(group) -> bool:
+    """True only when a cluster is CONFIRMED collinear: enough marks to judge
+    (``>= _GRID_MIN_COUNT``) AND their minor-axis span is below the 2-D
+    threshold (a dimension-tick / grid-bubble strip).
+
+    Negative-evidence test — used to DEMOTE an existing vision label, so it must
+    never fire on sparse/absent instance data (that is merely unknown, not a
+    strip). The asymmetry is deliberate: creating a columns binding needs proof
+    of 2-D; overriding a vision label needs proof of collinearity.
+    """
+    centroids = _instance_centroids(group)
+    if len(centroids) < _GRID_MIN_COUNT:
+        return False
+    minor = _minor_axis_span(group)
+    return minor is not None and minor < _min_2d_span_pt(group)
+
+
 def _is_perimeter_ring(group) -> bool:
-    """True when instance centres hug the bbox edges (a hollow perimeter ring)."""
+    """True when instance centres hug the bbox edges (a hollow perimeter ring).
+
+    Requires a genuine 2-D spread first — a collinear strip is all-boundary /
+    zero-inner and would otherwise pass the hollow-ring test spuriously.
+    """
     centroids = _instance_centroids(group)
     if len(centroids) < _PERIMETER_MIN_COUNT:
+        return False
+    if not _is_2d_distributed(group):
         return False
     xs = [c[0] for c in centroids]
     ys = [c[1] for c in centroids]
@@ -755,6 +823,9 @@ def _library_symbol_bindings(groups, labels_by_id, binding_map) -> Dict[str, Tup
             g for g in unlabeled
             if int(_field(g, "count", 0) or 0) >= _GRID_MIN_COUNT
             and _size_uniform(g) and _is_small_marker(g)
+            # A column grid is 2-D — reject a collinear dimension-tick strip
+            # whose count coincidentally matches the column total (§10).
+            and _is_2d_distributed(g)
         ]
         if cands:
             winner = max(cands, key=lambda g: int(_field(g, "count", 0) or 0))
@@ -813,6 +884,17 @@ _BOLLARD_NAME_RE = re.compile(r"bollard", re.IGNORECASE)
 def _is_bollard_name(name) -> bool:
     """True when a bound symbol name is a bollard (dedup applies only to these)."""
     return bool(name) and bool(_BOLLARD_NAME_RE.search(str(name)))
+
+
+# Object types that are inherently a 2-D array on the plan (a column grid, a
+# bollard ring). A collinear cluster labeled as one of these is a coincidence
+# (dimension ticks), so its count is flagged for review rather than trusted.
+_GRID_OBJECT_NAME_RE = re.compile(r"column|bollard", re.IGNORECASE)
+
+
+def _is_grid_object_name(name) -> bool:
+    """True when a name denotes an inherently 2-D object array (columns/bollards)."""
+    return bool(name) and bool(_GRID_OBJECT_NAME_RE.search(str(name)))
 
 
 # Only collapse when the co-location is SYSTEMATIC (each physical object drawn
@@ -941,18 +1023,32 @@ def _fuse_symbol_groups(
 
         if entry and label and label != _UNKNOWN_LABEL:
             qty = _dedup_colocated_count(group, count) if _is_bollard_name(label) else count
+            # Flag-don't-guess (§10): a columns/bollards label on a COLLINEAR
+            # cluster is a coincidence — a dimension-tick strip whose count
+            # happens to match the object total, never a real 2-D grid/ring.
+            # Keep the count but force review + demote confidence so it is never
+            # presented as a trusted quantity.
+            collinear_grid_object = _is_grid_object_name(label) and _is_collinear_strip(group)
+            review = group_review or collinear_grid_object
+            reason = "symbol group has mixed text tags" if group_review else ""
+            if collinear_grid_object:
+                reason = (
+                    "labeled %s but the cluster is a single collinear strip "
+                    "(dimension ticks / grid bubbles), not a 2-D array — verify" % label
+                )
             components.append(
                 {
                     "name": label,
                     "quantity": qty,
                     "unit": "EA",
                     "provenance": "geometry",
-                    "confidence": _min_confidence(group_conf, entry.get("confidence")),
-                    "candidate_id": cid,
-                    "needs_review": group_review,
-                    "review_reason": (
-                        "symbol group has mixed text tags" if group_review else ""
+                    "confidence": _min_confidence(
+                        "low" if collinear_grid_object else group_conf,
+                        entry.get("confidence"),
                     ),
+                    "candidate_id": cid,
+                    "needs_review": review,
+                    "review_reason": reason,
                 }
             )
             continue

@@ -709,6 +709,65 @@ def test_column_grid_not_deduped():
     assert cols["quantity"] == 132          # dedup applies only to bollard bindings
 
 
+def _collinear_strip(n, step=14.0, origin=(500.0, 1863.0), size=1.3):
+    """n identical marks on a SINGLE horizontal line — a dimension-tick strip
+    (Crow ground truth §10: the 136 marks all at Y=1863.2 that coincidentally
+    equalled the column count)."""
+    ox, oy = origin
+    return [(ox + i * step, oy, ox + i * step + size, oy + size) for i in range(n)]
+
+
+def test_collinear_strip_labeled_columns_is_flagged_not_trusted():
+    # A columns label on a collinear tick strip is a coincidence — keep the
+    # count but force review + low confidence (flag-don't-guess §10).
+    group = _sym_group("SYM-1", 136, _collinear_strip(136))
+    bundle = {"symbol_groups": [group], "sheet_name": "S1"}
+    labels = {"matches": [{"symbol_id": "SYM-1", "label": "Columns", "confidence": "high"}]}
+    result = fuse_sheet(bundle, labels)
+    col = [c for c in result["components"] if c["name"] == "Columns"][0]
+    assert col["quantity"] == 136           # count preserved, never silently dropped
+    assert col["needs_review"] is True      # but never presented as trusted
+    assert col["confidence"] == "low"
+    assert "collinear" in col["review_reason"].lower()
+
+
+def test_real_2d_column_grid_stays_trusted():
+    # The guard must NOT touch a genuine 2-D column grid.
+    group = _sym_group("SYM-1", 132, _grid(12, 11))
+    bundle = {"symbol_groups": [group], "sheet_name": "S1"}
+    labels = {"matches": [{"symbol_id": "SYM-1", "label": "Columns", "confidence": "high"}]}
+    result = fuse_sheet(bundle, labels)
+    col = [c for c in result["components"] if c["name"] == "Columns"][0]
+    assert col["quantity"] == 132
+    assert col["needs_review"] is False
+
+
+def test_structural_grid_hint_does_not_bind_collinear_strip():
+    # The naming-library structural_grid_symbol hint must not name a collinear
+    # dimension-tick strip "Columns" just because it is the largest marker
+    # cluster — a column grid is inherently 2-D (§10).
+    group = _sym_group("SYM-1", 136, _collinear_strip(136))
+    bundle = {"symbol_groups": [group], "sheet_name": "S1"}
+    vocabulary = [
+        {"name": "Columns", "binding_hint": "structural_grid_symbol", "basis": "count"}
+    ]
+    result = fuse_sheet(bundle, {"matches": []}, vocabulary=vocabulary)
+    names = {c["name"] for c in result["components"]}
+    assert "Columns" not in names           # no coincidental columns binding
+
+
+def test_structural_grid_hint_binds_real_2d_grid():
+    # The same hint SHOULD still bind a genuine 2-D grid.
+    group = _sym_group("SYM-1", 132, _grid(12, 11))
+    bundle = {"symbol_groups": [group], "sheet_name": "S1"}
+    vocabulary = [
+        {"name": "Columns", "binding_hint": "structural_grid_symbol", "basis": "count"}
+    ]
+    result = fuse_sheet(bundle, {"matches": []}, vocabulary=vocabulary)
+    cols = [c for c in result["components"] if c["name"] == "Columns"]
+    assert cols and cols[0]["quantity"] == 132
+
+
 def test_noise_clusters_excluded_from_takeoff():
     noise = [
         _sym_group("SYM-1", 6, _grid(3, 2), texts=["1", "2", "3", "4"]),
