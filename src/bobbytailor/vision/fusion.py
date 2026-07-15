@@ -29,6 +29,8 @@ compat for pre-fusion passes); the pipeline switches to this module in 21-13.
 from __future__ import annotations
 
 import logging
+import math
+import re
 from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -604,6 +606,179 @@ def _is_regular_grid(centroids: List[Tuple[float, float]], group) -> bool:
     return fill >= _GRID_MIN_FILL
 
 
+# ── Naming-library-driven symbol binding (binding_hint → geometry) ───────────
+#
+# The AI naming pass (object_vocabulary.extract_naming_conventions), merged into
+# the component library, tags each object with a ``binding_hint``. Two hints
+# name unlabeled symbol clusters an estimator would recognise instantly:
+#   - ``structural_grid_symbol`` → the LARGE repeated small marker on the
+#     structural grid IS the columns (Crow: 136× → Columns);
+#   - ``perimeter_jamb_symbol`` → a repeated small marker forming a perimeter
+#     ring / door-jamb pattern IS the bollards (Crow: 56× ring → Bollards).
+# Both are conservative: they fire ONLY when the library explicitly carries the
+# hint AND the cluster geometry matches (uniform small markers; perimeter ring
+# for bollards). Vision gallery labels stay primary; this fills unknowns.
+
+_MARKER_MAX_SIZE_FT = 3.0        # a "marker" (column/bollard) is a small symbol
+_MARKER_SIZE_CV_MAX = 0.5        # instances must be roughly uniform in size
+_PERIMETER_MIN_COUNT = 8         # a plausible perimeter/jamb repetition
+_PERIMETER_INNER_MAX_FILL = 0.25 # a ring is hollow: ≤25% of points in the centre
+
+
+def _instance_dims(group) -> Tuple[List[float], List[float]]:
+    """(widths, heights) of each instance bbox, skipping malformed boxes."""
+    widths: List[float] = []
+    heights: List[float] = []
+    for box in _field(group, "instance_bboxes_pt", None) or []:
+        try:
+            widths.append(abs(float(box[2]) - float(box[0])))
+            heights.append(abs(float(box[3]) - float(box[1])))
+        except (TypeError, ValueError, IndexError):
+            continue
+    return widths, heights
+
+
+def _size_uniform(group) -> bool:
+    """True when instance sizes are tight (low coefficient of variation)."""
+    widths, heights = _instance_dims(group)
+    if not widths:
+        return False
+    for dims in (widths, heights):
+        mean = sum(dims) / len(dims)
+        if mean <= 0:
+            continue
+        var = sum((d - mean) ** 2 for d in dims) / len(dims)
+        if (var ** 0.5) / mean > _MARKER_SIZE_CV_MAX:
+            return False
+    return True
+
+
+def _is_small_marker(group) -> bool:
+    """True when the cluster's instances are small symbols (columns/bollards).
+
+    Prefers the deterministic ``bbox_size_ft`` (real feet) when the group
+    carries it — a marker is ≤ :data:`_MARKER_MAX_SIZE_FT` in both dims. Without
+    it, falls back to a scale-independent test: the median instance is tiny
+    relative to the cluster's overall spread.
+    """
+    size_ft = _field(group, "bbox_size_ft", None)
+    if size_ft:
+        try:
+            return max(float(size_ft[0]), float(size_ft[1])) <= _MARKER_MAX_SIZE_FT
+        except (TypeError, ValueError, IndexError):
+            pass
+    centroids = _instance_centroids(group)
+    if len(centroids) < 2:
+        return True
+    xs = [c[0] for c in centroids]
+    ys = [c[1] for c in centroids]
+    span = math.hypot(max(xs) - min(xs), max(ys) - min(ys))
+    widths, heights = _instance_dims(group)
+    if not widths or span <= 0:
+        return True
+    med = _median([max(w, h) for w, h in zip(widths, heights)])
+    return med <= 0.06 * span
+
+
+def _is_perimeter_ring(group) -> bool:
+    """True when instance centres hug the bbox edges (a hollow perimeter ring)."""
+    centroids = _instance_centroids(group)
+    if len(centroids) < _PERIMETER_MIN_COUNT:
+        return False
+    xs = [c[0] for c in centroids]
+    ys = [c[1] for c in centroids]
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    w, h = x1 - x0, y1 - y0
+    if w <= 0 or h <= 0:
+        return False
+    ix0, ix1 = x0 + 0.25 * w, x1 - 0.25 * w
+    iy0, iy1 = y0 + 0.25 * h, y1 - 0.25 * h
+    inner = sum(1 for px, py in centroids if ix0 < px < ix1 and iy0 < py < iy1)
+    return inner / float(len(centroids)) <= _PERIMETER_INNER_MAX_FILL
+
+
+def _binding_hint_map(vocabulary) -> Dict[str, dict]:
+    """Map ``binding_hint -> {'name', 'basis'}`` from the naming library.
+
+    First-seen object per hint wins. Accepts the object LIST form (merged
+    component library / naming conventions, carrying ``binding_hint``) or a
+    name→info dict. ``"other"`` / empty hints are ignored (no binding channel).
+    Returns an empty map for None/empty vocabulary (additive-only).
+    """
+    out: Dict[str, dict] = {}
+    items: List[dict] = []
+    if isinstance(vocabulary, list):
+        items = [o for o in vocabulary if isinstance(o, dict)]
+    elif isinstance(vocabulary, dict):
+        for name, info in vocabulary.items():
+            entry = dict(info) if isinstance(info, dict) else {}
+            entry.setdefault("name", name)
+            items.append(entry)
+    for obj in items:
+        hint = str(obj.get("binding_hint") or "").strip().lower()
+        if not hint or hint == "other":
+            continue
+        name = str(obj.get("name") or obj.get("canonical_name") or "").strip()
+        if not name:
+            continue
+        basis = obj.get("basis") or obj.get("measure")
+        out.setdefault(hint, {"name": name, "basis": basis})
+    return out
+
+
+def _library_symbol_bindings(groups, labels_by_id, binding_map) -> Dict[str, Tuple[str, str]]:
+    """Bind unlabeled symbol clusters to naming-library objects by hint+geometry.
+
+    Returns ``{candidate_id: (object_name, hint)}``. A cluster already given a
+    real vision label is skipped (vision stays primary). ``structural_grid_symbol``
+    binds the largest uniform small-marker cluster (count ≥ ``_GRID_MIN_COUNT``);
+    ``perimeter_jamb_symbol`` binds the largest uniform small-marker cluster whose
+    centres form a perimeter ring. Empty binding map → ``{}`` (unchanged behaviour).
+    """
+    if not binding_map:
+        return {}
+    unlabeled = []
+    for g in groups or []:
+        cid = _field(g, "candidate_id", "")
+        if not cid:
+            continue
+        entry = labels_by_id.get(cid)
+        if entry and entry.get("label") and entry["label"] != _UNKNOWN_LABEL:
+            continue
+        unlabeled.append(g)
+
+    bindings: Dict[str, Tuple[str, str]] = {}
+
+    grid = binding_map.get("structural_grid_symbol")
+    if grid:
+        cands = [
+            g for g in unlabeled
+            if int(_field(g, "count", 0) or 0) >= _GRID_MIN_COUNT
+            and _size_uniform(g) and _is_small_marker(g)
+        ]
+        if cands:
+            winner = max(cands, key=lambda g: int(_field(g, "count", 0) or 0))
+            bindings[_field(winner, "candidate_id", "")] = (
+                grid["name"], "structural_grid_symbol",
+            )
+
+    perim = binding_map.get("perimeter_jamb_symbol")
+    if perim:
+        cands = [
+            g for g in unlabeled
+            if _field(g, "candidate_id", "") not in bindings
+            and int(_field(g, "count", 0) or 0) >= _PERIMETER_MIN_COUNT
+            and _size_uniform(g) and _is_small_marker(g) and _is_perimeter_ring(g)
+        ]
+        if cands:
+            winner = max(cands, key=lambda g: int(_field(g, "count", 0) or 0))
+            bindings[_field(winner, "candidate_id", "")] = (
+                perim["name"], "perimeter_jamb_symbol",
+            )
+
+    return bindings
+
+
 def deterministic_symbol_name(group) -> Optional[str]:
     """Conservative geometry-only fallback label for an UNLABELED symbol group.
 
@@ -623,9 +798,18 @@ def deterministic_symbol_name(group) -> Optional[str]:
 
 
 def _fuse_symbol_groups(
-    bundle: dict, labels_by_id: Dict[str, dict], components: List[dict]
+    bundle: dict,
+    labels_by_id: Dict[str, dict],
+    components: List[dict],
+    library_bindings: Optional[Dict[str, Tuple[str, str]]] = None,
 ) -> None:
-    """Symbol groups → EA components; count is ALWAYS the deterministic size."""
+    """Symbol groups → EA components; count is ALWAYS the deterministic size.
+
+    ``library_bindings`` maps ``candidate_id -> (object_name, hint)`` for
+    clusters the naming library binds by ``binding_hint`` (columns / bollards);
+    it fills an unlabeled cluster BEFORE the conservative geometry fallback.
+    """
+    library_bindings = library_bindings or {}
     for group in bundle.get("symbol_groups") or []:
         cid = _field(group, "candidate_id", "")
         if not cid:
@@ -653,11 +837,38 @@ def _fuse_symbol_groups(
             )
             continue
 
-        # Vision gave no usable label. Before flagging, try a conservative
-        # deterministic geometry fallback (a large regular grid → Columns): the
-        # count is carried as a real EA quantity with a named line so a golden
-        # item is never lost to a generic "Component" collapse — but the row is
-        # still flagged for verification since a model label was unavailable.
+        # Vision gave no usable label. First, the naming library may bind this
+        # cluster by binding_hint + geometry (the LARGE grid marker → columns,
+        # a perimeter ring → bollards) — an estimator's read driven by the
+        # plan's OWN naming, not a hardcoded lexicon. Named, count carried,
+        # flagged for verification since no vision label confirmed it.
+        lib_bind = library_bindings.get(cid)
+        if lib_bind:
+            lib_name, lib_hint = lib_bind
+            components.append(
+                {
+                    "name": lib_name,
+                    "quantity": count,
+                    "unit": "EA",
+                    "provenance": "geometry",
+                    "confidence": "medium",
+                    "candidate_id": cid,
+                    "name_source": "naming_library",
+                    "binding_hint": lib_hint,
+                    "needs_review": True,
+                    "review_reason": (
+                        "named by naming library (%s → %s); vision label "
+                        "unavailable — verify" % (lib_hint, lib_name)
+                    ),
+                }
+            )
+            continue
+
+        # No library binding. Before flagging, try a conservative deterministic
+        # geometry fallback (a large regular grid → Columns): the count is
+        # carried as a real EA quantity with a named line so a golden item is
+        # never lost to a generic "Component" collapse — but the row is still
+        # flagged for verification since a model label was unavailable.
         det_name = deterministic_symbol_name(group)
         if det_name:
             components.append(
@@ -699,6 +910,174 @@ def _fuse_symbol_groups(
         )
 
 
+# ── Naming-library-driven wall-class → wall-object mapping ───────────────────
+#
+# Wall thickness classes (TC1..TCn, each with LF) are named by mapping them to
+# the naming library's wall objects by THICKNESS + binding_hint: a printed
+# thickness match is authoritative (CMU "8\"" → the ~8" class); otherwise the
+# dominant (most-LF, perimeter) unmatched class is the exterior tilt-up and a
+# thinner tilt class is the interior tilt-up. Ambiguous / unmatched classes are
+# left to the existing needs_review path — never a silent wrong bind.
+
+_WALL_BINDING_HINTS = frozenset(
+    {"exterior_wall", "interior_wall", "masonry_wall"}
+)
+_WALL_THICKNESS_TOL_IN = 1.5
+
+# A thickness token in inches: "8", "8\"", "7 5/8", "8 in".
+_THICKNESS_TOKEN_RE = re.compile(r"(\d+(?:\.\d+)?)(?:\s+(\d+)\s*/\s*(\d+))?")
+
+
+def _parse_thickness_in(value) -> Optional[float]:
+    """Parse a printed thickness token (string/number) to inches, else None."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value) if value > 0 else None
+    m = _THICKNESS_TOKEN_RE.search(str(value))
+    if not m:
+        return None
+    whole = float(m.group(1))
+    if m.group(2) and m.group(3):
+        try:
+            whole += float(m.group(2)) / float(m.group(3))
+        except (ValueError, ZeroDivisionError):
+            pass
+    return whole if whole > 0 else None
+
+
+def _wall_thickness_in_by_class(bundle: dict) -> Dict[str, float]:
+    """LF-weighted mean thickness (inches) per wall thickness class, from geometry."""
+    fpp = float(bundle.get("fpp") or 0.0)
+    if fpp <= 0:
+        return {}
+    acc: Dict[str, List[float]] = {}
+    for w in bundle.get("walls") or []:
+        cls = _field(w, "thickness_class", "") or ""
+        if not cls:
+            continue
+        tpt = float(_field(w, "thickness_pt", 0.0) or 0.0)
+        ln = float(_field(w, "length_pt", 0.0) or 0.0)
+        if ln <= 0:
+            continue
+        a = acc.setdefault(cls, [0.0, 0.0])
+        a[0] += tpt * ln
+        a[1] += ln
+    out: Dict[str, float] = {}
+    for cls, (sw, sl) in acc.items():
+        if sl > 0:
+            out[cls] = round(sw / sl * fpp * 12.0, 2)
+    return out
+
+
+def _wall_objects_from_vocabulary(vocabulary) -> List[dict]:
+    """Wall-ish library objects: wall_area basis OR a wall binding_hint."""
+    objs: List[dict] = []
+    if isinstance(vocabulary, list):
+        for o in vocabulary:
+            if not isinstance(o, dict):
+                continue
+            hint = str(o.get("binding_hint") or "").strip().lower()
+            basis = o.get("basis") or o.get("measure")
+            if basis == _WALL_AREA_BASIS or hint in _WALL_BINDING_HINTS:
+                objs.append(o)
+    return objs
+
+
+def map_wall_classes_from_library(
+    lf_by_class: Dict[str, float],
+    thickness_by_class: Dict[str, float],
+    wall_objects: List[dict],
+) -> Dict[str, Tuple[str, Optional[str], bool]]:
+    """Map wall thickness classes to naming-library wall objects.
+
+    Returns ``{class: (object_name, basis, confident)}``. ``confident`` is True
+    only for a printed-thickness match (authoritative); hint-based binds are
+    ``False`` so fusion flags them needs_review. A class that no object claims is
+    absent from the map (it stays on the existing unlabeled needs_review path).
+    """
+    result: Dict[str, Tuple[str, Optional[str], bool]] = {}
+    if not lf_by_class or not wall_objects:
+        return result
+    classes = list(lf_by_class.keys())
+    used_classes: set = set()
+    used_objs: set = set()
+
+    # Pass 1 — printed-thickness match (authoritative).
+    for oi, obj in enumerate(wall_objects):
+        th = _parse_thickness_in(obj.get("thickness_in"))
+        if th is None:
+            continue
+        best = None
+        for cls in classes:
+            if cls in used_classes:
+                continue
+            cth = thickness_by_class.get(cls)
+            if cth is None:
+                continue
+            d = abs(cth - th)
+            if d <= _WALL_THICKNESS_TOL_IN and (best is None or d < best[0]):
+                best = (d, cls)
+        if best is not None:
+            obj_name = str(obj.get("name") or obj.get("canonical_name") or "").strip()
+            if obj_name:
+                result[best[1]] = (obj_name, obj.get("basis") or obj.get("measure"), True)
+                used_classes.add(best[1])
+                used_objs.add(oi)
+
+    # Pass 2 — hint-based (dominant/perimeter = exterior; thinner = interior).
+    remaining = [c for c in classes if c not in used_classes]
+    remaining.sort(key=lambda c: lf_by_class.get(c, 0.0), reverse=True)
+
+    def _obj_indices(pred):
+        return [i for i, o in enumerate(wall_objects)
+                if i not in used_objs and pred(o)]
+
+    def _hint(o) -> str:
+        return str(o.get("binding_hint") or "").strip().lower()
+
+    def _variant(o) -> str:
+        return str(o.get("variant") or "").strip().lower()
+
+    ext = _obj_indices(lambda o: _hint(o) == "exterior_wall" or _variant(o) == "exterior")
+    inter = _obj_indices(lambda o: _hint(o) == "interior_wall" or _variant(o) == "interior")
+    mas = _obj_indices(lambda o: _hint(o) == "masonry_wall")
+
+    def _assign(obj_idx: int, cls: str) -> None:
+        obj = wall_objects[obj_idx]
+        name = str(obj.get("name") or obj.get("canonical_name") or "").strip()
+        if not name or cls in result:
+            return
+        result[cls] = (name, obj.get("basis") or obj.get("measure"), False)
+        used_classes.add(cls)
+        used_objs.add(obj_idx)
+
+    # Masonry by hint → the thinnest remaining class (CMU is a thin wall).
+    if mas and remaining:
+        thin = sorted(
+            (c for c in remaining if c not in used_classes),
+            key=lambda c: thickness_by_class.get(c, float("inf")),
+        )
+        if thin:
+            _assign(mas[0], thin[0])
+    # Exterior → the dominant (most-LF) remaining class.
+    for cls in remaining:
+        if cls in used_classes:
+            continue
+        if ext:
+            _assign(ext.pop(0), cls)
+            break
+    # Interior → the next remaining class.
+    for cls in remaining:
+        if cls in used_classes:
+            continue
+        if inter:
+            _assign(inter.pop(0), cls)
+            break
+
+    return result
+
+
 def _fuse_wall_classes(
     bundle: dict,
     labels_by_id: Dict[str, dict],
@@ -706,6 +1085,7 @@ def _fuse_wall_classes(
     vocab_map: Optional[Dict[str, dict]] = None,
     wall_height_ft: Optional[float] = None,
     wall_height_source: Optional[str] = None,
+    library_wall_map: Optional[Dict[str, Tuple[str, Optional[str], bool]]] = None,
 ) -> None:
     """Wall thickness classes → LF, or SF when the label is a wall_area object.
 
@@ -718,15 +1098,34 @@ def _fuse_wall_classes(
     the item for review. Any other label (or none) keeps LF exactly as before.
     """
     vocab_map = vocab_map or {}
+    library_wall_map = library_wall_map or {}
     lf_by_class = bundle.get("wall_lf_by_class") or {}
     for cls in sorted(lf_by_class):
         lf = lf_by_class[cls]
         cid = _wall_candidate_id(cls)
         entry = labels_by_id.get(cid)
         label = (entry or {}).get("label")
+
+        # Resolve the wall object name + basis for this class. A vision label
+        # (via the vocabulary) is primary; when vision gave nothing, the naming
+        # library maps the class by thickness + binding_hint (never a silent
+        # wrong bind — a hint-only match is flagged, an unmapped class stays
+        # unlabeled needs_review below).
+        name = None
+        basis = None
+        vision_conf = None
+        from_vision = False
+        confident = False
         if entry and label and label != _UNKNOWN_LABEL:
-            vocab = vocab_map.get(str(label).strip().lower())
-            basis = (vocab or {}).get("basis")
+            name = label
+            basis = (vocab_map.get(str(label).strip().lower()) or {}).get("basis")
+            vision_conf = entry.get("confidence")
+            from_vision = True
+            confident = True
+        elif cls in library_wall_map:
+            name, basis, confident = library_wall_map[cls]
+
+        if name is not None:
             if (
                 basis == _WALL_AREA_BASIS
                 and wall_height_ft is not None
@@ -735,40 +1134,56 @@ def _fuse_wall_classes(
                 height = float(wall_height_ft)
                 source = wall_height_source or "default"
                 is_default = source == "default"
+                # Flag when the height is a default OR the wall name came from a
+                # non-authoritative (hint-only) library bind — ambiguous binds
+                # are always reviewed, never silently trusted.
+                needs_review = is_default or (not from_vision and not confident)
+                reasons = []
+                if is_default:
+                    reasons.append("wall height assumed (%s) — verify on sheet" % source)
+                if not from_vision:
+                    reasons.append(
+                        "wall class named by naming library (%s bind) — verify"
+                        % ("thickness" if confident else "hint")
+                    )
                 components.append(
                     {
-                        "name": label,
+                        "name": name,
                         "quantity": round(float(lf) * height, 1),
                         "unit": "SF",
                         "provenance": "geometry",
                         "confidence": _min_confidence(
-                            "high" if not is_default else "medium",
-                            entry.get("confidence"),
+                            "high" if (from_vision and not is_default and confident)
+                            else "medium",
+                            vision_conf,
                         ),
                         "candidate_id": cid,
+                        "name_source": "vision" if from_vision else "naming_library",
                         "formula": "%.1f LF × %.1f ft height (%s)"
                         % (round(float(lf), 1), height, source),
                         "wall_height_ft": height,
                         "wall_height_source": source,
-                        "needs_review": is_default,
-                        "review_reason": (
-                            "wall height assumed (%s) — verify on sheet" % source
-                            if is_default
-                            else ""
-                        ),
+                        "needs_review": needs_review,
+                        "review_reason": "; ".join(reasons),
                     }
                 )
                 continue
             components.append(
                 {
-                    "name": label,
+                    "name": name,
                     "quantity": round(float(lf), 1),
                     "unit": "LF",
                     "provenance": "geometry",
-                    "confidence": _min_confidence("high", entry.get("confidence")),
+                    "confidence": _min_confidence(
+                        "high" if from_vision else "medium", vision_conf
+                    ),
                     "candidate_id": cid,
-                    "needs_review": False,
-                    "review_reason": "",
+                    "name_source": "vision" if from_vision else "naming_library",
+                    "needs_review": not from_vision and not confident,
+                    "review_reason": (
+                        "" if from_vision or confident
+                        else "wall class named by naming library (hint bind) — verify"
+                    ),
                 }
             )
         else:
@@ -1079,7 +1494,22 @@ def fuse_sheet(
 
     vocab_map = _vocabulary_basis_map(vocabulary)
 
-    _fuse_symbol_groups(deterministic_bundle, symbol_labels, components)
+    # Naming-library-driven binding (binding_hint → geometry). Empty vocabulary
+    # → empty maps → identical to prior behaviour (additive-only).
+    binding_map = _binding_hint_map(vocabulary)
+    library_bindings = _library_symbol_bindings(
+        deterministic_bundle.get("symbol_groups") or [], symbol_labels, binding_map
+    )
+    wall_objects = _wall_objects_from_vocabulary(vocabulary)
+    library_wall_map = map_wall_classes_from_library(
+        deterministic_bundle.get("wall_lf_by_class") or {},
+        _wall_thickness_in_by_class(deterministic_bundle),
+        wall_objects,
+    )
+
+    _fuse_symbol_groups(
+        deterministic_bundle, symbol_labels, components, library_bindings
+    )
     _fuse_wall_classes(
         deterministic_bundle,
         wall_labels,
@@ -1087,6 +1517,7 @@ def fuse_sheet(
         vocab_map=vocab_map,
         wall_height_ft=wall_height_ft,
         wall_height_source=wall_height_source,
+        library_wall_map=library_wall_map,
     )
     _fuse_project_area_items(deterministic_bundle, vocabulary, components)
     _fuse_rooms(deterministic_bundle, room_labels, components, rejected)
