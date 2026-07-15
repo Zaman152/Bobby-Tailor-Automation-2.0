@@ -1,0 +1,29 @@
+{
+  "overall_qty": 0.26666666666666666,
+  "name_found_rate": 0.5333333333333333,
+  "qty_acc_when_found": 0.5,
+  "count_qty": 0.375,
+  "count_found": 0.5,
+  "measured_qty": 0.14285714285714285,
+  "measured_found": 0.5714285714285714,
+  "n_total": 15,
+  "n_count": 8,
+  "n_measured": 7,
+  "geometry_text_qty_acc": 0.5,
+  "n_geometry_text": 2,
+  "vision_qty_share": 0.0,
+  "n_quantity_bearing": 21,
+  "provenance_counts": {
+    "deterministic": 12,
+    "unknown": 9
+  },
+  "silent_misses": [
+    "CASS WHITE",
+    "Columns-H-35'",
+    "Exposed Structure",
+    "Internal Tilt up walls",
+    "Ladder-H-20'",
+    "Lift",
+    "Stairs"
+  ]
+}
