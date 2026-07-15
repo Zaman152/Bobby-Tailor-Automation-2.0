@@ -364,7 +364,16 @@ def analyze_drawing(
                 "format": {"type": "json_schema", "schema": output_schema}
             }
 
-        response = client.messages.create(**request_kwargs)
+        # A high output cap on a slow model (Opus reader passes) can exceed the
+        # SDK's 10-minute non-streaming ceiling — `client.messages.create` then
+        # raises "Streaming is required…" before any call is made (this killed
+        # the Opus naming pass on Bob's). Stream those long requests and
+        # reassemble the final message; short per-sheet calls stay non-streaming.
+        if max_out_tokens > 20000 or pass_type in ("naming_conventions", "vocabulary"):
+            with client.messages.stream(**request_kwargs) as _stream:
+                response = _stream.get_final_message()
+        else:
+            response = client.messages.create(**request_kwargs)
 
         # Capture usage and calculate cost
         usage = response.usage
