@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 import tempfile
 from dataclasses import asdict, dataclass
@@ -601,6 +602,105 @@ def _resolve_wall_height(manifest, learned) -> "tuple[float, str]":
     return default, "default"
 
 
+# Autonomous wall-height resolution (manifest replacement, plans-only).
+# Keywords whose neighborhood in the plan text layer plausibly carries a wall /
+# clear-height callout; a feet-inches token near one of these is a candidate.
+_WALL_HEIGHT_KEYWORDS = (
+    "T.O. WALL",
+    "TOP OF WALL",
+    "T/WALL",
+    "WALL HEIGHT",
+    "WALL HT",
+    "CLEAR HEIGHT",
+    "CLEAR HT",
+    "CLR HT",
+    "CLEAR",
+    "CLR",
+    "TILT",
+    "CMU",
+    "PANEL",
+)
+# Feet-inches token: "35'-0\"", "30' - 6", "24'". Feet 1-2 digits (heights are
+# single/double-digit); inches optional.
+_WALL_HEIGHT_TOKEN = re.compile(r"(\d{1,2})\s*'\s*-?\s*(\d{1,2})?\s*\"?")
+# Plausible interior/clear wall heights (ft). Outside this band we are reading a
+# plan dimension, a detail callout, or a spec code — not a wall height.
+_WALL_HEIGHT_MIN_FT = 8.0
+_WALL_HEIGHT_MAX_FT = 60.0
+# Flagged fallback when nothing parses: a conventional industrial clear height.
+_WALL_HEIGHT_DEFAULT_FT = 30.0
+
+
+def _parse_wall_height_token(match) -> Optional[float]:
+    """Feet-inches regex match → feet within the plausible wall-height band."""
+    feet = int(match.group(1))
+    inches = int(match.group(2)) if match.group(2) else 0
+    if inches >= 12:
+        return None
+    val = feet + inches / 12.0
+    if _WALL_HEIGHT_MIN_FT <= val <= _WALL_HEIGHT_MAX_FT:
+        return val
+    return None
+
+
+def _resolve_project_wall_height(pages_text, footprint=None, learned=None) -> "tuple[float, str]":
+    """Autonomously resolve the project wall/clear height, with its source.
+
+    Replaces the manifest ``height_ft`` role under the plans-only mandate.
+    Precedence (per the binding spec): a learned ``wall_height_ft`` assumption
+    wins when present; otherwise the plan text layer is read for a wall/clear
+    height callout near a wall keyword (``T.O. WALL``, ``TOP OF WALL``,
+    ``CLEAR``/``CLR``, ``WALL HEIGHT``, or a feet-inches token near
+    ``TILT``/``CMU``/``PANEL``); a robust (max plausible, 8'-60') value is
+    taken. When nothing parses, a flagged industrial default (30.0 ft) applies.
+
+    Args:
+        pages_text: Concatenated plan text layer (elevations / sections /
+                    keynotes / general notes across all pages).
+        footprint:  Optional Footprint (unused for the value today; reserved so
+                    callers can pass the measured extent for future bounds).
+        learned:    Optional LearnedContext; a stored ``wall_height_ft`` wins.
+
+    Returns:
+        ``(height_ft, source)`` where source is ``"learned"`` | ``"plan"`` |
+        ``"default"`` — the assumption is never silent.
+    """
+    if learned is not None:
+        try:
+            value = learned.get_assumption_value("wall_height_ft")
+        except Exception:  # noqa: BLE001 — learning must never break a run
+            value = None
+        if isinstance(value, dict):
+            value = value.get("wall_height_ft") or value.get("height_ft") or value.get("value")
+        try:
+            height = float(value) if value is not None else None
+        except (TypeError, ValueError):
+            height = None
+        if height and height > 0:
+            return height, "learned"
+
+    text = pages_text or ""
+    if text:
+        upper = text.upper()
+        heights: List[float] = []
+        for keyword in _WALL_HEIGHT_KEYWORDS:
+            start = 0
+            while True:
+                idx = upper.find(keyword, start)
+                if idx < 0:
+                    break
+                start = idx + len(keyword)
+                window = text[max(0, idx - 30): idx + len(keyword) + 40]
+                for match in _WALL_HEIGHT_TOKEN.finditer(window):
+                    val = _parse_wall_height_token(match)
+                    if val is not None:
+                        heights.append(val)
+        if heights:
+            return round(max(heights), 2), "plan"
+
+    return _WALL_HEIGHT_DEFAULT_FT, "default"
+
+
 def _learned_scale_prior(learned, sheet_name: str) -> Optional[float]:
     """Learned feet-per-inch scale prior for *sheet_name*, if any.
 
@@ -782,6 +882,12 @@ class TakeoffPipeline:
         # names+aliases feed merged into the symbol-gallery candidate list.
         self._project_vocabulary: list = []
         self._project_vocab_labels: List[str] = []
+        # Autonomous project wall/clear height (manifest replacement): resolved
+        # ONCE per project by run_project from the plan text layer (or learned
+        # context), and threaded into fuse_sheet so wall_area vocabulary items
+        # bind as SF (LF × height). None until run_project resolves it.
+        self._project_wall_height: Optional[float] = None
+        self._project_wall_height_source: Optional[str] = None
         # Optional reliable drawing scale (feet per inch) for geometry measurement.
         self._scale_fpi = None
         # One BudgetGuard per run (set by run_project). The scraper path
@@ -1544,7 +1650,17 @@ class TakeoffPipeline:
         vision_labels.update(_sum_usage(vision_results))
 
         # ── Fusion: labels bind to deterministic quantities only ──────────
-        fused = fuse_sheet(bundle, vision_labels, registry)
+        # Thread the autonomous project vocabulary (measure basis) + resolved
+        # wall height so wall_area labels bind as SF (LF × height) and
+        # floor/roof-plane vocabulary items bind to the measured footprint.
+        fused = fuse_sheet(
+            bundle,
+            vision_labels,
+            registry,
+            vocabulary=getattr(self, "_project_vocabulary", None),
+            wall_height_ft=getattr(self, "_project_wall_height", None),
+            wall_height_source=getattr(self, "_project_wall_height_source", None),
+        )
         merged = merge_with_provenance([fused])
 
         # QuantityVerifier on the fused result → targeted-crop verify-retry
@@ -2073,15 +2189,33 @@ class TakeoffPipeline:
         # exactly as before (additive-only). Gated on analyzer availability.
         self._project_vocabulary = []
         self._project_vocab_labels = []
+        # Concatenated plan text layer (keynotes / notes / abbreviations /
+        # schedule headers across every page) — the estimator's reading source
+        # for BOTH the vocabulary pass and the autonomous wall-height resolver.
+        plan_text = "\n\n".join(
+            part for page in pages for part in (
+                page.get("full_page_text", ""),
+                page.get("title_block_text", ""),
+            ) if part
+        )
+        # ── Autonomous wall/clear height (manifest replacement) ──────────────
+        # Resolved ONCE for the whole project BEFORE the per-sheet loop so the
+        # fusion wall_area binding (LF × height → SF) has a height on every
+        # sheet. Precedence: learned wall_height_ft > plan-text callout >
+        # flagged 30 ft industrial default. Whatever the source, it is flagged
+        # on derived wall-area items — never a silent substitution.
+        wall_height_ft, wall_height_source = _resolve_project_wall_height(
+            plan_text, None, self._learned_context,
+        )
+        self._project_wall_height = wall_height_ft
+        self._project_wall_height_source = wall_height_source
+        logger.info(
+            "run_project: project wall height → %.1f ft (source=%s)",
+            wall_height_ft, wall_height_source,
+        )
         if self._analyzer is not None:
             vocab_page = self._select_vocabulary_page(pages)
             if vocab_page is not None:
-                plan_text = "\n\n".join(
-                    part for page in pages for part in (
-                        page.get("full_page_text", ""),
-                        page.get("title_block_text", ""),
-                    ) if part
-                )
                 self._build_project_vocabulary(
                     vocab_page["image_path"], plan_text, self._run_budget
                 )

@@ -326,6 +326,70 @@ def _field(obj, name: str, default=None):
     return getattr(obj, name, default)
 
 
+# ── Project-vocabulary measure basis ─────────────────────────────────────────
+#
+# The autonomous project vocabulary (object_vocabulary.build_project_vocabulary)
+# names every distinct object type AND carries its MEASURE BASIS: count, linear,
+# wall_area, floor_area, roof_area. Fusion uses the basis to decide which
+# deterministic geometry to bind to a named line item — walls become SF (LF ×
+# height) when their vision label resolves to a wall_area object, and
+# floor/roof-plane items get the measured building footprint area.
+
+_WALL_AREA_BASIS = "wall_area"
+_FLOOR_ROOF_BASES = frozenset({"floor_area", "roof_area"})
+
+
+def _iter_vocabulary(vocabulary):
+    """Yield ``(name, basis, unit)`` for each PRIMARY vocabulary object.
+
+    Accepts either the parsed object LIST
+    (``[{"name","measure","unit","aliases"}, ...]`` — the pipeline's
+    ``self._project_vocabulary``) or a name→info DICT
+    (``{"CMU Wall": {"basis": "wall_area", "unit": "SF"}, ...}``). Aliases are
+    NOT yielded here (they are lookup-only — see :func:`_vocabulary_basis_map`).
+    """
+    if isinstance(vocabulary, dict):
+        for name, info in vocabulary.items():
+            if isinstance(info, dict):
+                yield name, info.get("basis") or info.get("measure"), info.get("unit")
+            elif isinstance(info, str):
+                yield name, info, None
+    elif isinstance(vocabulary, list):
+        for obj in vocabulary:
+            if isinstance(obj, dict):
+                yield obj.get("name"), obj.get("measure") or obj.get("basis"), obj.get("unit")
+
+
+def _vocabulary_basis_map(vocabulary) -> Dict[str, dict]:
+    """Case/alias-insensitive ``normalized_name -> {'basis','unit','name'}`` map.
+
+    Primary names win over aliases on a collision (``setdefault``). Aliases are
+    included only for the object-LIST form (the name→info dict form has no
+    alias channel). Returns an empty map for ``None`` / empty vocabulary so
+    fusion behavior is unchanged when no vocabulary exists (additive-only).
+    """
+    result: Dict[str, dict] = {}
+    for name, basis, unit in _iter_vocabulary(vocabulary):
+        if isinstance(name, str) and name.strip():
+            result.setdefault(
+                name.strip().lower(), {"basis": basis, "unit": unit, "name": name}
+            )
+    if isinstance(vocabulary, list):
+        for obj in vocabulary:
+            if not isinstance(obj, dict):
+                continue
+            basis = obj.get("measure") or obj.get("basis")
+            unit = obj.get("unit")
+            name = obj.get("name")
+            for alias in obj.get("aliases") or []:
+                if isinstance(alias, str) and alias.strip():
+                    result.setdefault(
+                        alias.strip().lower(),
+                        {"basis": basis, "unit": unit, "name": name},
+                    )
+    return result
+
+
 def _wall_candidate_id(thickness_class: str) -> str:
     """Wall candidate ID for a thickness class ("TC1" → "WALL-TC1")."""
     cls = str(thickness_class)
@@ -498,9 +562,24 @@ def _fuse_symbol_groups(
 
 
 def _fuse_wall_classes(
-    bundle: dict, labels_by_id: Dict[str, dict], components: List[dict]
+    bundle: dict,
+    labels_by_id: Dict[str, dict],
+    components: List[dict],
+    vocab_map: Optional[Dict[str, dict]] = None,
+    wall_height_ft: Optional[float] = None,
+    wall_height_source: Optional[str] = None,
 ) -> None:
-    """Wall thickness classes → LF components (LF from geometry only)."""
+    """Wall thickness classes → LF, or SF when the label is a wall_area object.
+
+    LF always comes from geometry. When a wall class's vision label resolves
+    (via the project vocabulary, case/alias-insensitive) to a ``wall_area``
+    object AND a positive wall height is available, the component is emitted as
+    area = ``round(LF × height, 1)`` SF — the manifest-era wall-area binding,
+    now driven by the autonomous vocabulary + resolved height. The height and
+    its source are recorded in the formula; a ``default``-sourced height flags
+    the item for review. Any other label (or none) keeps LF exactly as before.
+    """
+    vocab_map = vocab_map or {}
     lf_by_class = bundle.get("wall_lf_by_class") or {}
     for cls in sorted(lf_by_class):
         lf = lf_by_class[cls]
@@ -508,6 +587,40 @@ def _fuse_wall_classes(
         entry = labels_by_id.get(cid)
         label = (entry or {}).get("label")
         if entry and label and label != _UNKNOWN_LABEL:
+            vocab = vocab_map.get(str(label).strip().lower())
+            basis = (vocab or {}).get("basis")
+            if (
+                basis == _WALL_AREA_BASIS
+                and wall_height_ft is not None
+                and float(wall_height_ft) > 0
+            ):
+                height = float(wall_height_ft)
+                source = wall_height_source or "default"
+                is_default = source == "default"
+                components.append(
+                    {
+                        "name": label,
+                        "quantity": round(float(lf) * height, 1),
+                        "unit": "SF",
+                        "provenance": "geometry",
+                        "confidence": _min_confidence(
+                            "high" if not is_default else "medium",
+                            entry.get("confidence"),
+                        ),
+                        "candidate_id": cid,
+                        "formula": "%.1f LF × %.1f ft height (%s)"
+                        % (round(float(lf), 1), height, source),
+                        "wall_height_ft": height,
+                        "wall_height_source": source,
+                        "needs_review": is_default,
+                        "review_reason": (
+                            "wall height assumed (%s) — verify on sheet" % source
+                            if is_default
+                            else ""
+                        ),
+                    }
+                )
+                continue
             components.append(
                 {
                     "name": label,
@@ -533,6 +646,57 @@ def _fuse_wall_classes(
                     "review_reason": "unlabeled wall thickness class",
                 }
             )
+
+
+def _fuse_project_area_items(
+    bundle: dict, vocabulary, components: List[dict]
+) -> None:
+    """Whole-building floor/roof vocabulary items → footprint-area SF components.
+
+    For each vocabulary object whose measure basis is ``floor_area`` or
+    ``roof_area`` (sealed concrete, exposed structure, roof deck …), emit ONE
+    component whose quantity is the measured building footprint area — these
+    planes legitimately span the whole footprint for this building type, which
+    is exactly why they fell back to ~6 SF room slivers without a footprint
+    binding. Guarded: nothing is invented unless a footprint with
+    ``area_sf > 0`` exists. Each name is emitted once (first-seen).
+    """
+    footprint = bundle.get("footprint")
+    if not footprint:
+        return
+    area_sf = _field(footprint, "area_sf", None)
+    try:
+        area_val = float(area_sf) if area_sf is not None else 0.0
+    except (TypeError, ValueError):
+        area_val = 0.0
+    if area_val <= 0:
+        return
+    confidence = _field(footprint, "confidence", "medium")
+    needs_review = bool(_field(footprint, "needs_review", False))
+    seen = set()
+    for name, basis, _unit in _iter_vocabulary(vocabulary):
+        if basis not in _FLOOR_ROOF_BASES:
+            continue
+        if not isinstance(name, str) or not name.strip():
+            continue
+        key = name.strip().lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        components.append(
+            {
+                "name": name,
+                "quantity": round(area_val, 1),
+                "unit": "SF",
+                "provenance": "geometry",
+                "confidence": confidence,
+                "basis": basis,
+                "needs_review": needs_review,
+                "review_reason": (
+                    "whole-building %s bound to measured footprint" % basis
+                ),
+            }
+        )
 
 
 def _fuse_rooms(
@@ -709,6 +873,9 @@ def fuse_sheet(
     deterministic_bundle: dict,
     vision_labels: dict,
     registry: Optional[Dict[str, dict]] = None,
+    vocabulary=None,
+    wall_height_ft: Optional[float] = None,
+    wall_height_source: Optional[str] = None,
 ) -> dict:
     """Apply vision ID→label answers to deterministic candidates for a sheet.
 
@@ -733,6 +900,17 @@ def fuse_sheet(
             (``_cost_usd`` etc.) is carried through to the result.
         registry: ``{candidate_id: {"bbox_pt": ..., "kind": ...}}``. When
             None, built from the bundle via :func:`build_registry`.
+        vocabulary: Optional project vocabulary — the parsed object LIST
+            (``self._project_vocabulary``) or a name→info DICT. Carries each
+            object's MEASURE BASIS (count/linear/wall_area/floor_area/
+            roof_area) so wall classes labeled ``wall_area`` bind as SF
+            (LF × height) and floor/roof-plane items bind to the footprint
+            area. When None/empty, wall classes emit LF and no floor/roof
+            items are invented (prior behavior).
+        wall_height_ft: Resolved project wall height (ft) for the wall_area
+            binding. When None or ≤ 0, wall classes stay LF.
+        wall_height_source: Provenance of the height ("plan" | "learned" |
+            "default"); a "default" height flags derived wall-area items.
 
     Returns:
         Extraction dict mirroring the analyze_drawing result shape:
@@ -761,8 +939,18 @@ def fuse_sheet(
         vision_labels.get("room_labels"), "room_id", "room_labels", registry, rejected
     )
 
+    vocab_map = _vocabulary_basis_map(vocabulary)
+
     _fuse_symbol_groups(deterministic_bundle, symbol_labels, components)
-    _fuse_wall_classes(deterministic_bundle, wall_labels, components)
+    _fuse_wall_classes(
+        deterministic_bundle,
+        wall_labels,
+        components,
+        vocab_map=vocab_map,
+        wall_height_ft=wall_height_ft,
+        wall_height_source=wall_height_source,
+    )
+    _fuse_project_area_items(deterministic_bundle, vocabulary, components)
     _fuse_rooms(deterministic_bundle, room_labels, components, rejected)
     _fuse_schedules(deterministic_bundle, components)
     _fuse_footprint(deterministic_bundle, components)

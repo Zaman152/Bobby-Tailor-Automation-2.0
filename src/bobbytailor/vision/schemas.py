@@ -230,10 +230,25 @@ def vocabulary_schema() -> dict:
     Shape::
 
         {"objects": [
-            {"name": str, "measure": "count"|"area"|"length",
+            {"name": str,
+             "measure": "count"|"linear"|"wall_area"|"floor_area"|"roof_area",
              "unit": str, "aliases": [str, ...]},
             ...
         ]}
+
+    The ``measure`` value is a MEASURE BASIS telling fusion which deterministic
+    geometry to bind to the named object (semantic-only — still zero numeric
+    fields):
+
+    - ``count``      — discrete items counted EA (columns, bollards, doors,
+                       ladders, stairs, lifts) → symbol-group counts.
+    - ``linear``     — items measured in LF that are NOT walls (curbs, rails).
+    - ``wall_area``  — vertical walls quantified as SF (CMU, tilt-up); fusion
+                       computes area = wall LF × wall height.
+    - ``floor_area`` — slab / floor coverings spanning the building (sealed
+                       concrete, flooring, concrete slab) → footprint area.
+    - ``roof_area``  — roof / ceiling / exposed structure spanning the building
+                       → footprint area.
 
     Returns:
         JSON schema dict (semantic path — no numeric properties).
@@ -252,9 +267,19 @@ def vocabulary_schema() -> dict:
                     "properties": {
                         # Distinct object type name (e.g. "Column", "Bollard").
                         "name": {"type": "string"},
-                        # HOW the type is quantified — a string enum, never a
-                        # number (semantic discipline).
-                        "measure": {"enum": ["count", "area", "length"]},
+                        # The MEASURE BASIS — HOW the type is quantified — a
+                        # string enum, never a number (semantic discipline).
+                        # Tells fusion which geometry to bind: count/linear/
+                        # wall_area/floor_area/roof_area.
+                        "measure": {
+                            "enum": [
+                                "count",
+                                "linear",
+                                "wall_area",
+                                "floor_area",
+                                "roof_area",
+                            ]
+                        },
                         # Unit label as a string (e.g. "ea", "sf", "lf") —
                         # read as text, never computed.
                         "unit": {"type": "string"},

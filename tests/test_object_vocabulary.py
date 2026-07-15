@@ -79,7 +79,13 @@ def test_vocabulary_schema_strict_objects_all_required():
     item = schema["properties"]["objects"]["items"]
     assert item["additionalProperties"] is False
     assert set(item["required"]) == set(item["properties"].keys())
-    assert item["properties"]["measure"]["enum"] == ["count", "area", "length"]
+    assert item["properties"]["measure"]["enum"] == [
+        "count",
+        "linear",
+        "wall_area",
+        "floor_area",
+        "roof_area",
+    ]
 
 
 def test_vocabulary_schema_accepts_sample_object_list():
@@ -87,8 +93,10 @@ def test_vocabulary_schema_accepts_sample_object_list():
     sample = {
         "objects": [
             {"name": "Column", "measure": "count", "unit": "ea", "aliases": ["COL"]},
-            {"name": "Slab", "measure": "area", "unit": "sf", "aliases": []},
-            {"name": "Handrail", "measure": "length", "unit": "lf", "aliases": ["HR"]},
+            {"name": "Sealed Concrete", "measure": "floor_area", "unit": "sf", "aliases": []},
+            {"name": "Exposed Structure", "measure": "roof_area", "unit": "sf", "aliases": []},
+            {"name": "CMU Wall", "measure": "wall_area", "unit": "sf", "aliases": ["CMU"]},
+            {"name": "Curb", "measure": "linear", "unit": "lf", "aliases": []},
         ]
     }
     _validate_against(schema, sample)

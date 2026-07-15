@@ -455,6 +455,98 @@ def test_fused_output_feeds_merge_with_provenance():
     assert any(r.get("candidate_id") == "SYM-999" for r in merged["fusion_rejected"])
 
 
+# ── Vocabulary measure-basis binding (wall_area → SF, floor/roof → footprint) ─
+
+
+def test_fuse_binds_wall_area_and_floor_roof_from_vocabulary():
+    """The core binding: a wall_area label → LF×height SF; floor/roof-plane
+    vocabulary items → the measured footprint area (Crow 100-1000x gap)."""
+    bundle = {
+        "sheet_name": "A2.1",
+        "wall_lf_by_class": {"TC1": 1714.0},
+        "footprint": {"area_sf": 397600.0, "confidence": "high", "needs_review": False},
+    }
+    vocabulary = {
+        "CMU Wall": {"basis": "wall_area"},
+        "Sealed Concrete": {"basis": "floor_area"},
+        "Exposed Structure": {"basis": "roof_area"},
+    }
+    labels = {
+        "wall_class_labels": [
+            {"wall_class_id": "WALL-TC1", "label": "CMU Wall", "confidence": "high"}
+        ]
+    }
+    result = fuse_sheet(
+        bundle, labels, vocabulary=vocabulary, wall_height_ft=35.0,
+        wall_height_source="plan",
+    )
+    comps = {c["name"]: c for c in result["components"]}
+
+    cmu = comps["CMU Wall"]
+    assert cmu["unit"] == "SF"
+    assert cmu["quantity"] == round(1714.0 * 35.0, 1)  # LF × height, not LF
+    assert cmu["provenance"] == "geometry"
+    assert cmu["wall_height_ft"] == 35.0
+    assert cmu["wall_height_source"] == "plan"
+    assert cmu["needs_review"] is False  # plan-sourced height → not flagged
+
+    for name in ("Sealed Concrete", "Exposed Structure"):
+        item = comps[name]
+        assert item["unit"] == "SF"
+        assert item["quantity"] == 397600.0  # the whole footprint, not a sliver
+        assert item["provenance"] == "geometry"
+
+
+def test_fuse_wall_area_default_height_is_flagged():
+    bundle = {"wall_lf_by_class": {"TC1": 1000.0}}
+    vocabulary = [
+        {"name": "CMU Wall", "measure": "wall_area", "unit": "SF", "aliases": ["CMU"]}
+    ]
+    # Alias label resolves too (case/alias-insensitive), and a default-sourced
+    # height flags the derived wall-area item for review.
+    labels = {"wall_class_labels": [{"wall_class_id": "WALL-TC1", "label": "CMU"}]}
+    result = fuse_sheet(
+        bundle, labels, vocabulary=vocabulary, wall_height_ft=30.0,
+        wall_height_source="default",
+    )
+    cmu = [c for c in result["components"] if c["candidate_id"] == "WALL-TC1"][0]
+    assert cmu["unit"] == "SF"
+    assert cmu["quantity"] == 30000.0
+    assert cmu["needs_review"] is True
+    assert "default" in cmu["review_reason"]
+
+
+def test_fuse_no_vocabulary_no_footprint_keeps_lf_and_invents_nothing():
+    """Regression guard: absent vocabulary/footprint/height, walls stay LF and
+    no floor/roof items are invented (additive-only)."""
+    bundle = {"wall_lf_by_class": {"TC1": 1714.0}}
+    labels = {
+        "wall_class_labels": [
+            {"wall_class_id": "WALL-TC1", "label": "CMU Wall", "confidence": "high"}
+        ]
+    }
+    result = fuse_sheet(bundle, labels)  # no vocabulary, no height, no footprint
+    wall = [c for c in result["components"] if c.get("candidate_id") == "WALL-TC1"][0]
+    assert wall["unit"] == "LF"  # unchanged prior behavior
+    assert wall["quantity"] == 1714.0
+    assert all(
+        c.get("basis") not in ("floor_area", "roof_area") for c in result["components"]
+    )
+
+
+def test_fuse_floor_area_needs_footprint_with_positive_area():
+    """floor/roof binding is geometry-gated: no footprint → no invented item."""
+    bundle = {"wall_lf_by_class": {}}  # no footprint at all
+    vocabulary = {"Sealed Concrete": {"basis": "floor_area"}}
+    result = fuse_sheet(bundle, {}, vocabulary=vocabulary, wall_height_ft=30.0)
+    assert not any(c["name"] == "Sealed Concrete" for c in result["components"])
+
+    # Present but zero-area footprint is equally non-binding.
+    bundle2 = {"wall_lf_by_class": {}, "footprint": {"area_sf": 0.0}}
+    result2 = fuse_sheet(bundle2, {}, vocabulary=vocabulary)
+    assert not any(c["name"] == "Sealed Concrete" for c in result2["components"])
+
+
 # ── ID-grounding round-trip (registry → overlay marker → answer → component) ──
 
 

@@ -347,7 +347,7 @@ def _run_vector_sheet(
     monkeypatch.setattr(
         tp,
         "fuse_sheet",
-        lambda b, v, r: {
+        lambda b, v, r=None, *a, **k: {
             "components": [dict(c) for c in fused_components],
             "measurements": [],
             "fusion_rejected": [],
