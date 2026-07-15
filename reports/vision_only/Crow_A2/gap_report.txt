@@ -1,0 +1,86 @@
+====================================================================================
+VISION-ONLY BENCHMARK — Crow A2
+====================================================================================
+Overall quantity accuracy: 40%   Name/found rate: 60%   Qty acc when found: 67%
+  Counts (EA)   n= 8  found=50%  qty_ok=38%
+  Measured(SF/LF) n= 7  found=71%  qty_ok=43%
+  Provenance split: geometry/text qty acc=75% (n=4)  vision qty share=0% of 62 quantity-bearing rows
+  Provenance classes: deterministic=49, unknown=13
+  SILENT MISSES (5): CASS WHITE; Ladder-H-20'; Lift; Stairs; Hand Rail
+  [plans-only] runtime=523s  cost=$0.4041  sheets=4
+
+STATUS    ITEM                                  GOLDEN            AI    ERR%  CAT  PROV
+------------------------------------------------------------------------------------
+MISSING   CASS WHITE                        397,556.00             —       —  measured  unknown
+FAIL_QTY  Bollards≈Bollard                       28.00          0.00   100.0  count  unknown
+FAIL_QTY  CMU Wall                            2,204.33          8.00    99.6  measured  deterministic
+MISSING   Columns-H-35'                         132.00             —       —  count  unknown
+PASS      Exposed Structure                 395,673.42    397,600.00     0.5  measured  deterministic
+PASS      Internal Tilt up walls≈Tilt Up Wall    108,442.66    106,998.00     1.3  measured  deterministic
+MISSING   Ladder-H-20'                            1.00             —       —  count  unknown
+MISSING   Lift                                    1.00             —       —  count  unknown
+PASS      Mobilization                            1.00          1.00     0.0  count  unknown
+PASS      Sealed Concrete                   395,673.42    397,600.10     0.5  measured  deterministic
+MISSING   Stairs                                 10.00             —       —  count  unknown
+FAIL_QTY  Guard Rail≈Pipe Guardrail             420.35         10.86    97.4  measured  unknown
+MISSING   Hand Rail                             438.80             —       —  measured  unknown
+PASS      Door Frames-HM                         29.00         29.00     0.0  count  unknown
+PASS      Doors-HM                               29.00         29.00     0.0  count  unknown
+
+EXTRA items AI produced not in golden:
+  + 4                              279.5 SF
+  + Block Fill & Paint             40086.0 SF
+  + Building Footprint             397600.0 SF
+  + Building Perimeter             2972.0 LF
+  + Canopy                         397600.0 SF
+  + Dock Bumper                    56.0 EA
+  + Electrical Panels              1.0 EA
+  + Fire Riser                     1.0 EA
+  + Flooring                       8.8 SQ_FT
+  + Metal Stair                    11.0 EA
+  + ROOF ASSEMBLY                  417480.0 SF
+  + ROOM-3                         11.1 SF
+  + ROOM-4                         11.0 SF
+  + ROOM-5                         10.7 SF
+  + ROOM-6                         10.6 SF
+  + SYM-10                         14.0 EA
+  + SYM-11                         14.0 EA
+  + SYM-12                         14.0 EA
+  + SYM-19                         10.0 EA
+  + SYM-20                         10.0 EA
+  + SYM-21                         8.0 EA
+  + SYM-22                         8.0 EA
+  + SYM-23                         8.0 EA
+  + SYM-24                         8.0 EA
+  + SYM-26                         6.0 EA
+  + SYM-27                         6.0 EA
+  + SYM-28                         5.0 EA
+  + SYM-29                         5.0 EA
+  + SYM-30                         5.0 EA
+  + SYM-31                         5.0 EA
+  + SYM-32                         5.0 EA
+  + SYM-33                         4.0 EA
+  + SYM-34                         4.0 EA
+  + SYM-35                         4.0 EA
+  + SYM-36                         4.0 EA
+  + SYM-37                         4.0 EA
+  + SYM-39                         4.0 EA
+  + SYM-40                         4.0 EA
+  + SYM-41                         4.0 EA
+  + SYM-43                         3.0 EA
+  + SYM-44                         3.0 EA
+  + SYM-45                         3.0 EA
+  + SYM-46                         3.0 EA
+  + SYM-6                          41.0 EA
+  + SYM-7                          39.0 EA
+  + SYM-9                          15.0 EA
+  + Structural Column              136.0 EA
+  + Vapor Barrier                  397600.0 SF
+------------------------------------------------------------------------------------
+GATE CHECKS
+  FAIL  geometry_text_qty_acc    value=0.75  required >= 0.97
+  FAIL  overall_qty              value=0.4  required >= 0.9
+  FAIL  item_found_rate          value=0.6  required >= 0.95
+  FAIL  silent_misses            value=['CASS WHITE', "Ladder-H-20'", 'Lift', 'Stairs', 'Hand Rail']  required == 0 (every golden category present or flagged)
+  PASS  vision_qty_share         value=0.0  required <= 0.05 (vision-provenance quantities ~0 on vector fixtures)
+  GATE VERDICT: FAILED

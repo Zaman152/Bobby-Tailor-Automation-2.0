@@ -1,0 +1,1719 @@
+[
+  {
+    "item": "4",
+    "quantity": 279.5,
+    "quantity_fmt": "279.5",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 279.5,
+        "description": "4",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Block Fill & Paint",
+    "quantity": 40086.0,
+    "quantity_fmt": "40,086",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "paint",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count; wall class named by naming library (hint bind) \u2014 verify"
+    ],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 40086.0,
+        "description": "Block Fill & Paint",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Bollard",
+    "quantity": 0.0,
+    "quantity_fmt": "0",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png"
+    ],
+    "item_type": "concrete_slab",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 0.0,
+        "description": "Concrete core diameter - bollard",
+        "formula": "8 sf \u00d7 4\" / (12 \u00d7 27) = 0.10 cy"
+      }
+    ]
+  },
+  {
+    "item": "Building Footprint",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 397600.0,
+        "description": "Building Footprint",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Building Perimeter",
+    "quantity": 2972.0,
+    "quantity_fmt": "2,972",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 2972.0,
+        "description": "Building Perimeter",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "CMU Wall",
+    "quantity": 8.0,
+    "quantity_fmt": "8",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png"
+    ],
+    "item_type": "cmu_wall",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 8.0,
+        "description": "CMU wall thickness - pump/electrical room",
+        "formula": "8 sf \u00d7 1.0 = 8 sf"
+      }
+    ]
+  },
+  {
+    "item": "Canopy",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "canopy",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "learned",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 397600.0,
+        "description": "Canopy",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Concrete Curb",
+    "quantity": 0.05,
+    "quantity_fmt": "0.1",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png"
+    ],
+    "item_type": "concrete_slab",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 0.05,
+        "description": "Concrete curb dimension callout",
+        "formula": "4 sf \u00d7 4\" / (12 \u00d7 27) = 0.05 cy"
+      }
+    ]
+  },
+  {
+    "item": "Concrete Pad",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "concrete_slab",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "learned",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 397600.0,
+        "description": "Concrete Pad",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Concrete Slab",
+    "quantity": 0.06,
+    "quantity_fmt": "0.1",
+    "unit": "CY",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png"
+    ],
+    "item_type": "concrete_slab",
+    "line_count": 2,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 0.02,
+        "description": "Vertical support outside diameter - concrete max",
+        "formula": "2 sf \u00d7 4\" / (12 \u00d7 27) = 0.02 cy"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 0.04,
+        "description": "Concrete chamfer",
+        "formula": "3 sf \u00d7 4\" / (12 \u00d7 27) = 0.04 cy"
+      }
+    ]
+  },
+  {
+    "item": "Dock Bumper",
+    "quantity": 56.0,
+    "quantity_fmt": "56",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); named by naming library (perimeter_jamb_symbol \u2192 Dock Bumper); vision label unavailable \u2014 verify"
+    ],
+    "source": "learned",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 56.0,
+        "description": "Dock Bumper",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Door Frames-HM",
+    "quantity": 29.0,
+    "quantity_fmt": "29",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 29.0,
+        "description": "Door Frames-HM",
+        "formula": "authoritative plan schedule (29 EA)"
+      }
+    ]
+  },
+  {
+    "item": "Doors-AL",
+    "quantity": 6.0,
+    "quantity_fmt": "6",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 6.0,
+        "description": "Doors-AL",
+        "formula": "authoritative plan schedule (6 EA)"
+      }
+    ]
+  },
+  {
+    "item": "Doors-HM",
+    "quantity": 29.0,
+    "quantity_fmt": "29",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 29.0,
+        "description": "Doors-HM",
+        "formula": "authoritative plan schedule (29 EA)"
+      }
+    ]
+  },
+  {
+    "item": "Doors-STL",
+    "quantity": 70.0,
+    "quantity_fmt": "70",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 70.0,
+        "description": "Doors-STL",
+        "formula": "authoritative plan schedule (70 EA)"
+      }
+    ]
+  },
+  {
+    "item": "Electrical Panels",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png"
+    ],
+    "item_type": "electrical_fixture",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 1.0,
+        "description": "Electrical Panel",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Exposed Structure",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "exposed_structure",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 397600.0,
+        "description": "Exposed Structure",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Fire Riser",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 1.0,
+        "description": "Fire Riser",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Flooring",
+    "quantity": 8.8,
+    "quantity_fmt": "8.8",
+    "unit": "SQ_FT",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0002.png",
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png"
+    ],
+    "item_type": "flooring",
+    "line_count": 5,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0002.png",
+        "qty": 1.1,
+        "description": "Finish Floor elevation - West Elevation",
+        "formula": "1 sf \u00d7 1.1 waste = 1 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0002.png",
+        "qty": 1.1,
+        "description": "Finish Floor elevation - South Elevation",
+        "formula": "1 sf \u00d7 1.1 waste = 1 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0002.png",
+        "qty": 1.1,
+        "description": "Finish Floor elevation - East Elevation",
+        "formula": "1 sf \u00d7 1.1 waste = 1 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0002.png",
+        "qty": 1.1,
+        "description": "Finish Floor elevation - North Elevation",
+        "formula": "1 sf \u00d7 1.1 waste = 1 sf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 4.4,
+        "description": "Truck court dimension below finish floor",
+        "formula": "4 sf \u00d7 1.1 waste = 4 sf"
+      }
+    ]
+  },
+  {
+    "item": "Metal Stair",
+    "quantity": 11.0,
+    "quantity_fmt": "11",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png"
+    ],
+    "item_type": "flooring",
+    "line_count": 2,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 2.0,
+        "description": "Pipe handrail outside diameter - stair section",
+        "formula": "2 lf \u00d7 1.05 = 2 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 9.0,
+        "description": "Finish floor to finish floor stair height",
+        "formula": "8 sf \u00d7 1.1 waste = 9 sf"
+      }
+    ]
+  },
+  {
+    "item": "Mobilization",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "standard_line_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": 1.0,
+        "description": "Mobilization (standard estimating line item)",
+        "formula": "standard_line_item"
+      }
+    ]
+  },
+  {
+    "item": "Pipe Guardrail",
+    "quantity": 10.860000000000001,
+    "quantity_fmt": "10.9",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png"
+    ],
+    "item_type": "hand_rail",
+    "line_count": 7,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 1.54,
+        "description": "Steel pipe guardrail outside diameter - ramp",
+        "formula": "2 lf \u00d7 1.03 = 2 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 1.54,
+        "description": "Steel pipe guardrail outside diameter - dock area",
+        "formula": "2 lf \u00d7 1.03 = 2 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 1.58,
+        "description": "Steel pipe handrail outside diameter",
+        "formula": "2 lf \u00d7 1.05 = 2 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 1.54,
+        "description": "Guardrail outside diameter - stair",
+        "formula": "2 lf \u00d7 1.03 = 2 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 1.54,
+        "description": "Guardrail outside diameter - Z-guard detail",
+        "formula": "2 lf \u00d7 1.03 = 2 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 1.54,
+        "description": "Guardrail outside diameter - Z-guard handrail attach",
+        "formula": "2 lf \u00d7 1.03 = 2 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 1.58,
+        "description": "Pipe handrail outside diameter - handrail at vert support",
+        "formula": "2 lf \u00d7 1.05 = 2 lf"
+      }
+    ]
+  },
+  {
+    "item": "ROOF ASSEMBLY",
+    "quantity": 417480.0,
+    "quantity_fmt": "417,480",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "insulation",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "learned",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 417480.0,
+        "description": "Roof Insulation",
+        "formula": "count \u00d7 1.05"
+      }
+    ]
+  },
+  {
+    "item": "ROOM-3",
+    "quantity": 11.1,
+    "quantity_fmt": "11.1",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 11.1,
+        "description": "ROOM-3",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "ROOM-4",
+    "quantity": 11.0,
+    "quantity_fmt": "11",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 11.0,
+        "description": "ROOM-4",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "ROOM-5",
+    "quantity": 10.7,
+    "quantity_fmt": "10.7",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 10.7,
+        "description": "ROOM-5",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "ROOM-6",
+    "quantity": 10.6,
+    "quantity_fmt": "10.6",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 10.6,
+        "description": "ROOM-6",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-10",
+    "quantity": 14.0,
+    "quantity_fmt": "14",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 14.0,
+        "description": "SYM-10",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-11",
+    "quantity": 14.0,
+    "quantity_fmt": "14",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 14.0,
+        "description": "SYM-11",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-12",
+    "quantity": 14.0,
+    "quantity_fmt": "14",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 14.0,
+        "description": "SYM-12",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-19",
+    "quantity": 10.0,
+    "quantity_fmt": "10",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 10.0,
+        "description": "SYM-19",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-20",
+    "quantity": 10.0,
+    "quantity_fmt": "10",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 10.0,
+        "description": "SYM-20",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-21",
+    "quantity": 8.0,
+    "quantity_fmt": "8",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 8.0,
+        "description": "SYM-21",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-22",
+    "quantity": 8.0,
+    "quantity_fmt": "8",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 8.0,
+        "description": "SYM-22",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-23",
+    "quantity": 8.0,
+    "quantity_fmt": "8",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 8.0,
+        "description": "SYM-23",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-24",
+    "quantity": 8.0,
+    "quantity_fmt": "8",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 8.0,
+        "description": "SYM-24",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-26",
+    "quantity": 6.0,
+    "quantity_fmt": "6",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 6.0,
+        "description": "SYM-26",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-27",
+    "quantity": 6.0,
+    "quantity_fmt": "6",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 6.0,
+        "description": "SYM-27",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-28",
+    "quantity": 5.0,
+    "quantity_fmt": "5",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 5.0,
+        "description": "SYM-28",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-29",
+    "quantity": 5.0,
+    "quantity_fmt": "5",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 5.0,
+        "description": "SYM-29",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-30",
+    "quantity": 5.0,
+    "quantity_fmt": "5",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 5.0,
+        "description": "SYM-30",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-31",
+    "quantity": 5.0,
+    "quantity_fmt": "5",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 5.0,
+        "description": "SYM-31",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-32",
+    "quantity": 5.0,
+    "quantity_fmt": "5",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 5.0,
+        "description": "SYM-32",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-33",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-33",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-34",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-34",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-35",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-35",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-36",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-36",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-37",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-37",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-39",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-39",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-40",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-40",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-41",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-41",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-43",
+    "quantity": 3.0,
+    "quantity_fmt": "3",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 3.0,
+        "description": "SYM-43",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-44",
+    "quantity": 3.0,
+    "quantity_fmt": "3",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 3.0,
+        "description": "SYM-44",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-45",
+    "quantity": 3.0,
+    "quantity_fmt": "3",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 3.0,
+        "description": "SYM-45",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-46",
+    "quantity": 3.0,
+    "quantity_fmt": "3",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 3.0,
+        "description": "SYM-46",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-6",
+    "quantity": 41.0,
+    "quantity_fmt": "41",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 41.0,
+        "description": "SYM-6",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-7",
+    "quantity": 39.0,
+    "quantity_fmt": "39",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 39.0,
+        "description": "SYM-7",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-9",
+    "quantity": 15.0,
+    "quantity_fmt": "15",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 15.0,
+        "description": "SYM-9",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Sealed Concrete",
+    "quantity": 397600.1,
+    "quantity_fmt": "397,600.1",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png"
+    ],
+    "item_type": "concrete_slab",
+    "line_count": 2,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 397600.0,
+        "description": "Sealed Concrete",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 0.1,
+        "description": "Concrete slab thickness - dock leveler section",
+        "formula": "8 sf \u00d7 4\" / (12 \u00d7 27) = 0.10 cy"
+      }
+    ]
+  },
+  {
+    "item": "Structural Column",
+    "quantity": 136.0,
+    "quantity_fmt": "136",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "columns",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "named by naming library (structural_grid_symbol \u2192 Structural Column); vision label unavailable \u2014 verify"
+    ],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 136.0,
+        "description": "Structural Column",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Tilt Up Wall",
+    "quantity": 106998.0,
+    "quantity_fmt": "106,998",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "concrete_slab",
+    "line_count": 2,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count; wall class named by naming library (hint bind) \u2014 verify"
+    ],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 106992.0,
+        "description": "Tilt Up Wall",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 6.0,
+        "description": "Site Cast Concrete Panel (S.C.C.P.)",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Vapor Barrier",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 397600.0,
+        "description": "Vapor Barrier",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Wall Framing",
+    "quantity": 1037.71,
+    "quantity_fmt": "1,037.7",
+    "unit": "STUDS",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+      "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 6,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count; unlabeled wall thickness class"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 48.62,
+        "description": "WALL-TC10",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 37.29,
+        "description": "WALL-TC11",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 27.17,
+        "description": "WALL-TC12",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 855.8,
+        "description": "WALL-TC3",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0001.png",
+        "qty": 60.83,
+        "description": "WALL-TC8",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_A2_20260715_214607/page_0003.png",
+        "qty": 8.0,
+        "description": "P.O. concrete wall dimension",
+        "formula": "ceil(7lf \u00d7 12 / 16\" OC) + 1 = 7; \u00d7 1.1 waste = 8"
+      }
+    ]
+  }
+]

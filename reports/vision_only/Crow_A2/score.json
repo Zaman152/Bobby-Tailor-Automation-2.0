@@ -1,0 +1,27 @@
+{
+  "overall_qty": 0.4,
+  "name_found_rate": 0.6,
+  "qty_acc_when_found": 0.6666666666666666,
+  "count_qty": 0.375,
+  "count_found": 0.5,
+  "measured_qty": 0.42857142857142855,
+  "measured_found": 0.7142857142857143,
+  "n_total": 15,
+  "n_count": 8,
+  "n_measured": 7,
+  "geometry_text_qty_acc": 0.75,
+  "n_geometry_text": 4,
+  "vision_qty_share": 0.0,
+  "n_quantity_bearing": 62,
+  "provenance_counts": {
+    "unknown": 13,
+    "deterministic": 49
+  },
+  "silent_misses": [
+    "CASS WHITE",
+    "Ladder-H-20'",
+    "Lift",
+    "Stairs",
+    "Hand Rail"
+  ]
+}
