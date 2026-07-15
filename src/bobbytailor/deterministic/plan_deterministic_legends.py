@@ -42,18 +42,42 @@ def build_deterministic_legends(
     """
     legends: List[dict] = []
 
+    # Door schedule → authoritative legend. A *type + count* schedule (Crow-style:
+    # Type / Count / Material columns) is read by the component-library harvester,
+    # which counts every door and frame by material via the abbreviation key —
+    # this recovers ALL rows, not just the handful a per-opening tag scan finds.
+    # A per-opening schedule (Moxy-style: one row per opening tag) has no Count
+    # column, so it keeps the proven per-opening extractor. Component path wins
+    # when present; otherwise fall back.
+    door_legend = None
     try:
-        from bobbytailor.deterministic.schedule_extraction import extract_door_legend_from_pdf
-        door_legend = extract_door_legend_from_pdf(pdf_path)
+        door_legend = build_door_component_legend(pdf_path)
         if door_legend:
-            legends.append(door_legend)
             logger.info(
-                "Door schedule: %d row(s) from plans (pages %s)",
+                "Door schedule (type+count): %d component row(s) from plans (pages %s)",
                 len(door_legend.get("rows") or []),
                 door_legend.get("_source_pages"),
             )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Door-schedule extraction failed: %s", exc)
+        logger.warning("Door-component extraction failed: %s", exc)
+        door_legend = None
+
+    if not door_legend:
+        try:
+            from bobbytailor.deterministic.schedule_extraction import extract_door_legend_from_pdf
+            door_legend = extract_door_legend_from_pdf(pdf_path)
+            if door_legend:
+                logger.info(
+                    "Door schedule (per-opening): %d row(s) from plans (pages %s)",
+                    len(door_legend.get("rows") or []),
+                    door_legend.get("_source_pages"),
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Door-schedule extraction failed: %s", exc)
+            door_legend = None
+
+    if door_legend:
+        legends.append(door_legend)
 
     if not dev_companion_present and dev_manifest:
         try:
@@ -70,6 +94,77 @@ def build_deterministic_legends(
             logger.warning("Footprint extraction failed: %s", exc)
 
     return legends
+
+
+def build_door_component_legend(pdf_path: str) -> Optional[dict]:
+    """Build an authoritative door/frame legend from a *type + count* schedule.
+
+    Delegates to the component-library harvester, which reads the Type / Count /
+    Material columns of a type+count door schedule and counts doors AND frames by
+    material via the abbreviation key (with the printed-note HM reclassification).
+    Each material group becomes an EXACT, auto-verifiable ``takeoff_legend`` row
+    whose quantity passes through verbatim (never re-waste a counted door).
+
+    Returns ``None`` when the set has no type+count door schedule (e.g. a
+    per-opening schedule, which keeps its ``schedule_extraction`` path).
+    """
+    try:
+        import fitz
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        from bobbytailor.deterministic.component_library import extract_door_component_counts
+        page_text = "\n".join(
+            (doc[i].get_text() or "") for i in range(doc.page_count)
+        )
+        counts = extract_door_component_counts(doc, notes_text=page_text)
+        # Which pages carried a door schedule (for provenance).
+        source_pages = [
+            i + 1 for i in range(doc.page_count)
+            if "DOOR SCHEDULE" in ((doc[i].get_text() or "").upper())
+        ]
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        doc.close()
+
+    if not counts:
+        return None
+
+    rows: List[dict] = []
+    total = 0
+    for c in counts:
+        n = c.get("quantity")
+        if not n:
+            continue
+        total += int(n)
+        rows.append({
+            "ITEM": c["name"],
+            "DESCRIPTION": c["name"],
+            "QTY": str(n), "QUANTITY": str(n), "UNIT": c.get("unit") or "EA",
+        })
+    if not rows:
+        return None
+
+    return {
+        "name": "Door Schedule (extracted from plans)",
+        "table_purpose": "takeoff_legend",
+        "schedule_type": "door",
+        "use_for_takeoff": True,
+        "description": (
+            "{} scheduled doors/frames counted deterministically by material from "
+            "the type+count door schedule on sheet page(s) {}. Materials decoded "
+            "via the plan's abbreviation key; personnel doors carried in hollow "
+            "metal frames are named per the plan's printed HOLLOW METAL DOOR note."
+        ).format(total, source_pages),
+        "columns": ["ITEM", "QTY", "UNIT"],
+        "rows": rows,
+        "_source_pages": source_pages,
+    }
 
 
 def merge_page_pdfs(pdf_paths: List[Path], out_path: Path) -> Optional[str]:
