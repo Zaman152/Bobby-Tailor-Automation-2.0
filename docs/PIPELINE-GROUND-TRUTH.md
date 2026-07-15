@@ -158,3 +158,27 @@ robust/chunked naming extraction, sheet-composition-agnostic measurement (schedu
 plan, not just one floor plan), per-format schedule parsing, the learning loop, then re-validation
 across Crow + Bob's + Moxy + Chelsea. This is the real state; the earlier Crow numbers should NOT be
 read as "the app works."
+
+## 9. Opus reader fix + the measurement-engine frontier (2026-07-15)
+
+Routed the once-per-project naming/reading pass to **Opus 4.8**, fed it a **lean distilled digest**
+(keynotes/abbreviations/detail labels/schedule headers, ~5–10k chars vs 35k raw), added
+retry-on-invalid-JSON + tolerant extraction, and **streamed** the call (a 32k `max_tokens` on Opus
+tripped the SDK's ">10 min ⇒ streaming required" guard and killed the pass instantly).
+
+**Result:** the reader now **generalizes** — on Bob's it produced a valid 24-object manifest (Sonnet
+had returned invalid JSON), and Bob's **name-found rate rose 8% → 33%** (Doors, Canopy now found).
+
+**But Bob's overall is still ~8%, and this pinpoints the real remaining frontier: the MEASUREMENT
+engine is floor-plan-centric.** Bob's golden quantities are Gas Piping 886 LF (civil linework),
+Exterior Painting CMU 16,219 SF + EIFS 3,053 SF (elevation wall areas), Lintels 179 LF (structural) —
+**none measured by the floor-plan walls/rooms/footprint engine.** Crow is a warehouse (everything on
+one floor plan); Bob's is a retail fit-out (quantities across civil + elevations + schedules).
+
+**So the naming is now general; the measurement is not.** The next program is a
+**sheet-type-aware measurement layer**: civil linework LF (piping/curb/utilities on C-sheets),
+elevation wall-area SF (painting/EIFS/cladding on elevations), schedule-driven counts per format, in
+addition to the floor-plan engine — then the fusion binds the (now-general) names to whichever
+measurement produced the number. Plus the learning loop, then re-validate across all 4 plans.
+Session API spend to date ≈ $16. Context is very large — continue in a FRESH session using this doc
++ memories as the plan.
