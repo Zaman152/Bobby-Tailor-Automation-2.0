@@ -322,9 +322,17 @@ def analyze_drawing(
         if model != CLAUDE_MODEL:
             logger.info(f"  Using {model} for sheet (pass={pass_type})")
 
+        # The naming/reading and vocabulary passes build the WHOLE-project
+        # manifest in one response — a large plan's manifest can run long, and a
+        # mid-JSON truncation is exactly the invalid_json failure that killed the
+        # manifest on Bob's. Give those reader passes a higher output cap so the
+        # manifest is never cut off; per-sheet passes keep the standard 16k.
+        max_out_tokens = 16000  # complex schedules/floor plans can produce 10k+ tokens of JSON
+        if pass_type in ("naming_conventions", "vocabulary"):
+            max_out_tokens = 32000
         request_kwargs = dict(
             model=model,
-            max_tokens=16000,  # complex schedules/floor plans can produce 10k+ tokens of JSON
+            max_tokens=max_out_tokens,
             # System prompt with cache_control: cached after first call
             # per-prompt, saving ~90% on repeated drawing analyses.
             system=[

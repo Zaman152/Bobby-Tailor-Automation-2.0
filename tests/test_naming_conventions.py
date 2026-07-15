@@ -15,6 +15,7 @@ gap. Pins:
 - unnamed clusters surface as DISTINCT flagged EA rows (no "Component" blob).
 """
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -23,10 +24,13 @@ from bobbytailor.vision.schemas import naming_convention_schema
 from bobbytailor.vision.object_vocabulary import (
     extract_naming_conventions,
     majority_keep_conventions,
+    _tolerant_json_object,
 )
 from bobbytailor.deterministic.component_library import (
     extract_naming_text,
+    distill_naming_text,
     harvest_detail_labels,
+    harvest_naming_signal_lines,
     merge_with_naming_conventions,
 )
 from bobbytailor.vision.fusion import (
@@ -458,3 +462,173 @@ def test_merge_naming_conventions_adds_new_object():
     boll = next(e for e in merged if e["name"] == "Bollards")
     assert boll["binding_hint"] == "perimeter_jamb_symbol"
     assert boll["source"] == "naming_convention"
+
+
+# ── 9. RESILIENCE: retry-on-invalid, tolerant extract, loud fallback ──────────
+# The #1 generalization fix — Bob's returned invalid_json → no manifest → 8%.
+# The reader pass must recover a valid manifest on ANY plan (no real API here;
+# the analyzer is a stub returning the invalid_json shape analyze_drawing emits).
+
+
+def _invalid_json_result(raw):
+    """The exact error dict analyze_drawing returns on an unrecoverable parse."""
+    return {"error": "invalid_json", "raw": raw, "_cost_usd": 0.01}
+
+
+def test_extract_naming_conventions_retries_invalid_then_valid():
+    """Invalid JSON once, valid next → a fresh retry yields the valid library."""
+    calls = {"n": 0}
+
+    def _flaky(*a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _invalid_json_result("not json at all <<<")  # unrecoverable
+        return _canned_library()
+
+    objs = extract_naming_conventions(_flaky, "/tmp/p.png", "text")
+    assert calls["n"] == 2, "second (fresh) attempt was not made"
+    assert {o["canonical_name"] for o in objs} == {"Columns", "Exterior Tilt Up Wall"}
+
+
+def test_extract_naming_conventions_always_invalid_falls_back_loudly(caplog):
+    """Always-invalid → returns [] WITHOUT raising and logs a loud fallback."""
+    def _always_invalid(*a, **k):
+        return _invalid_json_result("garbage with no braces here")
+
+    with caplog.at_level(logging.WARNING):
+        objs = extract_naming_conventions(
+            _always_invalid, "/tmp/p.png", "COLUMN BOLLARD S.C.C.P. notes"
+        )
+    assert objs == []
+    assert "FELL BACK to the deterministic library" in caplog.text
+    # The failing plan must be VISIBLE — the naming-text fingerprint is logged.
+    assert "naming_text[:80]" in caplog.text
+
+
+def test_extract_naming_conventions_recovers_prose_wrapped_json():
+    """A prose/markdown-wrapped JSON blob → tolerant extract recovers it."""
+    blob = (
+        "Sure! Here is the naming manifest you asked for:\n\n```json\n"
+        + json.dumps(_canned_library())
+        + "\n```\n\nLet me know if you need anything else."
+    )
+
+    def _prose(*a, **k):
+        return _invalid_json_result(blob)
+
+    objs = extract_naming_conventions(_prose, "/tmp/p.png", "text")
+    assert {o["canonical_name"] for o in objs} == {"Columns", "Exterior Tilt Up Wall"}
+
+
+def test_tolerant_json_object_variants():
+    payload = _canned_library()
+    # bare object
+    assert _tolerant_json_object(json.dumps(payload))["objects"][0]["canonical_name"] == "Columns"
+    # fenced
+    assert _tolerant_json_object("```json\n" + json.dumps(payload) + "\n```") is not None
+    # prose-wrapped
+    assert _tolerant_json_object("blah blah " + json.dumps(payload) + " thanks") is not None
+    # unrecoverable
+    assert _tolerant_json_object("no json here") is None
+    assert _tolerant_json_object("") is None
+    assert _tolerant_json_object(None) is None
+
+
+def test_majority_keep_invalid_vote_is_non_vote():
+    """An empty (failed) vote is a NON-VOTE — it must not dilute the majority."""
+    valid = [{"canonical_name": "Columns", "binding_hint": "structural_grid_symbol",
+              "basis": "count"}]
+    # 1 real vote + 1 empty (failed) vote → Columns survives (empty excluded).
+    kept = majority_keep_conventions([valid, []])
+    assert {o["canonical_name"] for o in kept} == {"Columns"}
+    # 2 real + 1 empty → still kept (n counts only the 2 real votes).
+    kept2 = majority_keep_conventions([valid, valid, []])
+    assert "Columns" in {o["canonical_name"] for o in kept2}
+
+
+def test_extract_naming_conventions_retry_stops_on_first_success():
+    """A valid first result short-circuits — no wasted retries."""
+    calls = {"n": 0}
+
+    def _ok(*a, **k):
+        calls["n"] += 1
+        return _canned_library()
+
+    extract_naming_conventions(_ok, "/tmp/p.png", "text")
+    assert calls["n"] == 1
+
+
+# ── 10. DISTILLED naming text: LEAN, capped, covers all 4 real plans ─────────
+# Guards the "works on Crow only" trap: the distilled prompt input for EVERY
+# real plan must be non-empty, under the char cap, and carry that plan's own
+# printed object nouns. Reading the real PDF text layer in-test is API-free.
+
+_UPLOADS = Path(__file__).parent.parent / "uploads"
+_FIXTURES = Path(__file__).parent / "fixtures"
+
+# (label, plan-PDF path, printed object nouns that MUST survive distillation).
+# Crow/Bob's have committed fixtures; Chelsea/Moxy read the large real uploads
+# (skipped when absent so the suite stays green on a clean checkout).
+_PLAN_DIGEST_CASES = [
+    ("crow", _FIXTURES / "crow_cass" / "crow_cass_plans.pdf",
+     ["column", "bollard", "s.c.c.p"]),
+    ("bobs", _FIXTURES / "bobs_discount" / "bobs_discount_plans.pdf",
+     ["cmu", "gas", "lintel", "eifs"]),
+    ("chelsea", _UPLOADS / "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+     ["column", "stair"]),
+    ("moxy", _UPLOADS / "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+     ["column", "gas", "elevator"]),
+]
+
+_DISTILL_CAP = 15000
+
+
+@pytest.mark.parametrize("label,path,nouns", _PLAN_DIGEST_CASES)
+def test_distilled_naming_text_covers_all_four_plans(label, path, nouns):
+    if not path.is_file():
+        pytest.skip("{} plan PDF not present: {}".format(label, path))
+    import fitz
+    doc = fitz.open(str(path))
+    pages = [{"full_page_text": doc[i].get_text() or ""} for i in range(doc.page_count)]
+    doc.close()
+
+    digest = distill_naming_text(pages)
+    assert digest, "{}: distilled naming text is empty".format(label)
+    assert len(digest) <= _DISTILL_CAP, \
+        "{}: digest {} chars exceeds the {} cap".format(label, len(digest), _DISTILL_CAP)
+    low = digest.lower()
+    for noun in nouns:
+        assert noun in low, \
+            "{}: distilled digest is missing printed object noun {!r}".format(label, noun)
+
+
+def test_distill_naming_text_empty_input_is_empty_string():
+    assert distill_naming_text([]) == ""
+    assert distill_naming_text([""]) == ""
+
+
+def test_distill_naming_text_truncates_with_marker():
+    # Many unique naming-signal lines → over a tiny cap → truncated with marker.
+    body = "\n".join(
+        "COLUMN wall bollard CMU detail line {} SCHEDULE".format(i)
+        for i in range(2000)
+    )
+    digest = distill_naming_text([body], max_chars=1500)
+    marker = "… [naming text truncated]"
+    assert marker in digest
+    assert len(digest) <= 1500 + len("\n" + marker)
+
+
+def test_harvest_naming_signal_lines_keeps_only_naming_lines():
+    text = (
+        "COLUMN GRID LAYOUT\n"
+        "THE QUICK BROWN FOX JUMPED\n"        # no naming signal → dropped
+        "PROVIDE BOLLARDS AT ALL DOCK DOORS\n"
+        "SEE ARCHITECT FOR COLORS\n"          # no naming signal → dropped
+        "8\" CMU MASONRY WALL\n"
+    )
+    lines = harvest_naming_signal_lines(text)
+    joined = " | ".join(lines).lower()
+    assert "column" in joined and "bollard" in joined and "cmu" in joined
+    assert "quick brown fox" not in joined
+    assert "see architect for colors" not in joined

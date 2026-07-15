@@ -20,10 +20,19 @@ annotations, no match statements).
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Callable, Dict, List, Optional
 
 from bobbytailor.vision.schemas import naming_convention_schema, vocabulary_schema
+
+# Tolerant JSON repair (shared with claude_analyzer) — used only as the last
+# guarded step when recovering a naming manifest from a prose-wrapped payload.
+try:
+    from json_repair import repair_json as _repair_json
+    _JSON_REPAIR_AVAILABLE = True
+except ImportError:  # pragma: no cover — optional dependency
+    _JSON_REPAIR_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +266,18 @@ def majority_vote_objects(samples: List[List[Dict]]) -> List[Dict]:
     return kept
 
 
-_MAX_NAMING_TEXT_CHARS = 48000
+# The reader pass is fed LEAN, distilled naming text
+# (:func:`component_library.distill_naming_text`, already capped). This is the
+# final safety net so an over-long caller input can never blow the request
+# budget — the raw 35k-token dump on Bob's caused the invalid_json failure the
+# Opus routing + distillation fix targets. Truncated WITH a marker (below).
+_MAX_NAMING_TEXT_CHARS = 15000
+
+# Retry budget for the reader/manifest pass: 1 initial call + up to 2 fresh
+# retries on an invalid / empty / error result before falling back (loudly) to
+# the deterministic library. Bounded so a persistently-failing model cannot
+# loop — the pass is additive and must never block a run.
+_NAMING_MAX_ATTEMPTS = 3
 
 NAMING_CONVENTION_INSTRUCTION = (
     "You are a construction estimator preparing a take-off. Read THIS plan's "
@@ -291,15 +311,15 @@ def build_naming_hint(naming_text: Optional[str]) -> str:
     """Build the user-message hint: naming instruction + the plan's naming text.
 
     The instruction frames the naming-convention task; *naming_text* is the
-    comprehensive plan text harvested by
-    :func:`component_library.extract_naming_text` (keynotes / notes / detail
-    labels / abbreviations / schedules). Truncated to ``_MAX_NAMING_TEXT_CHARS``
-    to bound request size while keeping far more context than the vocabulary
-    pass (naming conventions live throughout the notes, not just the top).
+    LEAN, distilled plan text harvested by
+    :func:`component_library.distill_naming_text` (abbreviations / detail labels
+    / object-noun + keynote + schedule lines — already capped). Re-truncated to
+    ``_MAX_NAMING_TEXT_CHARS`` here as a final safety net (with a marker) so an
+    over-long caller input can never blow the reader pass's request budget.
     """
     text = (naming_text or "").strip()
     if len(text) > _MAX_NAMING_TEXT_CHARS:
-        text = text[:_MAX_NAMING_TEXT_CHARS]
+        text = text[:_MAX_NAMING_TEXT_CHARS].rstrip() + "\n… [naming text truncated]"
     if not text:
         return NAMING_CONVENTION_INSTRUCTION
     return "{}\n\nPLAN NAMING TEXT (keynotes, notes, details, abbreviations, schedules):\n{}".format(
@@ -344,67 +364,8 @@ def _clean_convention(obj: Dict) -> Optional[Dict]:
     }
 
 
-def extract_naming_conventions(
-    analyzer: Callable,
-    image_path: str,
-    naming_text: str,
-    guard=None,
-    sheet_name: str = "project",
-) -> List[Dict]:
-    """ONE structured vision call → THIS plan's naming CONVENTION library.
-
-    Reads the plan's own notes / details / abbreviations / schedules (plus
-    optionally the main-plan image) and returns the naming library the plan
-    uses: a list of ``{canonical_name, aliases, basis, binding_hint, variant,
-    thickness_in, height_ft}`` objects (see
-    :func:`schemas.naming_convention_schema`). Semantic-only — no numeric
-    fields. Additive: on ANY model error or malformed response returns ``[]``
-    (never raises, never blocks a run).
-
-    Args:
-        analyzer:    Callable with the ``analyze_drawing`` signature (injected
-                     so tests stub it — this function NEVER makes a real call).
-        image_path:  Path to the project's main floor-plan image (optional
-                     visual context).
-        naming_text: Comprehensive plan naming text (from
-                     :func:`component_library.extract_naming_text`).
-        guard:       Optional BudgetGuard; the completed call is charged.
-        sheet_name:  Label for logging / model routing.
-    """
-    try:
-        if guard is not None and getattr(guard, "exhausted", False):
-            logger.info(
-                "extract_naming_conventions: budget exhausted — skipping naming pass"
-            )
-            return []
-        hint = build_naming_hint(naming_text)
-        result = analyzer(
-            image_path,
-            sheet_name,
-            pass_type="naming_conventions",
-            sheet_type="",
-            output_schema=naming_convention_schema(),
-            images=[image_path] if image_path else None,
-            user_hint=hint,
-        )
-    except Exception as exc:  # noqa: BLE001 — naming is strictly additive
-        logger.warning("extract_naming_conventions: vision call failed: %s", exc)
-        return []
-
-    if guard is not None:
-        try:
-            guard.charge(_result_cost_usd(result))
-        except Exception as exc:  # noqa: BLE001 — never let accounting break the run
-            logger.warning("extract_naming_conventions: budget charge failed: %s", exc)
-
-    if not isinstance(result, dict) or result.get("error"):
-        logger.warning(
-            "extract_naming_conventions: no naming library (%s)",
-            (result or {}).get("error") if isinstance(result, dict) else type(result),
-        )
-        return []
-
-    objects = result.get("objects")
+def _conventions_from_objects(objects) -> List[Dict]:
+    """Clean a raw ``objects`` list into the naming-convention shape (drop junk)."""
     if not isinstance(objects, list):
         return []
     cleaned: List[Dict] = []
@@ -413,6 +374,171 @@ def extract_naming_conventions(
         if entry is not None:
             cleaned.append(entry)
     return cleaned
+
+
+def _tolerant_json_object(text) -> Optional[Dict]:
+    """Best-effort recover a JSON object from prose / markdown-wrapped text.
+
+    Mirrors the freeform JSON-repair the ``analyze_drawing`` freeform path uses,
+    but GUARDED and scoped to the naming pass: strip a ``` fence, isolate the
+    outermost ``{ ... }`` span, ``json.loads`` it, and (only then) fall back to
+    ``json_repair`` when available. Returns the parsed dict or ``None`` — never
+    raises. This recovers a manifest the structured-output path emitted as text
+    (the ``invalid_json`` payload carries the raw model text under ``raw``).
+    """
+    if not isinstance(text, str) or not text.strip():
+        return None
+    s = text.strip()
+    # Strip a leading markdown code fence (```json ... ``` or ``` ... ```).
+    if s.startswith("```"):
+        parts = s.split("```")
+        if len(parts) >= 2:
+            s = parts[1]
+            if s.lstrip().lower().startswith("json"):
+                s = s.lstrip()[4:]
+    # Isolate the outermost JSON object span.
+    start = s.find("{")
+    end = s.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    candidate = s[start : end + 1]
+    try:
+        obj = json.loads(candidate)
+    except Exception:  # noqa: BLE001 — fall through to guarded repair
+        obj = None
+    if obj is None and _JSON_REPAIR_AVAILABLE:
+        try:
+            obj = _repair_json(candidate, return_objects=True)
+        except Exception:  # noqa: BLE001 — repair is best-effort only
+            obj = None
+    return obj if isinstance(obj, dict) else None
+
+
+def extract_naming_conventions(
+    analyzer: Callable,
+    image_path: str,
+    naming_text: str,
+    guard=None,
+    sheet_name: str = "project",
+) -> List[Dict]:
+    """Resilient structured vision call → THIS plan's naming CONVENTION library.
+
+    Reads the plan's own notes / details / abbreviations / schedules (plus
+    optionally the main-plan image) and returns the naming library the plan
+    uses: a list of ``{canonical_name, aliases, basis, binding_hint, variant,
+    thickness_in, height_ft}`` objects (see
+    :func:`schemas.naming_convention_schema`). Semantic-only — no numeric
+    fields. Additive: on ANY model error or malformed response returns ``[]``
+    (never raises, never blocks a run) so the caller keeps the deterministic
+    library.
+
+    ROBUSTNESS (the #1 generalization fix — Bob's returned ``invalid_json`` →
+    no manifest → 8% accuracy):
+      - **Retry.** An invalid / empty / error result is retried with a FRESH
+        call up to :data:`_NAMING_MAX_ATTEMPTS` times before giving up.
+      - **Tolerant extract.** When a call fails with ``invalid_json`` but
+        carries raw model text, :func:`_tolerant_json_object` recovers the
+        manifest (strip prose / markdown, outer ``{...}``, guarded repair)
+        before consuming a retry.
+      - **Loud fallback.** When every attempt fails the pass logs a WARNING
+        naming the sheet + a naming-text fingerprint, then returns ``[]``.
+
+    Args:
+        analyzer:    Callable with the ``analyze_drawing`` signature (injected
+                     so tests stub it — this function NEVER makes a real call).
+        image_path:  Path to the project's main floor-plan image (optional
+                     visual context).
+        naming_text: LEAN distilled plan naming text (from
+                     :func:`component_library.distill_naming_text`).
+        guard:       Optional BudgetGuard; each completed call is charged.
+        sheet_name:  Label for logging / model routing.
+    """
+    if guard is not None and getattr(guard, "exhausted", False):
+        logger.info(
+            "extract_naming_conventions: budget exhausted — skipping naming pass"
+        )
+        return []
+
+    hint = build_naming_hint(naming_text)
+    last_error = None
+
+    for attempt in range(1, _NAMING_MAX_ATTEMPTS + 1):
+        # Budget can drain across retries — stop charging further calls once it does.
+        if guard is not None and getattr(guard, "exhausted", False):
+            last_error = "budget_exhausted"
+            break
+        try:
+            result = analyzer(
+                image_path,
+                sheet_name,
+                pass_type="naming_conventions",
+                sheet_type="",
+                output_schema=naming_convention_schema(),
+                images=[image_path] if image_path else None,
+                user_hint=hint,
+            )
+        except Exception as exc:  # noqa: BLE001 — naming is strictly additive
+            logger.warning(
+                "extract_naming_conventions: vision call raised "
+                "(attempt %d/%d): %s",
+                attempt, _NAMING_MAX_ATTEMPTS, exc,
+            )
+            last_error = exc
+            continue
+
+        # Charge whatever the call cost (even an error result reflects paid work).
+        if guard is not None:
+            try:
+                guard.charge(_result_cost_usd(result))
+            except Exception as exc:  # noqa: BLE001 — never let accounting break the run
+                logger.warning(
+                    "extract_naming_conventions: budget charge failed: %s", exc
+                )
+
+        # Happy path: a well-formed structured result with named objects.
+        if isinstance(result, dict) and not result.get("error"):
+            cleaned = _conventions_from_objects(result.get("objects"))
+            if cleaned:
+                return cleaned
+            last_error = "empty"
+        else:
+            last_error = (
+                result.get("error") if isinstance(result, dict) else type(result)
+            )
+            # Tolerant recovery: a text response the structured path could not
+            # parse (invalid_json) still carries the raw model text — try to
+            # extract the manifest from it before spending a retry.
+            if isinstance(result, dict) and result.get("raw"):
+                recovered = _tolerant_json_object(result.get("raw"))
+                if recovered is not None:
+                    cleaned = _conventions_from_objects(recovered.get("objects"))
+                    if cleaned:
+                        logger.warning(
+                            "extract_naming_conventions: recovered naming "
+                            "manifest from invalid_json via tolerant extract "
+                            "(attempt %d, sheet=%s)",
+                            attempt, sheet_name,
+                        )
+                        return cleaned
+
+        if attempt < _NAMING_MAX_ATTEMPTS:
+            logger.warning(
+                "extract_naming_conventions: no naming library "
+                "(attempt %d/%d, error=%s) — retrying with a fresh call",
+                attempt, _NAMING_MAX_ATTEMPTS, last_error,
+            )
+
+    # Loud fallback — every attempt failed. The caller keeps the deterministic
+    # library; log with the sheet + a naming-text fingerprint so the failing
+    # plan is VISIBLE (invalid_json silently killed the manifest on Bob's).
+    fingerprint = " ".join((naming_text or "").split())[:80]
+    logger.warning(
+        "extract_naming_conventions: FELL BACK to the deterministic library "
+        "after %d attempt(s) (sheet=%s, last_error=%s) — reader pass produced "
+        "NO manifest; naming_text[:80]=%r",
+        _NAMING_MAX_ATTEMPTS, sheet_name, last_error, fingerprint,
+    )
+    return []
 
 
 def majority_keep_conventions(samples: List[List[Dict]]) -> List[Dict]:
@@ -426,8 +552,14 @@ def majority_keep_conventions(samples: List[List[Dict]]) -> List[Dict]:
     thickness_in / height_ft are the plurality of the non-empty sample values
     (ties → the first-seen non-empty). First-seen name casing / order preserved.
     N==1 returns that sample unchanged. Never raises.
+
+    An EMPTY sample (a naming call that failed / returned nothing) is treated as
+    a NON-VOTE, not a majority-diluting sample — it is excluded from the sample
+    count ``n``. Otherwise a single invalid vote could halve the majority and
+    drop an object the real votes all named (the ``invalid_json`` failure mode
+    this robustness pass targets).
     """
-    clean = [s for s in (samples or []) if isinstance(s, list)]
+    clean = [s for s in (samples or []) if isinstance(s, list) and s]
     n = len(clean)
     if n == 0:
         return []
