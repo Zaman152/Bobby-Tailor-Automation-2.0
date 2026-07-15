@@ -703,26 +703,58 @@ def _resolve_wall_height(manifest, learned) -> "tuple[float, str]":
 
 
 # Autonomous wall-height resolution (manifest replacement, plans-only).
-# Keywords whose neighborhood in the plan text layer plausibly carries a wall /
-# clear-height callout; a feet-inches token near one of these is a candidate.
-_WALL_HEIGHT_KEYWORDS = (
+#
+# Precedence is TIERED so an explicit clear-height callout is never outvoted by a
+# stray plan dimension that happens to sit near a material keyword (the Crow bug:
+# "48' - 4\"" bay dimensions near "PANEL" resolved 48' instead of the printed
+# "36' CLEAR"). Tier 1 (CLEAR/CLR) is authoritative; Tier 2 is an explicit
+# wall-height keyword; Tier 3 (material-adjacent / A.F.F) is the least-reliable
+# fallback used only when no clear/wall-height callout parses.
+#
+# Tier 2 — explicit wall-height keywords (a feet-inches token in the window is a
+# genuine wall-height callout).
+_WALL_HEIGHT_PRIMARY_KEYWORDS = (
     "T.O. WALL",
     "TOP OF WALL",
     "T/WALL",
     "WALL HEIGHT",
     "WALL HT",
-    "CLEAR HEIGHT",
-    "CLEAR HT",
-    "CLR HT",
-    "CLEAR",
-    "CLR",
+)
+# Tier 3 — material-adjacent / above-finished-floor tokens (weakest signal; a
+# nearby feet-inches token MAY be a wall height but is often a plan dimension, so
+# this tier fires only when Tiers 1 & 2 are empty).
+_WALL_HEIGHT_MATERIAL_KEYWORDS = (
     "TILT",
     "CMU",
     "PANEL",
+    "A.F.F",
+    "AFF",
 )
+# Back-compat alias (kept for any external reference); the union of the keyword
+# tiers scanned by the feet-inches window search.
+_WALL_HEIGHT_KEYWORDS = _WALL_HEIGHT_PRIMARY_KEYWORDS + _WALL_HEIGHT_MATERIAL_KEYWORDS
 # Feet-inches token: "35'-0\"", "30' - 6", "24'". Feet 1-2 digits (heights are
 # single/double-digit); inches optional.
 _WALL_HEIGHT_TOKEN = re.compile(r"(\d{1,2})\s*'\s*-?\s*(\d{1,2})?\s*\"?")
+# Dedicated CLEAR / CLR clear-height patterns (Tier 1, authoritative). A foot
+# mark is REQUIRED so a bare "48" gridline number or an inch value
+# ("48\" A.F.F.") can never match; the whole-word CLEAR boundary excludes
+# "CLEARANCE" and "CLEAR ANODIZED".
+_CLEAR_HEIGHT_PATTERNS = (
+    # feet (opt. inches) immediately before the CLEAR / CLR keyword:
+    #   "36' CLEAR", "BUILDING TO BE 36'-0\" CLEAR"
+    re.compile(
+        r"(\d{1,2})\s*'\s*(?:-\s*(\d{1,2})\s*\"?)?\s*(?:CLEAR|CLR)\b",
+        re.IGNORECASE,
+    ),
+    # the keyword (opt. HEIGHT/HT) then the feet value:
+    #   "CLEAR HEIGHT 36'", "CLR HT 24'-0\"", "CLEAR 18'-0\""
+    re.compile(
+        r"\b(?:CLEAR|CLR)\b(?:\s*(?:HEIGHT|HT))?\s*[:=]?\s*(\d{1,2})\s*'\s*"
+        r"(?:-\s*(\d{1,2})\s*\"?)?",
+        re.IGNORECASE,
+    ),
+)
 # Plausible interior/clear wall heights (ft). Outside this band we are reading a
 # plan dimension, a detail callout, or a spec code — not a wall height.
 _WALL_HEIGHT_MIN_FT = 8.0
@@ -731,16 +763,58 @@ _WALL_HEIGHT_MAX_FT = 60.0
 _WALL_HEIGHT_DEFAULT_FT = 30.0
 
 
-def _parse_wall_height_token(match) -> Optional[float]:
-    """Feet-inches regex match → feet within the plausible wall-height band."""
-    feet = int(match.group(1))
-    inches = int(match.group(2)) if match.group(2) else 0
+def _feet_inches_to_ft(feet_str, inches_str) -> Optional[float]:
+    """(feet, inches) regex groups → feet within the plausible wall-height band."""
+    try:
+        feet = int(feet_str)
+    except (TypeError, ValueError):
+        return None
+    inches = 0
+    if inches_str:
+        try:
+            inches = int(inches_str)
+        except (TypeError, ValueError):
+            inches = 0
     if inches >= 12:
         return None
     val = feet + inches / 12.0
     if _WALL_HEIGHT_MIN_FT <= val <= _WALL_HEIGHT_MAX_FT:
         return val
     return None
+
+
+def _parse_wall_height_token(match) -> Optional[float]:
+    """Feet-inches regex match → feet within the plausible wall-height band."""
+    return _feet_inches_to_ft(match.group(1), match.group(2))
+
+
+def _clear_height_values(text: str) -> List[float]:
+    """Plausible clear heights from explicit CLEAR / CLR callouts (Tier 1)."""
+    out: List[float] = []
+    for pat in _CLEAR_HEIGHT_PATTERNS:
+        for m in pat.finditer(text):
+            val = _feet_inches_to_ft(m.group(1), m.group(2))
+            if val is not None:
+                out.append(val)
+    return out
+
+
+def _keyword_window_heights(text: str, upper: str, keywords) -> List[float]:
+    """Plausible heights from feet-inches tokens near each keyword's occurrence."""
+    heights: List[float] = []
+    for keyword in keywords:
+        start = 0
+        while True:
+            idx = upper.find(keyword, start)
+            if idx < 0:
+                break
+            start = idx + len(keyword)
+            window = text[max(0, idx - 30): idx + len(keyword) + 40]
+            for match in _WALL_HEIGHT_TOKEN.finditer(window):
+                val = _parse_wall_height_token(match)
+                if val is not None:
+                    heights.append(val)
+    return heights
 
 
 def _resolve_project_wall_height(pages_text, footprint=None, learned=None) -> "tuple[float, str]":
@@ -782,21 +856,22 @@ def _resolve_project_wall_height(pages_text, footprint=None, learned=None) -> "t
     text = pages_text or ""
     if text:
         upper = text.upper()
-        heights: List[float] = []
-        for keyword in _WALL_HEIGHT_KEYWORDS:
-            start = 0
-            while True:
-                idx = upper.find(keyword, start)
-                if idx < 0:
-                    break
-                start = idx + len(keyword)
-                window = text[max(0, idx - 30): idx + len(keyword) + 40]
-                for match in _WALL_HEIGHT_TOKEN.finditer(window):
-                    val = _parse_wall_height_token(match)
-                    if val is not None:
-                        heights.append(val)
-        if heights:
-            return round(max(heights), 2), "plan"
+        # Tier 1 (authoritative) — an explicit CLEAR / CLR clear-height callout
+        # ("NN' CLEAR", "CLEAR HEIGHT NN'"). This is THE building/wall height on
+        # tilt-up & industrial plans and must win over any material-adjacent
+        # plan dimension (Crow: "36' CLEAR" beats stray "48' - 4\"" bay dims).
+        clears = _clear_height_values(text)
+        if clears:
+            return round(max(clears), 2), "plan"
+        # Tier 2 — an explicit wall-height keyword (T.O. WALL, WALL HEIGHT, ...).
+        primary = _keyword_window_heights(text, upper, _WALL_HEIGHT_PRIMARY_KEYWORDS)
+        if primary:
+            return round(max(primary), 2), "plan"
+        # Tier 3 (fallback) — material-adjacent / A.F.F tokens (least reliable);
+        # used ONLY when no clear-height or wall-height callout parsed.
+        material = _keyword_window_heights(text, upper, _WALL_HEIGHT_MATERIAL_KEYWORDS)
+        if material:
+            return round(max(material), 2), "plan"
 
     return _WALL_HEIGHT_DEFAULT_FT, "default"
 
