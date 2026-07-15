@@ -46,7 +46,7 @@ def test_takeoff_legend_sf_and_ea_rows():
     assert abs(by_type["cmu_wall"]["quantity"] - 2204.33) < 1
     assert by_type["columns"]["quantity"] == 132
     # Authoritative legend rows are tagged so aggregation can dedupe vision items.
-    assert all(e.get("qty_source") == "companion_takeoff_legend" for e in est)
+    assert all(e.get("qty_source") == "plan_schedule_legend" for e in est)
 
 
 def test_takeoff_legend_does_not_apply_waste():

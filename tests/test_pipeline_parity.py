@@ -1059,5 +1059,5 @@ class TestCompanionIsolation:
             src = _SRC_FILES[name].read_text()
             assert "find_companion_takeoff_pdf" not in src, name
             assert "companion_takeoff" not in src.replace(
-                "companion_takeoff_legend", ""
+                "plan_schedule_legend", ""
             ), name

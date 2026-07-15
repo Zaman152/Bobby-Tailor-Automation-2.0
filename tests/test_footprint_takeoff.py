@@ -165,7 +165,7 @@ def test_footprint_overrides_unstable_vision_area():
         # Authoritative footprint-derived legend row (what our legend becomes).
         {"description": "Exposed Structure", "item_type": "exposed_structure",
          "quantity": 397600.0, "unit": "SF",
-         "qty_source": "companion_takeoff_legend", "confidence": "high"},
+         "qty_source": "plan_schedule_legend", "confidence": "high"},
         # Unstable vision read of the same item — must be suppressed, not summed.
         {"description": "Exposed Structure", "item_type": "exposed_structure",
          "calculated_quantity": 440180.0, "calculated_unit": "SF",

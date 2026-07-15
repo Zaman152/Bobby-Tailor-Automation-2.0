@@ -90,6 +90,37 @@ def _pick_model(
     return CLAUDE_MODEL
 
 
+def _response_text(response) -> str:
+    """Concatenate the text of every ``text`` content block in a response.
+
+    Claude Sonnet 5 (and other extended-thinking models) return one or more
+    ``ThinkingBlock`` entries BEFORE the answer, so ``response.content[0]`` is
+    NOT guaranteed to be the text/JSON block — a bare ``.content[0].text``
+    raises ``'ThinkingBlock' object has no attribute 'text'`` and silently
+    drops the whole sheet's extraction. Scan for the text block(s) instead;
+    thinking / tool_use / other block types are skipped. Raises ValueError if
+    the response carries no text block at all (a real, surfaced error rather
+    than a swallowed empty result).
+    """
+    blocks = getattr(response, "content", None) or []
+    # Preferred: explicit type=="text" blocks (the real SDK TextBlock shape).
+    parts = [
+        b.text for b in blocks
+        if getattr(b, "type", None) == "text" and hasattr(b, "text")
+    ]
+    if not parts:
+        # Fallback for SDK/stub shapes that omit .type: any block exposing a
+        # .text attribute. A ThinkingBlock carries .thinking (NOT .text), so it
+        # is still skipped here — the extended-thinking bug stays fixed.
+        parts = [b.text for b in blocks if hasattr(b, "text")]
+    if not parts:
+        raise ValueError(
+            "Model response contained no text block "
+            f"(blocks: {[getattr(b, 'type', '?') for b in blocks]})"
+        )
+    return "".join(parts)
+
+
 def encode_image(filepath: str) -> Tuple[str, str]:
     """Encode image to base64 and detect media type.
     Automatically compresses to stay under the Anthropic 5 MB base64 limit
@@ -336,7 +367,7 @@ def analyze_drawing(
         output_tokens = usage.output_tokens
         cost_usd = (input_tokens * p["in"] + output_tokens * p["out"]) / 1_000_000
 
-        raw_text = response.content[0].text.strip()
+        raw_text = _response_text(response).strip()
 
         if output_schema is None:
             # Freeform path — strip markdown fences if present
@@ -603,6 +634,6 @@ Return JSON only:
     )
 
     try:
-        return json.loads(response.content[0].text.strip())
+        return json.loads(_response_text(response).strip())
     except Exception:
         return {"action": "wait", "reason": "Could not parse response"}

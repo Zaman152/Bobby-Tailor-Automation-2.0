@@ -243,7 +243,7 @@ def aggregate_takeoff(calculated_items: List[Dict], manifest=None, learned=None)
     # vision/room-derived duplicates of items the legend already covers.
     legend_names: set = set()
     for item in calculated_items:
-        if item.get("qty_source") == "companion_takeoff_legend":
+        if item.get("qty_source") == "plan_schedule_legend":
             desc = item.get("description", "")
             name, _ = normalize_item_name(
                 desc, item.get("item_type", ""), item.get("unit", ""), learned=learned,
@@ -270,13 +270,14 @@ def aggregate_takeoff(calculated_items: List[Dict], manifest=None, learned=None)
         except (TypeError, ValueError):
             continue
 
-        is_legend = item.get("qty_source") == "companion_takeoff_legend"
+        is_legend = item.get("qty_source") == "plan_schedule_legend"
         bucket_source = ""
         if is_legend:
-            # Trust the take-off: keep its label and unit exactly as printed.
+            # Trust the plan's own printed schedule: keep its label and unit
+            # exactly as printed.
             canonical_name = _clean_legend_label(desc)
             canonical_unit = (unit or "").strip().upper()
-            bucket_source = "companion_takeoff_legend"
+            bucket_source = "plan_schedule_legend"
         else:
             # Manifest takes priority over the hardcoded map: when the user told us
             # what objects exist and what to call them, use that name + unit VERBATIM.

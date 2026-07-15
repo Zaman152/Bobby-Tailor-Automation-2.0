@@ -20,7 +20,7 @@ def test_companion_legend_suppresses_vision_duplicate():
     items = [
         {"description": "Sealed Concrete", "item_type": "sealed_concrete",
          "calculated_quantity": 395673.42, "calculated_unit": "sq_ft",
-         "qty_source": "companion_takeoff_legend", "source_sheet": "A-101"},
+         "qty_source": "plan_schedule_legend", "source_sheet": "A-101"},
         {"description": "Sealed Concrete for Warehouse", "item_type": "sealed_concrete",
          "calculated_quantity": 397556.0, "calculated_unit": "sq_ft",
          "qty_source": "room_profile", "source_sheet": "A-101"},
@@ -36,7 +36,7 @@ def test_companion_legend_suppresses_base_name_variant():
     items = [
         {"description": "Columns-H-35'", "item_type": "columns",
          "calculated_quantity": 132, "calculated_unit": "ea",
-         "qty_source": "companion_takeoff_legend", "source_sheet": "S-101"},
+         "qty_source": "plan_schedule_legend", "source_sheet": "S-101"},
         {"description": "Columns", "item_type": "columns",
          "calculated_quantity": 140, "calculated_unit": "ea",
          "qty_source": "count", "source_sheet": "S-101"},
@@ -52,7 +52,7 @@ def test_companion_legend_keeps_unrelated_vision_items():
     """Suppression must not touch items the legend doesn't cover."""
     items = [
         {"description": "Bollards", "item_type": "bollard", "calculated_quantity": 28,
-         "calculated_unit": "ea", "qty_source": "companion_takeoff_legend",
+         "calculated_unit": "ea", "qty_source": "plan_schedule_legend",
          "source_sheet": "A-101"},
         {"description": "windows", "item_type": "general",
          "calculated_quantity": 7, "calculated_unit": "ea", "qty_source": "count",
