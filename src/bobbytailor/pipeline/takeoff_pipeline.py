@@ -103,6 +103,10 @@ from bobbytailor.learning.retrieval import (  # noqa: F401 (re-exported for patc
     apply_learned_quantity_flags,
     load_learned_context,
 )
+# AI-manifest persistence (learn-ai-manifest): module-level import so tests can
+# patch `takeoff_pipeline.record_ai_manifest` and so the Opus naming manifest
+# ACCUMULATES into learning_vocabulary (source='ai') for reuse on future runs.
+from bobbytailor.learning.store import record_ai_manifest  # noqa: F401
 
 # Verify-retry arbitration (21-14): module-level import so tests can patch
 # `takeoff_pipeline.retry_flagged_items` (patchability convention, 20-00).
@@ -2631,6 +2635,33 @@ class TakeoffPipeline:
         # for the calculator and downstream aggregation (RESEARCH §6).
         if project_key and self._settings.learning_enabled:
             self.load_learning(project_key, project_type)
+
+        # Persist the AI naming manifest (learn-ai-manifest): the Opus-built
+        # project vocabulary is upserted into learning_vocabulary as
+        # source='ai' at a modest weight so it ACCUMULATES a growing autonomous
+        # naming dictionary across runs (human corrections still outrank it —
+        # retrieval ranks source='human' first). Best-effort: a store failure
+        # must NEVER break a run (additive, wrapped, logged non-fatal).
+        if (
+            project_key
+            and self._settings.learning_enabled
+            and getattr(self, "_project_vocabulary", None)
+        ):
+            try:
+                n = record_ai_manifest(
+                    project_key, project_type, self._project_vocabulary
+                )
+                logger.info(
+                    "run_project: persisted AI naming manifest → %d vocabulary "
+                    "row(s) (source='ai', project_type=%r)",
+                    n, project_type,
+                )
+            except Exception as exc:  # noqa: BLE001 — learning must never break a run
+                logger.warning(
+                    "run_project: AI-manifest persistence failed "
+                    "(project_key=%r) — run continues without it: %s",
+                    project_key, exc,
+                )
 
         # Wall height for derived wall-area estimates: manifest assumption >
         # learned wall_height_ft (injection point 3b — applies ONLY when no

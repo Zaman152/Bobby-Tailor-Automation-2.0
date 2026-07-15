@@ -53,6 +53,32 @@ VALID_SCOPES = frozenset(
     {SCOPE_ITEM, SCOPE_SCALE, SCOPE_WALL_HEIGHT, SCOPE_NAME, SCOPE_MISSED_ITEM, SCOPE_UNIT}
 )
 
+# ---------------------------------------------------------------------------
+# Vocabulary provenance (learning_vocabulary.source).
+# ---------------------------------------------------------------------------
+#: A human-authored/confirmed mapping (distilled from corrections). Default —
+#: pre-migration rows and every ``distill`` insert are 'human'.
+SOURCE_HUMAN = "human"
+#: An AI-generated mapping persisted by :func:`record_ai_manifest` (the Opus
+#: naming manifest). Ranks BELOW human rows in retrieval regardless of weight.
+SOURCE_AI = "ai"
+
+#: Initial weight for an AI-manifest vocabulary row — deliberately below a
+#: single human confirmation (1.0) so a human vote always outweighs it AND the
+#: source-first retrieval ordering makes human authoritative for the same
+#: raw_pattern (RESEARCH §6 conflict policy, human-wins invariant).
+AI_MANIFEST_WEIGHT = 0.5
+#: Modest per-run bump when the same AI mapping recurs — capped below 1.0 so an
+#: accumulated AI dictionary never numerically overtakes a human confirmation.
+AI_MANIFEST_BUMP = 0.1
+AI_MANIFEST_WEIGHT_CAP = 0.99
+
+#: Sanity caps mirrored from ``distill`` (WR-02): an AI-manifest object name is
+#: a short human-facing item label — anything longer is a stuffed/corrupted
+#: payload and must never be installed as learned vocabulary.
+MAX_AI_CANONICAL_NAME_LEN = 100
+MAX_AI_UNIT_LEN = 20
+
 #: Serialized JSON values (and item_pattern) longer than this are REJECTED
 #: on write — defense against payload stuffing through the correction UI.
 #: Rejected, never truncated: truncation corrupts the stored JSON mid-token
@@ -113,6 +139,7 @@ CREATE TABLE IF NOT EXISTS learning_vocabulary (
   unit TEXT NOT NULL,
   weight REAL NOT NULL DEFAULT 1.0,   -- votes; incremented per confirming correction
   last_seen TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'human', -- 'human' (distilled correction) | 'ai' (Opus manifest)
   UNIQUE(project_type, raw_pattern, canonical_name, unit)
 );
 
@@ -176,6 +203,26 @@ def _set_metadata(conn: sqlite3.Connection, key: str, value: str) -> None:
     )
 
 
+def _add_column_if_missing(
+    conn: sqlite3.Connection, table: str, column: str, column_def: str
+) -> None:
+    """Idempotently ALTER TABLE ADD COLUMN, guarded by a PRAGMA existence check.
+
+    ``table``/``column``/``column_def`` come from a fixed internal call site
+    (never user input); PRAGMA table_info and ALTER TABLE cannot be
+    parameterized for identifiers, so they are interpolated from these
+    trusted literals only. Safe on an existing DB — adds the column with its
+    DEFAULT (back-filling every existing row) exactly once, no-ops thereafter.
+    """
+    existing = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(%s)" % table).fetchall()
+    }
+    if column in existing:
+        return
+    conn.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, column, column_def))
+
+
 def _ensure_schema() -> None:
     """Lazy double-checked schema init (job_store pattern), keyed by DB path.
 
@@ -192,6 +239,17 @@ def _ensure_schema() -> None:
         conn = get_connection()
         try:
             conn.executescript(SCHEMA_SQL)
+            # Additive column migrations — guarded by a PRAGMA existence check
+            # so an existing pre-migration learning.db upgrades WITHOUT data
+            # loss and re-init stays idempotent (no version bump required for
+            # an additive DEFAULT'd column; the CREATE above already carries it
+            # for fresh DBs, the ALTER only fires on legacy DBs).
+            _add_column_if_missing(
+                conn,
+                "learning_vocabulary",
+                "source",
+                "TEXT NOT NULL DEFAULT '%s'" % SOURCE_HUMAN,
+            )
             version = _get_metadata(conn, SCHEMA_VERSION_KEY)
             if version is None:
                 conn.execute(
@@ -303,6 +361,130 @@ def record_correction(
             conn.close()
 
 
+def _normalize_pattern(text: Any) -> str:
+    """Whitespace-collapsed, lowercased raw_pattern key (mirrors retrieval)."""
+    return " ".join(str(text or "").split()).strip().lower()
+
+
+def record_ai_manifest(
+    project_key: Optional[str],
+    project_type: Optional[str],
+    objects: Optional[List[Dict[str, Any]]],
+    ts: Optional[str] = None,
+) -> int:
+    """Persist an AI-generated naming manifest into ``learning_vocabulary``.
+
+    The Opus naming pass (``vision.object_vocabulary`` / the merged project
+    vocabulary) builds a per-run manifest that today lives ONLY in memory and
+    is regenerated every run. This upserts each manifest object into
+    ``learning_vocabulary`` with ``source='ai'`` so the app accumulates a
+    growing autonomous naming dictionary that future runs reuse.
+
+    For each object, every one of {canonical name} ∪ {aliases} becomes a
+    ``raw_pattern`` (normalized/lowercased) mapping to the object's canonical
+    name + unit, at a MODEST weight (:data:`AI_MANIFEST_WEIGHT`, below a single
+    human confirmation at 1.0). Idempotent via the UNIQUE constraint: a
+    recurring AI mapping bumps its weight slightly (capped below 1.0) and
+    refreshes ``last_seen``; a first sighting inserts a fresh row.
+
+    Human-wins invariant: an existing ``source='human'`` row for the same
+    (project_type, raw_pattern, canonical_name, unit) is NEVER overwritten or
+    re-weighted — the human mapping is left exactly as distilled. (Retrieval
+    additionally ranks any human row for the same raw_pattern first, so a
+    human's canonical name overrides the AI's regardless of weight.)
+
+    ``ts`` is the ``last_seen`` timestamp (accepted like ``record_correction``
+    derives ``created_at``); defaults to UTC now. Returns the number of rows
+    inserted or updated. ``project_type=None`` writes global (NULL) rows.
+    """
+    if not objects:
+        return 0
+    _ensure_schema()
+    seen_at = ts or _utc_now()
+    project_type = project_type if project_type else None
+
+    written = 0
+    with _write_lock:
+        conn = get_connection()
+        try:
+            for obj in objects:
+                if not isinstance(obj, dict):
+                    continue
+                canonical = str(obj.get("canonical_name") or obj.get("name") or "").strip()
+                unit = str(obj.get("unit") or "").strip()
+                # WR-02 sanity gate — never install an over-length/empty mapping
+                # (it would flow into prompt hints and aggregation renames).
+                if (
+                    not canonical
+                    or len(canonical) > MAX_AI_CANONICAL_NAME_LEN
+                    or len(unit) > MAX_AI_UNIT_LEN
+                ):
+                    continue
+
+                raw_patterns: List[str] = []
+                seen_keys = set()
+                candidates = [canonical]
+                aliases = obj.get("aliases")
+                if isinstance(aliases, list):
+                    candidates.extend(a for a in aliases if isinstance(a, str))
+                for cand in candidates:
+                    key = _normalize_pattern(cand)
+                    if not key or len(key) > MAX_VALUE_LEN or key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+                    raw_patterns.append(key)
+
+                for raw_pattern in raw_patterns:
+                    existing = conn.execute(
+                        """
+                        SELECT id, source FROM learning_vocabulary
+                        WHERE project_type IS ? AND raw_pattern = ?
+                          AND canonical_name = ? AND unit = ?
+                        """,
+                        (project_type, raw_pattern, canonical, unit),
+                    ).fetchone()
+                    if existing is not None:
+                        # Human mapping is authoritative — leave it untouched.
+                        if existing["source"] == SOURCE_HUMAN:
+                            continue
+                        conn.execute(
+                            """
+                            UPDATE learning_vocabulary
+                            SET weight = MIN(weight + ?, ?), last_seen = ?
+                            WHERE id = ?
+                            """,
+                            (
+                                AI_MANIFEST_BUMP,
+                                AI_MANIFEST_WEIGHT_CAP,
+                                seen_at,
+                                existing["id"],
+                            ),
+                        )
+                    else:
+                        conn.execute(
+                            """
+                            INSERT INTO learning_vocabulary (
+                                project_type, raw_pattern, canonical_name, unit,
+                                weight, last_seen, source
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (
+                                project_type,
+                                raw_pattern,
+                                canonical,
+                                unit,
+                                AI_MANIFEST_WEIGHT,
+                                seen_at,
+                                SOURCE_AI,
+                            ),
+                        )
+                    written += 1
+            conn.commit()
+        finally:
+            conn.close()
+    return written
+
+
 def get_corrections(
     project_type: Optional[str] = None,
     sheet_type: Optional[str] = None,
@@ -368,20 +550,24 @@ def get_corrections(
 def get_vocabulary(project_type: Optional[str] = None) -> List[Dict[str, Any]]:
     """Learned naming map for a project type (plus global NULL rows).
 
-    Ordered by weight DESC so the max-weight mapping wins; ties broken by
-    most-recent ``last_seen`` (RESEARCH §6 conflict policy).
+    Precedence (RESEARCH §6 conflict policy + human-wins invariant):
+    ``source='human'`` rows rank BEFORE ``source='ai'`` rows regardless of
+    weight — a human's canonical name always overrides the AI manifest for the
+    same raw_pattern. Within a source tier the max-weight mapping wins; ties
+    break by most-recent ``last_seen``. Both human AND ai rows are returned so
+    the accumulated AI dictionary is reused when no human row exists.
     """
     _ensure_schema()
     conn = get_connection()
     try:
         rows = conn.execute(
             """
-            SELECT id, project_type, raw_pattern, canonical_name, unit, weight, last_seen
+            SELECT id, project_type, raw_pattern, canonical_name, unit, weight, last_seen, source
             FROM learning_vocabulary
             WHERE project_type = ? OR project_type IS NULL
-            ORDER BY weight DESC, last_seen DESC, id DESC
+            ORDER BY (source = ?) DESC, weight DESC, last_seen DESC, id DESC
             """,
-            (project_type,),
+            (project_type, SOURCE_HUMAN),
         ).fetchall()
         return [dict(r) for r in rows]
     finally:
