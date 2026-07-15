@@ -114,6 +114,8 @@ from bobbytailor.vision.schemas import (
 )
 from bobbytailor.vision.object_vocabulary import (
     build_project_vocabulary,
+    extract_naming_conventions,
+    majority_keep_conventions,
     majority_vote_objects,
     vocabulary_labels,
 )
@@ -2333,6 +2335,56 @@ class TakeoffPipeline:
             )
         return self._project_vocabulary
 
+    def _build_naming_conventions(
+        self,
+        image_path: str,
+        naming_text: str,
+        guard: Optional[BudgetGuard],
+    ) -> list:
+        """Build THIS plan's naming-convention library ONCE (voted, best-effort).
+
+        Delegates to :func:`object_vocabulary.extract_naming_conventions` with
+        the injected analyzer (budget-charged uniformly). Run N times
+        (``ensemble_settings()["n"]``, budget permitting) and majority-KEPT
+        (:func:`object_vocabulary.majority_keep_conventions`) so a stochastic
+        run cannot drop an object every other run names. Returns the cleaned
+        convention objects (``canonical_name`` / ``aliases`` / ``basis`` /
+        ``binding_hint`` / ``variant`` / ``thickness_in`` / ``height_ft``); any
+        failure returns ``[]`` (additive-only — never breaks a run).
+        """
+        try:
+            n = int(ensemble_settings()["n"])
+        except Exception:  # noqa: BLE001 — config stubbed → single-shot
+            n = 1
+        n = max(1, n)
+
+        samples: list = []
+        for _ in range(n):
+            if guard is not None and getattr(guard, "exhausted", False):
+                break
+            try:
+                objs = extract_naming_conventions(
+                    self._analyzer,
+                    image_path,
+                    naming_text,
+                    guard=guard,
+                    sheet_name="project",
+                )
+            except Exception as exc:  # noqa: BLE001 — naming is strictly additive
+                logger.warning("_build_naming_conventions: failed: %s", exc)
+                objs = []
+            samples.append(objs or [])
+            if n <= 1:
+                break
+
+        if len(samples) <= 1:
+            return samples[0] if samples else []
+        try:
+            return majority_keep_conventions(samples)
+        except Exception as exc:  # noqa: BLE001 — additive, never break a run
+            logger.warning("_build_naming_conventions: vote failed: %s", exc)
+            return samples[0] if samples else []
+
     def run_project(
         self,
         pages: list[dict],
@@ -2434,33 +2486,52 @@ class TakeoffPipeline:
         # Ladder, Guard Rail, ...) straight from the printed text. This is the
         # authoritative naming source that replaces the deleted manifest.
         deterministic_library: list = []
+        naming_text = plan_text
         try:
             from bobbytailor.deterministic.component_library import (  # noqa: PLC0415
                 harvest_component_library,
-                merge_with_vocabulary,
+                merge_with_naming_conventions,
+                extract_naming_text,
                 library_labels,
             )
             deterministic_library = harvest_component_library([plan_text])
+            # Comprehensive naming text (keynotes / notes / ALL detail labels /
+            # abbreviations / schedules) — the estimator's reading source for
+            # the AI naming-convention pass. Falls back to plan_text on failure.
+            try:
+                naming_text = extract_naming_text(pages) or plan_text
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("run_project: naming-text extraction failed: %s", exc)
+                naming_text = plan_text
         except Exception as exc:  # noqa: BLE001 — library harvest is additive-only
             logger.warning("run_project: component-library harvest failed: %s", exc)
             deterministic_library = []
 
-        llm_objects: list = []
+        # AI NAMING-CONVENTION pass (plans-only, voted, semantic-only): reads the
+        # plan's OWN notes/details/abbreviations/schedules and reports THIS
+        # plan's naming library — name/aliases/basis PLUS the binding_hint /
+        # variant / thickness that DRIVE geometry binding (columns, bollards,
+        # tilt-up interior/exterior, CMU). Best-effort: any failure leaves the
+        # deterministic library unchanged (additive-only). Gated on analyzer.
+        naming_conventions: list = []
         if self._analyzer is not None:
             vocab_page = self._select_vocabulary_page(pages)
             if vocab_page is not None:
-                llm_objects = self._build_project_vocabulary(
-                    vocab_page["image_path"], plan_text, self._run_budget
+                naming_conventions = self._build_naming_conventions(
+                    vocab_page["image_path"], naming_text, self._run_budget
                 ) or []
 
         # Merge: deterministic entries are AUTHORITATIVE for names/aliases; the
-        # LLM vocab fills a missing measure-basis and contributes object types
-        # the printed text missed. Additive: an empty library ⇒ prior behavior.
+        # AI naming pass fills a missing basis + the binding fields and adds
+        # objects the printed text missed. Additive: empty conventions ⇒ the
+        # deterministic library unchanged (prior behavior).
         try:
-            merged = merge_with_vocabulary(deterministic_library, llm_objects)
+            merged = merge_with_naming_conventions(
+                deterministic_library, naming_conventions
+            )
         except Exception as exc:  # noqa: BLE001
-            logger.warning("run_project: vocabulary merge failed: %s", exc)
-            merged = llm_objects or deterministic_library
+            logger.warning("run_project: naming-convention merge failed: %s", exc)
+            merged = deterministic_library
         if merged:
             self._project_vocabulary = merged
             try:
@@ -2468,10 +2539,10 @@ class TakeoffPipeline:
             except Exception:  # noqa: BLE001
                 pass
             logger.info(
-                "run_project: merged vocabulary → %d object type(s) "
-                "(%d deterministic, %d llm), %d candidate label(s)",
+                "run_project: naming library → %d object type(s) "
+                "(%d deterministic, %d naming), %d candidate label(s)",
                 len(self._project_vocabulary), len(deterministic_library),
-                len(llm_objects), len(self._project_vocab_labels),
+                len(naming_conventions), len(self._project_vocab_labels),
             )
 
         total = len(pages)

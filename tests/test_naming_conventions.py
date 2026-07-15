@@ -1,0 +1,460 @@
+"""Offline tests for AI-driven NAMING-CONVENTION extraction + geometry binding.
+
+No API calls anywhere — the analyzer is a stub callable; reading the real Crow
+PDF text layer in-test is allowed (and encouraged) to close the offline≠real
+gap. Pins:
+
+- naming_convention_schema() carries ZERO numeric fields (recursive check);
+- extract_naming_conventions parses a stubbed convention library, returns []
+  (never raises) on error, and majority-KEEPS across voted samples;
+- extract_naming_text harvests keynotes + abbreviations + detail labels from
+  the REAL Crow plan set;
+- geometry binding is DRIVEN by the naming library: a structural-grid cluster
+  binds to Columns, a perimeter ring to Bollards, wall thickness classes map to
+  tilt-up(ext)/CMU with the plan height, ambiguous → needs_review;
+- unnamed clusters surface as DISTINCT flagged EA rows (no "Component" blob).
+"""
+import json
+from pathlib import Path
+
+import pytest
+
+from bobbytailor.vision.schemas import naming_convention_schema
+from bobbytailor.vision.object_vocabulary import (
+    extract_naming_conventions,
+    majority_keep_conventions,
+)
+from bobbytailor.deterministic.component_library import (
+    extract_naming_text,
+    harvest_detail_labels,
+    merge_with_naming_conventions,
+)
+from bobbytailor.vision.fusion import (
+    fuse_sheet,
+    map_wall_classes_from_library,
+    merge_with_provenance,
+)
+from bobbytailor.pipeline.calculator import apply_estimation_tables
+from bobbytailor.pipeline.reporter import _normalize_calculated
+from bobbytailor.pipeline.aggregator import aggregate_takeoff, normalize_item_name
+
+
+CROW_PDF = Path(__file__).parent / "fixtures" / "crow_cass" / "crow_cass_plans.pdf"
+
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+
+def _assert_no_numeric_types(node):
+    if isinstance(node, dict):
+        declared = node.get("type")
+        if isinstance(declared, str):
+            assert declared not in ("integer", "number"), node
+        elif isinstance(declared, list):
+            assert "integer" not in declared and "number" not in declared, node
+        for value in node.values():
+            _assert_no_numeric_types(value)
+    elif isinstance(node, list):
+        for value in node:
+            _assert_no_numeric_types(value)
+
+
+def _stub_analyzer(payload):
+    """A stub analyzer returning *payload* (dict) for any call."""
+    def _call(*args, **kwargs):
+        return payload
+    return _call
+
+
+def _summary_from(symbol_groups=None, bundle_extra=None, vocabulary=None,
+                  matches=None, wall_height_ft=None, wall_height_source=None):
+    """Full offline downstream path with a naming-library vocabulary."""
+    bundle = {"sheet_name": "S-101"}
+    if symbol_groups is not None:
+        bundle["symbol_groups"] = symbol_groups
+    if bundle_extra:
+        bundle.update(bundle_extra)
+    fused = fuse_sheet(
+        bundle,
+        {"matches": matches or []},
+        vocabulary=vocabulary,
+        wall_height_ft=wall_height_ft,
+        wall_height_source=wall_height_source,
+    )
+    merged = merge_with_provenance([fused])
+    merged["_source_sheet"] = "S-101"
+    merged["sheet_type"] = "floor_plan"
+    estimates = apply_estimation_tables(merged, project_type="commercial")
+    calculated = _normalize_calculated(estimates)
+    return aggregate_takeoff(calculated), fused
+
+
+def _row(summary, item):
+    for r in summary:
+        if r.get("item") == item:
+            return r
+    return None
+
+
+def _filled_grid(cols, rows, step=30.0, size=8.0, origin=(200.0, 200.0)):
+    ox, oy = origin
+    return [
+        (ox + c * step, oy + r * step, ox + c * step + size, oy + r * step + size)
+        for r in range(rows) for c in range(cols)
+    ]
+
+
+def _perimeter_ring(n_per_side, step=25.0, size=6.0, origin=(100.0, 100.0)):
+    """A hollow rectangular ring of instance bboxes."""
+    ox, oy = origin
+    boxes = []
+    span = n_per_side * step
+    for i in range(n_per_side):
+        d = i * step
+        boxes.append((ox + d, oy, ox + d + size, oy + size))                 # top
+        boxes.append((ox + d, oy + span, ox + d + size, oy + span + size))   # bottom
+        boxes.append((ox, oy + d, ox + size, oy + d + size))                 # left
+        boxes.append((ox + span, oy + d, ox + span + size, oy + d + size))   # right
+    return boxes
+
+
+# ── 1. schema: zero numeric fields ───────────────────────────────────────────
+
+
+def test_naming_convention_schema_has_no_numeric_fields():
+    _assert_no_numeric_types(naming_convention_schema())
+
+
+def test_naming_convention_schema_thickness_height_are_strings():
+    props = naming_convention_schema()["properties"]["objects"]["items"]["properties"]
+    assert props["thickness_in"]["type"] == "string"
+    assert props["height_ft"]["type"] == "string"
+
+
+# ── 2. extract_naming_conventions: stub, error, budget ───────────────────────
+
+
+def _canned_library():
+    return {
+        "objects": [
+            {
+                "canonical_name": "Columns",
+                "aliases": ["COLUMN", "INTERIOR COLUMN"],
+                "basis": "count",
+                "binding_hint": "structural_grid_symbol",
+                "variant": "",
+                "thickness_in": "",
+                "height_ft": "35",
+            },
+            {
+                "canonical_name": "Exterior Tilt Up Wall",
+                "aliases": ["S.C.C.P.", "TILT WALL PANEL"],
+                "basis": "wall_area",
+                "binding_hint": "exterior_wall",
+                "variant": "exterior",
+                "thickness_in": "",
+                "height_ft": "36",
+            },
+        ]
+    }
+
+
+def test_extract_naming_conventions_parses_stub():
+    objs = extract_naming_conventions(_stub_analyzer(_canned_library()), "/tmp/p.png", "text")
+    names = {o["canonical_name"] for o in objs}
+    assert names == {"Columns", "Exterior Tilt Up Wall"}
+    cols = next(o for o in objs if o["canonical_name"] == "Columns")
+    assert cols["binding_hint"] == "structural_grid_symbol"
+    assert cols["basis"] == "count"
+    ext = next(o for o in objs if o["canonical_name"] == "Exterior Tilt Up Wall")
+    assert ext["variant"] == "exterior" and ext["binding_hint"] == "exterior_wall"
+
+
+def test_extract_naming_conventions_unknown_hint_normalised_to_other():
+    payload = {"objects": [{"canonical_name": "X", "binding_hint": "wat", "basis": "bogus"}]}
+    objs = extract_naming_conventions(_stub_analyzer(payload), "/tmp/p.png", "t")
+    assert objs[0]["binding_hint"] == "other"
+    assert objs[0]["basis"] is None
+
+
+def test_extract_naming_conventions_error_result_returns_empty():
+    assert extract_naming_conventions(_stub_analyzer({"error": "boom"}), "/tmp/p.png", "t") == []
+
+
+def test_extract_naming_conventions_raising_analyzer_returns_empty():
+    def _boom(*a, **k):
+        raise RuntimeError("model down")
+    assert extract_naming_conventions(_boom, "/tmp/p.png", "t") == []
+
+
+def test_extract_naming_conventions_charges_budget_guard():
+    charged = {}
+
+    class _Guard:
+        exhausted = False
+        def charge(self, usd):
+            charged["usd"] = usd
+
+    payload = dict(_canned_library())
+    payload["_cost_usd"] = 0.042
+    extract_naming_conventions(_stub_analyzer(payload), "/tmp/p.png", "t", guard=_Guard())
+    assert charged.get("usd") == 0.042
+
+
+# ── 3. majority-KEEP across voted samples ────────────────────────────────────
+
+
+def test_majority_keep_drops_minority_object():
+    a = [{"canonical_name": "Columns", "binding_hint": "structural_grid_symbol", "basis": "count"}]
+    b = [{"canonical_name": "Columns", "binding_hint": "structural_grid_symbol", "basis": "count"}]
+    c = [
+        {"canonical_name": "Columns", "binding_hint": "structural_grid_symbol", "basis": "count"},
+        {"canonical_name": "Ghost", "binding_hint": "other", "basis": "count"},
+    ]
+    kept = majority_keep_conventions([a, b, c])
+    names = {o["canonical_name"] for o in kept}
+    assert "Columns" in names        # 3/3 majority
+    assert "Ghost" not in names      # 1/3 minority dropped
+
+
+def test_majority_keep_single_sample_unchanged():
+    a = [{"canonical_name": "Bollards", "binding_hint": "perimeter_jamb_symbol"}]
+    assert majority_keep_conventions([a]) == a
+
+
+# ── 4. comprehensive naming-text extraction (REAL Crow PDF) ──────────────────
+
+
+@pytest.mark.skipif(not CROW_PDF.is_file(), reason="Crow Cass PDF fixture missing")
+def test_extract_naming_text_includes_keynotes_abbr_details_from_crow():
+    import fitz
+    doc = fitz.open(str(CROW_PDF))
+    pages = [{"full_page_text": doc[i].get_text() or ""} for i in range(doc.page_count)]
+    doc.close()
+    text = extract_naming_text(pages)
+    upper = text.upper()
+    # Keynotes / general notes that PRINT the takeoff object names.
+    assert "BOLLARD" in upper
+    assert "INTERIOR COLUMN" in upper
+    assert "TILT WALL" in upper or "S.C.C.P" in upper
+    assert "36' CLEAR" in upper or "36'" in upper
+    # Explicit ABBREVIATIONS section is surfaced.
+    assert "=== ABBREVIATIONS ===" in text
+    # Detail / section labels are surfaced.
+    assert "=== DETAIL / SECTION LABELS ===" in text
+    assert "DETAIL" in upper
+
+
+def test_harvest_detail_labels_drops_pure_refs_keeps_named():
+    text = "TYPICAL S.C.C.P. JOINT DETAIL\nDETAIL 7/A-401\nSTAIR SECTION\nDETAIL 3/A-201"
+    labels = harvest_detail_labels(text)
+    assert "TYPICAL S.C.C.P. JOINT DETAIL" in labels
+    assert "STAIR SECTION" in labels
+    assert all("A-401" not in lbl for lbl in labels)
+
+
+def test_extract_naming_text_empty_input_is_empty_string():
+    assert extract_naming_text([]) == ""
+
+
+# ── 5. symbol binding DRIVEN by the naming library ───────────────────────────
+
+
+def test_structural_grid_binds_to_columns_136_ea():
+    groups = [{
+        "candidate_id": "SYM-1",
+        "count": 136,
+        "representative_bbox_pt": (200.0, 200.0, 208.0, 208.0),
+        "instance_bboxes_pt": _filled_grid(17, 8),
+        "bbox_size_ft": (1.0, 0.4),
+        "contained_texts": [],
+        "confidence": "medium",
+    }]
+    vocab = [{"name": "Columns", "basis": "count", "binding_hint": "structural_grid_symbol"}]
+    summary, _ = _summary_from(symbol_groups=groups, vocabulary=vocab)
+    cols = _row(summary, "Columns")
+    assert cols is not None, "structural-grid cluster did not bind to Columns"
+    assert float(cols["quantity"]) == 136.0
+    assert (cols.get("unit") or "").upper() == "EA"
+
+
+def test_perimeter_ring_binds_to_bollards():
+    groups = [{
+        "candidate_id": "SYM-2",
+        "count": 56,
+        "representative_bbox_pt": (100.0, 100.0, 106.0, 106.0),
+        "instance_bboxes_pt": _perimeter_ring(14),
+        "bbox_size_ft": (0.8, 0.9),
+        "contained_texts": [],
+        "confidence": "medium",
+    }]
+    vocab = [{"name": "Bollards", "basis": "count", "binding_hint": "perimeter_jamb_symbol"}]
+    summary, _ = _summary_from(symbol_groups=groups, vocabulary=vocab)
+    boll = _row(summary, "Bollards")
+    assert boll is not None, "perimeter ring did not bind to Bollards"
+    assert float(boll["quantity"]) == 56.0
+
+
+def test_grid_and_ring_bind_together_columns_and_bollards():
+    groups = [
+        {
+            "candidate_id": "SYM-1", "count": 136,
+            "representative_bbox_pt": (200.0, 200.0, 208.0, 208.0),
+            "instance_bboxes_pt": _filled_grid(17, 8),
+            "bbox_size_ft": (1.0, 0.4), "contained_texts": [], "confidence": "medium",
+        },
+        {
+            "candidate_id": "SYM-2", "count": 56,
+            "representative_bbox_pt": (900.0, 900.0, 906.0, 906.0),
+            "instance_bboxes_pt": _perimeter_ring(14, origin=(900.0, 900.0)),
+            "bbox_size_ft": (0.8, 0.9), "contained_texts": [], "confidence": "medium",
+        },
+    ]
+    vocab = [
+        {"name": "Columns", "basis": "count", "binding_hint": "structural_grid_symbol"},
+        {"name": "Bollards", "basis": "count", "binding_hint": "perimeter_jamb_symbol"},
+    ]
+    summary, _ = _summary_from(symbol_groups=groups, vocabulary=vocab)
+    assert float(_row(summary, "Columns")["quantity"]) == 136.0
+    assert float(_row(summary, "Bollards")["quantity"]) == 56.0
+
+
+def test_large_item_not_bound_as_bollard_perimeter():
+    # A large (8.8 ft) perimeter-ish cluster is NOT a small marker → no bollard bind.
+    groups = [{
+        "candidate_id": "SYM-4", "count": 40,
+        "representative_bbox_pt": (100.0, 100.0, 200.0, 200.0),
+        "instance_bboxes_pt": _perimeter_ring(10, step=120.0, size=90.0),
+        "bbox_size_ft": (8.8, 8.7), "contained_texts": [], "confidence": "medium",
+    }]
+    vocab = [{"name": "Bollards", "basis": "count", "binding_hint": "perimeter_jamb_symbol"}]
+    summary, _ = _summary_from(symbol_groups=groups, vocabulary=vocab)
+    assert _row(summary, "Bollards") is None
+
+
+# ── 6. wall thickness class → naming-library wall object ──────────────────────
+
+
+def _wall_bundle():
+    """TC1 = thick (12") perimeter, 1714 LF; TC2 = 8", 63 LF. fpp = 1.0."""
+    walls = [
+        {"thickness_class": "TC1", "thickness_pt": 1.0, "length_pt": 1714.0},
+        {"thickness_class": "TC2", "thickness_pt": 8.0 / 12.0, "length_pt": 63.0},
+    ]
+    return {
+        "walls": walls,
+        "wall_lf_by_class": {"TC1": 1714.0, "TC2": 63.0},
+        "fpp": 1.0,
+    }
+
+
+def _wall_library():
+    return [
+        {"name": "Exterior Tilt Up Wall", "basis": "wall_area",
+         "binding_hint": "exterior_wall", "variant": "exterior"},
+        {"name": "CMU Wall", "basis": "wall_area",
+         "binding_hint": "masonry_wall", "thickness_in": "8"},
+    ]
+
+
+def test_map_wall_classes_thickness_and_hint():
+    mapping = map_wall_classes_from_library(
+        {"TC1": 1714.0, "TC2": 63.0},
+        {"TC1": 12.0, "TC2": 8.0},
+        _wall_library(),
+    )
+    assert mapping["TC2"][0] == "CMU Wall"          # thickness match (authoritative)
+    assert mapping["TC2"][2] is True                # confident
+    assert mapping["TC1"][0] == "Exterior Tilt Up Wall"  # dominant → exterior
+    assert mapping["TC1"][2] is False               # hint bind → not confident
+
+
+def test_wall_binding_through_fusion_sf_with_plan_height():
+    _, fused = _summary_from(
+        bundle_extra=_wall_bundle(),
+        vocabulary=_wall_library(),
+        wall_height_ft=36.0,
+        wall_height_source="plan",
+    )
+    comps = {c["name"]: c for c in fused["components"]}
+    assert "Exterior Tilt Up Wall" in comps
+    ext = comps["Exterior Tilt Up Wall"]
+    assert ext["unit"] == "SF"
+    assert ext["quantity"] == round(1714.0 * 36.0, 1)
+    assert ext["needs_review"] is True              # hint bind flagged
+    cmu = comps["CMU Wall"]
+    assert cmu["unit"] == "SF"
+    assert cmu["quantity"] == round(63.0 * 36.0, 1)
+
+
+def test_ambiguous_wall_class_stays_needs_review():
+    # A third thickness class no library object claims → unlabeled needs_review.
+    bundle = _wall_bundle()
+    bundle["walls"].append(
+        {"thickness_class": "TC3", "thickness_pt": 2.0, "length_pt": 300.0}
+    )
+    bundle["wall_lf_by_class"]["TC3"] = 300.0
+    _, fused = _summary_from(
+        bundle_extra=bundle, vocabulary=_wall_library(),
+        wall_height_ft=36.0, wall_height_source="plan",
+    )
+    tc3 = next(c for c in fused["components"] if c.get("candidate_id") == "WALL-TC3")
+    assert tc3["needs_review"] is True
+    assert tc3["unit"] == "LF"                       # never a silent wrong SF bind
+
+
+# ── 7. unnamed-cluster collapse fix (no "Component" blob) ─────────────────────
+
+
+def test_two_unnamed_clusters_stay_distinct_flagged_rows():
+    groups = [
+        {"candidate_id": "SYM-1", "count": 40,
+         "representative_bbox_pt": (10.0, 10.0, 16.0, 16.0),
+         "instance_bboxes_pt": [(10.0, 10.0, 16.0, 16.0)],
+         "contained_texts": [], "confidence": "medium"},
+        {"candidate_id": "SYM-2", "count": 12,
+         "representative_bbox_pt": (50.0, 50.0, 56.0, 56.0),
+         "instance_bboxes_pt": [(50.0, 50.0, 56.0, 56.0)],
+         "contained_texts": [], "confidence": "medium"},
+    ]
+    # No vision labels, no naming library → both stay unnamed but DISTINCT.
+    summary, _ = _summary_from(symbol_groups=groups, vocabulary=None)
+    qtys = sorted(float(r["quantity"]) for r in summary if r.get("quantity"))
+    assert 40.0 in qtys and 12.0 in qtys
+    # They must NOT collapse into one "Component" bucket summing 52.
+    assert _row(summary, "Component") is None
+    flagged = [r for r in summary if r.get("needs_review")]
+    assert len(flagged) >= 2
+
+
+def test_normalize_item_name_generic_component_uses_description():
+    n1, _ = normalize_item_name("SYM-1", "component", "EA")
+    n2, _ = normalize_item_name("SYM-2", "component", "EA")
+    assert n1 == "SYM-1" and n2 == "SYM-2"
+    assert n1 != n2
+
+
+# ── 8. merge: deterministic authoritative, naming fills binding fields ────────
+
+
+def test_merge_naming_conventions_fills_binding_hint_on_deterministic():
+    deterministic = [{"name": "Columns", "aliases": ["COLUMN"], "basis": "count",
+                      "unit": "EA", "source": "keynote"}]
+    conventions = [{"canonical_name": "Columns", "aliases": ["INTERIOR COLUMN"],
+                    "basis": "count", "binding_hint": "structural_grid_symbol",
+                    "variant": "", "thickness_in": "", "height_ft": "35"}]
+    merged = merge_with_naming_conventions(deterministic, conventions)
+    cols = next(e for e in merged if e["name"] == "Columns")
+    assert cols["binding_hint"] == "structural_grid_symbol"
+    assert cols["height_ft"] == "35"
+    assert "INTERIOR COLUMN" in cols["aliases"]     # aliases unioned
+
+
+def test_merge_naming_conventions_adds_new_object():
+    conventions = [{"canonical_name": "Bollards", "aliases": [], "basis": "count",
+                    "binding_hint": "perimeter_jamb_symbol", "variant": "",
+                    "thickness_in": "", "height_ft": ""}]
+    merged = merge_with_naming_conventions([], conventions)
+    boll = next(e for e in merged if e["name"] == "Bollards")
+    assert boll["binding_hint"] == "perimeter_jamb_symbol"
+    assert boll["source"] == "naming_convention"
