@@ -411,6 +411,121 @@ def extract_door_component_counts(doc, notes_text: str = "") -> List[dict]:
     return count_doors_by_material(door_rows, notes_text="\n".join(all_notes))
 
 
+# ── Comprehensive naming-relevant text extraction (AI naming-pass input) ──────
+
+# A detail / section label line an estimator reads to learn the plan's naming
+# ("TYPICAL S.C.C.P. JOINT DETAIL", "STAIR SECTION"). Whole-word DETAIL/SECTION.
+_DETAIL_LABEL_RE = re.compile(r"\b(DETAIL|SECTION)\b", re.IGNORECASE)
+# Pure callout references ("DETAIL 7/A-401") carry no naming signal — drop them.
+_PURE_REF_RE = re.compile(r"^(DETAIL|SECTION)\s+\d+\s*/\s*[A-Z]?-?\d", re.IGNORECASE)
+_MAX_DETAIL_LABELS = 120
+
+
+def harvest_detail_labels(text: str) -> List[str]:
+    """Distinct short detail / section label lines from plan text.
+
+    These are the labels an estimator reads to learn a plan's own naming
+    ("TYPICAL S.C.C.P. JOINT DETAIL", "STAIR SECTION", "RAMP RAIL SECTION").
+    Pure callout refs ("DETAIL 7/A-401") are dropped. First-seen order,
+    case-insensitive dedupe, capped. Never raises.
+    """
+    if not text:
+        return []
+    out: List[str] = []
+    seen = set()
+    for raw in text.splitlines():
+        line = " ".join(raw.split()).strip()
+        if not line or len(line) > 70:
+            continue
+        if not _DETAIL_LABEL_RE.search(line):
+            continue
+        if _PURE_REF_RE.match(line):
+            continue
+        # Must carry at least one word beyond the DETAIL/SECTION keyword.
+        words = [w for w in re.split(r"[\s/]+", line) if w and not w.isdigit()]
+        if len(words) < 2:
+            continue
+        key = line.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(line)
+        if len(out) >= _MAX_DETAIL_LABELS:
+            break
+    return out
+
+
+def extract_naming_text(pages, doc=None) -> str:
+    """Harvest the FULL naming-relevant plan text for the AI naming pass.
+
+    An estimator learns a plan's OWN naming conventions by reading everything
+    the drawing prints: keynotes, general notes, ALL detail / section labels,
+    the abbreviation key, schedule headers / rows, legends and title blocks.
+    This gathers that text (deterministically, no API) into ONE lightly
+    structured document — the input to
+    :func:`object_vocabulary.extract_naming_conventions`.
+
+    The point is COMPLETENESS: rather than a truncated top-of-page snippet, it
+    concatenates every page's text under ``=== PAGE n ===`` markers, then
+    appends explicit ``=== ABBREVIATIONS ===`` and
+    ``=== DETAIL / SECTION LABELS ===`` sections so those naming anchors are
+    guaranteed present (and structured) even when a page's raw text buries or
+    splits them.
+
+    Args:
+        pages: A list of page-text strings, or a list of page dicts with
+               ``full_page_text`` / ``text`` / ``title_block_text`` keys.
+        doc:   Optional open ``fitz.Document`` — when supplied, every page's
+               ``get_text()`` is read directly (authoritative), superseding
+               *pages* for the per-page body so the harvest is never limited to
+               a caller-truncated snippet.
+
+    Returns:
+        One concatenated naming-text document (empty string for empty input).
+        Never raises.
+    """
+    texts: List[str] = []
+    if doc is not None:
+        try:
+            page_count = doc.page_count
+        except Exception:  # noqa: BLE001
+            page_count = 0
+        for i in range(page_count):
+            try:
+                body = doc[i].get_text() or ""
+            except Exception:  # noqa: BLE001
+                body = ""
+            if body.strip():
+                texts.append(body)
+    if not texts:
+        texts = _pages_to_texts(pages)
+
+    sections: List[str] = []
+    for idx, body in enumerate(texts, 1):
+        body = (body or "").strip()
+        if body:
+            sections.append("=== PAGE {} ===\n{}".format(idx, body))
+
+    full_text = "\n".join(texts)
+
+    try:
+        abbr = parse_abbreviations(full_text)
+    except Exception:  # noqa: BLE001
+        abbr = OrderedDict()
+    if abbr:
+        lines = ["{} = {}".format(code, exp) for code, exp in abbr.items()]
+        sections.append("=== ABBREVIATIONS ===\n" + "\n".join(lines))
+
+    try:
+        labels = harvest_detail_labels(full_text)
+    except Exception:  # noqa: BLE001
+        labels = []
+    if labels:
+        sections.append("=== DETAIL / SECTION LABELS ===\n" + "\n".join(labels))
+
+    return "\n\n".join(sections)
+
+
 # ── Library assembly + merge with the LLM vocabulary ──────────────────────────
 
 
@@ -700,6 +815,101 @@ def merge_with_vocabulary(
     # the LLM-provided basis (e.g. an LLM "Exposed Structure" basis=count is
     # corrected to roof_area), so area binding is identical every run. The LLM
     # basis only survives where classify_basis returns None.
+    apply_deterministic_basis(det)
+    return det
+
+
+# ── Naming-convention merge (binding_hint / variant / thickness / height) ─────
+
+# Default estimator unit per measure basis (only used to seed a NEW naming
+# object the deterministic text never named — deterministic units are authoritative).
+_UNIT_BY_BASIS = {
+    "count": "EA",
+    "linear": "LF",
+    "wall_area": "SF",
+    "floor_area": "SF",
+    "roof_area": "SF",
+}
+
+# Binding-carrying fields an AI naming convention contributes to a library
+# entry (never overwritten once set; deterministic names/aliases stay
+# authoritative). Kept semantic-only — strings, never numbers.
+_BINDING_FIELDS = ("binding_hint", "variant", "thickness_in", "height_ft")
+
+
+def merge_with_naming_conventions(
+    deterministic: List[dict],
+    conventions: Optional[List[dict]] = None,
+) -> List[dict]:
+    """Merge the deterministic library with the AI NAMING-CONVENTION library.
+
+    The naming conventions
+    (:func:`object_vocabulary.extract_naming_conventions`) carry each object's
+    ``canonical_name`` / ``aliases`` / ``basis`` PLUS the binding fields the
+    geometry binder needs: ``binding_hint`` (structural_grid_symbol,
+    perimeter_jamb_symbol, exterior_wall, interior_wall, masonry_wall, ...),
+    ``variant`` (interior/exterior) and printed ``thickness_in`` / ``height_ft``
+    (as strings).
+
+    Merge discipline (same authority model as :func:`merge_with_vocabulary`):
+    deterministic entries are AUTHORITATIVE for names + aliases; the AI naming
+    pass (a) fills a deterministic entry's missing ``basis`` and the binding
+    fields, and (b) contributes named objects the printed text missed. Additive:
+    empty conventions return the deterministic library unchanged, and vice-versa.
+    The deterministic measure-basis classifier stays authoritative at the end.
+    """
+    det = _dedup_library(deterministic or [])
+    covered = {}
+    for entry in det:
+        for label in [entry["name"]] + list(entry.get("aliases") or []):
+            covered[_norm(label)] = entry
+
+    for conv in conventions or []:
+        if not isinstance(conv, dict):
+            continue
+        name = (conv.get("canonical_name") or conv.get("name") or "").strip()
+        if not name:
+            continue
+        aliases = [a for a in (conv.get("aliases") or []) if isinstance(a, str) and a.strip()]
+        basis = conv.get("basis") if conv.get("basis") in _VALID_BASES else None
+
+        match = covered.get(_norm(name))
+        if match is None:
+            for a in aliases:
+                match = covered.get(_norm(a))
+                if match is not None:
+                    break
+
+        if match is not None:
+            # Deterministic name/aliases win; the AI fills basis + binding fields.
+            for a in aliases:
+                if a not in match["aliases"]:
+                    match["aliases"].append(a)
+            if match.get("basis") is None and basis is not None:
+                match["basis"] = basis
+            for field in _BINDING_FIELDS:
+                val = conv.get(field)
+                if isinstance(val, str) and val.strip() and not match.get(field):
+                    match[field] = val.strip()
+            continue
+
+        # New object the printed text missed — add it (naming-convention-sourced).
+        new_entry = {
+            "name": name,
+            "aliases": list(dict.fromkeys(aliases)),
+            "basis": basis,
+            "unit": _UNIT_BY_BASIS.get(basis or "", None),
+            "source": "naming_convention",
+        }
+        for field in _BINDING_FIELDS:
+            val = conv.get(field)
+            if isinstance(val, str) and val.strip():
+                new_entry[field] = val.strip()
+        det.append(new_entry)
+        for label in [name] + aliases:
+            covered.setdefault(_norm(label), new_entry)
+
+    # Deterministic measure-basis is AUTHORITATIVE (identical every run).
     apply_deterministic_basis(det)
     return det
 
