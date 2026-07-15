@@ -93,6 +93,10 @@ MODEL_ROUTING: dict[tuple[str, str], str] = {
     # a semantic estimator read of the drawing + keynotes/notes/abbreviations
     # → route to the semantic model (Sonnet), mirroring the "semantic" row.
     (WILDCARD_SHEET_TYPE, "vocabulary"):   CLAUDE_MODEL_SEMANTIC,
+    # AI naming-convention pass (plans-only autonomous naming): reads the plan's
+    # own notes/details/abbreviations/schedules and reports THIS plan's naming
+    # library (name/aliases/basis/binding_hint/variant) → semantic model (Sonnet).
+    (WILDCARD_SHEET_TYPE, "naming_conventions"): CLAUDE_MODEL_SEMANTIC,
     (WILDCARD_SHEET_TYPE, "legend"):       CLAUDE_MODEL_DENSE,
     (WILDCARD_SHEET_TYPE, "schedule"):     CLAUDE_MODEL_DENSE,
     (WILDCARD_SHEET_TYPE, "verify_retry"): CLAUDE_MODEL_DENSE,

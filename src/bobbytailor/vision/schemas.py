@@ -296,6 +296,114 @@ def vocabulary_schema() -> dict:
     }
 
 
+# Binding hints tell fusion WHICH deterministic geometry a named object maps to
+# (semantic-only — a category label, never a coordinate or count). Kept as a
+# closed enum so an answer outside the recognised set is grammatically
+# impossible (enum-of-candidates grounding, mirrors every vector-path schema).
+NAMING_BINDING_HINTS = [
+    "structural_grid_symbol",   # repeated symbol on the structural grid → columns
+    "perimeter_jamb_symbol",    # repeated symbol at the perimeter / door jambs → bollards
+    "exterior_wall",            # exterior tilt-up / S.C.C.P. panel face
+    "interior_wall",            # interior tilt-up panel face
+    "masonry_wall",             # CMU / block wall
+    "floor_slab",               # slab / floor covering spanning the footprint
+    "roof_deck",                # roof / ceiling / exposed structure overhead
+    "count_from_schedule",      # counted from a schedule / legend row
+    "other",                    # named object with no geometry binding hint
+]
+
+
+def naming_convention_schema() -> dict:
+    """Schema for the AI NAMING-CONVENTION pass (plans-only autonomous naming).
+
+    Unlike :func:`vocabulary_schema` (which only NAMES object types), this pass
+    reads the plan's OWN notes / details / abbreviations / schedules and reports
+    the naming CONVENTION this plan uses for each takeoff object: its canonical
+    name, aliases, measure basis, a ``binding_hint`` telling fusion which
+    geometry the object maps to, an interior/exterior ``variant`` where the plan
+    distinguishes it, and (as STRINGS — never numbers) any thickness / height
+    the plan prints for it.
+
+    Semantic-only discipline (same as every vector-path schema): ZERO numeric
+    properties. ``thickness_in`` and ``height_ft`` are STRING fields (the plan's
+    printed token, e.g. ``"8"``, ``"36'-0\\""``) — the naming pass classifies and
+    names, it never counts or measures. The recursive no-numeric-fields test
+    covers this schema.
+
+    Shape::
+
+        {"objects": [
+            {"canonical_name": str,
+             "aliases": [str, ...],
+             "basis": "count"|"linear"|"wall_area"|"floor_area"|"roof_area",
+             "binding_hint": <one of NAMING_BINDING_HINTS>,
+             "variant": str,          # "interior" | "exterior" | ""
+             "thickness_in": str,     # printed thickness token or "" (string!)
+             "height_ft": str},       # printed height token or ""  (string!)
+            ...
+        ]}
+
+    Returns:
+        JSON schema dict (semantic path — no numeric properties).
+    """
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["objects"],
+        "properties": {
+            "objects": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": [
+                        "canonical_name",
+                        "aliases",
+                        "basis",
+                        "binding_hint",
+                        "variant",
+                        "thickness_in",
+                        "height_ft",
+                    ],
+                    "properties": {
+                        # The name THIS plan uses for the object (verbatim from
+                        # its notes / details / abbreviations / schedules).
+                        "canonical_name": {"type": "string"},
+                        # Aliases / abbreviations the plan prints for it
+                        # (e.g. "S.C.C.P." → "Tilt-Up Wall Panel").
+                        "aliases": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        # Measure basis — HOW the object is quantified (string
+                        # enum, never a number).
+                        "basis": {
+                            "enum": [
+                                "count",
+                                "linear",
+                                "wall_area",
+                                "floor_area",
+                                "roof_area",
+                            ]
+                        },
+                        # WHICH geometry fusion should bind to this object.
+                        "binding_hint": {"enum": list(NAMING_BINDING_HINTS)},
+                        # interior / exterior where the plan distinguishes the
+                        # face; "" when it does not.
+                        "variant": {"type": "string"},
+                        # Printed thickness / height tokens carried as STRINGS
+                        # (semantic hints, never numeric fields) so the binder
+                        # can map a wall class to the right object; "" when the
+                        # plan prints none.
+                        "thickness_in": {"type": "string"},
+                        "height_ft": {"type": "string"},
+                    },
+                },
+            },
+        },
+    }
+
+
 def raster_extraction_schema() -> dict:
     """Schema for the raster fallback path — the ONLY schema with numbers.
 
