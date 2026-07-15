@@ -526,6 +526,152 @@ def extract_naming_text(pages, doc=None) -> str:
     return "\n\n".join(sections)
 
 
+# ── LEAN distilled naming text (AI naming-pass input, budget-capped) ──────────
+
+# A construction naming-SIGNAL line: a plan line that mentions an object an
+# estimator quantifies, or a schedule / keynote / general-note header. Used to
+# distill the naming-relevant FRACTION of the page text (a small slice of a
+# 30k-token plan) — never the full page body. Kept broad so it generalises
+# across disciplines (structural, arch, civil, MEP) and plan vocabularies.
+# A single leading ``\b`` gives every alternative a word-start boundary; there is
+# deliberately NO trailing boundary so plurals / inflections match (BOLLARDS,
+# DOORS, COLUMNS, ROOFING). Slight over-matching (e.g. "gasket") is harmless —
+# the digest is char-capped and only used to seed the reader prompt.
+_NAMING_SIGNAL_RE = re.compile(
+    r"\b("
+    r"bollard|column|ladder|guard\s*rail|guardrail|hand\s*rail|handrail|"
+    r"stair|elevator|lift|escalator|downspout|gutter|canopy|mezzanine|"
+    r"lintel|curb|catch\s*basin|manhole|hydrant|dock\s*leveler|dock\s*bumper|"
+    r"wheel\s*stop|ramp|bench|sign|"
+    r"cmu|masonry|block\s*wall|tilt.?up|tilt\s*panel|s\.?c\.?c\.?p|"
+    r"concrete\s*panel|precast|eifs|partition|wall|"
+    r"sealed\s*concrete|polished\s*concrete|slab|flooring|"
+    r"exposed\s*structure|bar\s*joist|open\s*web\s*joist|roof|ceiling|"
+    r"gas|pipe|piping|conduit|duct|fence|trench|"
+    r"door|frame|window|"
+    r"keynote|general\s+note|schedule|abbreviation"
+    r")",
+    re.IGNORECASE,
+)
+# Line-count and char-budget caps for the distilled naming digest. The char cap
+# keeps the prompt LEAN (Bob's dumped ~35k input tokens of raw text → the reader
+# pass returned invalid_json → no manifest). ~15k chars is comfortably under a
+# safe request budget while retaining every naming anchor for the 4 real plans.
+_MAX_NAMING_SIGNAL_LINES = 400
+_MAX_DISTILLED_NAMING_CHARS = 15000
+
+
+def harvest_naming_signal_lines(text: str, max_lines: int = _MAX_NAMING_SIGNAL_LINES) -> List[str]:
+    """Distinct short plan lines carrying object-naming signal.
+
+    Keeps ONLY lines matching :data:`_NAMING_SIGNAL_RE` (an object noun /
+    schedule / keynote keyword) — the naming-relevant fraction an estimator
+    reads, NOT the full page body. First-seen order, case-insensitive dedupe,
+    length- and count-capped. Never raises.
+    """
+    if not text:
+        return []
+    out: List[str] = []
+    seen = set()
+    for raw in text.splitlines():
+        line = " ".join(raw.split()).strip()
+        if not line or len(line) > 160:
+            continue
+        if not _NAMING_SIGNAL_RE.search(line):
+            continue
+        key = line.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(line)
+        if len(out) >= max_lines:
+            break
+    return out
+
+
+def distill_naming_text(
+    pages,
+    doc=None,
+    max_chars: int = _MAX_DISTILLED_NAMING_CHARS,
+) -> str:
+    """Distill the LEAN, budget-capped naming text for the AI naming pass.
+
+    Unlike :func:`extract_naming_text` (which concatenates every page's FULL
+    body — 30k+ tokens on a large plan), this harvests only the naming-relevant
+    slice — the abbreviation key, detail / section labels, and object-noun /
+    keynote / schedule lines — into ONE compact digest capped at *max_chars*.
+    This is the LEAN prompt input for
+    :func:`object_vocabulary.extract_naming_conventions`: it preserves the
+    naming signal an estimator reads while cutting the raw-page dump that
+    starved / truncated the reader pass on Bob's (invalid_json → no manifest).
+
+    Order is truncation-safe: the dense ABBREVIATIONS and DETAIL / SECTION
+    LABELS sections come FIRST (highest naming density), then the object-noun /
+    keynote lines, so the identifying signal survives even when a 40-page plan
+    overflows the budget (truncated with an explicit marker). Never raises.
+
+    Args:
+        pages: A list of page-text strings, or page dicts with
+               ``full_page_text`` / ``text`` / ``title_block_text`` keys.
+        doc:   Optional open ``fitz.Document`` — when supplied every page's
+               ``get_text()`` is read directly (authoritative), superseding
+               *pages* for the per-page body.
+        max_chars: Hard char cap for the returned digest (truncated with a
+               marker when exceeded).
+
+    Returns:
+        A compact naming-text digest (empty string for empty input).
+    """
+    texts: List[str] = []
+    if doc is not None:
+        try:
+            page_count = doc.page_count
+        except Exception:  # noqa: BLE001
+            page_count = 0
+        for i in range(page_count):
+            try:
+                body = doc[i].get_text() or ""
+            except Exception:  # noqa: BLE001
+                body = ""
+            if body.strip():
+                texts.append(body)
+    if not texts:
+        texts = _pages_to_texts(pages)
+
+    full_text = "\n".join(texts)
+    if not full_text.strip():
+        return ""
+
+    sections: List[str] = []
+
+    try:
+        abbr = parse_abbreviations(full_text)
+    except Exception:  # noqa: BLE001
+        abbr = OrderedDict()
+    if abbr:
+        lines = ["{} = {}".format(code, exp) for code, exp in abbr.items()]
+        sections.append("=== ABBREVIATIONS ===\n" + "\n".join(lines))
+
+    try:
+        labels = harvest_detail_labels(full_text)
+    except Exception:  # noqa: BLE001
+        labels = []
+    if labels:
+        sections.append("=== DETAIL / SECTION LABELS ===\n" + "\n".join(labels))
+
+    try:
+        signal = harvest_naming_signal_lines(full_text)
+    except Exception:  # noqa: BLE001
+        signal = []
+    if signal:
+        sections.append("=== KEYNOTES / NOTES / SCHEDULES ===\n" + "\n".join(signal))
+
+    digest = "\n\n".join(sections)
+    if len(digest) > max_chars:
+        digest = digest[:max_chars].rstrip() + "\n… [naming text truncated]"
+    return digest
+
+
 # ── Library assembly + merge with the LLM vocabulary ──────────────────────────
 
 

@@ -2491,17 +2491,19 @@ class TakeoffPipeline:
             from bobbytailor.deterministic.component_library import (  # noqa: PLC0415
                 harvest_component_library,
                 merge_with_naming_conventions,
-                extract_naming_text,
+                distill_naming_text,
                 library_labels,
             )
             deterministic_library = harvest_component_library([plan_text])
-            # Comprehensive naming text (keynotes / notes / ALL detail labels /
-            # abbreviations / schedules) — the estimator's reading source for
-            # the AI naming-convention pass. Falls back to plan_text on failure.
+            # LEAN, budget-capped naming text (abbreviations / detail labels /
+            # object-noun + keynote + schedule lines) — the DISTILLED estimator
+            # reading source for the AI naming-convention pass. Deliberately NOT
+            # the full 30k-token page dump (that starved the reader on Bob's →
+            # invalid_json → no manifest). Falls back to plan_text on failure.
             try:
-                naming_text = extract_naming_text(pages) or plan_text
+                naming_text = distill_naming_text(pages) or plan_text
             except Exception as exc:  # noqa: BLE001
-                logger.warning("run_project: naming-text extraction failed: %s", exc)
+                logger.warning("run_project: naming-text distillation failed: %s", exc)
                 naming_text = plan_text
         except Exception as exc:  # noqa: BLE001 — library harvest is additive-only
             logger.warning("run_project: component-library harvest failed: %s", exc)
