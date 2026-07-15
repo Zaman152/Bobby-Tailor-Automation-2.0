@@ -106,6 +106,10 @@ from bobbytailor.vision.schemas import (
     semantic_labeling_schema,
     symbol_gallery_schema,
 )
+from bobbytailor.vision.object_vocabulary import (
+    build_project_vocabulary,
+    vocabulary_labels,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -381,6 +385,32 @@ def _legend_labels_from_schedules(schedules) -> List[str]:
             if len(labels) >= _MAX_LEGEND_LABELS:
                 return labels
     return labels
+
+
+def _dedupe_labels(labels: List[str], cap: int = _MAX_LEGEND_LABELS) -> List[str]:
+    """Case-insensitive first-seen dedupe of a label list, capped at *cap*.
+
+    Used to merge deterministic schedule labels with the autonomous
+    project-vocabulary labels for the symbol-gallery candidate enum — the
+    gallery pass only runs when this merged list is non-empty, so when
+    vocabulary is empty the result is identical to schedule labels alone
+    (additive-only guarantee)."""
+    out: List[str] = []
+    seen = set()
+    for label in labels or []:
+        if not isinstance(label, str):
+            continue
+        text = label.strip()
+        if not text or len(text) > 80:
+            continue
+        norm = text.lower()
+        if norm in seen:
+            continue
+        seen.add(norm)
+        out.append(text)
+        if len(out) >= cap:
+            break
+    return out
 
 
 def _legend_crop_rect(viewports, schedules):
@@ -712,6 +742,12 @@ class TakeoffPipeline:
         self._settings = settings if settings is not None else RunSettings.from_env()
         # Optional object manifest, set by run_project; drives targeted counting.
         self._manifest = None
+        # Autonomous project vocabulary (hybrid-naming manifest replacement):
+        # built ONCE per project by run_project. `_project_vocabulary` holds the
+        # parsed object dicts; `_project_vocab_labels` is the flat deduped
+        # names+aliases feed merged into the symbol-gallery candidate list.
+        self._project_vocabulary: list = []
+        self._project_vocab_labels: List[str] = []
         # Optional reliable drawing scale (feet per inch) for geometry measurement.
         self._scale_fpi = None
         # One BudgetGuard per run (set by run_project). The scraper path
@@ -1360,7 +1396,17 @@ class TakeoffPipeline:
         symbols = bundle.get("symbol_groups") or []
 
         registry = build_registry(bundle)
-        legend_labels = _legend_labels_from_schedules(schedules)
+        # Hybrid naming: merge deterministic schedule labels with the
+        # autonomous project-vocabulary labels (manifest replacement). For a
+        # plan whose only extracted schedule is a 2-row door table, the vocab
+        # labels supply "Column"/"Bollard"/"Ladder"/... so the gallery runs
+        # and geometry symbol clusters bind to real object names instead of
+        # staying label=None. When vocabulary is empty this is identical to
+        # schedule labels alone (additive-only).
+        legend_labels = _dedupe_labels(
+            _legend_labels_from_schedules(schedules)
+            + list(getattr(self, "_project_vocab_labels", []) or [])
+        )
 
         # ── Semantic vision passes (labels only — budget-guarded) ─────────
         vision_labels: dict = {}
@@ -1823,6 +1869,81 @@ class TakeoffPipeline:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    def _select_vocabulary_page(self, pages: "list[dict]") -> Optional[dict]:
+        """Pick a VECTOR plan-body page to seed the project vocabulary, or None.
+
+        The vocabulary labels only feed the vector symbol-gallery candidate
+        list (``_run_sheet_vector``). So the pass is gated on the existence of
+        at least one vector-eligible plan page: deterministic routing enabled,
+        not raster-forced, a source PDF page, a plan-body sheet type, and the
+        PDF page actually being vector. Returns the first such page (its image
+        is the estimator's main visual). Returns None when no sheet would ever
+        consume the vocabulary — so no wasted spend on legacy/raster-only runs.
+        """
+        if not self._settings.deterministic_enabled or self._settings.raster_force:
+            return None
+        for page in pages or []:
+            image_path = page.get("image_path")
+            pdf_path = page.get("pdf_path")
+            page_index = page.get("page_index")
+            if not image_path or pdf_path is None or page_index is None:
+                continue
+            resolved = page.get("sheet_type_hint") or page.get("sheet_type")
+            if not resolved:
+                resolved = classify_sheet_type_from_text(
+                    page.get("title_block_text", ""), page.get("full_page_text", "")
+                )
+            if resolved not in _PLAN_SHEET_TYPES:
+                continue
+            try:
+                doc = fitz.open(pdf_path)
+                try:
+                    if is_vector_sheet(doc[page_index]):
+                        return page
+                finally:
+                    doc.close()
+            except Exception as exc:  # noqa: BLE001 — unreadable PDF → skip page
+                logger.debug(
+                    "_select_vocabulary_page: %s page %s unreadable (%s)",
+                    pdf_path, page_index, exc,
+                )
+        return None
+
+    def _build_project_vocabulary(
+        self,
+        image_path: str,
+        plan_text: str,
+        guard: Optional[BudgetGuard],
+    ) -> list:
+        """Build the project vocabulary ONCE (budget-charged, best-effort).
+
+        Delegates to :func:`object_vocabulary.build_project_vocabulary` with
+        the injected analyzer so budget is charged uniformly via the guard;
+        stores the parsed objects on ``self._project_vocabulary`` and the flat
+        deduped names+aliases feed on ``self._project_vocab_labels``. Any
+        failure leaves both empty (additive-only — never breaks a run).
+        """
+        objects: list = []
+        try:
+            objects = build_project_vocabulary(
+                self._analyzer,
+                image_path,
+                plan_text,
+                guard=guard,
+                sheet_name="project",
+            )
+        except Exception as exc:  # noqa: BLE001 — vocabulary is strictly additive
+            logger.warning("_build_project_vocabulary: failed: %s", exc)
+            objects = []
+        self._project_vocabulary = objects or []
+        self._project_vocab_labels = vocabulary_labels(self._project_vocabulary)
+        if self._project_vocab_labels:
+            logger.info(
+                "run_project: project vocabulary → %d object type(s), %d candidate label(s)",
+                len(self._project_vocabulary), len(self._project_vocab_labels),
+            )
+        return self._project_vocabulary
+
     def run_project(
         self,
         pages: list[dict],
@@ -1883,6 +2004,29 @@ class TakeoffPipeline:
         # project_type detector has run, so type-level vocabulary/manifests
         # join for calculator/aggregation. Never per-sheet DB churn.
         self.load_learning(project_key)
+
+        # ── Autonomous project vocabulary (hybrid-naming manifest replacement)
+        # Built ONCE for the whole project BEFORE the per-sheet loop: an
+        # estimator read of the main plan image + concatenated plan text
+        # (keynotes/notes/abbreviations/schedule headers) yields candidate
+        # object NAMES that seed the symbol-gallery candidate list so geometry
+        # symbol clusters can bind to real names on plans whose schedules are
+        # sparse. Best-effort: any failure stores [] and the run continues
+        # exactly as before (additive-only). Gated on analyzer availability.
+        self._project_vocabulary = []
+        self._project_vocab_labels = []
+        if self._analyzer is not None:
+            vocab_page = self._select_vocabulary_page(pages)
+            if vocab_page is not None:
+                plan_text = "\n\n".join(
+                    part for page in pages for part in (
+                        page.get("full_page_text", ""),
+                        page.get("title_block_text", ""),
+                    ) if part
+                )
+                self._build_project_vocabulary(
+                    vocab_page["image_path"], plan_text, self._run_budget
+                )
 
         total = len(pages)
         all_extracted: list[dict] = []
