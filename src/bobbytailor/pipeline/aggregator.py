@@ -162,7 +162,23 @@ def normalize_item_name(description: str, item_type: str, unit: str, learned=Non
             if spec_match:
                 name = f"{name}-{spec_match}"
             return name, default_unit
-    canonical = item_type.replace("_", " ").title() if item_type else (description or "")[:40]
+    # Unnamed clusters must stay DISTINCT. A generic item_type ("component" /
+    # "general") is NOT a name — collapsing every unnamed SYM-* cluster to a
+    # single "Component" bucket silently merges physically distinct clusters and
+    # buries their individual counts. Prefer the row's own description (the
+    # candidate_id or its contained text) so two unnamed clusters surface as two
+    # flagged rows carrying their own counts, never one "Component" blob.
+    it = (item_type or "").strip().lower()
+    if it and it not in ("component", "general"):
+        canonical = item_type.replace("_", " ").title()
+    else:
+        desc_name = (description or "").strip()
+        if desc_name:
+            canonical = desc_name[:40]
+        elif item_type:
+            canonical = item_type.replace("_", " ").title()
+        else:
+            canonical = "Component"
     return canonical, unit or "EA"
 
 
