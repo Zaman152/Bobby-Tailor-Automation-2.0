@@ -407,6 +407,98 @@ def test_ambiguous_wall_class_stays_needs_review():
     assert tc3["unit"] == "LF"                       # never a silent wrong SF bind
 
 
+# ── 6b. tilt-up = perimeter × height; CMU = small interior class × height ─────
+
+
+def test_tiltup_wall_binds_to_building_perimeter_times_height():
+    # Crow golden: "Internal Tilt up walls" = footprint perimeter (2972 LF) ×
+    # 36' clear ≈ 108,443 SF — NOT the thickness-class linework LF.
+    bundle = {
+        "walls": [{"thickness_class": "TC1", "thickness_pt": 1.0, "length_pt": 300.0}],
+        "wall_lf_by_class": {"TC1": 300.0},   # class LF is deliberately NOT the basis
+        "fpp": 1.0,
+        "footprint": {"perimeter_lf": 2972.0, "area_sf": 397600.0, "confidence": "high"},
+    }
+    vocab = [
+        {"name": "Internal Tilt up walls", "basis": "wall_area",
+         "binding_hint": "exterior_wall", "variant": "exterior"},
+    ]
+    _, fused = _summary_from(
+        bundle_extra=bundle, vocabulary=vocab,
+        wall_height_ft=36.0, wall_height_source="plan",
+    )
+    comps = {c["name"]: c for c in fused["components"]}
+    tilt = comps["Internal Tilt up walls"]
+    assert tilt["unit"] == "SF"
+    assert tilt["quantity"] == round(2972.0 * 36.0, 1)   # perimeter × height
+    assert abs(tilt["quantity"] - 108443.0) / 108443.0 < 0.03   # within ±3% of golden
+    assert "perimeter" in tilt["formula"]
+
+
+def test_cmu_binds_to_small_interior_class_not_dominant_perimeter():
+    # Two ~8" classes: the dominant perimeter (2972 LF) and a small interior
+    # pump-room wall (61 LF). CMU must bind to the SMALL one → ~2,204 SF.
+    lf = {"TC1": 2972.0, "TC2": 61.0}
+    thick = {"TC1": 8.0, "TC2": 8.0}   # identical thickness — LF must break the tie
+    wall_objects = [
+        {"name": "Internal Tilt up walls", "basis": "wall_area",
+         "binding_hint": "exterior_wall", "variant": "exterior"},
+        {"name": "CMU Wall", "basis": "wall_area",
+         "binding_hint": "masonry_wall", "thickness_in": "8"},
+    ]
+    mapping = map_wall_classes_from_library(lf, thick, wall_objects)
+    assert mapping["TC2"][0] == "CMU Wall"                    # small interior class
+    assert mapping["TC1"][0] == "Internal Tilt up walls"     # dominant → tilt-up
+
+    bundle = {
+        "walls": [
+            {"thickness_class": "TC1", "thickness_pt": 8.0 / 12.0, "length_pt": 2972.0},
+            {"thickness_class": "TC2", "thickness_pt": 8.0 / 12.0, "length_pt": 61.0},
+        ],
+        "wall_lf_by_class": lf, "fpp": 1.0,
+        "footprint": {"perimeter_lf": 2972.0, "confidence": "high"},
+    }
+    _, fused = _summary_from(
+        bundle_extra=bundle, vocabulary=wall_objects,
+        wall_height_ft=36.0, wall_height_source="plan",
+    )
+    comps = {c["name"]: c for c in fused["components"]}
+    cmu = comps["CMU Wall"]
+    assert cmu["quantity"] == round(61.0 * 36.0, 1)
+    assert abs(cmu["quantity"] - 2204.0) / 2204.0 < 0.05     # within ±5% of golden
+
+
+def test_cmu_never_binds_the_only_dominant_class():
+    # Only the dominant perimeter class exists — a masonry object must NOT bind
+    # to it (ambiguous → stays unclaimed / needs_review, never a giant CMU SF).
+    mapping = map_wall_classes_from_library(
+        {"TC1": 2972.0},
+        {"TC1": 8.0},
+        [{"name": "CMU Wall", "basis": "wall_area",
+          "binding_hint": "masonry_wall", "thickness_in": "8"}],
+    )
+    assert "TC1" not in mapping
+
+
+def test_tiltup_without_perimeter_falls_back_to_lf_and_flags():
+    bundle = {
+        "walls": [{"thickness_class": "TC1", "thickness_pt": 1.0, "length_pt": 300.0}],
+        "wall_lf_by_class": {"TC1": 300.0}, "fpp": 1.0,   # no footprint / perimeter
+    }
+    vocab = [
+        {"name": "Exterior Tilt Up Wall", "basis": "wall_area",
+         "binding_hint": "exterior_wall", "variant": "exterior"},
+    ]
+    _, fused = _summary_from(
+        bundle_extra=bundle, vocabulary=vocab,
+        wall_height_ft=36.0, wall_height_source="plan",
+    )
+    ext = next(c for c in fused["components"] if c.get("candidate_id") == "WALL-TC1")
+    assert ext["quantity"] == round(300.0 * 36.0, 1)   # class LF fallback
+    assert ext["needs_review"] is True
+    assert "perimeter" in ext["review_reason"]
+
+
 # ── 7. unnamed-cluster collapse fix (no "Component" blob) ─────────────────────
 
 

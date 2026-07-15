@@ -924,6 +924,35 @@ _WALL_BINDING_HINTS = frozenset(
 )
 _WALL_THICKNESS_TOL_IN = 1.5
 
+# A tilt-up / precast / site-cast-concrete-panel exterior wall: its area is the
+# building PERIMETER × clear height (the panels wrap the footprint), never a
+# thickness-class linework length. Matched on the object's own printed naming.
+_TILTUP_NAME_RE = re.compile(
+    r"tilt.?up|tilt\s*panel|precast|s\.?c\.?c\.?p|site\s*cast|concrete\s*panel",
+    re.IGNORECASE,
+)
+# A CMU / masonry wall — a SMALL interior wall class (low LF, thin), never the
+# dominant perimeter class.
+_MASONRY_NAME_RE = re.compile(
+    r"\bcmu\b|masonry|block\s*wall|concrete\s*masonry", re.IGNORECASE
+)
+
+
+def _is_tiltup_name(name) -> bool:
+    """True when the wall object name is a tilt-up / precast / S.C.C.P. panel."""
+    return bool(name) and bool(_TILTUP_NAME_RE.search(str(name)))
+
+
+def _is_masonry_object(obj: dict) -> bool:
+    """True when a library wall object is CMU / masonry (by hint or its name)."""
+    if not isinstance(obj, dict):
+        return False
+    hint = str(obj.get("binding_hint") or "").strip().lower()
+    if hint == "masonry_wall":
+        return True
+    name = str(obj.get("name") or obj.get("canonical_name") or "")
+    return bool(_MASONRY_NAME_RE.search(name))
+
 # A thickness token in inches: "8", "8\"", "7 5/8", "8 in".
 _THICKNESS_TOKEN_RE = re.compile(r"(\d+(?:\.\d+)?)(?:\s+(\d+)\s*/\s*(\d+))?")
 
@@ -1003,15 +1032,25 @@ def map_wall_classes_from_library(
     used_classes: set = set()
     used_objs: set = set()
 
+    # The dominant (most-LF) class is the exterior perimeter wall — a CMU /
+    # masonry object must NEVER bind to it (Crow: the small interior pump-room
+    # "8\" CMU WALL" is ~61 LF, the perimeter tilt-up class is thousands of LF).
+    dominant_class = (
+        max(lf_by_class, key=lambda c: lf_by_class.get(c, 0.0)) if lf_by_class else None
+    )
+
     # Pass 1 — printed-thickness match (authoritative).
     for oi, obj in enumerate(wall_objects):
         th = _parse_thickness_in(obj.get("thickness_in"))
         if th is None:
             continue
+        exclude_dominant = _is_masonry_object(obj)
         best = None
         for cls in classes:
             if cls in used_classes:
                 continue
+            if exclude_dominant and cls == dominant_class:
+                continue  # never bind CMU to the dominant perimeter class
             cth = thickness_by_class.get(cls)
             if cth is None:
                 continue
@@ -1052,11 +1091,17 @@ def map_wall_classes_from_library(
         used_classes.add(cls)
         used_objs.add(obj_idx)
 
-    # Masonry by hint → the thinnest remaining class (CMU is a thin wall).
+    # Masonry by hint → the SMALLEST-LF non-dominant class (a CMU wall is a
+    # small interior wall, never the dominant perimeter class). Keying on LF
+    # (not just thickness) is what stops the giant perimeter class binding to
+    # CMU when several classes share a thickness.
     if mas and remaining:
         thin = sorted(
-            (c for c in remaining if c not in used_classes),
-            key=lambda c: thickness_by_class.get(c, float("inf")),
+            (
+                c for c in remaining
+                if c not in used_classes and c != dominant_class
+            ),
+            key=lambda c: lf_by_class.get(c, 0.0),
         )
         if thin:
             _assign(mas[0], thin[0])
@@ -1100,6 +1145,19 @@ def _fuse_wall_classes(
     vocab_map = vocab_map or {}
     library_wall_map = library_wall_map or {}
     lf_by_class = bundle.get("wall_lf_by_class") or {}
+
+    # Measured building perimeter (for tilt-up / precast panel area = perimeter ×
+    # height). None when no footprint / perimeter was measured — a tilt-up wall
+    # then falls back to its class LF and is flagged (never a silent guess).
+    footprint = bundle.get("footprint")
+    perimeter_lf: Optional[float] = None
+    if footprint is not None:
+        try:
+            p = _field(footprint, "perimeter_lf", None)
+            perimeter_lf = float(p) if p is not None else None
+        except (TypeError, ValueError):
+            perimeter_lf = None
+
     for cls in sorted(lf_by_class):
         lf = lf_by_class[cls]
         cid = _wall_candidate_id(cls)
@@ -1134,10 +1192,29 @@ def _fuse_wall_classes(
                 height = float(wall_height_ft)
                 source = wall_height_source or "default"
                 is_default = source == "default"
+
+                # Tilt-up / precast panels: the exterior wall area is the building
+                # PERIMETER × height (the panels wrap the footprint), not the
+                # thickness-class linework LF. Bind to the measured perimeter when
+                # available; without it, fall back to the class LF and flag.
+                lf_value = float(lf)
+                lf_basis = "wall class linework"
+                tiltup_missing_perimeter = False
+                if _is_tiltup_name(name):
+                    if perimeter_lf is not None and perimeter_lf > 0:
+                        lf_value = perimeter_lf
+                        lf_basis = "building perimeter"
+                    else:
+                        tiltup_missing_perimeter = True
+
                 # Flag when the height is a default OR the wall name came from a
-                # non-authoritative (hint-only) library bind — ambiguous binds
-                # are always reviewed, never silently trusted.
-                needs_review = is_default or (not from_vision and not confident)
+                # non-authoritative (hint-only) library bind OR a tilt-up wall is
+                # missing its perimeter — ambiguous binds are always reviewed.
+                needs_review = (
+                    is_default
+                    or (not from_vision and not confident)
+                    or tiltup_missing_perimeter
+                )
                 reasons = []
                 if is_default:
                     reasons.append("wall height assumed (%s) — verify on sheet" % source)
@@ -1146,10 +1223,15 @@ def _fuse_wall_classes(
                         "wall class named by naming library (%s bind) — verify"
                         % ("thickness" if confident else "hint")
                     )
+                if tiltup_missing_perimeter:
+                    reasons.append(
+                        "tilt-up wall area needs the building perimeter "
+                        "(unavailable) — using class LF; verify"
+                    )
                 components.append(
                     {
                         "name": name,
-                        "quantity": round(float(lf) * height, 1),
+                        "quantity": round(lf_value * height, 1),
                         "unit": "SF",
                         "provenance": "geometry",
                         "confidence": _min_confidence(
@@ -1159,8 +1241,8 @@ def _fuse_wall_classes(
                         ),
                         "candidate_id": cid,
                         "name_source": "vision" if from_vision else "naming_library",
-                        "formula": "%.1f LF × %.1f ft height (%s)"
-                        % (round(float(lf), 1), height, source),
+                        "formula": "%.1f LF (%s) × %.1f ft height (%s)"
+                        % (round(lf_value, 1), lf_basis, height, source),
                         "wall_height_ft": height,
                         "wall_height_source": source,
                         "needs_review": needs_review,
