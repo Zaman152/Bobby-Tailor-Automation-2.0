@@ -89,6 +89,10 @@ MODEL_ROUTING: dict[tuple[str, str], str] = {
     # Phase-wide pass routes consumed by the vision package (21-08/21-11/21-14)
     (WILDCARD_SHEET_TYPE, "classify"):     CLAUDE_MODEL_CLASSIFY,
     (WILDCARD_SHEET_TYPE, "semantic"):     CLAUDE_MODEL_SEMANTIC,
+    # Project-vocabulary pass (hybrid naming, plans-only manifest replacement):
+    # a semantic estimator read of the drawing + keynotes/notes/abbreviations
+    # → route to the semantic model (Sonnet), mirroring the "semantic" row.
+    (WILDCARD_SHEET_TYPE, "vocabulary"):   CLAUDE_MODEL_SEMANTIC,
     (WILDCARD_SHEET_TYPE, "legend"):       CLAUDE_MODEL_DENSE,
     (WILDCARD_SHEET_TYPE, "schedule"):     CLAUDE_MODEL_DENSE,
     (WILDCARD_SHEET_TYPE, "verify_retry"): CLAUDE_MODEL_DENSE,
