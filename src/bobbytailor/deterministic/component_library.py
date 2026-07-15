@@ -905,6 +905,101 @@ def apply_deterministic_basis(entries: List[dict]) -> List[dict]:
     return entries
 
 
+# ── Estimator take-off name normalization (safety net) ────────────────────────
+
+# General ``(regex, canonical estimator take-off name)`` rules — FIRST match
+# wins, exactly like the aggregator's ITEM_NAME_MAP. An estimator reads the
+# plan's own abbreviation ("S.C.C.P." = Site Cast Concrete Panel) or literal
+# words ("exposed metal roof deck", "polished slab on grade") and WRITES the
+# industry-standard take-off item name on the quantity take-off ("Tilt Up Wall",
+# "Exposed Structure", "Sealed Concrete"). This table reproduces that read so a
+# correctly-measured quantity carries the estimator's vocabulary — the scorer
+# matches on the estimator term, not the plan's raw label (a raw "S.C.C.P."
+# shares no tokens with "Tilt Up Wall" and scores MISSING).
+#
+# GENERAL construction terminology only (generalises to any plan — never a
+# project-specific name). Data-driven / extensible: add a row to cover a new
+# abbreviation. Authoritative over the raw plan label, but BELOW a human learned
+# correction — it is applied to the naming library, which the aggregator resolves
+# AFTER the learned-vocabulary lookup (learned > library > static), so a human
+# rename always wins.
+_ESTIMATOR_NAME_RULES = [
+    # ── Tilt-up / site-cast concrete wall panels → "Tilt Up Wall" ──────────
+    (r"\bs\.?\s*c\.?\s*c\.?\s*p\.?", "Tilt Up Wall"),   # S.C.C.P. = site cast concrete panel
+    (r"site.?cast.*concrete.*panel", "Tilt Up Wall"),
+    (r"tilt.?up|tilt\s*wall|tilt\s*panel", "Tilt Up Wall"),
+    # ── Exposed metal roof deck / open structure → "Exposed Structure" ─────
+    (r"metal\s*roof\s*deck", "Exposed Structure"),
+    (r"roof\s*assembly", "Exposed Structure"),
+    (r"(concrete\s*)?slab\s*on\s*metal\s*deck", "Exposed Structure"),
+    (r"exposed.*(structure|deck|roof|joist)|open\s*web\s*joist|bar\s*joist", "Exposed Structure"),
+    # ── Sealed / polished slab-on-grade → "Sealed Concrete" ───────────────
+    (r"sealed\s*concrete|polished\s*concrete", "Sealed Concrete"),
+    (r"(sealed|polished).*slab|slab.*(sealed|polished)", "Sealed Concrete"),
+    # ── Masonry → "CMU Wall" ──────────────────────────────────────────────
+    (r"\bcmu\b|concrete\s*masonry\s*unit", "CMU Wall"),
+    (r"(masonry|block)\s*wall", "CMU Wall"),
+    # ── Hollow-metal door LEAF (never a frame) → "Doors-HM" ────────────────
+    (r"hollow.?metal.*door(?!\s*frame)|door(?!\s*frame).*hollow.?metal", "Doors-HM"),
+]
+
+# Compile once at import — the rules never change at runtime.
+_ESTIMATOR_NAME_MAP = [
+    (re.compile(pat, re.IGNORECASE), canonical) for pat, canonical in _ESTIMATOR_NAME_RULES
+]
+
+
+def normalize_estimator_name(name: str, aliases=()) -> tuple:
+    """Map a detected/AI object name to its STANDARD estimator take-off name.
+
+    First-match-wins over :data:`_ESTIMATOR_NAME_RULES`: a raw plan abbreviation
+    ("S.C.C.P.") or the plan's own words ("site cast concrete panel", "metal roof
+    deck", "polished slab on grade") normalise to the industry-standard take-off
+    item name an estimator writes ("Tilt Up Wall", "Exposed Structure", "Sealed
+    Concrete"). The name AND aliases are searched, so a correct alias rescues a
+    mislabelled canonical.
+
+    Returns ``(canonical_name, aliases)``. When a rule fires and the canonical
+    differs from the input, the ORIGINAL name is PRESERVED (prepended) in the
+    returned aliases so a later drawing-text lookup still resolves the object via
+    its plan term (the drawing prints "S.C.C.P." next to the wall). An unmatched
+    name is returned UNCHANGED — no false remap. Never raises.
+    """
+    original = (name or "").strip()
+    out_aliases = [a for a in (aliases or []) if isinstance(a, str) and a.strip()]
+    if not original:
+        return original, list(out_aliases)
+    haystack = _norm(" ".join([original] + out_aliases))
+    for pattern, canonical in _ESTIMATOR_NAME_MAP:
+        if pattern.search(haystack):
+            if _norm(canonical) == _norm(original):
+                return original, list(out_aliases)   # already the estimator term
+            preserved = list(out_aliases)
+            if not any(_norm(a) == _norm(original) for a in preserved):
+                preserved.insert(0, original)        # keep the plan term for binding
+            return canonical, preserved
+    return original, list(out_aliases)
+
+
+def apply_estimator_names(entries: List[dict]) -> List[dict]:
+    """Rewrite each library entry's ``name`` to the estimator take-off term.
+
+    Applies :func:`normalize_estimator_name` in place: a matched entry's ``name``
+    becomes the standard take-off item name and its former label is preserved as
+    an alias (so drawing-text binding is unaffected). Entries the table cannot
+    place keep their name. Mutates and returns *entries*. Additive — never raises.
+    """
+    for entry in entries or []:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name") or ""
+        canonical, aliases = normalize_estimator_name(name, entry.get("aliases") or ())
+        if _norm(canonical) != _norm(name):
+            entry["name"] = canonical
+            entry["aliases"] = list(dict.fromkeys(aliases))
+    return entries
+
+
 def merge_with_vocabulary(
     deterministic: List[dict],
     llm_objects: Optional[List[dict]] = None,
@@ -1057,6 +1152,15 @@ def merge_with_naming_conventions(
 
     # Deterministic measure-basis is AUTHORITATIVE (identical every run).
     apply_deterministic_basis(det)
+    # Estimator take-off name normalization (safety net): rewrite a raw plan
+    # label / abbreviation the naming pass emitted ("S.C.C.P.", "Metal Roof
+    # Deck") to the standard take-off item name ("Tilt Up Wall", "Exposed
+    # Structure"), preserving the plan term as an alias so binding is unchanged.
+    # Runs AFTER basis classification (basis is derived from the plan's own
+    # vocabulary before the rename) and is authoritative over the raw label; a
+    # human learned correction still wins because the aggregator consults the
+    # learned vocabulary BEFORE resolving this library.
+    apply_estimator_names(det)
     return det
 
 

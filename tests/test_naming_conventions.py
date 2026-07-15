@@ -32,7 +32,10 @@ from bobbytailor.deterministic.component_library import (
     harvest_detail_labels,
     harvest_naming_signal_lines,
     merge_with_naming_conventions,
+    normalize_estimator_name,
+    apply_estimator_names,
 )
+from bobbytailor.vision.object_vocabulary import NAMING_CONVENTION_INSTRUCTION
 from bobbytailor.vision.fusion import (
     fuse_sheet,
     map_wall_classes_from_library,
@@ -724,3 +727,165 @@ def test_harvest_naming_signal_lines_keeps_only_naming_lines():
     assert "column" in joined and "bollard" in joined and "cmu" in joined
     assert "quick brown fox" not in joined
     assert "see architect for colors" not in joined
+
+
+# ── 11. ESTIMATOR take-off name normalization (deterministic safety net) ──────
+# The dominant remaining accuracy gap: quantities are correct but named with the
+# plan's raw label (e.g. "S.C.C.P.") instead of the estimator take-off term
+# ("Tilt Up Wall"), so the scorer can't match. This safety net maps the raw
+# plan vocabulary to the standard take-off item name (general, not project-
+# specific), preserving the plan term as an alias so binding is unaffected.
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("S.C.C.P.", "Tilt Up Wall"),
+        ("site cast concrete panel", "Tilt Up Wall"),
+        ("tilt wall", "Tilt Up Wall"),
+        ("Exterior Tilt-Up Panel", "Tilt Up Wall"),
+        ("metal roof deck", "Exposed Structure"),
+        ("exposed roof structure", "Exposed Structure"),
+        ("concrete slab on metal deck", "Exposed Structure"),
+        ("roof assembly", "Exposed Structure"),
+        ("polished slab on grade", "Sealed Concrete"),
+        ("sealed concrete slab", "Sealed Concrete"),
+        ('8" CMU wall', "CMU Wall"),
+        ("concrete masonry unit", "CMU Wall"),
+        ("hollow metal door", "Doors-HM"),
+    ],
+)
+def test_normalize_estimator_name_maps_to_takeoff_terms(raw, expected):
+    canonical, _ = normalize_estimator_name(raw)
+    assert canonical == expected
+
+
+@pytest.mark.parametrize(
+    "gibberish",
+    ["Zorpt角 widget", "Purple Nurple Assembly", "Ladder", "Columns", "Bollards"],
+)
+def test_normalize_estimator_name_leaves_unknown_unchanged(gibberish):
+    # Unknown / already-good names must never be falsely remapped.
+    canonical, aliases = normalize_estimator_name(gibberish)
+    assert canonical == gibberish
+
+
+def test_normalize_estimator_name_preserves_plan_term_as_alias():
+    # The plan prints "S.C.C.P." next to the wall — after normalization the plan
+    # term must remain an alias so a drawing-text lookup still resolves the wall.
+    canonical, aliases = normalize_estimator_name("S.C.C.P.", ["site cast concrete panel"])
+    assert canonical == "Tilt Up Wall"
+    assert "S.C.C.P." in aliases                     # plan term retained
+    assert "site cast concrete panel" in aliases     # existing alias kept
+
+
+def test_normalize_estimator_name_via_alias_match():
+    # A mislabelled canonical is rescued when a correct alias carries the signal.
+    canonical, aliases = normalize_estimator_name("Wall Panel Type A", ["S.C.C.P."])
+    assert canonical == "Tilt Up Wall"
+    assert "Wall Panel Type A" in aliases
+
+
+def test_apply_estimator_names_rewrites_library_entries():
+    entries = [
+        {"name": "S.C.C.P.", "aliases": [], "basis": "wall_area", "unit": "SF"},
+        {"name": "METAL ROOF DECK", "aliases": [], "basis": "roof_area", "unit": "SF"},
+        {"name": "Ladder", "aliases": [], "basis": "count", "unit": "EA"},
+    ]
+    out = apply_estimator_names(entries)
+    by = {e["name"]: e for e in out}
+    assert "Tilt Up Wall" in by
+    assert "Exposed Structure" in by
+    assert "Ladder" in by                            # unmatched name untouched
+    # Plan term preserved as an alias for drawing-text binding.
+    assert "S.C.C.P." in by["Tilt Up Wall"]["aliases"]
+    # Basis (classified from the plan's own vocabulary) survives the rename.
+    assert by["Tilt Up Wall"]["basis"] == "wall_area"
+
+
+def test_merge_naming_conventions_emits_estimator_canonical_with_plan_alias():
+    # A naming pass that (wrongly) returns the plan's raw label as canonical is
+    # normalized to the estimator take-off term at the library level, with the
+    # plan term preserved as an alias.
+    conventions = [
+        {"canonical_name": "S.C.C.P.", "aliases": ["TILT PANEL"], "basis": "wall_area",
+         "binding_hint": "exterior_wall", "variant": "exterior",
+         "thickness_in": "", "height_ft": "36"},
+    ]
+    merged = merge_with_naming_conventions([], conventions)
+    entry = next(e for e in merged if e["name"] == "Tilt Up Wall")
+    assert entry["binding_hint"] == "exterior_wall"      # binding field preserved
+    assert entry["height_ft"] == "36"
+    assert "S.C.C.P." in entry["aliases"]                # plan term retained
+    assert not any(e["name"] == "S.C.C.P." for e in merged)
+
+
+# ── 12. prompt: estimator-naming guidance + canonical-vs-alias rule ───────────
+
+
+def test_naming_prompt_instructs_estimator_standard_canonical_names():
+    text = NAMING_CONVENTION_INSTRUCTION.lower()
+    # Canonical = the standard estimator take-off item name (not the raw label).
+    assert "take-off item name" in text
+    assert "not the plan's raw label" in text or "not the plan" in text
+    # The canonical-vs-alias rule and a worked estimator mapping are present.
+    assert "aliases" in text
+    assert "tilt up wall" in text
+    assert "exposed structure" in text
+    # Semantic-only discipline is still asserted.
+    assert "never invent a quantity" in text
+
+
+# ── 13. precedence: a human learned correction OUTRANKS estimator normalization
+
+
+class _StubLearned:
+    """Minimal LearnedContext stand-in exposing lookup_name (human corrections)."""
+
+    def __init__(self, mapping):
+        self._map = {k.strip().lower(): v for k, v in mapping.items()}
+
+    def lookup_name(self, raw):
+        return self._map.get((raw or "").strip().lower())
+
+
+_SCCP_DESC = "exterior site cast concrete panel"
+
+
+def test_learned_correction_outranks_estimator_normalization():
+    # The library resolves the site-cast-panel wall text to the estimator term
+    # "Tilt Up Wall" (plan term preserved as an alias); a human previously
+    # renamed that exact text to something else. The learned rename must win
+    # (aggregator precedence: learned > library > static).
+    library = [{"name": "Tilt Up Wall", "aliases": ["site cast concrete panel"],
+                "basis": "wall_area", "unit": "SF"}]
+    learned = _StubLearned({_SCCP_DESC: ("Internal Tilt up walls", "SF")})
+    items = [{
+        "description": _SCCP_DESC,
+        "item_type": "wall",
+        "calculated_quantity": 106997.0,
+        "calculated_unit": "SF",
+    }]
+    summary = aggregate_takeoff(items, learned=learned, library=library)
+    rows = [r for r in summary if r["item"] != "Mobilization"]
+    assert len(rows) == 1
+    assert rows[0]["item"] == "Internal Tilt up walls"   # human correction wins
+    assert rows[0]["source"] == "learned"
+
+
+def test_library_estimator_name_beats_raw_label_without_learning():
+    # No learned correction → the library's estimator take-off name is used
+    # (authoritative over the raw plan label the vision text carried).
+    library = [{"name": "Tilt Up Wall", "aliases": ["site cast concrete panel"],
+                "basis": "wall_area", "unit": "SF"}]
+    items = [{
+        "description": _SCCP_DESC,
+        "item_type": "wall",
+        "calculated_quantity": 106997.0,
+        "calculated_unit": "SF",
+    }]
+    summary = aggregate_takeoff(items, library=library)
+    rows = [r for r in summary if r["item"] != "Mobilization"]
+    assert len(rows) == 1
+    assert rows[0]["item"] == "Tilt Up Wall"
+    assert rows[0]["source"] == "library"
