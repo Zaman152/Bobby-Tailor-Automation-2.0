@@ -1,12 +1,29 @@
 {
-  "overall_qty": 0.4,
-  "name_found_rate": 0.7,
-  "qty_acc_when_found": 0.5714285714285714,
-  "count_qty": 0.3333333333333333,
-  "count_found": 0.6666666666666666,
-  "measured_qty": 0.5,
-  "measured_found": 0.75,
-  "n_total": 10,
-  "n_count": 6,
-  "n_measured": 4
+  "overall_qty": 0.06666666666666667,
+  "name_found_rate": 0.5333333333333333,
+  "qty_acc_when_found": 0.125,
+  "count_qty": 0.125,
+  "count_found": 0.375,
+  "measured_qty": 0.0,
+  "measured_found": 0.7142857142857143,
+  "n_total": 15,
+  "n_count": 8,
+  "n_measured": 7,
+  "geometry_text_qty_acc": 0.0,
+  "n_geometry_text": 5,
+  "vision_qty_share": 0.0,
+  "n_quantity_bearing": 17,
+  "provenance_counts": {
+    "deterministic": 10,
+    "unknown": 7
+  },
+  "silent_misses": [
+    "CASS WHITE",
+    "Columns-H-35'",
+    "Exposed Structure",
+    "Ladder-H-20'",
+    "Lift",
+    "Door Frames-HM",
+    "Doors-HM"
+  ]
 }

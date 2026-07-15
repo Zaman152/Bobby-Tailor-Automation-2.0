@@ -1,394 +1,640 @@
 [
   {
     "item": "Bollards",
-    "quantity": 0.0,
-    "quantity_fmt": "0",
+    "quantity": 15.0,
+    "quantity_fmt": "15",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png"
     ],
     "item_type": "concrete_slab",
-    "line_count": 1,
+    "line_count": 2,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count"
+    ],
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 15.0,
+        "description": "Bollard",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
         "qty": 0.0,
-        "description": "Bollard concrete dia.",
-        "formula": "12 sf \u00d7 4\" / (12 \u00d7 27) = 0.15 cy"
+        "description": "Bollard footing diameter - typical",
+        "formula": "18 sf \u00d7 4\" / (12 \u00d7 27) = 0.22 cy"
       }
     ]
   },
   {
-    "item": "Columns",
-    "quantity": 90.0,
-    "quantity_fmt": "90",
-    "unit": "EA",
+    "item": "CMU Wall",
+    "quantity": 8.0,
+    "quantity_fmt": "8",
+    "unit": "SF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png"
     ],
-    "item_type": "columns",
-    "line_count": 2,
+    "item_type": "cmu_wall",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-        "qty": 50.0,
-        "description": "Building column bay spacing - typical",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-        "qty": 40.0,
-        "description": "Building column bay spacing - end bay",
-        "formula": "count"
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
+        "qty": 8.0,
+        "description": "CMU wall thickness - pump/electrical room section",
+        "formula": "8 sf \u00d7 1.0 = 8 sf"
       }
     ]
   },
   {
     "item": "Component",
-    "quantity": 7.0,
-    "quantity_fmt": "7",
-    "unit": "EA",
+    "quantity": 401498.9,
+    "quantity_fmt": "401,498.9",
+    "unit": "LF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png"
     ],
     "item_type": "component",
-    "line_count": 5,
+    "line_count": 40,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 136.0,
+        "description": "SYM-1",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 56.0,
+        "description": "SYM-2",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 56.0,
+        "description": "0\" - 60' / 4\" - 48' / 54' - 0\" / 55' - 0\"",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 54.0,
+        "description": "1 / 10 / 11 / 12 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 43.0,
+        "description": "1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / G",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 41.0,
+        "description": "S.C.C.P.",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 39.0,
+        "description": "SYM-7",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 16.0,
+        "description": "10 / 11 / 12",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 14.0,
+        "description": "SYM-10",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 14.0,
+        "description": "SYM-11",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 13.0,
+        "description": "10 / 11 / 12 / 13 / 14 / 15 / 16 / 17 / 18 / 19 / 20 / 21 / 22",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 12.0,
+        "description": "1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / B / E / F",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 11.0,
+        "description": "1/2\" / 3/4\"",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 10.0,
+        "description": "SYM-19",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 8.0,
+        "description": "SYM-21",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 8.0,
+        "description": "SYM-22",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 8.0,
+        "description": "SYM-23",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 6.0,
+        "description": "SYM-27",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 5.0,
+        "description": "SYM-28",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 5.0,
+        "description": "SYM-29",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 5.0,
+        "description": "SYM-31",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 5.0,
+        "description": "SYM-32",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 4.0,
+        "description": "Steel Plate Track Guard",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-35",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-37",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-39",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 4.0,
+        "description": "SYM-41",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 4.0,
+        "description": "A-201",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
         "qty": 3.0,
-        "description": "Office Pod",
+        "description": "SYM-43",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-        "qty": 1.0,
-        "description": "Future Office Pod",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 3.0,
+        "description": "SYM-44",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-        "qty": 1.0,
-        "description": "Electrical Room",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 3.0,
+        "description": "SYM-46",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-        "qty": 1.0,
-        "description": "Fire Pump Room",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 3.0,
+        "description": "3/4\"",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 1.0,
-        "description": "Fire Riser",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 3.0,
+        "description": "2 1/2\" / 2 1/4\"",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 279.5,
+        "description": "4",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 11.1,
+        "description": "ROOM-3",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 11.0,
+        "description": "ROOM-4",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 10.7,
+        "description": "ROOM-5",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 10.6,
+        "description": "ROOM-6",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 397600.0,
+        "description": "Building Footprint",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 2972.0,
+        "description": "Building Perimeter",
         "formula": "count"
       }
     ]
   },
   {
     "item": "Concrete Slab",
-    "quantity": 0.08,
-    "quantity_fmt": "0.1",
-    "unit": "CY",
+    "quantity": 6.0,
+    "quantity_fmt": "6",
+    "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png"
     ],
     "item_type": "concrete_slab",
-    "line_count": 2,
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count"
+    ],
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 0.07,
-        "description": "Concrete slab thickness - ramp rail section",
-        "formula": "6 sf \u00d7 4\" / (12 \u00d7 27) = 0.07 cy"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 0.01,
-        "description": "Concrete slab on metal deck - pump/electrical room",
-        "formula": "1 sf \u00d7 4\" / (12 \u00d7 27) = 0.01 cy"
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 6.0,
+        "description": "Concrete Ramp",
+        "formula": "count"
       }
     ]
   },
   {
     "item": "Curb & Gutter",
-    "quantity": 0.15,
+    "quantity": 0.08,
     "quantity_fmt": "0.1",
     "unit": "LF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png"
     ],
     "item_type": "concrete_slab",
-    "line_count": 1,
+    "line_count": 2,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 0.15,
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
+        "qty": 0.01,
+        "description": "Concrete curb chamfer dimension",
+        "formula": "1 sf \u00d7 4\" / (12 \u00d7 27) = 0.01 cy"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
+        "qty": 0.07,
         "description": "Concrete curb - ramp plan",
-        "formula": "12 sf \u00d7 4\" / (12 \u00d7 27) = 0.15 cy"
+        "formula": "6 sf \u00d7 4\" / (12 \u00d7 27) = 0.07 cy"
       }
     ]
   },
   {
     "item": "Dock Doors",
-    "quantity": 110.0,
-    "quantity_fmt": "110",
+    "quantity": 9.0,
+    "quantity_fmt": "9",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0002.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0002.png"
     ],
     "item_type": "doors",
     "line_count": 3,
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-        "qty": 96.0,
-        "description": "Overhead Doors 9'-0\"x10'-0\"",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-        "qty": 10.0,
-        "description": "Overhead Door - 36'-8\" x 10' Overhead Door",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0002.png",
-        "qty": 4.0,
-        "description": "Overhead Dock Doors (KO) - truck court level",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "Doors",
-    "quantity": 18.0,
-    "quantity_fmt": "18",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0004.png"
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count"
     ],
-    "item_type": "doors",
-    "line_count": 8,
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0004.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 5.0,
+        "description": "Overhead Sectional Door",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0002.png",
         "qty": 2.0,
-        "description": "DOOR SCHEDULE",
-        "formula": "qty from schedule (2)"
+        "description": "Overhead Dock Doors (RO) - West Elevation",
+        "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0004.png",
-        "qty": 4.0,
-        "description": "DOOR SCHEDULE",
-        "formula": "qty from schedule (4)"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0004.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0002.png",
         "qty": 2.0,
-        "description": "DOOR SCHEDULE",
-        "formula": "qty from schedule (2)"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0004.png",
-        "qty": 2.0,
-        "description": "DOOR SCHEDULE",
-        "formula": "qty from schedule (2)"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0004.png",
-        "qty": 1.0,
-        "description": "DOOR SCHEDULE",
-        "formula": "qty from schedule (1 (2) MIN.)"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0004.png",
-        "qty": 1.0,
-        "description": "DOOR SCHEDULE",
-        "formula": "qty from schedule (1 (4) MIN.)"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0004.png",
-        "qty": 2.0,
-        "description": "DOOR SCHEDULE",
-        "formula": "qty from schedule (2)"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0004.png",
-        "qty": 4.0,
-        "description": "DOOR SCHEDULE",
-        "formula": "qty from schedule (4)"
+        "description": "Overhead Dock Doors (RO) - East Elevation",
+        "formula": "count"
       }
     ]
   },
   {
-    "item": "Doors-HM",
+    "item": "Dock Leveler",
     "quantity": 1.0,
     "quantity_fmt": "1",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
+        "qty": 1.0,
+        "description": "Dock Leveler (Future)",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Door Frames - Hollow Metal (door schedule)",
+    "quantity": 2.0,
+    "quantity_fmt": "2",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png"
     ],
     "item_type": "doors",
     "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 1.0,
-        "description": "H.M. Door (Hollow Metal Door)",
-        "formula": "count"
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 2.0,
+        "description": "Door Frames - Hollow Metal (door schedule)",
+        "formula": "authoritative plan schedule (2 EA)"
       }
     ]
   },
   {
-    "item": "Electrical Panels",
-    "quantity": 1.0,
-    "quantity_fmt": "1",
+    "item": "Doors - Aluminum (door schedule)",
+    "quantity": 2.0,
+    "quantity_fmt": "2",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png"
     ],
-    "item_type": "electrical_fixture",
+    "item_type": "doors",
     "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 1.0,
-        "description": "Electrical Panel",
-        "formula": "count"
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 2.0,
+        "description": "Doors - Aluminum (door schedule)",
+        "formula": "authoritative plan schedule (2 EA)"
       }
     ]
   },
   {
-    "item": "Exposed Structure",
-    "quantity": 397556.0,
-    "quantity_fmt": "397,556",
+    "item": "Exterior Tilt Up Wall",
+    "quantity": 6.6,
+    "quantity_fmt": "6.6",
     "unit": "SF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png"
     ],
-    "item_type": "exposed_structure",
+    "item_type": "wall_framing",
     "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-        "qty": 397556.0,
-        "description": "Exposed Structure for Cass White Warehouse",
-        "formula": "397556 sf \u00d7 1.0 = 397556 sf"
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 6.6,
+        "description": "S.C.C.P. (tilt-up concrete panel) wall",
+        "formula": "count \u00d7 1.1"
+      }
+    ]
+  },
+  {
+    "item": "Flooring",
+    "quantity": 4.4,
+    "quantity_fmt": "4.4",
+    "unit": "SQ_FT",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png"
+    ],
+    "item_type": "flooring",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
+        "qty": 4.4,
+        "description": "Dock pit depth - truck court to finish floor",
+        "formula": "4 sf \u00d7 1.1 waste = 4 sf"
       }
     ]
   },
   {
     "item": "Guard Rail",
-    "quantity": 7.7,
-    "quantity_fmt": "7.7",
+    "quantity": 24.689999999999998,
+    "quantity_fmt": "24.7",
     "unit": "LF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png"
     ],
     "item_type": "guard_rail",
-    "line_count": 5,
+    "line_count": 8,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count"
+    ],
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 11.33,
+        "description": "Pipe Guardrail",
+        "formula": "count \u00d7 1.03"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
         "qty": 1.54,
-        "description": "Steel pipe guardrail OD - ramp",
+        "description": "Steel pipe guardrail outside diameter - ramp",
         "formula": "2 lf \u00d7 1.03 = 2 lf"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
         "qty": 1.54,
-        "description": "Vertical support OD - guardrail",
+        "description": "Steel pipe guardrail outside diameter - ramp rail section",
         "formula": "2 lf \u00d7 1.03 = 2 lf"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
+        "qty": 4.12,
+        "description": "Vertical support spacing maximum - steel pipe guardrail",
+        "formula": "4 lf \u00d7 1.03 = 4 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
         "qty": 1.54,
-        "description": "Guardrail OD - stair/truck court",
+        "description": "Steel pipe guardrail OD - stair plan",
         "formula": "2 lf \u00d7 1.03 = 2 lf"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
         "qty": 1.54,
-        "description": "Guardrail OD - ramp rail section",
+        "description": "Steel pipe guardrail OD - Z-grade detail",
         "formula": "2 lf \u00d7 1.03 = 2 lf"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
         "qty": 1.54,
-        "description": "Vertical support spacing max - guardrail",
+        "description": "Steel pipe guardrail OD - Z-grade detail handrail",
+        "formula": "2 lf \u00d7 1.03 = 2 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
+        "qty": 1.54,
+        "description": "OD pipe guardrail - stair section",
         "formula": "2 lf \u00d7 1.03 = 2 lf"
       }
     ]
   },
   {
     "item": "Hand Rail",
-    "quantity": 9.99,
-    "quantity_fmt": "10.0",
+    "quantity": 3.6900000000000004,
+    "quantity_fmt": "3.7",
     "unit": "LF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png"
     ],
     "item_type": "hand_rail",
-    "line_count": 6,
+    "line_count": 3,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
         "qty": 1.58,
-        "description": "Handrail OD",
+        "description": "Steel pipe handrail OD - stair plan",
         "formula": "2 lf \u00d7 1.05 = 2 lf"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
+        "qty": 0.53,
+        "description": "Quick bolt diameter - stair rail connection",
+        "formula": "0 lf \u00d7 1.05 = 1 lf"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
         "qty": 1.58,
-        "description": "Vertical pipe OD - stair rail support",
+        "description": "OD pipe handrail - stair section",
         "formula": "2 lf \u00d7 1.05 = 2 lf"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 1.58,
-        "description": "Vertical pipe handrail OD attach at each support",
-        "formula": "2 lf \u00d7 1.05 = 2 lf"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 1.05,
-        "description": "Vertical pipe rail support - stair rail detail",
-        "formula": "1 lf \u00d7 1.05 = 1 lf"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 1.05,
-        "description": "Steel stringer - stair rail detail",
-        "formula": "1 lf \u00d7 1.05 = 1 lf"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 3.15,
-        "description": "Angle steel - stair rail base",
-        "formula": "3 lf \u00d7 1.05 = 3 lf"
-      }
-    ]
-  },
-  {
-    "item": "Ladder",
-    "quantity": 1.0,
-    "quantity_fmt": "1",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png"
-    ],
-    "item_type": "ladder",
-    "line_count": 1,
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-        "qty": 1.0,
-        "description": "Access Ladder",
-        "formula": "count"
       }
     ]
   },
@@ -400,6 +646,11 @@
     "source_sheets": [],
     "item_type": "standard_line_item",
     "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "",
     "detail": [
       {
         "sheet": null,
@@ -410,71 +661,115 @@
     ]
   },
   {
-    "item": "Paint",
-    "quantity": 130.0,
-    "quantity_fmt": "130",
-    "unit": "GALLONS",
+    "item": "Stairs",
+    "quantity": 5.0,
+    "quantity_fmt": "5",
+    "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png"
     ],
-    "item_type": "paint",
+    "item_type": "wall_framing",
     "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-        "qty": 130.0,
-        "description": "Paint for Cass White Warehouse",
-        "formula": "ceil(22699 sf \u00d7 2 coats / 350 sf/gal) = 130 gal"
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
+        "qty": 5.0,
+        "description": "P.O. concrete wall dimension - stair section",
+        "formula": "stud spacing reference: 5.25\" OC"
       }
     ]
   },
   {
-    "item": "Sealed Concrete",
-    "quantity": 397556.0,
-    "quantity_fmt": "397,556",
+    "item": "Storefront/Curtain Wall",
+    "quantity": 11.0,
+    "quantity_fmt": "11",
     "unit": "SF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png"
     ],
-    "item_type": "sealed_concrete",
+    "item_type": "wall_framing",
     "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count"
+    ],
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0001.png",
-        "qty": 397556.0,
-        "description": "Sealed Concrete for Cass White Warehouse",
-        "formula": "397556 sf \u00d7 1.0 = 397556 sf"
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 11.0,
+        "description": "Storefront/Curtain Wall System",
+        "formula": "count \u00d7 1.1"
       }
     ]
   },
   {
     "item": "Wall Framing",
-    "quantity": 17.0,
-    "quantity_fmt": "17",
-    "unit": "STUDS",
+    "quantity": 4087.13,
+    "quantity_fmt": "4,087.1",
+    "unit": "IN OC SPACING",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png"
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+      "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png"
     ],
     "item_type": "wall_framing",
-    "line_count": 3,
+    "line_count": 7,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count"
+    ],
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 6.0,
-        "description": "From center line of wall to wall opening",
-        "formula": "stud spacing reference: 6.0\" OC"
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 1885.4,
+        "description": "WALL-TC1",
+        "formula": "count \u00d7 1.1"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 48.62,
+        "description": "WALL-TC10",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 37.29,
+        "description": "WALL-TC11",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 27.17,
+        "description": "WALL-TC12",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 1224.85,
+        "description": "WALL-TC2",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0001.png",
+        "qty": 855.8,
+        "description": "WALL-TC3",
+        "formula": "count \u00d7 1.1"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260715_062822/page_0003.png",
         "qty": 8.0,
-        "description": "Pump/electrical room wall thickness",
+        "description": "Concrete footing - conc. retaining wall",
         "formula": "stud spacing reference: 8.0\" OC"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Crow_Cass_20260627_210624/page_0003.png",
-        "qty": 3.0,
-        "description": "Wall to meet UL approved (or equal) - fire rating",
-        "formula": "ceil(1lf \u00d7 12 / 16\" OC) + 1 = 2; \u00d7 1.1 waste = 3"
       }
     ]
   }
