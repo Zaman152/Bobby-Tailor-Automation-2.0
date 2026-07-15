@@ -511,6 +511,117 @@ def _grounded_labels(
     return grounded
 
 
+# ── Deterministic geometry fallback ("extract first, flag last") ─────────────
+#
+# When vision returns no/unknown label for a symbol group, an UNAMBIGUOUS
+# geometric signal may still name it deterministically BEFORE we fall back to
+# flagging. Conservative by design: only a large, dense, regular grid of
+# identical repeated symbols — the unmistakable signature of a structural
+# column grid — is named ("Columns"); everything weaker stays unnamed and
+# flagged for human review. Never a replacement for a real vision/library label.
+
+_GRID_MIN_COUNT = 20          # a "large" repeated grid; below this → flag, never guess
+_GRID_MIN_LINES = 3           # need ≥3 columns AND ≥3 rows to call it a grid
+_GRID_SPACING_CV_MAX = 0.25   # gap regularity: std/mean of line spacings must be tight
+_GRID_MIN_FILL = 0.6          # points must fill ≥60% of rows×cols (dense, not a lucky scatter)
+
+
+def _instance_centroids(group) -> List[Tuple[float, float]]:
+    """(cx, cy) center of each instance bbox, skipping malformed boxes."""
+    centroids: List[Tuple[float, float]] = []
+    for box in _field(group, "instance_bboxes_pt", None) or []:
+        try:
+            x0, y0, x1, y1 = float(box[0]), float(box[1]), float(box[2]), float(box[3])
+        except (TypeError, ValueError, IndexError):
+            continue
+        centroids.append(((x0 + x1) / 2.0, (y0 + y1) / 2.0))
+    return centroids
+
+
+def _median(values: List[float]) -> float:
+    ordered = sorted(values)
+    n = len(ordered)
+    if n == 0:
+        return 0.0
+    mid = n // 2
+    if n % 2:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+def _cluster_lines(values: List[float], tol: float) -> List[float]:
+    """Greedily snap sorted coordinates into gridlines within ``tol``."""
+    lines: List[float] = []
+    bucket: List[float] = []
+    for v in sorted(values):
+        if bucket and v - bucket[-1] > tol:
+            lines.append(sum(bucket) / len(bucket))
+            bucket = []
+        bucket.append(v)
+    if bucket:
+        lines.append(sum(bucket) / len(bucket))
+    return lines
+
+
+def _spacing_is_regular(lines: List[float]) -> bool:
+    """True when gridline spacings are tight (low coefficient of variation)."""
+    if len(lines) < _GRID_MIN_LINES:
+        return False
+    gaps = [b - a for a, b in zip(lines, lines[1:]) if b - a > 0]
+    if len(gaps) < _GRID_MIN_LINES - 1:
+        return False
+    mean = sum(gaps) / len(gaps)
+    if mean <= 0:
+        return False
+    var = sum((g - mean) ** 2 for g in gaps) / len(gaps)
+    cv = (var ** 0.5) / mean
+    return cv <= _GRID_SPACING_CV_MAX
+
+
+def _is_regular_grid(centroids: List[Tuple[float, float]], group) -> bool:
+    """Do these instance centers form a dense, evenly-spaced rectangular grid?"""
+    if len(centroids) < _GRID_MIN_COUNT:
+        return False
+    # Snap tolerance from the (identical) instance size — half a symbol
+    # width/height, so instances in the same column/row collapse to one line.
+    widths: List[float] = []
+    heights: List[float] = []
+    for box in _field(group, "instance_bboxes_pt", None) or []:
+        try:
+            widths.append(abs(float(box[2]) - float(box[0])))
+            heights.append(abs(float(box[3]) - float(box[1])))
+        except (TypeError, ValueError, IndexError):
+            continue
+    tol_x = max(_median(widths) * 0.5, 1.0)
+    tol_y = max(_median(heights) * 0.5, 1.0)
+    cols = _cluster_lines([c[0] for c in centroids], tol_x)
+    rows = _cluster_lines([c[1] for c in centroids], tol_y)
+    if len(cols) < _GRID_MIN_LINES or len(rows) < _GRID_MIN_LINES:
+        return False
+    if not (_spacing_is_regular(cols) and _spacing_is_regular(rows)):
+        return False
+    fill = len(centroids) / float(len(cols) * len(rows))
+    return fill >= _GRID_MIN_FILL
+
+
+def deterministic_symbol_name(group) -> Optional[str]:
+    """Conservative geometry-only fallback label for an UNLABELED symbol group.
+
+    Used ONLY when vision returns no/unknown label (see
+    :func:`_fuse_symbol_groups`). A large (``count >= _GRID_MIN_COUNT``), dense,
+    regular grid of identical repeated symbols is the unmistakable signature of
+    a structural column grid → ``"Columns"``. Weak or ambiguous signals return
+    ``None`` so the group stays flagged for human review (flag-don't-guess).
+    This is a FALLBACK, never a replacement for a real vision/library label.
+    """
+    count = int(_field(group, "count", 0) or 0)
+    if count < _GRID_MIN_COUNT:
+        return None
+    if _is_regular_grid(_instance_centroids(group), group):
+        return "Columns"
+    return None
+
+
 def _fuse_symbol_groups(
     bundle: dict, labels_by_id: Dict[str, dict], components: List[dict]
 ) -> None:
@@ -540,25 +651,52 @@ def _fuse_symbol_groups(
                     ),
                 }
             )
-        else:
-            # Unlabeled / "unknown" label → the deterministic count is still
-            # emitted (flag-don't-guess), named by contained text or the ID.
-            texts = _field(group, "contained_texts", []) or []
-            name = " / ".join(t for t in texts if t) or cid
+            continue
+
+        # Vision gave no usable label. Before flagging, try a conservative
+        # deterministic geometry fallback (a large regular grid → Columns): the
+        # count is carried as a real EA quantity with a named line so a golden
+        # item is never lost to a generic "Component" collapse — but the row is
+        # still flagged for verification since a model label was unavailable.
+        det_name = deterministic_symbol_name(group)
+        if det_name:
             components.append(
                 {
-                    "name": name,
+                    "name": det_name,
                     "quantity": count,
                     "unit": "EA",
                     "provenance": "geometry",
-                    "confidence": "low",
+                    "confidence": "medium",
                     "candidate_id": cid,
+                    "name_source": "deterministic_geometry",
                     "needs_review": True,
                     "review_reason": (
-                        "vision label unknown" if entry else "no vision label for symbol group"
+                        "named by deterministic geometry (regular grid → %s); "
+                        "vision label unavailable — verify" % det_name
                     ),
                 }
             )
+            continue
+
+        # No deterministic signal either → the deterministic count is STILL
+        # emitted (flag-don't-guess, never dropped), named by contained text or
+        # the candidate ID so distinct unknown groups stay distinguishable.
+        texts = _field(group, "contained_texts", []) or []
+        name = " / ".join(t for t in texts if t) or cid
+        components.append(
+            {
+                "name": name,
+                "quantity": count,
+                "unit": "EA",
+                "provenance": "geometry",
+                "confidence": "low",
+                "candidate_id": cid,
+                "needs_review": True,
+                "review_reason": (
+                    "vision label unknown" if entry else "no vision label for symbol group"
+                ),
+            }
+        )
 
 
 def _fuse_wall_classes(

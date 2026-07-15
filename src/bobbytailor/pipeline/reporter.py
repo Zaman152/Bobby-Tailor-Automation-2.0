@@ -623,6 +623,9 @@ def _normalize_calculated(estimates: list) -> List[Dict[str, Any]]:
             "raw_unit": e.get("raw_unit", ""),
             "calculated_quantity": e.get("quantity", ""),
             "calculated_unit": e.get("unit", ""),
+            # Preserve deterministic provenance (geometry/text_layer/schedule_table)
+            # so a symbol count is never surfaced as a null-provenance number.
+            "provenance": e.get("provenance"),
             "waste_factor": e.get("waste_factor_applied", 1.0),
             "formula_applied": e.get("formula", ""),   # NEW: shows the actual math
             "approximate": e.get("approximate", False),

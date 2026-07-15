@@ -606,16 +606,23 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
 
         # Propagate the count pass's own confidence; flag low-confidence or
         # unclassified ("general") counts for human review rather than presenting
-        # them as certain.
+        # them as certain. A review flag already set upstream (e.g. a fusion
+        # symbol group named by deterministic geometry, or a vision-unknown group
+        # carrying its deterministic count) is HONORED, never silently cleared —
+        # the flag-don't-guess signal must survive into the calculated take-off.
         conf = (c.get("confidence") or "").strip().lower() or None
         is_unclassified = item_type == "general"
-        needs_review = (conf == "low") or is_unclassified
+        upstream_review = bool(c.get("needs_review", False))
+        upstream_reason = (c.get("review_reason") or "").strip()
+        needs_review = (conf == "low") or is_unclassified or upstream_review
+        reasons: List[str] = []
         if is_unclassified:
-            reason = "unclassified item (no estimation table matched)"
+            reasons.append("unclassified item (no estimation table matched)")
         elif conf == "low":
-            reason = "low-confidence count"
-        else:
-            reason = ""
+            reasons.append("low-confidence count")
+        if upstream_review and upstream_reason:
+            reasons.append(upstream_reason)
+        reason = "; ".join(dict.fromkeys(reasons))
 
         return {
             "item_type": item_type if item_type != "general" else "component",
@@ -625,6 +632,10 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
             "raw_unit": unit,
             "quantity": round(final, 2),
             "unit": unit,
+            # Carry the deterministic provenance through so downstream consumers
+            # (aggregation, audit) can still tell a geometry count from a vision
+            # guess — it was being nulled between fusion and the report.
+            "provenance": c.get("provenance"),
             "waste_factor_applied": wf,
             "formula": f"count × {wf}" if wf != 1.0 else "count",
             "source_sheet": sheet_name,
