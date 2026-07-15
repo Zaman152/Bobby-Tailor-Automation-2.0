@@ -1,0 +1,23 @@
+{
+  "overall_qty": 0.3333333333333333,
+  "name_found_rate": 0.9333333333333333,
+  "qty_acc_when_found": 0.35714285714285715,
+  "count_qty": 0.375,
+  "count_found": 1.0,
+  "measured_qty": 0.2857142857142857,
+  "measured_found": 0.8571428571428571,
+  "n_total": 15,
+  "n_count": 8,
+  "n_measured": 7,
+  "geometry_text_qty_acc": 0.5,
+  "n_geometry_text": 4,
+  "vision_qty_share": 0.0,
+  "n_quantity_bearing": 57,
+  "provenance_counts": {
+    "unknown": 10,
+    "deterministic": 47
+  },
+  "silent_misses": [
+    "CASS WHITE"
+  ]
+}
