@@ -413,6 +413,40 @@ def _dedupe_labels(labels: List[str], cap: int = _MAX_LEGEND_LABELS) -> List[str
     return out
 
 
+def _build_symbol_count_hint(symbols) -> str:
+    """User hint listing each marked cluster's deterministic repetition count.
+
+    The clustering engine knows EXACTLY how many times each symbol repeats
+    (``SymbolGroup.count``). Handing those counts to the model — alongside the
+    in-context Set-of-Mark overlay of the FULL plan — is how an estimator
+    reads a sheet: a symbol repeating on a regular structural grid is columns;
+    one repeating along the building perimeter is bollards. A lone isolated
+    crop carries none of that signal, which is why the tiny-crop gallery
+    labelled everything "unknown". Pairs are sorted by count descending so the
+    highest-signal clusters lead. Returns "" when there are no counted groups.
+    """
+    pairs = []
+    for group in symbols or []:
+        cid = _sched_field(group, "candidate_id", "")
+        if not cid:
+            continue
+        count = int(_sched_field(group, "count", 0) or 0)
+        pairs.append((cid, count))
+    if not pairs:
+        return ""
+    pairs.sort(key=lambda pc: pc[1], reverse=True)
+    counts_str = ", ".join("{}×{}".format(cid, count) for cid, count in pairs)
+    return (
+        "Each marked symbol ID repeats this many times on the sheet: "
+        + counts_str
+        + ". Identify what each marked symbol is by picking the best-matching "
+        "object type. Use the repetition count and where it sits (a symbol "
+        "repeating on a regular structural grid is columns; a symbol repeating "
+        "along the building perimeter is bollards; etc.). Answer 'unknown' "
+        "only if genuinely unidentifiable."
+    )
+
+
 def _legend_crop_rect(viewports, schedules):
     """PDF-point rect of the sheet's legend region for the gallery crop."""
     for vp in viewports or []:
@@ -1339,12 +1373,18 @@ class TakeoffPipeline:
         schema: dict,
         images: list,
         guard: Optional[BudgetGuard],
+        user_hint: str = "",
     ) -> dict:
         """One structured-output vision call, charged to the budget guard.
 
         Raises BudgetExceeded when the guard is already exhausted or the
         charge for the completed call is refused (the refused result is
         discarded — the ledger only ever holds paid-and-accepted work).
+
+        ``user_hint`` (default "") threads an optional per-pass instruction
+        into ``analyze_drawing`` — e.g. the symbol-identification pass sends
+        the per-cluster repetition counts. Empty string preserves the prior
+        behaviour for every existing caller.
         """
         if guard is not None and guard.exhausted:
             raise BudgetExceeded(guard.spent_usd, guard.max_usd)
@@ -1355,6 +1395,7 @@ class TakeoffPipeline:
             sheet_type=sheet_type,
             output_schema=schema,
             images=images,
+            user_hint=user_hint,
         )
         if guard is not None:
             guard.charge(_result_cost_usd(result))
@@ -1451,19 +1492,36 @@ class TakeoffPipeline:
         if symbols and not budget_exhausted:
             if legend_labels:
                 try:
-                    legend_rect = _legend_crop_rect(viewports, schedules)
-                    gallery = _build_crop_gallery(
-                        page, symbols, legend_crop_rect=legend_rect
-                    )
-                    if gallery:
-                        symbol_ids = [
-                            _sched_field(g, "candidate_id", "") for g in symbols
-                        ]
-                        symbol_ids = [s for s in symbol_ids if s]
+                    # In-context Set-of-Mark identification (replaces the
+                    # tiny-crop gallery): mark every symbol cluster on the FULL
+                    # plan so the model sees WHERE each SYM-id sits on the real
+                    # drawing, and thread the deterministic repetition counts
+                    # so it can reason like an estimator (136× on a structural
+                    # grid → columns; 28-56× around the perimeter → bollards).
+                    # A lone crop of a column bubble is unidentifiable — which
+                    # is exactly why the old gallery pass returned "unknown"
+                    # for everything and Crow's 724 counted symbols never
+                    # became named line items.
+                    sym_candidates = {}
+                    for group in symbols:
+                        cid = _sched_field(group, "candidate_id", "")
+                        if not cid:
+                            continue
+                        rep = _sched_field(group, "representative_bbox_pt", None)
+                        if rep is None:
+                            rep = _sched_field(group, "bbox_pt", None)
+                        if rep:
+                            sym_candidates[cid] = rep
+                    if sym_candidates:
+                        overlay = _render_overlay(page, sym_candidates)
+                        images = overlay if isinstance(overlay, list) else [overlay]
+                        symbol_ids = list(sym_candidates.keys())
                         schema = symbol_gallery_schema(symbol_ids, legend_labels)
+                        count_hint = _build_symbol_count_hint(symbols)
                         res = self._structured_vision_call(
                             image_path, sheet_name, "symbol_gallery",
-                            resolved_type, schema, gallery, guard,
+                            resolved_type, schema, images[:20], guard,
+                            user_hint=count_hint,
                         )
                         passes_run.append("symbol_gallery")
                         if res and not res.get("error"):
@@ -1473,7 +1531,7 @@ class TakeoffPipeline:
                     budget_exhausted = True
                 except Exception as exc:  # noqa: BLE001
                     logger.warning(
-                        "run_sheet: %r — symbol gallery pass failed: %s",
+                        "run_sheet: %r — symbol identification pass failed: %s",
                         sheet_name, exc,
                     )
             else:
