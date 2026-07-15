@@ -182,3 +182,56 @@ addition to the floor-plan engine — then the fusion binds the (now-general) na
 measurement produced the number. Plus the learning loop, then re-validate across all 4 plans.
 Session API spend to date ≈ $16. Context is very large — continue in a FRESH session using this doc
 + memories as the plan.
+
+## 10. DECISIVE offline finding (2026-07-15) — "136 Columns" was COINCIDENTAL; no real column cluster
+
+Iterated the **deterministic geometry offline for FREE** (new tools `scripts/geom_probe.py`,
+`scripts/fusion_probe.py` — run just `_deterministic_bundle`, zero API) on the real Crow floor plan
+(page 1, fpp 0.555 / 40 ft-per-in). Rescored the two saved live runs (A2 $0.40, MAN $0.34) against
+the take-off — they are the SAME plan and expose the variance directly:
+
+| Item | Golden | run A2 | run MAN |
+|------|--------|--------|---------|
+| Bollards | 28 | **0** | **0** |
+| CMU Wall | 2,204 SF | **8** | **11,294** |
+| Columns | 132 | **MISSING** | 136 |
+| Internal Tilt-up | 108,442 | 106,998 ✓ | **0** |
+| Stairs | 10 | MISSING | 3 |
+| Exposed Structure / Sealed Concrete / Doors-HM / Frames-HM / Mobilization | — | ✓ | ✓ |
+
+**Only ~5 items are genuinely stable** (footprint-area, schedule, default). Everything vision-bound
+flips. Root causes, now proven from the raw geometry (not inferred):
+
+1. **The "136 columns" is NOT columns.** The 136-count symbol cluster (SYM-3) has its 136 instances
+   **all at Y=1863.2 — a single horizontal row** spanning the plan width. So do SYM-2 (204), SYM-4
+   (136), SYM-6/8 (68), SYM-10 (44)… **every high-count small-marker group has yspan=0**: they are
+   **dimension-tick / grid-bubble rows along the bottom**, not 2-D object arrays. A 2-D search for a
+   small-marker lattice (both spans > 300 pt, count 30–250) returns **zero** candidates. The real 132
+   columns are simply **not isolated as a cluster** by the shape-signature clusterer. The prior
+   session's "136-column cluster detected" (and the MAN run's Columns=136) was a **coincidental count
+   match** to golden 132 — dimension ticks that happened to number ~136. `_is_regular_grid` correctly
+   returns False on all of them; `deterministic_symbol_name` returns None for every group. **Columns
+   detection is unsolved.**
+2. **Naming variance is real and separate.** Same geometry, the cluster's NAME flips: "Structural
+   Column" (A2, from vision vocab, kept verbatim) vs "Columns-H-35'" (MAN, from the naming library).
+   The benchmark's strict tokenizer matches golden "Columns-H-35'" to "Columns" (subset) but NOT to
+   "Structural Column" → A2 scores MISSING. The library/vocab **verbatim path bypasses ITEM_NAME_MAP
+   normalization**, so synonyms never converge.
+3. **Bollards=0** is a vocabulary candidate "Bollards" that never bound to any cluster (defaulted 0);
+   the perimeter-jamb binding needs the AI naming pass to emit the hint AND a perimeter ring — neither
+   fires reliably. No real bollard detection.
+4. **CMU / tilt-up wall-class binding is vision-primary** (`_fuse_wall_classes` line ~1311): WHICH
+   thickness class (of 18 TC classes: TC1 6841 LF @ 4", … TC3 1120 @ 15.2", TC16 63 @ 16") is "CMU"
+   vs "tilt-up" is chosen by the stochastic label → 8 ↔ 11,294 flip.
+
+**Why this matters:** the honest measurable accuracy is ~5–6 solid items (footprint SF, schedule
+counts, tilt-up-when-perimeter-binds, mobilization). Column/bollard/CMU "hits" are coincidental or
+unstable. **Building a bespoke column/bollard detector cannot be validated offline** — there is no
+ground-truth object-position data, only the golden COUNT, so tuning to hit 132 just reproduces the
+coincidence trap. Genuine progress on these requires **paid live validation runs (user-authorized
+only — never autonomous)** and/or the **human-correction learning loop**. Offline-only, the safe
+correctness move is to stop emitting coincidental object rows (flag, don't guess) — but that removes
+the coincidental Columns hit and lowers the naive metric, so it is a decision for the user, not a
+silent change. Reaching "100% on any plan" remains the multi-session capability program of §8–§9.
+The free offline geometry-iteration harness now exists (`scripts/geom_probe.py`,
+`scripts/fusion_probe.py`).
