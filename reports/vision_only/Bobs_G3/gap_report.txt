@@ -1,0 +1,42 @@
+====================================================================================
+VISION-ONLY BENCHMARK — Bobs G3
+====================================================================================
+Overall quantity accuracy: 8%   Name/found rate: 33%   Qty acc when found: 25%
+  Counts (EA)   n= 7  found=43%  qty_ok=14%
+  Measured(SF/LF) n= 5  found=20%  qty_ok=0%
+  Provenance split: geometry/text qty acc=n/a (n=0)  vision qty share=0% of 10 quantity-bearing rows
+  Provenance classes: deterministic=4, unknown=6
+  SILENT MISSES (8): Gas Piping; Bollards; Exterior Painting - CMU Wall; Exterior Painting-EIFS - ALT; Lift; Lintels; Door Frame - HM; Ladder - H 24'
+  [plans-only] runtime=487s  cost=$0.1866  sheets=6
+
+STATUS    ITEM                                  GOLDEN            AI    ERR%  CAT  PROV
+------------------------------------------------------------------------------------
+MISSING   Gas Piping                            886.77             —       —  measured  unknown
+MISSING   Bollards                               11.00             —       —  count  unknown
+FAIL_QTY  Canopy                                 79.44        144.00    81.3  measured  unknown
+MISSING   Exterior Painting - CMU Wall       16,218.94             —       —  measured  unknown
+MISSING   Exterior Painting-EIFS - ALT        3,053.04             —       —  measured  unknown
+MISSING   Lift                                    1.00             —       —  count  unknown
+MISSING   Lintels                               179.24             —       —  measured  unknown
+PASS      Mobilization                            1.00          1.00     0.0  count  unknown
+MISSING   Door Frame - HM                        12.00             —       —  count  unknown
+FAIL_QTY  Doors -HM≈Doors                         5.00          2.00    60.0  count  unknown
+FAIL_QTY  Doors -WD≈Doors                         7.00          2.00    71.4  count  unknown
+MISSING   Ladder - H 24'                          1.00             —       —  count  unknown
+
+EXTRA items AI produced not in golden:
+  + Concrete Slab                  2.2 LF
+  + Dock Doors                     1.0 EA
+  + EXISTING ALUMINUM GUTTER SYSTEM 33.4 LF
+  + Electrical Panels              28.0 EA
+  + Keynote schedule item          4.0 EA
+  + Storefront/Curtain Wall        3.0 SF
+  + Wall Framing                   2.86 LF
+------------------------------------------------------------------------------------
+GATE CHECKS
+  FAIL  geometry_text_qty_acc    value=None  required >= 0.97
+  FAIL  overall_qty              value=0.08333333333333333  required >= 0.9
+  FAIL  item_found_rate          value=0.3333333333333333  required >= 0.95
+  FAIL  silent_misses            value=['Gas Piping', 'Bollards', 'Exterior Painting - CMU Wall', 'Exterior Painting-EIFS - ALT', 'Lift', 'Lintels', 'Door Frame - HM', "Ladder - H 24'"]  required == 0 (every golden category present or flagged)
+  PASS  vision_qty_share         value=0.0  required <= 0.05 (vision-provenance quantities ~0 on vector fixtures)
+  GATE VERDICT: FAILED

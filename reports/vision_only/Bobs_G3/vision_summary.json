@@ -1,0 +1,253 @@
+[
+  {
+    "item": "Canopy",
+    "quantity": 144.0,
+    "quantity_fmt": "144",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0005.png"
+    ],
+    "item_type": "canopy",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0005.png",
+        "qty": 144.0,
+        "description": "Bottom of canopy height dimension",
+        "formula": "144 sf \u00d7 1.0 = 144 sf"
+      }
+    ]
+  },
+  {
+    "item": "Concrete Slab",
+    "quantity": 2.2,
+    "quantity_fmt": "2.2",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0007.png"
+    ],
+    "item_type": "concrete_slab",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0007.png",
+        "qty": 2.2,
+        "description": "tilt-up concrete",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Dock Doors",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0005.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0005.png",
+        "qty": 1.0,
+        "description": "Truck dock doors",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Doors",
+    "quantity": 2.0,
+    "quantity_fmt": "2",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0005.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0005.png",
+        "qty": 2.0,
+        "description": "Entry door units (storefront)",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "EXISTING ALUMINUM GUTTER SYSTEM",
+    "quantity": 33.4,
+    "quantity_fmt": "33.4",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0004.png",
+      "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0007.png"
+    ],
+    "item_type": "component",
+    "line_count": 2,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); wall class named by naming library (hint bind) \u2014 verify"
+    ],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0004.png",
+        "qty": 30.5,
+        "description": "EXISTING ALUMINUM GUTTER SYSTEM",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0007.png",
+        "qty": 2.9,
+        "description": "EXISTING ALUMINUM GUTTER SYSTEM",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Electrical Panels",
+    "quantity": 28.0,
+    "quantity_fmt": "28",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0005.png"
+    ],
+    "item_type": "electrical_fixture",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0005.png",
+        "qty": 28.0,
+        "description": "Existing brick panel with cross reinforcement symbol",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Keynote schedule item",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0004.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0004.png",
+        "qty": 4.0,
+        "description": "Keynote schedule item",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Mobilization",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "standard_line_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": 1.0,
+        "description": "Mobilization (standard estimating line item)",
+        "formula": "standard_line_item"
+      }
+    ]
+  },
+  {
+    "item": "Storefront/Curtain Wall",
+    "quantity": 3.0,
+    "quantity_fmt": "3",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0005.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0005.png",
+        "qty": 3.0,
+        "description": "Typical Section @ Window - wall finder/header height",
+        "formula": "ceil(1lf \u00d7 12 / 16\" OC) + 1 = 2; \u00d7 1.1 waste = 3"
+      }
+    ]
+  },
+  {
+    "item": "Wall Framing",
+    "quantity": 2.86,
+    "quantity_fmt": "2.9",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0007.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count; unlabeled wall thickness class"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Bobs_G3_20260715_181734/page_0007.png",
+        "qty": 2.86,
+        "description": "WALL-TC2",
+        "formula": "count \u00d7 1.1"
+      }
+    ]
+  }
+]
