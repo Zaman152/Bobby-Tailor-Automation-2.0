@@ -534,6 +534,116 @@ def harvest_component_library(pages, doc=None) -> List[dict]:
     return library
 
 
+# ── Deterministic measure-basis classifier (authoritative over the LLM) ───────
+
+# Ordered ``(compiled pattern, basis)`` rules — FIRST match wins, exactly like
+# the aggregator's ITEM_NAME_MAP. The pattern is searched against a normalised
+# ``name + aliases`` haystack, so classification is derived from the plan's own
+# printed vocabulary with ZERO API variance. This is the authoritative measure
+# basis: a match here overrides whatever basis the LLM vocabulary pass guessed,
+# so floor/roof/wall-area binding (footprint SF, LF×height) is identical every
+# run. Extend by adding rows — ordering is the only contract (specific before
+# generic within a category; counted discrete items before area/linear so a
+# "dock door" / "door frame" never collapses into a wall).
+_MEASURE_BASIS_RULES = [
+    # ── count: discrete items counted each ────────────────────────────────
+    (r"\bbollard", "count"),
+    (r"\bcolumn", "count"),
+    (r"\bladder", "count"),
+    (r"\bstair", "count"),
+    (r"\blift\b|\belevator", "count"),
+    (r"\bhydrant", "count"),
+    (r"catch\s*basin", "count"),
+    (r"\bmanhole", "count"),
+    (r"\bdownspout", "count"),
+    (r"dock\s*leveler", "count"),
+    (r"dock\s*door", "count"),
+    (r"dock\s*bumper", "count"),
+    (r"\bdoor", "count"),          # doors AND door frames are counted
+    (r"\bframe", "count"),
+    (r"\bsign\b", "count"),
+    (r"\bbench\b", "count"),
+    # ── floor_area: slab / floor coverings spanning the building floor ─────
+    (r"sealed\s*concrete|polished\s*concrete", "floor_area"),
+    (r"slab.?on.?grade|\bsog\b", "floor_area"),
+    (r"concrete\s*floor|concrete\s*slab", "floor_area"),
+    (r"\bflooring\b|floor\s*tile", "floor_area"),
+    (r"\bvct\b|\blvt\b|\bcarpet\b|ceramic\s*tile|porcelain\s*tile|vinyl\s*tile", "floor_area"),
+    # ── wall_area: vertical walls quantified as length × height ────────────
+    (r"\bcmu\b", "wall_area"),
+    (r"masonry\s*wall|concrete\s*masonry", "wall_area"),
+    (r"block\s*wall", "wall_area"),
+    (r"tilt.?up|tilt\s*panel", "wall_area"),
+    (r"s\.?c\.?c\.?p\.?", "wall_area"),   # site-cast concrete panel
+    (r"concrete\s*panel|precast\s*panel", "wall_area"),
+    (r"\bpartition", "wall_area"),
+    (r"(?:interior|exterior)\s*wall|\bwall\b", "wall_area"),
+    # ── roof_area: roof / ceiling / exposed structure spanning overhead ────
+    (r"exposed\s*structure|exposed\s*deck|exposed\s*roof", "roof_area"),
+    (r"open\s*web\s*joist|bar\s*joist", "roof_area"),
+    (r"\broof\b", "roof_area"),
+    (r"\bceiling", "roof_area"),
+    # ── linear: linear-foot items that are NOT walls ──────────────────────
+    (r"guard\s*rail|guardrail", "linear"),
+    (r"hand\s*rail|handrail", "linear"),
+    (r"\brail\b", "linear"),
+    (r"\bcurb\b", "linear"),
+    (r"\bgutter\b", "linear"),
+    (r"\bpipe\b|piping", "linear"),
+    (r"\bconduit\b", "linear"),
+    (r"\bduct\b", "linear"),
+    (r"\bfence\b", "linear"),
+    (r"\btrench", "linear"),
+    (r"\blintel", "linear"),
+]
+
+# Compile once at import — the rules never change at runtime.
+_MEASURE_BASIS_MAP = [(re.compile(pat, re.IGNORECASE), basis) for pat, basis in _MEASURE_BASIS_RULES]
+
+
+def classify_basis(name: str, aliases=()) -> Optional[str]:
+    """Deterministically classify an object's MEASURE BASIS from its own text.
+
+    Returns one of ``count`` / ``linear`` / ``wall_area`` / ``floor_area`` /
+    ``roof_area`` when the name (or any alias) matches the standard
+    construction-vocabulary rules, else ``None`` (unknown — the LLM basis may
+    fill). No API call, no run-to-run variance — this is the authoritative
+    basis in :func:`merge_with_vocabulary`.
+
+    Args:
+        name:    The object/component name (e.g. ``"Exposed Structure"``).
+        aliases: Optional additional labels searched alongside the name.
+    """
+    parts = [name or ""]
+    for a in aliases or ():
+        if isinstance(a, str) and a.strip():
+            parts.append(a)
+    hay = _norm(" ".join(p for p in parts if p))
+    if not hay:
+        return None
+    for pattern, basis in _MEASURE_BASIS_MAP:
+        if pattern.search(hay):
+            return basis
+    return None
+
+
+def apply_deterministic_basis(entries: List[dict]) -> List[dict]:
+    """Overwrite each entry's ``basis`` with :func:`classify_basis` when known.
+
+    Authoritative: a deterministic match REPLACES the (possibly LLM-guessed)
+    basis; ``None`` leaves the existing basis untouched. Mutates and returns
+    *entries* in place. Additive — an entry the classifier cannot place keeps
+    whatever basis it already had.
+    """
+    for entry in entries or []:
+        if not isinstance(entry, dict):
+            continue
+        det = classify_basis(entry.get("name") or "", entry.get("aliases") or ())
+        if det is not None:
+            entry["basis"] = det
+    return entries
+
+
 def merge_with_vocabulary(
     deterministic: List[dict],
     llm_objects: Optional[List[dict]] = None,
@@ -586,6 +696,11 @@ def merge_with_vocabulary(
         det.append(new_entry)
         for label in [name] + obj_aliases:
             covered.setdefault(_norm(label), new_entry)
+    # Deterministic measure-basis is AUTHORITATIVE: a keyword match overrides
+    # the LLM-provided basis (e.g. an LLM "Exposed Structure" basis=count is
+    # corrected to roof_area), so area binding is identical every run. The LLM
+    # basis only survives where classify_basis returns None.
+    apply_deterministic_basis(det)
     return det
 
 

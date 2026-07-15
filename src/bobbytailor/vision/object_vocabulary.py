@@ -154,6 +154,89 @@ def build_project_vocabulary(
     return [obj for obj in objects if isinstance(obj, dict)]
 
 
+def _norm_name(text) -> str:
+    """Normalise an object name for cross-sample identity (lower, collapsed)."""
+    if not isinstance(text, str):
+        return ""
+    return " ".join(text.split()).strip().lower()
+
+
+def majority_vote_objects(samples: List[List[Dict]]) -> List[Dict]:
+    """Majority-vote object PRESENCE across N vocabulary samples.
+
+    Each element of *samples* is one vocabulary pass's ``objects`` list. An
+    object is KEPT only when its (normalised) name appears in a strict majority
+    of samples — this stops a stochastic "unknown" run from dropping a real
+    object (Exposed Structure, Columns, ...) that every other run names. For a
+    kept object: aliases are the union across the samples that named it, and
+    the basis is the plurality of the sample bases (ties → ``None`` so the
+    deterministic classifier / merge decides). First-seen name casing and order
+    are preserved.
+
+    N==1 (or a single sample) returns that sample's objects unchanged
+    (single-shot behaviour). Never raises.
+    """
+    clean = [s for s in (samples or []) if isinstance(s, list)]
+    n = len(clean)
+    if n == 0:
+        return []
+    if n == 1:
+        return [o for o in clean[0] if isinstance(o, dict)]
+
+    from collections import OrderedDict
+
+    counts: "OrderedDict[str, int]" = OrderedDict()
+    display: Dict[str, str] = {}
+    aliases: Dict[str, list] = {}
+    basis_votes: Dict[str, list] = {}
+    unit_votes: Dict[str, list] = {}
+
+    for sample in clean:
+        seen_this_sample = set()
+        for obj in sample:
+            if not isinstance(obj, dict):
+                continue
+            name = (obj.get("name") or "").strip()
+            key = _norm_name(name)
+            if not key or key in seen_this_sample:
+                continue
+            seen_this_sample.add(key)
+            counts[key] = counts.get(key, 0) + 1
+            display.setdefault(key, name)
+            aliases.setdefault(key, [])
+            for a in obj.get("aliases") or []:
+                if isinstance(a, str) and a.strip() and a not in aliases[key]:
+                    aliases[key].append(a)
+            b = obj.get("basis")
+            if b:
+                basis_votes.setdefault(key, []).append(b)
+            u = obj.get("unit")
+            if u:
+                unit_votes.setdefault(key, []).append(u)
+
+    def _plurality(values):
+        if not values:
+            return None
+        tally: Dict[str, int] = {}
+        for v in values:
+            tally[v] = tally.get(v, 0) + 1
+        top = max(tally.values())
+        winners = [v for v, c in tally.items() if c == top]
+        return winners[0] if len(winners) == 1 else None
+
+    kept: List[Dict] = []
+    for key, count in counts.items():
+        if count * 2 <= n:          # not a strict majority — drop it
+            continue
+        kept.append({
+            "name": display[key],
+            "aliases": list(aliases.get(key, [])),
+            "basis": _plurality(basis_votes.get(key, [])),
+            "unit": _plurality(unit_votes.get(key, [])),
+        })
+    return kept
+
+
 def vocabulary_labels(objects: List[Dict]) -> List[str]:
     """Flatten a vocabulary object list to a deduped list of names + aliases.
 

@@ -114,6 +114,7 @@ from bobbytailor.vision.schemas import (
 )
 from bobbytailor.vision.object_vocabulary import (
     build_project_vocabulary,
+    majority_vote_objects,
     vocabulary_labels,
 )
 
@@ -316,6 +317,94 @@ def _sched_field(obj, name: str, default=None):
     if isinstance(obj, dict):
         return obj.get(name, default)
     return getattr(obj, name, default)
+
+
+# ── Categorical majority-vote for residual vision label passes (21-reliability)
+# The single-shot symbol-gallery / wall-class passes are stochastic: one run a
+# real cluster is "Column", the next it is "unknown", so items flip FOUND/
+# MISSING between identical runs. Voting N samples per candidate id fixes that
+# for the genuinely-visual residual (the deterministic basis handles the rest).
+
+# Candidate-id field names carried by the voted label schemas, most-specific
+# first; the fallback matches any ``*_id`` string field.
+_CANDIDATE_ID_KEYS = ("symbol_id", "wall_class_id", "region_id", "candidate_id", "id")
+
+
+def _extract_candidate_id(item: dict):
+    """Return ``(id_value, id_key)`` for one voted label item, else ``(None, None)``."""
+    if not isinstance(item, dict):
+        return None, None
+    for k in _CANDIDATE_ID_KEYS:
+        v = item.get(k)
+        if isinstance(v, str) and v.strip():
+            return v, k
+    for k, v in item.items():
+        if k.endswith("_id") and isinstance(v, str) and v.strip():
+            return v, k
+    return None, None
+
+
+def _vote_label_text(label) -> str:
+    """Normalise a candidate label; missing/blank/non-string → ``"unknown"``."""
+    if not isinstance(label, str):
+        return "unknown"
+    text = label.strip()
+    return text if text else "unknown"
+
+
+def _vote_categorical_labels(samples: list, vote_key: str) -> list:
+    """Majority-vote the per-candidate labels under *vote_key* across *samples*.
+
+    Every sample's ``vote_key`` is a list of ``{<id>, label, ...}`` dicts. For
+    each candidate id the winning label is the plurality across samples (an id
+    ABSENT from a sample counts as an "unknown" vote); a tie or an
+    "unknown"/absent plurality yields ``"unknown"`` — flag-don't-guess.
+    Confidence: unanimous → ``high``, strict majority → ``medium``, else
+    ``low``. Candidate order is first-seen. Output items keep the id under the
+    same key they arrived with, so the shape is identical to a single call.
+    """
+    order: list = []
+    id_key_by_id: dict = {}
+    per_sample: list = []
+    for res in samples:
+        mapping: dict = {}
+        items = res.get(vote_key) if isinstance(res, dict) else None
+        if isinstance(items, list):
+            for it in items:
+                cid, idk = _extract_candidate_id(it)
+                if cid is None:
+                    continue
+                if cid not in id_key_by_id:
+                    order.append(cid)
+                    id_key_by_id[cid] = idk
+                mapping[cid] = _vote_label_text(it.get("label"))
+        per_sample.append(mapping)
+
+    n = len(per_sample)
+    voted: list = []
+    for cid in order:
+        tally: dict = {}
+        display: dict = {}
+        for mapping in per_sample:
+            lab = mapping.get(cid, "unknown")   # absent → unknown vote
+            low = lab.lower()
+            tally[low] = tally.get(low, 0) + 1
+            display.setdefault(low, lab)
+        top = max(tally.values())
+        winners = [low for low, c in tally.items() if c == top]
+        if len(winners) == 1 and winners[0] != "unknown":
+            low = winners[0]
+            label = display[low]
+            if top == n:
+                conf = "high"
+            elif top * 2 > n:
+                conf = "medium"
+            else:
+                conf = "low"
+        else:
+            label, conf = "unknown", "low"
+        voted.append({id_key_by_id[cid]: cid, "label": label, "confidence": conf})
+    return voted
 
 
 def _viewport_printed_fpi(page, viewports) -> dict:
@@ -1537,6 +1626,78 @@ class TakeoffPipeline:
             return {}
         return result
 
+    def _voted_structured_vision_call(
+        self,
+        image_path: str,
+        sheet_name: str,
+        pass_type: str,
+        sheet_type: str,
+        schema: dict,
+        images: list,
+        guard: Optional[BudgetGuard],
+        user_hint: str = "",
+        *,
+        vote_key: str,
+        n: Optional[int] = None,
+    ) -> dict:
+        """Majority-vote N structured vision calls over their per-candidate labels.
+
+        Runs :meth:`_structured_vision_call` up to *n* times (default
+        ``ensemble_settings()["n"]``), majority-voting the label list under
+        *vote_key* per candidate id so a stochastic "unknown" cannot flip an
+        item FOUND/MISSING between identical runs. Budget-guarded: sampling
+        stops early when the guard is exhausted and votes over whatever paid
+        samples were gathered (never a silent partial). ``n <= 1`` is exactly
+        the single-shot :meth:`_structured_vision_call` (byte-identical result).
+
+        The synthetic result keeps the SAME shape a single call returned — all
+        non-``vote_key`` scalar fields are carried from a representative sample
+        and usage/cost is summed across the voted samples — so downstream
+        ``res.get(vote_key)`` and ``fuse_sheet`` are unchanged.
+        """
+        if n is None:
+            try:
+                n = int(ensemble_settings()["n"])
+            except Exception:  # noqa: BLE001 — config stubbed → single-shot
+                n = 1
+        if n <= 1:
+            return self._structured_vision_call(
+                image_path, sheet_name, pass_type, sheet_type, schema, images,
+                guard, user_hint=user_hint,
+            )
+
+        samples: list = []
+        for _ in range(n):
+            if guard is not None and getattr(guard, "exhausted", False):
+                break
+            try:
+                res = self._structured_vision_call(
+                    image_path, sheet_name, pass_type, sheet_type, schema, images,
+                    guard, user_hint=user_hint,
+                )
+            except BudgetExceeded:
+                break
+            if isinstance(res, dict):
+                samples.append(res)
+
+        if not samples:
+            # No paid samples — surface the same signal a single call would
+            # (guard exhausted before the first call): the caller's
+            # ``except BudgetExceeded`` flags the pass, never a silent empty.
+            if guard is not None:
+                raise BudgetExceeded(guard.spent_usd, guard.max_usd)
+            return {}
+
+        # Base carries the non-voted scalar fields (e.g. semantic pass's
+        # ``main_plan_region``); prefer a non-error sample.
+        base = next((s for s in samples if not s.get("error")), samples[0])
+        result = dict(base)
+        result[vote_key] = _vote_categorical_labels(samples, vote_key)
+        result.update(_sum_usage(samples))  # aggregate paid usage/cost
+        result["_voted"] = True
+        result["_vote_samples"] = len(samples)
+        return result
+
     def _run_sheet_vector(
         self,
         *,
@@ -1602,9 +1763,10 @@ class TakeoffPipeline:
                 overlay = _render_overlay(page, candidates)
                 images = overlay if isinstance(overlay, list) else [overlay]
                 schema = semantic_labeling_schema(region_ids, wall_ids)
-                res = self._structured_vision_call(
+                res = self._voted_structured_vision_call(
                     image_path, sheet_name, "semantic", resolved_type,
                     schema, images[:20], guard,
+                    vote_key="wall_class_labels",
                 )
                 passes_run.append("semantic")
                 if res and not res.get("error"):
@@ -1648,10 +1810,11 @@ class TakeoffPipeline:
                         symbol_ids = list(sym_candidates.keys())
                         schema = symbol_gallery_schema(symbol_ids, legend_labels)
                         count_hint = _build_symbol_count_hint(symbols)
-                        res = self._structured_vision_call(
+                        res = self._voted_structured_vision_call(
                             image_path, sheet_name, "symbol_gallery",
                             resolved_type, schema, images[:20], guard,
                             user_hint=count_hint,
+                            vote_key="matches",
                         )
                         passes_run.append("symbol_gallery")
                         if res and not res.get("error"):
@@ -2120,19 +2283,47 @@ class TakeoffPipeline:
         stores the parsed objects on ``self._project_vocabulary`` and the flat
         deduped names+aliases feed on ``self._project_vocab_labels``. Any
         failure leaves both empty (additive-only — never breaks a run).
+
+        The vocabulary pass is run N times (``ensemble_settings()["n"]``,
+        budget permitting) and object PRESENCE is majority-voted
+        (:func:`object_vocabulary.majority_vote_objects`) so a stochastic
+        "unknown" run can no longer drop a real object (Exposed Structure,
+        Columns, ...) that every other run names. ``n <= 1`` (or a single paid
+        sample) is exactly today's single-shot behaviour.
         """
-        objects: list = []
         try:
-            objects = build_project_vocabulary(
-                self._analyzer,
-                image_path,
-                plan_text,
-                guard=guard,
-                sheet_name="project",
-            )
-        except Exception as exc:  # noqa: BLE001 — vocabulary is strictly additive
-            logger.warning("_build_project_vocabulary: failed: %s", exc)
-            objects = []
+            n = int(ensemble_settings()["n"])
+        except Exception:  # noqa: BLE001 — config stubbed → single-shot
+            n = 1
+        n = max(1, n)
+
+        samples: list = []
+        for _ in range(n):
+            if guard is not None and getattr(guard, "exhausted", False):
+                break
+            try:
+                objs = build_project_vocabulary(
+                    self._analyzer,
+                    image_path,
+                    plan_text,
+                    guard=guard,
+                    sheet_name="project",
+                )
+            except Exception as exc:  # noqa: BLE001 — vocabulary is strictly additive
+                logger.warning("_build_project_vocabulary: failed: %s", exc)
+                objs = []
+            samples.append(objs or [])
+            if n <= 1:
+                break
+
+        if len(samples) <= 1:
+            objects = samples[0] if samples else []
+        else:
+            try:
+                objects = majority_vote_objects(samples)
+            except Exception as exc:  # noqa: BLE001 — additive, never break a run
+                logger.warning("_build_project_vocabulary: vote failed: %s", exc)
+                objects = samples[0] if samples else []
         self._project_vocabulary = objects or []
         self._project_vocab_labels = vocabulary_labels(self._project_vocabulary)
         if self._project_vocab_labels:
