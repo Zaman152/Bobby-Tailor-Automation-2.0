@@ -621,6 +621,40 @@ def _build_measure_hint(manifest) -> Optional[str]:
     )
 
 
+def _manifest_room_mix(manifest) -> dict:
+    """``{unit type -> how many exist}`` from the manifest (the estimator's room mix).
+
+    A hotel/multifamily set draws ONE prototype of each unit type and the
+    take-off multiplies by the mix. That multiplier is an ESTIMATOR input — it is
+    routinely not in the drawing set at all (Moxy's plans index CS-04 "Guestroom
+    Matrix" but do not include the sheet, and the guestroom floors are absent),
+    so no reading of the plan can recover it.
+
+    Declared as manifest entries carrying ``unit_count``::
+
+        {"name": "QQ A", "measure": "unit_type", "assumptions": {"unit_count": 90}}
+
+    It is a COUNT, never a quantity: the app still measures every area.
+    """
+    mix: dict = {}
+    if not manifest:
+        return mix
+    for e in getattr(manifest, "entries", None) or []:
+        count = (e.assumptions or {}).get("unit_count")
+        if count in (None, ""):
+            continue
+        try:
+            n = int(float(count))
+        except (TypeError, ValueError):
+            continue
+        if n <= 0:
+            continue
+        key = " ".join(str(e.name or "").split()).strip().lower()
+        if key:
+            mix[key] = n
+    return mix
+
+
 def _manifest_scale_fpi(manifest) -> Optional[float]:
     """Project drawing scale (feet per inch) from a manifest assumption, if any.
 
@@ -2071,6 +2105,7 @@ class TakeoffPipeline:
             vocabulary=getattr(self, "_project_vocabulary", None),
             wall_height_ft=getattr(self, "_project_wall_height", None),
             wall_height_source=getattr(self, "_project_wall_height_source", None),
+            room_mix=_manifest_room_mix(getattr(self, "_manifest", None)),
         )
         merged = merge_with_provenance([fused])
 

@@ -1513,6 +1513,94 @@ def _fuse_wall_classes(
             )
 
 
+def _fuse_room_fills(
+    bundle: dict,
+    components: List[dict],
+    vocab_map: Optional[Dict[str, dict]] = None,
+    room_mix: Optional[Dict[str, int]] = None,
+) -> None:
+    """Measured enclosed-region areas → area line items (prototype × room mix).
+
+    The number is geometry: an area flood-filled from the drawing at that
+    drawing's own printed scale. The only human input is ``room_mix`` — how many
+    of each unit type the building has (an estimator's room mix, routinely absent
+    from the drawing set itself). It is a COUNT; it never supplies a quantity.
+
+    Binding is by DISCIPLINE, not size: a ceiling area comes off the Reflected
+    Ceiling Plan, a floor area off the Architectural plan. A prototype sheet
+    whose unit type is not in the room mix is emitted as the single measured unit
+    and flagged — never silently multiplied by a guessed count, and never dropped.
+    """
+    from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
+        select_fill_for_basis,
+        total_for_units,
+    )
+
+    fills = bundle.get("room_fills") or []
+    if not fills:
+        return
+    vocab_map = vocab_map or {}
+    room_mix = room_mix or {}
+
+    # Area objects the vocabulary/manifest asks for, deduped by canonical name.
+    wanted: Dict[str, dict] = {}
+    for info in vocab_map.values():
+        basis = str(info.get("basis") or "").strip().lower()
+        name = info.get("name")
+        if not name or basis not in _ROOM_FILL_BASES:
+            continue
+        wanted.setdefault(str(name).strip().lower(), {"name": name, "basis": basis,
+                                                      "unit": info.get("unit") or "SF"})
+    if not wanted:
+        return
+
+    for info in wanted.values():
+        pick = select_fill_for_basis(fills, info["basis"])
+        if pick is None:
+            continue
+        plan_key = _norm_name(pick.plan_name)
+        count = room_mix.get(plan_key)
+        known_count = count is not None and int(count) > 0
+        qty = total_for_units(pick.area_sf, count if known_count else None)
+
+        reasons = []
+        if pick.needs_review:
+            reasons.append(pick.review_reason)
+        if not known_count and pick.plan_name:
+            reasons.append(
+                "measured ONE %r unit (%.1f SF); how many exist is not stated in "
+                "the drawing set — supply the room mix to scale it"
+                % (pick.plan_name, pick.area_sf)
+            )
+        components.append(
+            {
+                "name": info["name"],
+                "quantity": qty,
+                "unit": info["unit"],
+                "provenance": "geometry",
+                "confidence": "medium" if reasons else "high",
+                "candidate_id": pick.candidate_id,
+                "name_source": "room_fill",
+                "formula": (
+                    "%.1f SF (%s, enclosed regions @ %.2f ft/in) × %d units"
+                    % (pick.area_sf, pick.viewport_title or pick.plan_kind,
+                       pick.scale_fpi or 0.0, int(count))
+                    if known_count else
+                    "%.1f SF (%s, enclosed regions @ %.2f ft/in)"
+                    % (pick.area_sf, pick.viewport_title or pick.plan_kind,
+                       pick.scale_fpi or 0.0)
+                ),
+                "unit_count": int(count) if known_count else None,
+                "needs_review": bool(reasons),
+                "review_reason": "; ".join(r for r in reasons if r),
+            }
+        )
+
+
+# Measure bases the enclosed-region engine can answer.
+_ROOM_FILL_BASES = frozenset({"ceiling_area", "roof_area", "floor_area"})
+
+
 def _fuse_project_area_items(
     bundle: dict, vocabulary, components: List[dict]
 ) -> None:
@@ -1741,6 +1829,7 @@ def fuse_sheet(
     vocabulary=None,
     wall_height_ft: Optional[float] = None,
     wall_height_source: Optional[str] = None,
+    room_mix: Optional[Dict[str, int]] = None,
 ) -> dict:
     """Apply vision ID→label answers to deterministic candidates for a sheet.
 
@@ -1832,6 +1921,7 @@ def fuse_sheet(
         library_wall_map=library_wall_map,
     )
     _fuse_project_area_items(deterministic_bundle, vocabulary, components)
+    _fuse_room_fills(deterministic_bundle, components, vocab_map, room_mix)
     _fuse_rooms(deterministic_bundle, room_labels, components, rejected)
     _fuse_schedules(deterministic_bundle, components)
     _fuse_footprint(deterministic_bundle, components)
