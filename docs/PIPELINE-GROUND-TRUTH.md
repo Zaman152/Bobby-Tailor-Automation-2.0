@@ -327,6 +327,66 @@ The classifier fix is real and necessary (26 sheets recovered; raw numbers rose 
 Guard Rail 0→140, Stairs 6→10), but it moved a 2% score to 4%: **unblocking the sheets proved the
 measurement engine cannot measure this building at all.** Run: 22 sheets contributed, $1.89, 21 min.
 
+## 13. Moxy document study (2026-07-17) — the measurement model, and why 100% is blocked
+
+Read the plans against the take-off page by page (not inferred — read). Findings:
+
+**13.1 The take-off is PER SHEET.** Each take-off page is the same sheet as the plan page with a
+"Legend" box overlaid listing what was measured *on that sheet*. Extracted map (all 40):
+`ID-411 → Door Frame-HM 2, Doors-WD 2, Guestroom-Wall Covering 366.43, Gyp Ceiling 706.76, Gyp Wall
+1,566.65`; `ID-202 → Guard Rail 23.01 LF, Hand Rail 23.50 LF`; `CS-02 → Lift 1, Mobilization 1`; etc.
+
+**13.2 THE MODEL: typical-unit × count.** Sheets ID-407…ID-422 are **prototype guestroom drawings** —
+one room per sheet (KING A, KING SUITE B, QQ A, BUNK B, ADA KING RIS…) at 1/4"=1'-0". The estimator's
+number is *that one room × how many of that type exist*. `Doors-WD` per sheet **is** the multiplier
+(one entry door per room). Dividing golden by it yields per-unit areas of **212–377 SF — textbook
+guestrooms**, which independently confirms the model:
+
+| sheet | type | units | ceiling/unit | wall/unit |
+|-------|------|-------|--------------|-----------|
+| ID-413 | QQ A | **90** | 253.8 | 691.2 |
+| ID-407 | KING A | 26 | 221.1 | 627.8 |
+| ID-411 | KING SUITE B | 2 | 353.4 | 783.3 |
+| ID-417 | BUNK B | 1 | 271.1 | 500.5 |
+
+ID-413 alone (90 × QQ A) is 22,843 SF = 39% of the whole Gyp Ceiling total.
+
+**13.3 BLOCKER A — the multiplier is NOT IN THE INPUT.** The drawing index (p1) lists
+**`CS-04 GUESTROOM MATRIX`** and `LEVEL 01–07 RCP PLAN`s, but the 40-page PDF contains **neither
+CS-04 nor the guestroom floors (LEVELS 02–06)** — only Level 1 Lobby, Pop-Up Hub, Level 7, and the 18
+prototype sheets. p2's "UNIT TYPE" is a *legend of tag symbols*, not counts; Level 7 carries no unit
+tags. **Nothing in this PDF states "90 × QQ A".** The estimator had the full set; our input is a
+subset. No LLM or geometry can derive a number the document does not contain — this is an INPUT gap,
+not a code gap. Resolution (user decision 2026-07-17): **the human supplies unit counts in the
+manifest** (an estimator knows the room mix) — the sanctioned human-in-the-loop channel.
+
+**13.4 BLOCKER B — the room engine cannot extract Moxy's rooms.** With the scale now correct
+(§13.5), on ID-411: `extract_walls` → 41 walls, but `extract_rooms` → 8 fragments of **17 SF** each
+(expected ~353). No closed room path exists in the vector data (a search for closed paths of 100–900
+SF returns **zero**) — Moxy draws rooms as loose axis-aligned strokes (type='s'), so Recipe C's
+centerline polygonization never closes them. The printed dimensions ARE in the text layer (63 on
+ID-411, incl. `17'-0"` × `20'-7 1/8"` = **350.1 SF vs golden 353.4 = 0.9%** — the estimator's own
+method), but a naive "two biggest dims" rule generalizes at **14–106% error** because each sheet has
+FOUR viewports (AR/FF/RCP/EM) whose dimension strings intermix, and rooms are not rectangles.
+**Remaining work = bind dimensions/geometry to the AR-plan viewport and close a non-rectangular
+outline.** That is a real CV task, not tuning.
+
+**13.5 FIXED — the scale reader only understood Crow's format.** `extract_printed_scales` required
+the literal word `SCALE`, so **all 40 Moxy sheets read ZERO scales** and fell back to a project-level
+assumption. Moxy prints the bare ratio under the viewport title (`KING SUITE B - AR PLAN` /
+`1/4" = 1'-0"`). Since area scales by the SQUARE, measuring a 1/4" sheet at an assumed 1/8" is a **4×
+error on every room**. Now reads Moxy p27 → 13 scales @ 4.0 ft/in, p9 @ 5.33. Commit 7ee4cc9.
+
+**Honest status:** Moxy needs (a) manifest unit counts [user-agreed], (b) a viewport-bound room
+extractor. Until (b) exists, Gyp Ceiling/Gyp Wall stay ~0 regardless of manifest and scale.
+
+## 12b. Why manifest + scale did not produce 100%
+
+The manifest is the shopping list; the scale is the ruler. **Neither measures anything.** The
+manifest said "Gyp Ceiling is an item, in SF" and the scale said "1 inch = N feet" — but the code had
+no per-room measurement step, so it computed 0, converted 0 correctly, and reported 0. Names + units
+cannot rescue a measurement that was never taken.
+
 **Why (this is §9's frontier, now confirmed at scale):** Moxy is a hotel interior fit-out. Its
 quantities are per-ROOM partition wall LF × height across ~20 guestroom floor plans, per-room ceiling
 areas, wall-covering areas keyed by finish type (WC-1…WC-10) via a finish schedule → room mapping,
