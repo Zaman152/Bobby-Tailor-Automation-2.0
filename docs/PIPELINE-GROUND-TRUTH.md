@@ -288,3 +288,50 @@ measurement), not a scale defect.
 column/bollard detection, CMU vs tilt-up wall-class disambiguation, rail LF. Do NOT tune these to
 the golden COUNT — validate against position/shape, or the coincidence trap of §10 repeats.
 Offline suite: **1099 green**.
+
+## 12. MOXY run (2026-07-17) — human-in-the-loop, 40 pages. Honest: **4% (1/24 items)**
+
+First run of the **human-in-the-loop** contract (distinct from the plans-only benchmark): a human
+supplies `human_inputs/moxy_knoxville.json` — 24 item names/units/aliases + `scale_ft_per_in: 8.0`
+(Moxy prints no text scale except page 2's `1/8" = 1'-0"`) — and the pipeline still produces every
+NUMBER. The manifest schema has **no quantity field** (`object_manifest.py`: "The manifest is NOT a
+take-off"), so the answer key cannot leak; verified programmatically before the run. NOTE: with a
+take-off-derived manifest the **name-found rate (82%) is circular and meaningless** — only the
+QUANTITY accuracy is a real measure.
+
+**THE bug this run exposed — `"COVER"` matched `"WALL COVERING"` and silently deleted 27/40 sheets.**
+`classify_sheet_type_from_text` tested keywords as bare SUBSTRINGS over full-page text and `_KW_TITLE`
+held the bare word `COVER`. `title_sheet` means *skip the sheet entirely, zero API, no geometry* — so
+every guestroom floor plan on this hotel (whose primary finish IS wall covering) was thrown away
+before measurement, i.e. all 129,521 SF of Gyp Wall. Bob's lost 3 sheets; Crow's page 0 — the
+OVERALL FLOOR PLAN every passing number comes from — classifies title_sheet on its page text too and
+survives only because its title block says "FLOOR PLAN" and is checked first. Fixed with
+whole-word matching (the same flaw made PLAN match PLANT, SECTION match SECTIONAL) + bare
+COVER/INDEX trusted only in the title block. Sheets skipped: **Moxy 28→2, Bob's 3→1, Crow 1→0**.
+
+**Honest accuracy after the fix (aggregate AI total vs golden total, the only fair read — Moxy's
+golden has duplicate per-room rows):**
+
+| Item | Golden | AI | % |
+|------|--------|-----|---|
+| Gyp Wall | 129,521 SF | 2,745 | 2.1% |
+| Gyp Ceiling | 58,680 SF | 0 | 0% |
+| Guestroom-Wall Covering | 27,014 SF | 15 | 0.1% |
+| CMU Wall | 6,916 SF | 126 | 1.8% |
+| Base / Lintels / WC-1..WC-10 / Exposed Structure | 3,541 LF / 1,530 LF / 7,432 SF / 3,771 SF | 0 | 0% |
+| Doors-WD / Door Frame-HM / Doors-HM | 213 / 215 / 10 EA | 0 | 0% |
+| Mobilization | 1 | 1 | ✅ (a constant) |
+
+**1 of 24 items within 5% = 4% — and the only pass is the hardcoded Mobilization default.**
+The classifier fix is real and necessary (26 sheets recovered; raw numbers rose — Gyp Wall 845→2,745,
+Guard Rail 0→140, Stairs 6→10), but it moved a 2% score to 4%: **unblocking the sheets proved the
+measurement engine cannot measure this building at all.** Run: 22 sheets contributed, $1.89, 21 min.
+
+**Why (this is §9's frontier, now confirmed at scale):** Moxy is a hotel interior fit-out. Its
+quantities are per-ROOM partition wall LF × height across ~20 guestroom floor plans, per-room ceiling
+areas, wall-covering areas keyed by finish type (WC-1…WC-10) via a finish schedule → room mapping,
+and a 213-door schedule. The engine measures a single main-plan footprint + thickness-class wall
+linework — Crow's shape. **Nothing in the current measurement layer produces per-room areas**, so
+Gyp Ceiling / WC-* / Base / Doors are all 0. Honest bottom line: **the app does not work on Moxy**;
+reaching accuracy here is the room-level measurement program (extract_rooms → per-room wall/ceiling
+areas → finish-schedule binding → per-format door schedules), not tuning.

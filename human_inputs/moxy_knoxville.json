@@ -1,0 +1,74 @@
+[
+  {"name": "Gyp Wall", "unit": "SF", "measure": "wall_area",
+   "aliases": ["gypsum wall", "gyp bd wall", "gwb wall", "drywall partition", "partition", "gypsum board", "gyp board"],
+   "assumptions": {"scale_ft_per_in": 8.0}},
+
+  {"name": "Gyp Ceiling", "unit": "SF", "measure": "ceiling_area",
+   "aliases": ["gypsum ceiling", "gyp bd ceiling", "gwb ceiling", "drywall ceiling", "gyp ceilings"]},
+
+  {"name": "Gyp Soffit", "unit": "SF", "measure": "area",
+   "aliases": ["gypsum soffit", "soffit", "gyp bd soffit", "gwb soffit"]},
+
+  {"name": "Guestroom-Wall Covering", "unit": "SF", "measure": "wall_area",
+   "aliases": ["wall covering", "wallcovering", "guest room wall covering", "vinyl wall covering", "guestroom wallcovering"]},
+
+  {"name": "CMU Wall", "unit": "SF", "measure": "wall_area",
+   "aliases": ["cmu", "concrete masonry unit", "masonry wall", "block wall", "concrete masonry"]},
+
+  {"name": "Exposed Structure", "unit": "SF", "measure": "roof_area",
+   "aliases": ["exposed deck", "exposed ceiling", "metal roof deck", "open to structure", "exposed to structure"]},
+
+  {"name": "Base", "unit": "LF", "measure": "linear",
+   "aliases": ["wall base", "rubber base", "vinyl base", "cove base", "base trim"]},
+
+  {"name": "Lintels", "unit": "LF", "measure": "linear",
+   "aliases": ["lintel", "steel lintel", "angle lintel", "loose lintel"]},
+
+  {"name": "Guard Rail", "unit": "LF", "measure": "linear",
+   "aliases": ["guardrail", "guard railing", "barrier rail"]},
+
+  {"name": "Hand Rail", "unit": "LF", "measure": "linear",
+   "aliases": ["handrail", "hand railing", "stair rail", "pipe rail"]},
+
+  {"name": "Doors-WD", "unit": "EA", "measure": "count",
+   "aliases": ["wood door", "wd door", "door wd", "solid core wood door", "wood doors"]},
+
+  {"name": "Doors-HM", "unit": "EA", "measure": "count",
+   "aliases": ["hollow metal door", "hm door", "door hm", "hollow metal doors"]},
+
+  {"name": "Door Frame-HM", "unit": "EA", "measure": "count",
+   "aliases": ["hollow metal frame", "hm frame", "frame hm", "door frame hollow metal", "hm door frame"]},
+
+  {"name": "Stairs", "unit": "EA", "measure": "count",
+   "aliases": ["stair", "stairway", "stair tread", "treads", "riser"]},
+
+  {"name": "Lift", "unit": "EA", "measure": "count",
+   "aliases": ["elevator", "passenger elevator", "hydraulic lift"]},
+
+  {"name": "Mobilization", "unit": "EA", "measure": "count",
+   "aliases": ["mobilize", "mobilisation"]},
+
+  {"name": "WC-1", "unit": "SF", "measure": "wall_area",
+   "aliases": ["wc1", "wall covering 1", "wall covering type 1"]},
+
+  {"name": "WC-2", "unit": "SF", "measure": "wall_area",
+   "aliases": ["wc2", "wall covering 2", "wall covering type 2"]},
+
+  {"name": "WC-4", "unit": "SF", "measure": "wall_area",
+   "aliases": ["wc4", "wall covering 4", "wall covering type 4"]},
+
+  {"name": "WC-6", "unit": "SF", "measure": "wall_area",
+   "aliases": ["wc6", "wall covering 6", "wall covering type 6"]},
+
+  {"name": "WC-7", "unit": "SF", "measure": "wall_area",
+   "aliases": ["wc7", "wall covering 7", "wall covering type 7"]},
+
+  {"name": "WC-8", "unit": "SF", "measure": "wall_area",
+   "aliases": ["wc8", "wall covering 8", "wall covering type 8"]},
+
+  {"name": "WC-9", "unit": "SF", "measure": "wall_area",
+   "aliases": ["wc9", "wall covering 9", "wall covering type 9"]},
+
+  {"name": "WC-10", "unit": "SF", "measure": "wall_area",
+   "aliases": ["wc10", "wall covering 10", "wall covering type 10"]}
+]
