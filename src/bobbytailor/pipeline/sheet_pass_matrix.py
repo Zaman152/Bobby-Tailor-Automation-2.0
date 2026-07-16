@@ -88,11 +88,21 @@ MODEL_ROUTING: dict[tuple[str, str], str] = {
     ("floor_plan", "legend"):    CLAUDE_MODEL_DENSE,
     # Phase-wide pass routes consumed by the vision package (21-08/21-11/21-14)
     (WILDCARD_SHEET_TYPE, "classify"):     CLAUDE_MODEL_CLASSIFY,
-    (WILDCARD_SHEET_TYPE, "semantic"):     CLAUDE_MODEL_SEMANTIC,
+    # Semantic labeling + the in-context symbol gallery (which routes through the
+    # "semantic" row) are the passes that decide WHICH geometry candidate is
+    # Columns / Bollards and WHICH wall thickness class is CMU vs tilt-up. On
+    # Sonnet those bindings were the #1 accuracy blocker — run-to-run they flip
+    # (CMU 8 ↔ 11,294 SF; Columns present ↔ missing) on the SAME plan, because
+    # the geometry is stable but the label is stochastic. These calls carry no
+    # numeric fields (candidate-ID enums only), so the model can only choose
+    # among geometry-supplied candidates — spending the best model here buys
+    # binding RELIABILITY, never a hallucinated quantity. Bounded: a handful of
+    # semantic calls per sheet, not a per-object loop.
+    (WILDCARD_SHEET_TYPE, "semantic"):     CLAUDE_MODEL_DENSE,
     # Project-vocabulary pass (hybrid naming, plans-only manifest replacement):
-    # a semantic estimator read of the drawing + keynotes/notes/abbreviations
-    # → route to the semantic model (Sonnet), mirroring the "semantic" row.
-    (WILDCARD_SHEET_TYPE, "vocabulary"):   CLAUDE_MODEL_SEMANTIC,
+    # a semantic estimator read of the drawing + keynotes/notes/abbreviations.
+    # Runs ONCE per project and seeds every downstream name → best model.
+    (WILDCARD_SHEET_TYPE, "vocabulary"):   CLAUDE_MODEL_DENSE,
     # AI naming-convention pass (plans-only autonomous naming): reads the plan's
     # own notes/details/abbreviations/schedules and reports THIS plan's naming
     # library (name/aliases/basis/binding_hint/variant). This is the project's

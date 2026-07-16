@@ -317,13 +317,24 @@ class TestModelRoutingV2:
     def test_schedule_wildcard_covers_any_sheet_type(self):
         assert pick_model_for_pass("elevation", "schedule") == self.DENSE
 
-    # -- semantic labeling → SEMANTIC (wildcard row) ------------------------
+    # -- semantic labeling → DENSE (wildcard row) ---------------------------
+    # The semantic pass (and the symbol gallery, which routes through it) picks
+    # WHICH geometry candidate is Columns/Bollards and WHICH wall class is CMU.
+    # On the Sonnet row those bindings flipped between identical runs (CMU
+    # 8 ↔ 11,294 SF) — the #1 accuracy blocker — so they run on the best model.
+    # The schemas carry no numeric fields, so this buys binding reliability and
+    # can never buy a hallucinated quantity.
 
     @pytest.mark.parametrize("sheet_type", [
         "floor_plan", "roof_plan", "mep_plan", "elevation", "civil_site",
     ])
-    def test_semantic_pass_returns_semantic_slug(self, sheet_type):
-        assert pick_model_for_pass(sheet_type, "semantic") == self.SEMANTIC
+    def test_semantic_pass_returns_dense_slug(self, sheet_type):
+        assert pick_model_for_pass(sheet_type, "semantic") == self.DENSE
+
+    @pytest.mark.parametrize("sheet_type", ["floor_plan", "civil_site"])
+    def test_vocabulary_pass_returns_dense_slug(self, sheet_type):
+        """The once-per-project vocabulary read seeds every downstream name."""
+        assert pick_model_for_pass(sheet_type, "vocabulary") == self.DENSE
 
     # -- verify-retry arbitration → DENSE (wildcard row) --------------------
 
@@ -374,7 +385,7 @@ class TestModelRoutingV2:
         assert resolve_routed_model("elevation", "measure") == self.SONNET
 
     def test_resolve_routed_model_wildcard(self):
-        assert resolve_routed_model("roof_plan", "semantic") == self.SEMANTIC
+        assert resolve_routed_model("roof_plan", "semantic") == self.DENSE
 
     def test_resolve_routed_model_none(self):
         assert resolve_routed_model("elevation", "count") is None
