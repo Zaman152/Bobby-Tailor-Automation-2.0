@@ -38,7 +38,7 @@ import re
 import sys
 import tempfile
 from dataclasses import asdict, dataclass
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Sequence
 
 import fitz
 
@@ -1687,11 +1687,27 @@ class TakeoffPipeline:
             except Exception as exc:  # noqa: BLE001 — footprint is additive
                 logger.debug("footprint_from_page failed on %r: %s", sheet_name, exc)
 
+        # Enclosed-region room measurement (Recipe E). The centerline
+        # polygonization above returns nothing usable on drawing styles that
+        # render rooms as loose strokes (Moxy: 17 SF fragments where the room is
+        # 353 SF, and no closed room path exists at all), so measure each
+        # drawing viewport as a filled region AT ITS OWN PRINTED SCALE. Additive:
+        # any failure leaves `room_fills` empty and the sheet behaves as before.
+        room_fills: list = []
+        if resolved_type in _PLAN_SHEET_TYPES:
+            try:
+                room_fills = self._measure_room_fills(
+                    page, viewports, printed_scales_by_region, sheet_name
+                )
+            except Exception as exc:  # noqa: BLE001 — measurement is additive
+                logger.debug("room_fill failed on %r: %s", sheet_name, exc)
+
         return {
             "symbol_groups": symbols,
             "walls": walls,
             "wall_lf_by_class": wall_lf,
             "rooms": rooms,
+            "room_fills": room_fills,
             "viewports": viewports,
             "schedules": schedules,
             "footprint": footprint,
@@ -1701,6 +1717,95 @@ class TakeoffPipeline:
             "_main_plan_region": main_id,
             "_scale_result": scale,
         }
+
+    # Largest plausible single dwelling/guest unit. Above this a "unit" fill has
+    # almost certainly swallowed a neighbouring drawing — flagged, never halved.
+    _MAX_UNIT_SF = 900.0
+
+    # A drawing occupies the space ABOVE its scale callout. These bound the clip
+    # around one callout; the generic viewport segmentation cuts a unit plan into
+    # several regions (Moxy ID-411 -> 167 + 65 + 41 SF instead of one 342 SF
+    # unit), so the callout is the reliable anchor for "one drawing".
+    _FILL_CLIP_UP_PT = 620.0
+    _FILL_CLIP_SIDE_PT = 260.0
+
+    def _measure_room_fills(
+        self,
+        page,
+        viewports: Sequence,
+        printed_scales_by_region: dict,
+        sheet_name: str,
+    ) -> list:
+        """Measure each scaled DRAWING as an enclosed region, at its own scale.
+
+        Anchored on the printed scale callouts: one callout marks one drawing,
+        and the drawing sits above it. Each is measured at ITS OWN printed scale
+        — a sheet routinely mixes a 1/4"=1'-0" unit plan with 1 1/2"=1'-0"
+        details, and area scales by the SQUARE, so one page-level scale corrupts
+        every region it touches. A drawing with no printed scale of its own is
+        skipped rather than measured with a borrowed one (flag-don't-guess).
+        """
+        from bobbytailor.deterministic.printed_scale import (  # noqa: PLC0415
+            extract_printed_scales,
+        )
+        from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
+            flag_implausible_unit,
+            measure_enclosed_area,
+            plan_titles,
+        )
+
+        try:
+            import fitz  # noqa: PLC0415
+        except Exception:  # noqa: BLE001
+            return []
+
+        scales = extract_printed_scales(page)
+        titles = plan_titles(page)
+        out: list = []
+        for i, (plan_name, plan_kind, tb) in enumerate(titles):
+            tx0, ty0, tx1, ty1 = tb
+            mid = (tx0 + tx1) / 2.0
+            # This drawing's OWN scale = the ratio printed directly beneath its
+            # title. Borrowing another drawing's scale is a squared error.
+            ps, best_gap = None, float("inf")
+            for s in scales:
+                cx, cy = s.center_pt
+                if abs(cx - mid) > self._FILL_CLIP_SIDE_PT:
+                    continue
+                gap = cy - ty1
+                if -6.0 <= gap < best_gap:
+                    ps, best_gap = s, gap
+            if ps is None:
+                continue
+            fpp = float(getattr(ps, "feet_per_point", 0.0) or 0.0)
+            if fpp <= 0:
+                continue
+            clip = fitz.Rect(
+                tx0 - self._FILL_CLIP_SIDE_PT,
+                max(0.0, ty0 - self._FILL_CLIP_UP_PT),
+                tx1 + self._FILL_CLIP_SIDE_PT,
+                max(0.0, ty0 - 8.0),
+            )
+            if clip.is_empty or clip.height <= 0 or clip.width <= 0:
+                continue
+            result = measure_enclosed_area(
+                page, clip, fpp, candidate_id="FILL-%d" % (i + 1)
+            )
+            if result is None:
+                continue
+            result = flag_implausible_unit(result, expect_max_sf=self._MAX_UNIT_SF)
+            result.sheet_name = sheet_name
+            result.plan_name = plan_name
+            result.plan_kind = plan_kind
+            result.viewport_title = "%s - %s PLAN" % (plan_name, plan_kind)
+            out.append(result)
+            logger.info(
+                "sheet %r: %s %r enclosed area %.1f SF at %.2f ft/in%s",
+                sheet_name, result.candidate_id, result.viewport_title,
+                result.area_sf, result.scale_fpi or 0.0,
+                " [needs review]" if result.needs_review else "",
+            )
+        return out
 
     def _structured_vision_call(
         self,

@@ -226,9 +226,14 @@ def _entry_from_dict(d: dict) -> Optional[ManifestEntry]:
     assumptions = dict(d.get("assumptions") or {})
     # Allow flat CSV-style assumption columns. `scale_ft_per_in` lets the user
     # supply a reliable drawing scale (e.g. 20 for 1"=20') that unlocks accurate
-    # vector-geometry measurement.
+    # vector-geometry measurement. `unit_count` is the ROOM MIX for a prototype
+    # sheet (e.g. 90 for "90 x QQ A"): hotel/multifamily take-offs draw ONE
+    # typical unit and multiply by how many exist, and that multiplier is an
+    # estimator input — it is frequently absent from the drawing set itself
+    # (Moxy's CS-04 Guestroom Matrix is listed in the index but not included).
+    # It is a COUNT, never a quantity: the app still measures the area.
     for k in ("height_ft", "thickness_in", "coats", "coverage",
-              "scale_ft_per_in", "scale_feet_per_inch"):
+              "scale_ft_per_in", "scale_feet_per_inch", "unit_count"):
         if d.get(k) not in (None, ""):
             try:
                 assumptions[k] = float(d[k])
