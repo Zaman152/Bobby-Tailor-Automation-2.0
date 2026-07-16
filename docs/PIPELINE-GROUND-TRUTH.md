@@ -380,6 +380,67 @@ error on every room**. Now reads Moxy p27 → 13 scales @ 4.0 ft/in, p9 @ 5.33. 
 **Honest status:** Moxy needs (a) manifest unit counts [user-agreed], (b) a viewport-bound room
 extractor. Until (b) exists, Gyp Ceiling/Gyp Wall stay ~0 regardless of manifest and scale.
 
+## 14. The room-measurement engine (2026-07-17) — Gyp Ceiling 0 → 7.0%
+
+**`deterministic/room_fill.py` (Recipe E).** A room is **not a polygon in the file — it is a REGION
+ENCLOSED BY INK**, so rasterize the drawing and flood-fill it. Built because every vector route
+failed on Moxy: `extract_rooms` → 17 SF fragments (room is 353), **zero** closed room paths exist,
+dimension-pairing 14–106%, wall-extent bbox 3–44%.
+
+Three rules carry the accuracy:
+1. **Sum EVERY enclosed region** in the unit (bedroom + bathroom + entry). A single-seed fill stops
+   at the bathroom wall — a systematic **~30% under**.
+2. **Measure at THAT drawing's own printed scale.** Area scales by the SQUARE; a 1/4"=1'-0" sheet
+   measured at an assumed 1/8" is a 4× error.
+3. **Select the drawing by DISCIPLINE, not size** — a ceiling comes off the **RCP** plan, a
+   floor/wall off the **AR** plan (`BASIS_PLAN_KIND` / `select_fill_for_basis`). Picking "the largest
+   region on the sheet" = **33% mean error**; by discipline = **3.3%**.
+
+Anchor each fill on its `"<NAME> - <KIND> PLAN"` title — the generic viewport segmentation shatters a
+unit plan into 167 + 65 + 41 SF pieces.
+
+**Prototype × room mix.** `_fuse_room_fills` emits the line item; the multiplier comes from manifest
+entries `{"name": "QQ A", "measure": "unit_type", "assumptions": {"unit_count": 90}}`, matched to the
+fill's `plan_name`. It is a COUNT, never a quantity — and it is an estimator input *because it is
+genuinely absent from the drawing set* (§13.3). A prototype whose type is not in the mix is emitted
+as the single measured unit and **flagged**, never multiplied by a guess.
+
+**Blind result (no golden peeking), Moxy Gyp Ceiling — was 0:**
+
+| sheet | measured/unit | × units | golden | err |
+|-------|---------------|---------|--------|-----|
+| ID-415 | 284.3 | 4,264 | 4,255 | **0.2%** |
+| ID-414 | 309.5 | 1,857 | 1,843 | **0.7%** |
+| ID-417 | 274.6 | 275 | 271 | **1.3%** |
+| ID-409 | 217.6 | 1,088 | 1,064 | **2.3%** |
+| ID-411 | 341.7 | 683 | 707 | **3.3%** |
+| ID-407 | 229.4 | 5,964 | 5,748 | **3.8%** |
+| ID-410 | 362.5 | 1,813 | 1,884 | **3.8%** |
+| ID-408 | 235.5 | 3,533 | 3,297 | 7.1% |
+| ID-413 | 272.6 | **24,534** | 22,843 | 7.4% |
+| **TOTAL** | | **45,837** | **42,835** | **7.0%** (5.0% excl. the 2 defects) |
+
+**14.1 A mixed sheet must still be measurable (the bug that hid all of the above).** Moxy's guestroom
+prototypes carry interior elevations AND the AR/RCP plans holding every quantity. The word ELEVATION
+won the classifier, so all 16 classified `elevation`, never reached `_DETERMINISTIC_SHEET_TYPES`, and
+the engine never ran: **run 3 measured 1 fill in the whole project and scored 2%.** A sheet is a
+COLLECTION of drawings; its type is only the dominant one. An explicit `"- AR/RCP PLAN"` viewport
+title now outranks a stray ELEVATION keyword (not FF/EM/FC — those carry no take-off geometry).
+Moxy floor_plan **10 → 26**; Crow/Bob's unchanged.
+
+**14.2 OPEN DEFECT — do not paper over.** ID-412/ID-416 measure **~2×** (458 vs 231): the clip reaches
+the adjacent opposite-hand plan. The 900 SF plausibility guard does not catch them. Setting it to
+~420 SF would make them pass and would **overfit to guestrooms** — it silently breaks on a lobby.
+Fix the clip, not the threshold.
+
+**14.3 Methodology warning (cost us hours).** "Best of AR/RCP" and "closest to golden" are **PEEKING**
+and inflated this engine's apparent accuracy from 33% → 3%. Fix the selection rule BLIND, then score.
+
+**14.4 Excel export.** `scripts/export_takeoff_excel.py` writes a client-ready workbook where every
+row carries its provenance — MEASURED / HUMAN INPUT / NEEDS REVIEW / NOT MEASURED — plus an About
+sheet defining each. A take-off a client bids from must say where each number came from, and a blank
+must never be read as a zero.
+
 ## 12b. Why manifest + scale did not produce 100%
 
 The manifest is the shopping list; the scale is the ruler. **Neither measures anything.** The
