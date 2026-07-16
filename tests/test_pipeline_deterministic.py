@@ -237,6 +237,72 @@ def test_vector_sheet_vision_saw_only_semantic_passes(crow_vector):
     assert not (seen & _EXTRACTION_PASSES)
 
 
+def test_off_scale_detail_viewports_excluded_from_geometry():
+    """Multi-scale page guard: Crow page 0 carries the OVERALL FLOOR PLAN at
+    1" = 40'-0" AND four S.C.C.P. details at 1 1/2" = 1'-0" (60x apart). Every
+    quantity is computed at the ONE resolved page scale, so detail linework must
+    be EXCLUDED — measuring it at the plan's scale is 60x wrong and would emit
+    junk take-off rows (and double-count objects the plan already shows).
+    """
+    if not CROW_PDF.exists():
+        pytest.skip("Crow fixture PDF not available")
+    from bobbytailor.deterministic.printed_scale import (
+        extract_printed_scales,
+        match_scales_to_viewports,
+    )
+    from bobbytailor.deterministic.viewports import segment_viewports
+
+    pipeline = TakeoffPipeline(analyzer=CannedSemanticAnalyzer(), settings=RunSettings())
+    doc = fitz.open(str(CROW_PDF))
+    page = doc[0]
+    bundle = pipeline._deterministic_bundle(
+        page, doc, str(CROW_PDF), 0, "A-101", "floor_plan"
+    )
+    resolved_fpp = bundle["fpp"]
+    assert resolved_fpp == pytest.approx(40.0 / 72.0, rel=1e-3)  # 1" = 40'
+
+    # The off-scale (detail) viewport rectangles on this page.
+    vps = segment_viewports(page)
+    by_region = match_scales_to_viewports(extract_printed_scales(page), vps)
+    off_boxes = [
+        vp.bbox_pt for vp in vps
+        if (ps := by_region.get(vp.region_id)) is not None
+        and abs(ps.feet_per_point - resolved_fpp) > 0.05 * resolved_fpp
+    ]
+    assert off_boxes, "fixture must carry at least one off-scale detail viewport"
+
+    def _inside(x, y, box):
+        return box[0] <= x <= box[2] and box[1] <= y <= box[3]
+
+    for group in bundle["symbol_groups"]:
+        for bx in group.instance_bboxes_pt:
+            cx, cy = (bx[0] + bx[2]) / 2.0, (bx[1] + bx[3]) / 2.0
+            for box in off_boxes:
+                assert not _inside(cx, cy, box), (
+                    "symbol %s has an instance inside an off-scale detail "
+                    "viewport — it is being measured at the wrong scale"
+                    % group.candidate_id
+                )
+    doc.close()
+
+
+def test_multi_scale_guard_keeps_main_plan_measurements_intact():
+    """The guard must remove ONLY off-scale geometry: the main plan's own
+    footprint (the golden-passing 397,600 SF / 2,972 LF) is untouched."""
+    if not CROW_PDF.exists():
+        pytest.skip("Crow fixture PDF not available")
+    pipeline = TakeoffPipeline(analyzer=CannedSemanticAnalyzer(), settings=RunSettings())
+    doc = fitz.open(str(CROW_PDF))
+    bundle = pipeline._deterministic_bundle(
+        doc[0], doc, str(CROW_PDF), 0, "A-101", "floor_plan"
+    )
+    fp = bundle["footprint"]
+    assert fp is not None
+    assert fp.area_sf == pytest.approx(397600.0, rel=0.01)
+    assert fp.perimeter_lf == pytest.approx(2972.0, rel=0.01)
+    doc.close()
+
+
 def test_vector_sheet_scale_confidence_main_plan_fpi_40(crow_vector):
     """Main-plan solve lands at the hand-verified 1" = 40' (scale_truth.json;
     the plan's "≈ 20" figure was the stale research note corrected in 21-07)."""

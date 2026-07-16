@@ -238,6 +238,12 @@ _DETERMINISTIC_SHEET_TYPES = _PLAN_SHEET_TYPES + ("schedule",)
 # Viewport kinds masked out of measurement (matches scale_solver._MASK_KINDS).
 _MASK_VIEWPORT_KINDS = ("title_block", "legend", "schedule")
 
+# Relative tolerance when comparing a viewport's own printed scale to the
+# resolved page scale. Drawing scales are discrete and far apart (1"=40' vs
+# 1 1/2"=1'-0" is 60x), so a loose 5% band separates them without ever
+# splitting a shared scale on floating-point noise.
+_SCALE_MATCH_TOL = 0.05
+
 # review_reason markers identifying ensemble-disagreement flags (needs_review
 # set by a vote) — these join the verify-retry queue alongside the
 # out-of-band QuantityVerifier flags (21-14, RESEARCH §3 handoff 3).
@@ -1628,16 +1634,48 @@ class TakeoffPipeline:
                 main_bbox = vp.bbox_pt
                 break
 
+        # ── Multi-scale page guard (V3-ACC: one page, many drawing scales) ───
+        # A sheet routinely carries the main plan (e.g. 1" = 40'-0") AND detail
+        # viewports at their own, far larger scale (e.g. 1 1/2" = 1'-0"). Every
+        # quantity below is computed at the ONE resolved page scale, so linework
+        # inside an off-scale viewport is measured with the wrong fpp — Crow
+        # page 0's four S.C.C.P. details are 60x off — and pollutes the wall
+        # classes and symbol clusters with junk take-off rows. A detail is also
+        # a BLOW-UP of an object already counted on the plan, so counting it
+        # would double-count. Exclude any viewport whose OWN printed scale
+        # disagrees with the resolved page scale (deterministic; a viewport with
+        # no printed scale of its own is left alone).
+        geometry_mask = list(mask_rects)
+        resolved_fpp = fpp
+        if resolved_fpp > 0:
+            for vp in viewports:
+                ps = printed_scales_by_region.get(vp.region_id)
+                if ps is None:
+                    continue
+                vp_fpp = float(getattr(ps, "feet_per_point", 0.0) or 0.0)
+                if vp_fpp <= 0:
+                    continue
+                if abs(vp_fpp - resolved_fpp) > _SCALE_MATCH_TOL * resolved_fpp:
+                    geometry_mask.append(vp.bbox_pt)
+                    logger.info(
+                        "sheet %r: excluding off-scale viewport %s (%s) — its "
+                        "printed scale %.4f ft/pt differs from the resolved page "
+                        "scale %.4f ft/pt; measuring it here would be %.0fx wrong",
+                        sheet_name, vp.region_id,
+                        getattr(ps, "title", "") or vp.kind,
+                        vp_fpp, resolved_fpp, max(vp_fpp, resolved_fpp) / min(vp_fpp, resolved_fpp),
+                    )
+
         walls: list = []
         wall_lf: dict = {}
         rooms: list = []
         symbols: list = []
         if resolved_type in _PLAN_SHEET_TYPES and fpp > 0:
-            walls = extract_walls(page, fpp, exclude_rects=mask_rects)
+            walls = extract_walls(page, fpp, exclude_rects=geometry_mask)
             wall_lf = wall_lf_by_class(walls, fpp)
             rooms = extract_rooms(page, walls, main_bbox, fpp)
             symbols = cluster_symbols(
-                page, fpp, exclude_rects=mask_rects, doc=doc, page_index=page_index
+                page, fpp, exclude_rects=geometry_mask, doc=doc, page_index=page_index
             )
 
         footprint = None
