@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import re
+from functools import lru_cache
 from typing import Optional
 
 from bobbytailor.config import (
@@ -138,7 +139,18 @@ def resolve_routed_model(sheet_type: str, pass_type: str) -> Optional[str]:
 # Keyword sets for sheet-type classification
 # Ordered from most-specific to least-specific to avoid early false matches.
 # ---------------------------------------------------------------------------
-_KW_TITLE    = frozenset(["INDEX", "COVER", "SHEET INDEX", "DRAWING INDEX", "TITLE SHEET"])
+# Title/cover keywords that are UNAMBIGUOUS wherever they appear. Bare "COVER"
+# and "INDEX" are deliberately NOT here — see _KW_TITLE_BLOCK_ONLY.
+_KW_TITLE    = frozenset(["SHEET INDEX", "DRAWING INDEX", "TITLE SHEET", "COVER SHEET"])
+# Bare title words trusted ONLY inside the title block. In full-page text they
+# are catastrophic: classifying a sheet "title_sheet" SKIPS IT ENTIRELY (zero
+# API, no geometry), and a real drawing routinely mentions these words in its
+# notes — a hotel's guestroom floor plans all say "WALL COVERING", a schedule
+# says "COVER PLATE". Moxy lost 27 of 40 sheets (every guestroom floor plan,
+# i.e. all 129,521 SF of Gyp Wall) to a bare "COVER" match; Bob's lost 3; Crow's
+# OVERALL FLOOR PLAN survives only because its title block says "FLOOR PLAN"
+# and is checked first.
+_KW_TITLE_BLOCK_ONLY = frozenset(["INDEX", "COVER"])
 _KW_SCHEDULE = frozenset(["SCHEDULE", "PANEL SCHEDULE", "EQUIPMENT SCHEDULE", "DOOR SCHEDULE",
                            "WINDOW SCHEDULE", "FINISH SCHEDULE"])
 _KW_ROOF     = frozenset(["ROOF PLAN"])           # must precede generic PLAN/FLOOR PLAN
@@ -149,6 +161,25 @@ _KW_FLOOR    = frozenset(["FLOOR PLAN", "FLOOR PLANS", "PLAN", "LEVEL"])
 
 # MEP sheet ID prefix: M (mechanical), P (plumbing), E (electrical) + digit
 _MEP_PREFIX_RE = re.compile(r"^[MPE]\d", re.IGNORECASE)
+
+
+@lru_cache(maxsize=256)
+def _kw_regex(keyword: str) -> "re.Pattern":
+    """Word-boundary matcher for one keyword (cached — called per page)."""
+    return re.compile(r"\b%s\b" % re.escape(keyword))
+
+
+def _hit(text: str, keywords: "frozenset[str]") -> bool:
+    """True when any keyword appears in *text* as a WHOLE WORD (text is upper).
+
+    Word-boundary matching, never a bare substring: a substring test made
+    "COVER" match "WALL COVERING" and silently skipped every guestroom floor
+    plan on Moxy (27 of 40 sheets). The same flaw makes "PLAN" match "PLANT",
+    "SECTION" match "SECTIONAL" and "DETAIL" match "DETAILED". Multi-word
+    keywords ("FLOOR PLAN") are matched with boundaries at each end, so normal
+    phrase hits are unaffected.
+    """
+    return any(_kw_regex(kw).search(text) for kw in keywords)
 
 
 def classify_sheet_type_from_text(title_block_text: str, full_page_text: str = "") -> str:
@@ -169,16 +200,16 @@ def classify_sheet_type_from_text(title_block_text: str, full_page_text: str = "
         Defaults to "floor_plan" when no keyword matches (safest: runs count+measure).
     """
 
-    def _hit(text: str, keywords: frozenset[str]) -> bool:
-        return any(kw in text for kw in keywords)
-
-    for src_raw in (title_block_text, full_page_text):
+    for is_title_block, src_raw in ((True, title_block_text), (False, full_page_text)):
         if not src_raw:
             continue
         src = src_raw.upper()
 
-        # Title / cover pages — checked before "schedule" to catch "INDEX"
-        if _hit(src, _KW_TITLE):
+        # Title / cover pages — checked before "schedule" to catch "INDEX".
+        # Unambiguous phrases match anywhere; the bare words ("COVER", "INDEX")
+        # are trusted ONLY in the title block, because title_sheet SKIPS the
+        # sheet entirely and a real drawing's notes say "WALL COVERING".
+        if _hit(src, _KW_TITLE) or (is_title_block and _hit(src, _KW_TITLE_BLOCK_ONLY)):
             return "title_sheet"
 
         # Dense tabular content

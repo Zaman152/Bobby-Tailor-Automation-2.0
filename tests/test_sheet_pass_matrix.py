@@ -153,6 +153,64 @@ class TestPlanPasses:
 # classify_sheet_type_from_text()
 # ---------------------------------------------------------------------------
 
+class TestTitleSheetFalsePositives:
+    """title_sheet SKIPS the sheet entirely (zero API, no geometry), so a false
+    positive silently deletes a drawing from the take-off. A bare substring test
+    made "COVER" match "WALL COVERING" and dropped 27 of Moxy's 40 sheets —
+    every guestroom floor plan, i.e. all 129,521 SF of Gyp Wall. Keyword hits
+    must be WHOLE WORDS, and the bare words are trusted only in the title block.
+    """
+
+    def test_wall_covering_note_is_not_a_title_sheet(self):
+        """THE Moxy bug: a hotel floor plan whose notes say "WALL COVERING"."""
+        page = "LEVEL 3 FLOOR PLAN\nNOTES: PROVIDE VINYL WALL COVERING AT ALL GUESTROOMS"
+        assert classify_sheet_type_from_text("", page) == "floor_plan"
+
+    @pytest.mark.parametrize("page_text", [
+        "GUESTROOM FLOOR PLAN — WALL COVERING SCHEDULE REFERENCE",
+        "FLOOR PLAN\nCOVERING: SEE FINISH LEGEND",
+        "LEVEL 2 FLOOR PLAN\nRECOVER EXISTING ROOF WHERE INDICATED",
+    ])
+    def test_cover_substring_never_skips_a_real_plan(self, page_text):
+        assert classify_sheet_type_from_text("", page_text) != "title_sheet"
+
+    def test_indexed_substring_does_not_skip(self):
+        page = "FLOOR PLAN\nSEE INDEXED KEYNOTES BELOW"
+        assert classify_sheet_type_from_text("", page) != "title_sheet"
+
+    # -- genuine title sheets must STILL be detected ------------------------
+
+    @pytest.mark.parametrize("text", [
+        "COVER SHEET", "SHEET INDEX", "DRAWING INDEX", "TITLE SHEET",
+    ])
+    def test_real_title_sheet_phrases_still_detected_anywhere(self, text):
+        assert classify_sheet_type_from_text("", text) == "title_sheet"
+
+    @pytest.mark.parametrize("tb", ["COVER", "INDEX"])
+    def test_bare_title_words_still_work_in_the_title_block(self, tb):
+        assert classify_sheet_type_from_text(tb, "") == "title_sheet"
+
+    def test_bare_cover_in_page_text_alone_is_not_a_title_sheet(self):
+        """A bare word in FULL-PAGE text is not enough to delete a sheet."""
+        assert classify_sheet_type_from_text("", "COVER") != "title_sheet"
+
+
+class TestKeywordWordBoundaries:
+    """Every keyword set matches whole words — the substring flaw that hit
+    "COVER"/"COVERING" equally hits PLAN/PLANT and SECTION/SECTIONAL."""
+
+    def test_plant_is_not_a_plan(self):
+        assert classify_sheet_type_from_text("PLANTING SCHEDULE") != "floor_plan"
+
+    def test_sectional_is_not_a_section(self):
+        # "SECTIONAL" must not trip the DETAIL set on its own.
+        assert classify_sheet_type_from_text("SECTIONAL OVERHEAD DOOR ELEVATION") == "elevation"
+
+    def test_multiword_keywords_still_match(self):
+        assert classify_sheet_type_from_text("OVERALL FLOOR PLAN") == "floor_plan"
+        assert classify_sheet_type_from_text("ROOF PLAN") == "roof_plan"
+
+
 class TestClassifySheetType:
     def test_overall_floor_plan(self):
         assert classify_sheet_type_from_text("OVERALL FLOOR PLAN") == "floor_plan"
