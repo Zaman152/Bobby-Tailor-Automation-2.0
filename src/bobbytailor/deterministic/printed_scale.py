@@ -274,22 +274,82 @@ def _page_blocks(page) -> List[tuple]:
     return out
 
 
+# The canonical architectural scale ratio, WITHOUT the word "SCALE":
+#   1/4" = 1'-0"   3/32" = 1'-0"   1 1/2" = 1'-0"   1" = 40'-0"   1" = 20'
+# Requiring the literal word "SCALE" hardcodes one CAD template's habit: Crow
+# writes `SCALE: 1" = 40'-0" 1 OVERALL FLOOR PLAN` in a single block, but Moxy
+# prints the bare ratio on its own line under the viewport title — so every
+# scale on all 40 Moxy sheets was discarded and the engine had NO scale at all.
+# This pattern is specific enough to be safe: it needs a paper-inch measure, an
+# '=', and a feet-and-inches value. Dimension strings ("12'-6\"") carry no '='.
+_BARE_RATIO_RE = re.compile(
+    r"""(?:\d+\s+)?          # optional whole part of a mixed number ("1 1/2")
+        \d+(?:\s*/\s*\d+)?   # inches, plain or fraction
+        \s*["″”]   # inch mark (straight or curly)
+        \s*=\s*
+        \d+\s*['′’]  # feet mark
+    """,
+    re.VERBOSE,
+)
+
+
+def _looks_like_scale_label(text: str) -> bool:
+    """True when a block is a scale callout — by keyword OR by bare ratio form."""
+    if "SCALE" in text.upper():
+        return True
+    return bool(_BARE_RATIO_RE.search(_normalize(text)))
+
+
+def _title_above(blocks: List[tuple], x0: float, y0: float, x1: float) -> str:
+    """Nearest text line directly ABOVE a bare ratio — its viewport title.
+
+    Moxy stacks the callout as two lines ("KING SUITE B - AR PLAN" / "1/4\" =
+    1'-0\""), so the title the main-plan picker needs lives in the previous
+    block, not in the ratio block itself.
+    """
+    best, best_gap = "", None
+    for bx0, by0, bx1, by1, btext in blocks:
+        txt = " ".join(_normalize(btext).split())
+        if not txt or _looks_like_scale_label(btext):
+            continue
+        gap = y0 - by1                      # block sits above the ratio
+        if gap < -2.0 or gap > _TITLE_MAX_GAP_PT:
+            continue
+        if bx1 < x0 - _TITLE_X_TOL_PT or bx0 > x1 + _TITLE_X_TOL_PT:
+            continue                        # not horizontally aligned with it
+        if best_gap is None or gap < best_gap:
+            best, best_gap = txt, gap
+    return best
+
+
+# A stacked title sits within ~2 text lines above its ratio, roughly x-aligned.
+_TITLE_MAX_GAP_PT = 40.0
+_TITLE_X_TOL_PT = 120.0
+
+
 def extract_printed_scales(page) -> List[PrintedScale]:
     """Read every printed scale label on *page* -> one PrintedScale per label.
 
-    Scans text blocks for a block that mentions ``SCALE`` and carries a
-    parseable ratio, then records its feet-per-inch, feet-per-point, center,
+    Accepts BOTH printed forms: a block mentioning ``SCALE`` (Crow), and a bare
+    architectural ratio on its own line (Moxy), whose title is then taken from
+    the line directly above. Records feet-per-inch, feet-per-point, center,
     bbox, drawing number and title. Never raises — a defective page yields an
     empty list and the caller falls back to RANSAC unchanged.
     """
     out: List[PrintedScale] = []
-    for x0, y0, x1, y1, text in _page_blocks(page):
-        if "SCALE" not in text.upper():
+    blocks = _page_blocks(page)
+    for x0, y0, x1, y1, text in blocks:
+        if not _looks_like_scale_label(text):
             continue
         fpi = parse_scale_ratio(text)
         if not fpi or fpi <= 0:
             continue
         number, title = _number_and_title(text)
+        if not title:
+            # Bare ratio ("1/4\" = 1'-0\"") — its title is the line above.
+            title = _title_above(blocks, x0, y0, x1)
+            if not number:
+                number, _t = _number_and_title(title)
         out.append(
             PrintedScale(
                 scale_text=" ".join(_normalize(text).split()),
