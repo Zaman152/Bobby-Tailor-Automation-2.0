@@ -235,3 +235,56 @@ the coincidental Columns hit and lowers the naive metric, so it is a decision fo
 silent change. Reaching "100% on any plan" remains the multi-session capability program of §8–§9.
 The free offline geometry-iteration harness now exists (`scripts/geom_probe.py`,
 `scripts/fusion_probe.py`).
+
+## 11. Scale R&D (2026-07-16) — two real, systemic scale bugs found + fixed
+
+New zero-API tool `scripts/scale_probe.py` reports every page's viewports, each viewport's OWN
+printed scale, and where a page carries several. Findings, all verified on the real PDFs:
+
+**11.0 Sheet map correction (important).** Crow's real floor plan is **page 0**
+(`OVERALL FLOOR PLAN` @ 1"=40', footprint 397,600 SF / perimeter 2,972 LF — the source of every
+passing number). **Page 1 is the ELEVATIONS sheet** (N@40, E@20, S@40, W@20); page 2 is 13
+details/sections; page 3 is door jambs/types. §10's probes ran on page 1 — the elevations — so its
+symbol analysis described the wrong sheet. **§10's conclusion still holds on page 0**: SYM-1 there
+is 136 marks at a single Y (`yspan=0`) — collinear dimension ticks, not a 2-D column grid; no 2-D
+small-marker cluster ≈132 exists. Also disproved on real data: the documented "56 marks → 28
+bollards" concentric dedup — `_dedup_colocated_count(56) → 56` (multiplicity 1.0), so the 56-mark
+2-D cluster is 56 distinct marks and never resolves to golden 28 by that route.
+
+**11.1 Multi-scale pages are the norm, and every page was measured with ONE scale.**
+All 4 Crow pages and 4 of 7 Bob's pages carry more than one drawing scale. Quantities are computed
+at the single resolved page scale, so any geometry inside an off-scale viewport was measured with
+the wrong fpp and emitted as junk take-off rows. **This bites the floor plan itself**: Crow page 0's
+four S.C.C.P. details at 1 1/2"=1'-0" are **60× off** against the plan's 1"=40'. A detail is also a
+blow-up of an object the plan already shows, so counting it double-counts. **Fixed:**
+`_deterministic_bundle` excludes any viewport whose own printed scale disagrees with the resolved
+page scale (>5%). Real effect on Crow page 0: symbol groups **48 → 36**, wall classes **15 → 13**,
+footprint untouched (397,600 SF).
+
+**11.2 Stacked-fraction scales lose their slash → 144× errors (high severity).**
+CAD exports typeset a scale fraction as ONE stacked glyph in its own text span; the PDF text layer
+flattens it and the slash vanishes. Real spans from Bob's page 4:
+`['SCALE: ', '18', '" = 1\'-0"']` — i.e. `1/8" = 1'-0"` (8.0 ft/in) read as `18" = 1'-0"`
+(**0.056**). **Crow writes literal slashes and never trips this, which is exactly why it survived —
+it is invisible on the fixture the pipeline was tuned against.** Bob's golden quantities are
+elevation areas, so it hit the sheets that matter. **Fixed** in `_paper_inches`: a bare digit-run
+that is the concatenation of a standard architectural fraction (18→1/8, 14→1/4, 12→1/2, 34→3/4,
+316→3/16 …) maps back to the fraction. Unambiguous — every literal reading ("18 paper inches = 1
+foot") is architecturally impossible — and tests pin that 1"=40', 3"=1'-0", 1 1/2"=1'-0" and literal
+1/8" are untouched. Bob's page 4: `[0.056, 0.083, 0.2, 0.333, 0.5]` → `[0.2, 0.333, 0.5, 2.0, 8.0]`.
+
+**11.3 Best model on the binding passes.** `(*, semantic)` and `(*, vocabulary)` now route to
+`CLAUDE_MODEL_DENSE` (Opus 4.8). The semantic/symbol-gallery pass is what picks WHICH candidate is
+Columns/Bollards and WHICH wall class is CMU — the bindings that flip run-to-run. Safe by
+construction: those schemas have zero numeric fields and candidate-ID enums, so a better model buys
+binding reliability, never a hallucinated quantity.
+
+**11.4 `identify_main_plan_scale` returning None on Bob's is CORRECT, not a bug** — Bob's plans set
+genuinely contains no floor plan (titles are all `VENT PIPE DETAIL`, `FRONT ELEVATION NEW`,
+`ROOF LADDER SECTION`…). That is the §9 measurement-engine frontier (elevation/civil/schedule
+measurement), not a scale defect.
+
+**Still open (needs a user-authorized paid validation run — cannot be validated offline):** real
+column/bollard detection, CMU vs tilt-up wall-class disambiguation, rail LF. Do NOT tune these to
+the golden COUNT — validate against position/shape, or the coincidence trap of §10 repeats.
+Offline suite: **1099 green**.
