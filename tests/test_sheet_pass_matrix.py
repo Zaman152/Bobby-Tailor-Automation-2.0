@@ -195,6 +195,36 @@ class TestTitleSheetFalsePositives:
         assert classify_sheet_type_from_text("", "COVER") != "title_sheet"
 
 
+class TestMixedSheetIsMeasurable:
+    """A sheet is a COLLECTION of drawings; its type is only the dominant one.
+    Moxy's guestroom prototypes carry interior elevations AND the AR/RCP plans
+    holding every guestroom quantity — classified "elevation" they never reach
+    the deterministic engine, so the sheets that matter most get skipped.
+    An explicit "<NAME> - AR/RCP PLAN" viewport title outranks a stray
+    ELEVATION keyword.
+    """
+
+    def test_guestroom_sheet_with_elevations_and_an_ar_plan_is_measurable(self):
+        page = ("KING SUITE B ENTRY - A\nKING SUITE B - ELEVATION F\n"
+                "KING SUITE B - AR PLAN\nKING SUITE B - RCP PLAN")
+        assert classify_sheet_type_from_text("", page) == "floor_plan"
+
+    def test_rcp_plan_title_alone_is_measurable(self):
+        assert classify_sheet_type_from_text("", "QQ A - RCP PLAN") == "floor_plan"
+
+    def test_pure_elevation_sheet_is_still_an_elevation(self):
+        page = "POP-UP HUB ELEVATION A\nHUB CORRIDOR ELEVATION B\nNORTH ELEVATION"
+        assert classify_sheet_type_from_text("", page) == "elevation"
+
+    def test_furniture_and_electrical_plans_do_not_make_a_sheet_measurable(self):
+        """FF/EM/FC plans carry no take-off geometry of their own."""
+        page = "KING A - FF PLAN\nKING A - EM PLAN\nNORTH ELEVATION"
+        assert classify_sheet_type_from_text("", page) == "elevation"
+
+    def test_roof_plan_still_wins_over_the_viewport_rule(self):
+        assert classify_sheet_type_from_text("", "ROOF PLAN\nQQ A - AR PLAN") == "roof_plan"
+
+
 class TestKeywordWordBoundaries:
     """Every keyword set matches whole words — the substring flaw that hit
     "COVER"/"COVERING" equally hits PLAN/PLANT and SECTION/SECTIONAL."""

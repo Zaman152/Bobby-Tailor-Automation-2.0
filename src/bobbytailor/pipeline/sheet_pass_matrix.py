@@ -162,6 +162,12 @@ _KW_FLOOR    = frozenset(["FLOOR PLAN", "FLOOR PLANS", "PLAN", "LEVEL"])
 # MEP sheet ID prefix: M (mechanical), P (plumbing), E (electrical) + digit
 _MEP_PREFIX_RE = re.compile(r"^[MPE]\d", re.IGNORECASE)
 
+# An explicit drawing-viewport title naming a measurable plan:
+#   "KING SUITE B - AR PLAN"   "QQ A - RCP PLAN"   "LEVEL 7 - AR PLAN"
+# AR = architectural, RCP = reflected ceiling. Deliberately NOT FF/EM/FC —
+# furniture/electrical/finish plans carry no take-off geometry of their own.
+_PLAN_VIEWPORT_RE = re.compile(r"-\s*(?:AR|RCP)\s+PLAN\b")
+
 
 @lru_cache(maxsize=256)
 def _kw_regex(keyword: str) -> "re.Pattern":
@@ -219,6 +225,17 @@ def classify_sheet_type_from_text(title_block_text: str, full_page_text: str = "
         # Roof plan — must come before generic ELEVATION / PLAN
         if _hit(src, _KW_ROOF):
             return "roof_plan"
+
+        # An explicit "<NAME> - AR/RCP PLAN" viewport title is specific, strong
+        # evidence that this sheet carries MEASURABLE plan drawings, and it
+        # outranks the generic ELEVATION keyword below. A sheet is a COLLECTION
+        # of drawings and the type is only its dominant one: Moxy's guestroom
+        # prototypes carry interior elevations AND the AR/RCP plans that hold
+        # every guestroom quantity (Gyp Ceiling/Gyp Wall). Classified
+        # "elevation", they never reach the deterministic engine — the sheets
+        # that matter most are the ones skipped.
+        if _PLAN_VIEWPORT_RE.search(src):
+            return "floor_plan"
 
         # Elevations / facades
         if _hit(src, _KW_ELEV):

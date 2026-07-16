@@ -1727,14 +1727,21 @@ class TakeoffPipeline:
         # 353 SF, and no closed room path exists at all), so measure each
         # drawing viewport as a filled region AT ITS OWN PRINTED SCALE. Additive:
         # any failure leaves `room_fills` empty and the sheet behaves as before.
+        #
+        # NOT gated on the sheet-level type. A sheet is not one thing — it is a
+        # COLLECTION of drawings, and the sheet type is only its dominant one.
+        # Moxy's guestroom prototypes carry interior elevations AND the AR/RCP
+        # plans that hold every guestroom quantity, so they classify "elevation"
+        # and a plan-type gate skips exactly the drawings that matter. The
+        # measurement gates on what is actually present: a titled plan viewport
+        # with its own printed scale (see _measure_room_fills).
         room_fills: list = []
-        if resolved_type in _PLAN_SHEET_TYPES:
-            try:
-                room_fills = self._measure_room_fills(
-                    page, viewports, printed_scales_by_region, sheet_name
-                )
-            except Exception as exc:  # noqa: BLE001 — measurement is additive
-                logger.debug("room_fill failed on %r: %s", sheet_name, exc)
+        try:
+            room_fills = self._measure_room_fills(
+                page, viewports, printed_scales_by_region, sheet_name
+            )
+        except Exception as exc:  # noqa: BLE001 — measurement is additive
+            logger.debug("room_fill failed on %r: %s", sheet_name, exc)
 
         return {
             "symbol_groups": symbols,
