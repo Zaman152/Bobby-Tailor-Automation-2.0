@@ -4,6 +4,8 @@ No PDF, no network, no paid calls — synthetic fitz-like pages and viewports.
 """
 from __future__ import annotations
 
+import pytest
+
 from bobbytailor.deterministic.geometry_takeoff import ScaleResult
 from bobbytailor.deterministic.printed_scale import (
     PrintedScale,
@@ -54,6 +56,41 @@ def test_parse_three_quarter_inch():
 def test_parse_smart_quotes_and_whitespace():
     # Curly double-prime / prime and messy spacing must still parse.
     assert parse_scale_ratio('SCALE:  1″  =  40′-0″') == 40.0
+
+
+# ── Dropped-slash stacked-fraction repair ─────────────────────────────────────
+#
+# CAD exports typeset the fraction as ONE stacked glyph in its own text span, so
+# the PDF text layer flattens '1/8" = 1'-0"' to '18" = 1'-0"' (real spans from
+# Bob's page 4: ['SCALE: ', '18', '" = 1\'-0"']). Read literally that is 0.056
+# ft/in instead of 8.0 — a 144x scale error that corrupts every quantity on the
+# sheet. The literal readings ("18 paper inches = 1 foot") are architecturally
+# impossible, so the repair cannot rewrite a legitimate scale.
+
+
+@pytest.mark.parametrize("text,expected", [
+    ('SCALE: 18" = 1\'-0"', 8.0),          # 1/8"  = 1'-0"
+    ('SCALE: 14" = 1\'-0"', 4.0),          # 1/4"  = 1'-0"
+    ('SCALE: 12" = 1\'-0"', 2.0),          # 1/2"  = 1'-0"
+    ('SCALE: 34" = 1\'-0"', 4.0 / 3.0),    # 3/4"  = 1'-0"
+    ('SCALE: 38" = 1\'-0"', 8.0 / 3.0),    # 3/8"  = 1'-0"
+    ('SCALE: 316" = 1\'-0"', 16.0 / 3.0),  # 3/16" = 1'-0"
+    ('SCALE: 116" = 1\'-0"', 16.0),        # 1/16" = 1'-0"
+    ('SCALE: 132" = 1\'-0"', 32.0),        # 1/32" = 1'-0"
+    ('SCALE: 332" = 1\'-0"', 32.0 / 3.0),  # 3/32" = 1'-0"
+])
+def test_parse_dropped_slash_stacked_fraction(text, expected):
+    assert abs(parse_scale_ratio(text) - expected) < 1e-3
+
+
+@pytest.mark.parametrize("text,expected", [
+    ('SCALE: 1" = 40\'-0"', 40.0),         # whole inch — untouched
+    ('SCALE: 3" = 1\'-0"', 1.0 / 3.0),     # legit whole-inch detail scale
+    ('SCALE: 1 1/2" = 1\'-0"', 2.0 / 3.0),  # mixed number — untouched
+    ('SCALE: 1/8" = 1\'-0"', 8.0),         # literal slash still wins
+])
+def test_dropped_slash_repair_never_rewrites_a_valid_scale(text, expected):
+    assert abs(parse_scale_ratio(text) - expected) < 1e-3
 
 
 def test_parse_garbage_returns_none():

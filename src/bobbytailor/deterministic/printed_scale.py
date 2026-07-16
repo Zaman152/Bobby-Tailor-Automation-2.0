@@ -107,12 +107,44 @@ def _normalize(text: str) -> str:
 # ── Ratio parsing ─────────────────────────────────────────────────────────────
 
 
+# Dropped-slash fraction repair (CAD PDFs with STACKED fraction glyphs).
+#
+# Many CAD exports typeset the fraction in a scale callout as a single stacked
+# glyph in its own text span. The PDF text layer then flattens it to the bare
+# digits and the slash is GONE:
+#
+#     spans: ['SCALE: ', '18', '" = 1\'-0"']      # really 1/8" = 1'-0"
+#
+# Parsed literally that reads "18 paper inches = 1 foot" -> 0.056 ft/in instead
+# of 8.0 — a 144x scale error that would corrupt every quantity on the sheet.
+# (Crow's PDF writes literal slashes and never hits this; Bob's does.)
+#
+# The repair is unambiguous because the literal readings are architecturally
+# absurd: no drawing is labelled "18 inches = 1 foot" (1.5x life size). Each key
+# below is the digit-concatenation of a STANDARD architectural scale fraction,
+# and every one is an impossible paper-inch measure, so the mapping cannot
+# silently rewrite a legitimate value.
+_DROPPED_SLASH_FRACTIONS = {
+    "132": 1 / 32,
+    "116": 1 / 16,
+    "332": 3 / 32,
+    "316": 3 / 16,
+    "18": 1 / 8,
+    "14": 1 / 4,
+    "38": 3 / 8,
+    "12": 1 / 2,
+    "34": 3 / 4,
+    "58": 5 / 8,
+}
+
+
 def _paper_inches(text_before_eq: str) -> Optional[float]:
     """Parse the drawing-inch side left of '=' -> paper inches.
 
-    Handles mixed numbers ("1 1/2"), plain fractions ("3/32", "1/4"), and whole
-    or decimal inches ("1", "1.5"). Non-digit tokens (e.g. "SCALE:") are
-    ignored — only the numeric drawing-inch value matters.
+    Handles mixed numbers ("1 1/2"), plain fractions ("3/32", "1/4"), whole or
+    decimal inches ("1", "1.5"), and stacked-fraction glyphs whose slash the PDF
+    text layer dropped ("18" -> 1/8; see :data:`_DROPPED_SLASH_FRACTIONS`).
+    Non-digit tokens (e.g. "SCALE:") are ignored.
     """
     s = text_before_eq
     # Mixed number: "1 1/2" -> 1.5
@@ -129,11 +161,15 @@ def _paper_inches(text_before_eq: str) -> Optional[float]:
         if den:
             return int(m.group(1)) / den
         return None
-    # Whole or decimal inches: "1", "1.5"
+    # Whole or decimal inches: "1", "1.5" — but first repair a stacked fraction
+    # whose slash the text layer dropped ("18" is 1/8, never 18 paper inches).
     m = re.search(r"(\d+(?:\.\d+)?)", s)
     if m:
+        token = m.group(1)
+        if token in _DROPPED_SLASH_FRACTIONS:
+            return _DROPPED_SLASH_FRACTIONS[token]
         try:
-            return float(m.group(1))
+            return float(token)
         except ValueError:
             return None
     return None
