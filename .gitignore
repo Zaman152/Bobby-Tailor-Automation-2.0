@@ -36,6 +36,8 @@ Thumbs.db
 *.swo
 *.egg-info/
 data/
+MagicMock/
+output/_archive/
 
 # Human-in-the-loop inputs (estimator-supplied manifests; not plans-only pipeline inputs)
 !human_inputs/
