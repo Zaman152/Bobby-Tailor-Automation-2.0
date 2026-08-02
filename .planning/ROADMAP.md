@@ -953,7 +953,7 @@ Context: `.planning/phases/21-accuracy-learning-engine/21-CONTEXT.md`
 Plans:
 
 - [x] 22-01-PLAN.md — Safety rails: golden exclusion + output isolation + stub hardening (wave 1, RESTRUCTURE-SPEC-S1)
-- [ ] 22-02-PLAN.md — DELETE bucket + ARCHIVE bucket + scripts/archive relocation (wave 2, RESTRUCTURE-SPEC-S2/S3)
+- [x] 22-02-PLAN.md — DELETE bucket + ARCHIVE bucket + scripts/archive relocation (wave 2, RESTRUCTURE-SPEC-S2/S3)
 - [ ] 22-03-PLAN.md — Legacy docs archive + web asset move into package (wave 3, RESTRUCTURE-SPEC-S4/S5)
 - [ ] 22-04-PLAN.md — Doc truth fixes + dead JS removal + GitNexus reindex (wave 4, RESTRUCTURE-SPEC-S6/S7/S8)
 
