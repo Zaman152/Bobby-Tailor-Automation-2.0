@@ -2,7 +2,7 @@
  * Bobby Tailor — Estimation Automation
  * Client-side application logic
  *
- * Layout: Master.md §8.2–8.7
+ * Layout: docs/design/bobby-tailor/MASTER.md (Page Pattern); legacy: docs/archive/Master.md §8.2–8.7
  */
 
 // ── CSRF & Fetch Helpers ────────────────────────────────────────────────────

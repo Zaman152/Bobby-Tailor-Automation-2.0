@@ -1,4 +1,4 @@
-"""Smoke tests for Masterv2 v2.1 extraction prompt."""
+"""Smoke tests for the v2.1 extraction prompt (spec: docs/archive/Masterv2.md)."""
 from bobbytailor.vision.claude_analyzer import EXTRACTION_PROMPT
 
 
