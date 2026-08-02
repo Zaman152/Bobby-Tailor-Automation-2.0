@@ -31,3 +31,9 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+# Web assets live inside the package (src/bobbytailor/web/{templates,static}) so
+# Flask resolves them by default; declare them below so a built wheel includes
+# them too. Recursive "**" globs require setuptools>=62 (pinned >=64).
+[tool.setuptools.package-data]
+bobbytailor = ["web/templates/*.html", "web/static/**/*"]

@@ -3,7 +3,6 @@ Flask web app factory — project selector UI + job runner.
 """
 import logging
 import os
-from pathlib import Path
 
 from flask import Flask, jsonify, redirect, request, url_for
 from flask_login import current_user
@@ -29,12 +28,9 @@ PUBLIC_ENDPOINTS: frozenset = frozenset({"auth.login", "auth.logout", "static"})
 
 def create_app() -> Flask:
     """Create and configure the Flask application."""
-    repo_root = Path(__file__).resolve().parents[3]
-    app = Flask(
-        __name__,
-        template_folder=str(repo_root / "templates"),
-        static_folder=str(repo_root / "static"),
-    )
+    # templates/ and static/ live inside this package, so Flask's default
+    # resolution (relative to app.root_path == src/bobbytailor/web/) finds them.
+    app = Flask(__name__)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
