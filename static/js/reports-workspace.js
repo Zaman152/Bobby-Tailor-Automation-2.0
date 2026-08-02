@@ -182,7 +182,11 @@ export async function openReportWorkspace(runFolder) {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
   workspace.querySelectorAll('.export-btn').forEach(btn => {
-    btn.addEventListener('click', () => exportReport(currentRun, btn.dataset.type));
+    btn.addEventListener('click', () => {
+      exportReport(currentRun, btn.dataset.type).catch((err) => {
+        alert(err.message || 'Export failed');
+      });
+    });
   });
   
   // Keyboard shortcuts
@@ -688,6 +692,29 @@ function confBadge(conf) {
   return `<span class="scale-conf scale-conf-${c}">${escapeHtml(c)}</span>`;
 }
 
+function scaleTakeoffDownloadHtml() {
+  if (!currentReportMeta?.files?.takeoff_summary_csv) return '';
+  return `
+    <div class="scale-download-row">
+      <button type="button" class="export-btn export-btn-primary scale-takeoff-download" data-type="takeoff">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span>Download Takeoff Summary CSV</span>
+      </button>
+    </div>`;
+}
+
+function bindScaleTakeoffDownload(container) {
+  container.querySelectorAll('.scale-takeoff-download').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      exportReport(currentRun, btn.dataset.type).catch((err) => {
+        alert(err.message || 'Export failed');
+      });
+    });
+  });
+}
+
 async function loadScaleTab(container) {
   const response = await fetch(`/api/reports/${encodeURIComponent(currentRun)}/scale`, { credentials: 'same-origin' });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -707,7 +734,9 @@ async function loadScaleTab(container) {
         <p>This run produced no vector floor / site / roof plan geometry, so there
         are no measured quantities to recalibrate. Counted (EA) and schedule
         quantities are not scale-dependent.</p>
+        ${scaleTakeoffDownloadHtml()}
       </div>`;
+    bindScaleTakeoffDownload(container);
     return;
   }
 
@@ -722,6 +751,7 @@ async function loadScaleTab(container) {
         wrong or multi-scale. Confirm or correct the scale below and the measured
         areas/lengths recompute instantly and exactly. Open each sheet to read its
         scale bar or a known dimension.</p>
+        ${scaleTakeoffDownloadHtml()}
       </div>
       <div class="scale-table-wrap">
       <table class="scale-table data-table">
@@ -774,6 +804,7 @@ async function loadScaleTab(container) {
     </div>`;
 
   bindScaleEvents(container, sheets);
+  bindScaleTakeoffDownload(container);
 
   if (pendingScaleFocus) {
     focusScaleSheet(container, pendingScaleFocus);
@@ -1294,7 +1325,7 @@ function updateWorkspaceURL() {
   window.history.replaceState({}, '', url);
 }
 
-function exportReport(runFolder, type) {
+async function exportReport(runFolder, type) {
   const fileMap = {
     summary: 'summary.txt',
     json: 'takeoff.json',
@@ -1303,10 +1334,26 @@ function exportReport(runFolder, type) {
     takeoff: 'takeoff_summary.csv',
   };
   const filename = fileMap[type] || `${type}.csv`;
+  const url = `/api/reports/${encodeURIComponent(runFolder)}/${encodeURIComponent(filename)}`;
+  const res = await fetch(url, { credentials: 'same-origin' });
+  if (!res.ok) {
+    let detail = `Export failed (${res.status})`;
+    try {
+      const body = await res.json();
+      if (body?.error) detail = body.error;
+    } catch (_) { /* non-JSON error body */ }
+    throw new Error(detail);
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.href = `/api/reports/${encodeURIComponent(runFolder)}/${encodeURIComponent(filename)}`;
+  link.href = objectUrl;
   link.download = `${runFolder}_${filename}`;
+  link.style.display = 'none';
+  document.body.appendChild(link);
   link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
 }
 
 function formatDate(timestamp) {

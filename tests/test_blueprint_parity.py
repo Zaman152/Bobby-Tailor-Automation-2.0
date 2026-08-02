@@ -157,6 +157,47 @@ def authed_client():
         yield app.test_client()
 
 
+def test_report_file_download_returns_attachment(authed_client, tmp_path, monkeypatch):
+    """Authenticated GET /api/reports/<run>/<file> must stream the file."""
+    monkeypatch.setenv("OUTPUT_DIR", str(tmp_path))
+    from bobbytailor import config
+
+    monkeypatch.setattr(config, "OUTPUT_DIR", str(tmp_path))
+
+    run = tmp_path / "TestProj_20260717_120000"
+    run.mkdir()
+    (run / "calculations.csv").write_text("item,qty\nDoor,3\n")
+
+    resp = authed_client.get("/api/reports/TestProj_20260717_120000/calculations.csv")
+    assert resp.status_code == 200
+    assert b"Door,3" in resp.data
+    assert "attachment" in (resp.headers.get("Content-Disposition") or "")
+
+
+def test_download_uses_repo_output_not_app_root(authed_client, tmp_path, monkeypatch):
+    """Regression: send_file must not resolve relative paths under app.root_path (src/bobbytailor/web/)."""
+    monkeypatch.setenv("OUTPUT_DIR", "./output")
+    from bobbytailor import config
+
+    monkeypatch.setattr(config, "OUTPUT_DIR", "./output")
+
+    run = tmp_path / "output" / "Crow_Cass_Test_20260627_213111"
+    run.mkdir(parents=True)
+    (run / "calculations.csv").write_text("item,qty\nWall,1\n")
+
+    # Point OUTPUT_DIR at tmp_path via resolve by chdir to tmp_path parent
+    import os
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+        resp = authed_client.get("/api/reports/Crow_Cass_Test_20260627_213111/calculations.csv")
+    finally:
+        os.chdir(old_cwd)
+
+    assert resp.status_code == 200
+    assert b"Wall,1" in resp.data
+
+
 def test_max_content_length_is_configured(client):
     from bobbytailor.config import MAX_UPLOAD_MB
 

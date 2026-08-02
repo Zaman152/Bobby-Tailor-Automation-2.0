@@ -1,8 +1,8 @@
 {
-  "overall_qty": 0.009523809523809525,
+  "overall_qty": 0.01904761904761905,
   "name_found_rate": 0.819047619047619,
-  "qty_acc_when_found": 0.011627906976744186,
-  "count_qty": 0.043478260869565216,
+  "qty_acc_when_found": 0.023255813953488372,
+  "count_qty": 0.08695652173913043,
   "count_found": 0.17391304347826086,
   "measured_qty": 0.0,
   "measured_found": 1.0,
@@ -10,12 +10,12 @@
   "n_count": 23,
   "n_measured": 82,
   "geometry_text_qty_acc": 0.0,
-  "n_geometry_text": 29,
+  "n_geometry_text": 36,
   "vision_qty_share": 0.0,
-  "n_quantity_bearing": 57,
+  "n_quantity_bearing": 48,
   "provenance_counts": {
-    "deterministic": 39,
-    "unknown": 18
+    "deterministic": 41,
+    "unknown": 7
   },
   "silent_misses": []
 }

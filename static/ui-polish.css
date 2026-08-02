@@ -1211,6 +1211,18 @@ textarea:focus-visible {
   overflow-x: auto;
 }
 
+.scale-empty {
+  padding: 24px;
+}
+
+.scale-download-row {
+  margin-top: 16px;
+}
+
+.scale-intro .scale-download-row {
+  margin-top: 12px;
+}
+
 /* ── Export Rail ── */
 .workspace-export {
   background: var(--bg-surface);

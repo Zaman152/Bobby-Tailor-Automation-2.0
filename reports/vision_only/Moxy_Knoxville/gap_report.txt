@@ -1,175 +1,181 @@
 ====================================================================================
 VISION-ONLY BENCHMARK — Moxy Knoxville
 ====================================================================================
-Overall quantity accuracy: 1%   Name/found rate: 82%   Qty acc when found: 1%
-  Counts (EA)   n=23  found=17%  qty_ok=4%
+Overall quantity accuracy: 2%   Name/found rate: 82%   Qty acc when found: 2%
+  Counts (EA)   n=23  found=17%  qty_ok=9%
   Measured(SF/LF) n=82  found=100%  qty_ok=0%
-  Provenance split: geometry/text qty acc=0% (n=29)  vision qty share=0% of 57 quantity-bearing rows
-  Provenance classes: deterministic=39, unknown=18
+  Provenance split: geometry/text qty acc=0% (n=36)  vision qty share=0% of 48 quantity-bearing rows
+  Provenance classes: deterministic=41, unknown=7
   Silent misses: 0 (every golden category present or flagged)
-  [manifest] runtime=1241s  cost=$1.8884  sheets=22
+  [manifest] runtime=894s  cost=$1.1514  sheets=22
 
 STATUS    ITEM                                  GOLDEN            AI    ERR%  CAT  PROV
 ------------------------------------------------------------------------------------
-FAIL_QTY  Lift                                    1.00          7.00   600.0  count  unknown
+PASS      Lift                                    1.00          1.00     0.0  count  unknown
 PASS      Mobilization                            1.00          1.00     0.0  count  unknown
-FAIL_QTY  Guard Rail                             69.86        140.08   100.5  measured  deterministic
+FAIL_QTY  Guard Rail                             69.86         83.43    19.4  measured  deterministic
 FAIL_QTY  Lintels                               849.71          0.00   100.0  measured  unknown
-FAIL_QTY  Guard Rail                             45.75        140.08   206.2  measured  deterministic
+FAIL_QTY  Guard Rail                             45.75         83.43    82.4  measured  deterministic
 FAIL_QTY  Lintels                               334.44          0.00   100.0  measured  unknown
-FAIL_QTY  Guard Rail                             49.96        140.08   180.4  measured  deterministic
-FAIL_QTY  Hand Rail≈Guard Rail                   41.11        140.08   240.7  measured  deterministic
+FAIL_QTY  Guard Rail                             49.96         83.43    67.0  measured  deterministic
+FAIL_QTY  Hand Rail                              41.11          0.00   100.0  measured  unknown
 FAIL_QTY  Lintels                               346.24          0.00   100.0  measured  unknown
 MISSING   Door Frame-HM                          67.00             —       —  count  unknown
 MISSING   Doors-HM                               10.00             —       —  count  unknown
 MISSING   Doors-WD                               65.00             —       —  count  unknown
-FAIL_QTY  CMU Wall                            5,394.79        126.00    97.7  measured  deterministic
-FAIL_QTY  Gyp Wall                            8,338.25      2,745.16    67.1  measured  deterministic
-FAIL_QTY  Stairs                                 16.00         10.00    37.5  count  unknown
-FAIL_QTY  CMU Wall                            1,521.68        126.00    91.7  measured  deterministic
-FAIL_QTY  Gyp Wall                              747.98      2,745.16   267.0  measured  deterministic
-FAIL_QTY  Stairs                                 12.00         10.00    16.7  count  unknown
-FAIL_QTY  Gyp Wall                            4,809.80      2,745.16    42.9  measured  deterministic
-FAIL_QTY  Exposed Structure                   3,770.94          0.00   100.0  measured  unknown
+FAIL_QTY  CMU Wall                            5,394.79        474.00    91.2  measured  deterministic
+FAIL_QTY  Gyp Wall                            8,338.25        191.18    97.7  measured  deterministic
+FAIL_QTY  Stairs                                 16.00          0.00   100.0  count  unknown
+FAIL_QTY  CMU Wall                            1,521.68        474.00    68.9  measured  deterministic
+FAIL_QTY  Gyp Wall                              747.98        191.18    74.4  measured  deterministic
+FAIL_QTY  Stairs                                 12.00          0.00   100.0  count  unknown
+FAIL_QTY  Gyp Wall                            4,809.80        191.18    96.0  measured  deterministic
+FAIL_QTY  Exposed Structure                   3,770.94         66.40    98.2  measured  deterministic
 FAIL_QTY  Gyp Ceiling                           653.13          0.00   100.0  measured  unknown
 FAIL_QTY  Gyp Ceiling                           263.70          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Wall                            1,425.99      2,745.16    92.5  measured  deterministic
+FAIL_QTY  Gyp Wall                            1,425.99        191.18    86.6  measured  deterministic
 FAIL_QTY  WC-1                                2,037.13          0.00   100.0  measured  unknown
 FAIL_QTY  WC-2≈WC-1                             225.43          0.00   100.0  measured  unknown
 FAIL_QTY  WC-1                                  843.51          0.00   100.0  measured  unknown
 FAIL_QTY  WC-2≈WC-1                             424.04          0.00   100.0  measured  unknown
 FAIL_QTY  WC-4≈WC-1                             169.28          0.00   100.0  measured  unknown
 FAIL_QTY  WC-7≈WC-1                             317.06          0.00   100.0  measured  unknown
-FAIL_QTY  Guard Rail                             23.01        140.08   508.8  measured  deterministic
-FAIL_QTY  Hand Rail≈Guard Rail                   23.50        140.08   496.1  measured  deterministic
+FAIL_QTY  Guard Rail                             23.01         83.43   262.6  measured  deterministic
+FAIL_QTY  Hand Rail                              23.50          0.00   100.0  measured  unknown
 FAIL_QTY  WC-6≈WC-1                           1,136.62          0.00   100.0  measured  unknown
 FAIL_QTY  WC-7≈WC-1                           1,253.94          0.00   100.0  measured  unknown
 FAIL_QTY  WC-9≈WC-1                             523.84          0.00   100.0  measured  unknown
 FAIL_QTY  WC-10≈WC-1                            148.77          0.00   100.0  measured  unknown
 FAIL_QTY  WC-8≈WC-1                             352.43          0.00   100.0  measured  unknown
 FAIL_QTY  Base                                3,541.01          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Wall                              303.37      2,745.16   804.9  measured  deterministic
+FAIL_QTY  Gyp Wall                              303.37        191.18    37.0  measured  deterministic
 FAIL_QTY  Gyp Ceiling                        11,643.39          0.00   100.0  measured  unknown
 MISSING   Door Frame-HM                          26.00             —       —  count  unknown
 MISSING   Doors-WD                               26.00             —       —  count  unknown
 FAIL_QTY  Gyp Ceiling                         5,748.30          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Soffit                            118.72        163.00    37.3  measured  unknown
-FAIL_QTY  Gyp Wall                           16,321.95      2,745.16    83.2  measured  deterministic
+FAIL_QTY  Gyp Soffit                            118.72         36.00    69.7  measured  deterministic
+FAIL_QTY  Gyp Wall                           16,321.95        191.18    98.8  measured  deterministic
 MISSING   Door Frame-HM                          15.00             —       —  count  unknown
 MISSING   Doors-WD                               15.00             —       —  count  unknown
 FAIL_QTY  Gyp Ceiling                         3,297.17          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Soffit                             65.68        163.00   148.2  measured  unknown
-FAIL_QTY  Gyp Wall                            9,429.62      2,745.16    70.9  measured  deterministic
+FAIL_QTY  Gyp Soffit                             65.68         36.00    45.2  measured  deterministic
+FAIL_QTY  Gyp Wall                            9,429.62        191.18    98.0  measured  deterministic
 MISSING   Door Frame-HM                           5.00             —       —  count  unknown
 MISSING   Doors-WD                                5.00             —       —  count  unknown
 FAIL_QTY  Gyp Ceiling                         1,063.99          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Soffit                             21.70        163.00   651.2  measured  unknown
-FAIL_QTY  Gyp Wall                            3,185.76      2,745.16    13.8  measured  deterministic
+FAIL_QTY  Gyp Soffit                             21.70         36.00    65.9  measured  deterministic
+FAIL_QTY  Gyp Wall                            3,185.76        191.18    94.0  measured  deterministic
 FAIL_QTY  Gyp Ceiling                         1,884.35          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Wall                            4,601.10      2,745.16    40.3  measured  deterministic
+FAIL_QTY  Gyp Wall                            4,601.10        191.18    95.8  measured  deterministic
 MISSING   Door Frame-HM                           2.00             —       —  count  unknown
 MISSING   Doors-WD                                2.00             —       —  count  unknown
 FAIL_QTY  Gyp Ceiling                           706.76          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Wall                            1,566.65      2,745.16    75.2  measured  deterministic
-FAIL_QTY  Guestroom-Wall Covering               239.76         15.00    93.7  measured  unknown
+FAIL_QTY  Gyp Wall                            1,566.65        191.18    87.8  measured  deterministic
+FAIL_QTY  Guestroom-Wall Covering               239.76          0.00   100.0  measured  unknown
 FAIL_QTY  Gyp Ceiling                           461.49          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Soffit                              7.30        163.00  2132.9  measured  unknown
-FAIL_QTY  Gyp Wall                              632.00      2,745.16   334.4  measured  deterministic
+FAIL_QTY  Gyp Soffit                              7.30         36.00   393.2  measured  deterministic
+FAIL_QTY  Gyp Wall                              632.00        191.18    69.8  measured  deterministic
 MISSING   Door Frame-HM                          90.00             —       —  count  unknown
 MISSING   Doors-WD                               90.00             —       —  count  unknown
-FAIL_QTY  Guestroom-Wall Covering            19,928.61         15.00    99.9  measured  unknown
+FAIL_QTY  Guestroom-Wall Covering            19,928.61          0.00   100.0  measured  unknown
 FAIL_QTY  Gyp Ceiling                        22,842.72          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Wall                           62,210.20      2,745.16    95.6  measured  deterministic
+FAIL_QTY  Gyp Wall                           62,210.20        191.18    99.7  measured  deterministic
 MISSING   Door Frame-HM                           6.00             —       —  count  unknown
 MISSING   Doors-WD                                6.00             —       —  count  unknown
-FAIL_QTY  Guestroom-Wall Covering             1,321.29         15.00    98.9  measured  unknown
+FAIL_QTY  Guestroom-Wall Covering             1,321.29          0.00   100.0  measured  unknown
 FAIL_QTY  Gyp Ceiling                         1,843.26          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Wall                            3,143.37      2,745.16    12.7  measured  deterministic
-FAIL_QTY  Guestroom-Wall Covering             3,572.68         15.00    99.6  measured  unknown
+FAIL_QTY  Gyp Wall                            3,143.37        191.18    93.9  measured  deterministic
+FAIL_QTY  Guestroom-Wall Covering             3,572.68          0.00   100.0  measured  unknown
 FAIL_QTY  Gyp Ceiling                         4,254.61          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Wall                            7,538.85      2,745.16    63.6  measured  deterministic
-FAIL_QTY  Guestroom-Wall Covering               240.44         15.00    93.8  measured  unknown
+FAIL_QTY  Gyp Wall                            7,538.85        191.18    97.5  measured  deterministic
+FAIL_QTY  Guestroom-Wall Covering               240.44          0.00   100.0  measured  unknown
 FAIL_QTY  Gyp Ceiling                           461.00          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Soffit                             15.33        163.00   963.3  measured  unknown
-FAIL_QTY  Gyp Wall                              650.83      2,745.16   321.8  measured  deterministic
+FAIL_QTY  Gyp Soffit                             15.33         36.00   134.8  measured  deterministic
+FAIL_QTY  Gyp Wall                              650.83        191.18    70.6  measured  deterministic
 MISSING   Door Frame-HM                           1.00             —       —  count  unknown
 MISSING   Doors-WD                                1.00             —       —  count  unknown
-FAIL_QTY  Guestroom-Wall Covering               241.14         15.00    93.8  measured  unknown
+FAIL_QTY  Guestroom-Wall Covering               241.14          0.00   100.0  measured  unknown
 FAIL_QTY  Gyp Ceiling                           271.11          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Wall                              500.48      2,745.16   448.5  measured  deterministic
-FAIL_QTY  Guestroom-Wall Covering               184.02         15.00    91.8  measured  unknown
+FAIL_QTY  Gyp Wall                              500.48        191.18    61.8  measured  deterministic
+FAIL_QTY  Guestroom-Wall Covering               184.02          0.00   100.0  measured  unknown
 FAIL_QTY  Gyp Ceiling                           355.84          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Wall                              587.93      2,745.16   366.9  measured  deterministic
+FAIL_QTY  Gyp Wall                              587.93        191.18    67.5  measured  deterministic
 MISSING   Door Frame-HM                           3.00             —       —  count  unknown
 MISSING   Doors-WD                                3.00             —       —  count  unknown
-FAIL_QTY  Guestroom-Wall Covering               552.64         15.00    97.3  measured  unknown
+FAIL_QTY  Guestroom-Wall Covering               552.64          0.00   100.0  measured  unknown
 FAIL_QTY  Gyp Ceiling                         1,108.39          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Wall                            1,775.64      2,745.16    54.6  measured  deterministic
+FAIL_QTY  Gyp Wall                            1,775.64        191.18    89.2  measured  deterministic
 FAIL_QTY  Gyp Ceiling                           470.21          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Soffit                              7.20        163.00  2163.9  measured  unknown
-FAIL_QTY  Gyp Wall                              650.20      2,745.16   322.2  measured  deterministic
-FAIL_QTY  Guestroom-Wall Covering               494.93         15.00    97.0  measured  unknown
+FAIL_QTY  Gyp Soffit                              7.20         36.00   400.0  measured  deterministic
+FAIL_QTY  Gyp Wall                              650.20        191.18    70.6  measured  deterministic
+FAIL_QTY  Guestroom-Wall Covering               494.93          0.00   100.0  measured  unknown
 FAIL_QTY  Gyp Ceiling                           894.25          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Soffit                             16.16        163.00   908.7  measured  unknown
-FAIL_QTY  Gyp Wall                              456.12      2,745.16   501.9  measured  deterministic
-FAIL_QTY  Guestroom-Wall Covering               238.42         15.00    93.7  measured  unknown
+FAIL_QTY  Gyp Soffit                             16.16         36.00   122.8  measured  deterministic
+FAIL_QTY  Gyp Wall                              456.12        191.18    58.1  measured  deterministic
+FAIL_QTY  Guestroom-Wall Covering               238.42          0.00   100.0  measured  unknown
 FAIL_QTY  Gyp Ceiling                           456.73          0.00   100.0  measured  unknown
-FAIL_QTY  Gyp Soffit                              7.98        163.00  1942.6  measured  unknown
-FAIL_QTY  Gyp Wall                              645.14      2,745.16   325.5  measured  deterministic
+FAIL_QTY  Gyp Soffit                              7.98         36.00   351.1  measured  deterministic
+FAIL_QTY  Gyp Wall                              645.14        191.18    70.4  measured  deterministic
 
 EXTRA items AI produced not in golden:
   + A1-01A                         3.0 EA
-  + Artwork by FF&E                1.0 EA
+  + ACC BUNK                       0.0 
+  + ACC KING TUB                   0.0 
+  + ACC QQ RIS                     0.0 
+  + ADA KING RIS                   0.0 
+  + BUNK A                         0.0 
+  + BUNK B                         0.0 
   + Barn Door                      3.0 EA
-  + Columns                        20.0 EA
-  + Concrete Slab                  294.3 SF
+  + Canopy                         118.5 SF
+  + Columns                        19.0 EA
+  + Concrete Slab                  179.1 LF
   + Door Frames - Aluminum (door schedule) 5.0 EA
   + Door Frames - Galvanized Steel (door schedule) 6.0 EA
   + Door Frames - Hollow Metal (door schedule) 42.0 EA
   + Doors - Glass / Aluminum (door schedule) 6.0 EA
   + Doors - Hollow Metal (door schedule) 6.0 EA
   + Doors - Solid Core Wood (door schedule) 42.0 EA
-  + Double Metal Decorative Sliding Screen w 1.0 EA
-  + Flooring                       71.05999999999999 LF
+  + Electrical Panels              24.0 EA
   + Interior Partition             4.18 SF
-  + Mechanical equipment/louvers (rooftop) 2.0 EA
-  + Mirror                         1.0 EA
-  + Mirrors                        3.0 EA
-  + Paint                          4.0 SF
-  + ROOM-1                         38.9 SF
-  + SYM-1                          4.0 EA
-  + SYM-10                         16.0 EA
-  + SYM-11                         12.0 EA
+  + Internally Illuminated Sign    2.0 EA
+  + KING A                         0.0 
+  + KING B                         0.0 
+  + KING C                         0.0 
+  + KING SUITE A                   0.0 
+  + KING SUITE B                   0.0 
+  + KING SUITE C                   0.0 
+  + QQ A                           0.0 
+  + QQ B                           0.0 
+  + QQ C                           0.0 
+  + SYM-1                          10.0 EA
+  + SYM-10                         15.0 EA
+  + SYM-11                         16.0 EA
   + SYM-12                         18.0 EA
-  + SYM-13                         18.0 EA
-  + SYM-14                         13.0 EA
-  + SYM-15                         12.0 EA
-  + SYM-16                         8.0 EA
-  + SYM-17                         11.0 EA
-  + SYM-18                         7.0 EA
+  + SYM-13                         14.0 EA
+  + SYM-14                         12.0 EA
+  + SYM-15                         8.0 EA
+  + SYM-16                         11.0 EA
+  + SYM-17                         4.0 EA
+  + SYM-18                         10.0 EA
   + SYM-19                         9.0 EA
   + SYM-2                          120.0 EA
-  + SYM-20                         9.0 EA
-  + SYM-21                         6.0 EA
+  + SYM-20                         6.0 EA
+  + SYM-21                         3.0 EA
   + SYM-22                         3.0 EA
-  + SYM-3                          57.0 EA
-  + SYM-4                          19.0 EA
-  + SYM-5                          30.0 EA
-  + SYM-6                          23.0 EA
-  + SYM-7                          14.0 EA
-  + SYM-8                          21.0 EA
-  + SYM-9                          21.0 EA
-  + Sealed Concrete                11.0 SF
-  + Single Metal Decorative Sliding Screen w 1.0 EA
-  + Solid Railing / Sliding Section for Fold 1.0 EA
-  + Storefront                     2898.0 SF
-  + Structural Column              470.0 EA
-  + Towel Drop and Water Millwork  1.0 EA
-  + Windows                        105.0 EA
+  + SYM-3                          29.0 EA
+  + SYM-4                          12.0 EA
+  + SYM-5                          29.0 EA
+  + SYM-6                          10.0 EA
+  + SYM-7                          20.0 EA
+  + SYM-8                          18.0 EA
+  + SYM-9                          17.0 EA
+  + Sealed Concrete                56.7 SF
+  + Structural Column              224.0 EA
+  + Windows                        42.0 EA
 ------------------------------------------------------------------------------------
 GATE CHECKS  [tracking-only — never fails the run]
   FAIL  geometry_text_qty_acc    value=0.0  required >= 0.97
-  FAIL  overall_qty              value=0.009523809523809525  required >= 0.9
+  FAIL  overall_qty              value=0.01904761904761905  required >= 0.9
   FAIL  item_found_rate          value=0.819047619047619  required >= 0.95
   PASS  silent_misses            value=[]  required == 0 (every golden category present or flagged)
   PASS  vision_qty_share         value=0.0  required <= 0.05 (vision-provenance quantities ~0 on vector fixtures)

@@ -5,7 +5,7 @@
     "quantity_fmt": "3",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png"
     ],
     "item_type": "component",
     "line_count": 1,
@@ -18,7 +18,7 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 3.0,
         "description": "A1-01A",
         "formula": "count"
@@ -26,28 +26,146 @@
     ]
   },
   {
-    "item": "Artwork by FF&E",
-    "quantity": 1.0,
-    "quantity_fmt": "1",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png"
-    ],
-    "item_type": "component",
-    "line_count": 1,
+    "item": "ACC BUNK",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
     "review_reasons": [
-      "unclassified item (no estimation table matched)"
+      "manifest object not found in plans"
     ],
-    "source": "vision",
+    "source": "manifest_missing",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 1.0,
-        "description": "Artwork by FF&E",
-        "formula": "count"
+        "sheet": null,
+        "qty": null,
+        "description": "ACC BUNK (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "ACC KING TUB",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "ACC KING TUB (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "ACC QQ RIS",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "ACC QQ RIS (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "ADA KING RIS",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "ADA KING RIS (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "BUNK A",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "BUNK A (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "BUNK B",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "BUNK B (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
       }
     ]
   },
@@ -57,18 +175,20 @@
     "quantity_fmt": "3",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png"
     ],
     "item_type": "doors",
     "line_count": 1,
-    "needs_review": false,
-    "confidence": "high",
+    "needs_review": true,
+    "confidence": "medium",
     "auto_verified": false,
-    "review_reasons": [],
+    "review_reasons": [
+      "symbol group has mixed text tags"
+    ],
     "source": "library",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png",
         "qty": 3.0,
         "description": "guestroom barn door",
         "formula": "count"
@@ -101,15 +221,16 @@
   },
   {
     "item": "CMU Wall",
-    "quantity": 126.0,
-    "quantity_fmt": "126",
+    "quantity": 474.0,
+    "quantity_fmt": "474",
     "unit": "SF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png"
     ],
     "item_type": "cmu_wall",
-    "line_count": 2,
+    "line_count": 3,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
@@ -119,45 +240,127 @@
     "source": "manifest",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-        "qty": 72.0,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png",
+        "qty": 45.0,
         "description": "CMU Wall",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 54.0,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
+        "qty": 400.5,
+        "description": "CMU Wall",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png",
+        "qty": 28.5,
         "description": "CMU Wall",
         "formula": "count"
       }
     ]
   },
   {
-    "item": "Columns",
-    "quantity": 20.0,
-    "quantity_fmt": "20",
-    "unit": "EA",
+    "item": "Canopy",
+    "quantity": 118.5,
+    "quantity_fmt": "118.5",
+    "unit": "SF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0005.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0014.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0023.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png"
     ],
-    "item_type": "columns",
-    "line_count": 2,
-    "needs_review": false,
-    "confidence": "medium",
+    "item_type": "canopy",
+    "line_count": 4,
+    "needs_review": true,
+    "confidence": "low",
     "auto_verified": false,
-    "review_reasons": [],
+    "review_reasons": [
+      "low-confidence count; wall class named by naming library (hint bind) \u2014 verify",
+      "measured ONE 'L2-L6 CORRIDOR' unit (18.4 SF); how many exist is not stated in the drawing set \u2014 supply the room mix to scale it"
+    ],
     "source": "library",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0005.png",
-        "qty": 12.0,
-        "description": "Structural columns (vertical supports)",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png",
+        "qty": 11.2,
+        "description": "Canopy",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0014.png",
-        "qty": 8.0,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0015.png",
+        "qty": 53.3,
+        "description": "Canopy",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0023.png",
+        "qty": 18.4,
+        "description": "Canopy",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png",
+        "qty": 35.6,
+        "description": "Canopy",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Ceiling Tile",
+    "quantity": 19.87,
+    "quantity_fmt": "19.9",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0023.png"
+    ],
+    "item_type": "ceiling_grid",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "measured ONE 'L2-L6 CORRIDOR' unit (18.4 SF); how many exist is not stated in the drawing set \u2014 supply the room mix to scale it"
+    ],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0023.png",
+        "qty": 19.87,
+        "description": "Ceiling Tile",
+        "formula": "count \u00d7 1.08"
+      }
+    ]
+  },
+  {
+    "item": "Columns",
+    "quantity": 19.0,
+    "quantity_fmt": "19",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0014.png"
+    ],
+    "item_type": "columns",
+    "line_count": 2,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "symbol group has mixed text tags"
+    ],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+        "qty": 14.0,
+        "description": "Columns",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0014.png",
+        "qty": 5.0,
         "description": "Columns",
         "formula": "count"
       }
@@ -165,37 +368,23 @@
   },
   {
     "item": "Concrete Slab",
-    "quantity": 294.3,
-    "quantity_fmt": "294.3",
-    "unit": "SF",
+    "quantity": 179.1,
+    "quantity_fmt": "179.1",
+    "unit": "LF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0014.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0022.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png"
     ],
     "item_type": "concrete_slab",
-    "line_count": 3,
+    "line_count": 1,
     "needs_review": false,
-    "confidence": "high",
+    "confidence": "medium",
     "auto_verified": false,
     "review_reasons": [],
-    "source": "library",
+    "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-        "qty": 258.5,
-        "description": "tilt-up concrete",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0014.png",
-        "qty": 30.3,
-        "description": "tilt-up concrete",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0022.png",
-        "qty": 5.5,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+        "qty": 179.1,
         "description": "tilt-up concrete",
         "formula": "count"
       }
@@ -207,7 +396,7 @@
     "quantity_fmt": "5",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png"
     ],
     "item_type": "doors",
     "line_count": 1,
@@ -218,7 +407,7 @@
     "source": "plan_schedule_legend",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 5.0,
         "description": "Door Frames - Aluminum (door schedule)",
         "formula": "authoritative plan schedule (5 EA)"
@@ -231,7 +420,7 @@
     "quantity_fmt": "6",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png"
     ],
     "item_type": "doors",
     "line_count": 1,
@@ -242,7 +431,7 @@
     "source": "plan_schedule_legend",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 6.0,
         "description": "Door Frames - Galvanized Steel (door schedule)",
         "formula": "authoritative plan schedule (6 EA)"
@@ -255,7 +444,7 @@
     "quantity_fmt": "42",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png"
     ],
     "item_type": "doors",
     "line_count": 1,
@@ -266,7 +455,7 @@
     "source": "plan_schedule_legend",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 42.0,
         "description": "Door Frames - Hollow Metal (door schedule)",
         "formula": "authoritative plan schedule (42 EA)"
@@ -279,7 +468,7 @@
     "quantity_fmt": "6",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png"
     ],
     "item_type": "doors",
     "line_count": 1,
@@ -290,7 +479,7 @@
     "source": "plan_schedule_legend",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 6.0,
         "description": "Doors - Glass / Aluminum (door schedule)",
         "formula": "authoritative plan schedule (6 EA)"
@@ -303,7 +492,7 @@
     "quantity_fmt": "6",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png"
     ],
     "item_type": "doors",
     "line_count": 1,
@@ -314,7 +503,7 @@
     "source": "plan_schedule_legend",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 6.0,
         "description": "Doors - Hollow Metal (door schedule)",
         "formula": "authoritative plan schedule (6 EA)"
@@ -327,7 +516,7 @@
     "quantity_fmt": "42",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png"
     ],
     "item_type": "doors",
     "line_count": 1,
@@ -338,7 +527,7 @@
     "source": "plan_schedule_legend",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 42.0,
         "description": "Doors - Solid Core Wood (door schedule)",
         "formula": "authoritative plan schedule (42 EA)"
@@ -346,38 +535,137 @@
     ]
   },
   {
-    "item": "Double Metal Decorative Sliding Screen w",
-    "quantity": 1.0,
-    "quantity_fmt": "1",
+    "item": "Electrical Panels",
+    "quantity": 24.0,
+    "quantity_fmt": "24",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0018.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png"
     ],
-    "item_type": "component",
+    "item_type": "ceiling_grid",
     "line_count": 1,
-    "needs_review": true,
-    "confidence": "low",
+    "needs_review": false,
+    "confidence": "medium",
     "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched)"
-    ],
+    "review_reasons": [],
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0018.png",
-        "qty": 1.0,
-        "description": "Double Metal Decorative Sliding Screen with Visible Track and Lockable Hardware for TV",
-        "formula": "count"
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
+        "qty": 24.0,
+        "description": "acoustic panel",
+        "formula": "count \u00d7 1.08"
       }
     ]
   },
   {
     "item": "Exposed Structure",
+    "quantity": 66.4,
+    "quantity_fmt": "66.4",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0023.png"
+    ],
+    "item_type": "exposed_structure",
+    "line_count": 2,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "measured ONE 'L2-L6 CORRIDOR' unit (18.4 SF); how many exist is not stated in the drawing set \u2014 supply the room mix to scale it"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
+        "qty": 48.0,
+        "description": "exposed concrete",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0023.png",
+        "qty": 18.4,
+        "description": "Exposed Structure",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "Guard Rail",
+    "quantity": 83.42999999999999,
+    "quantity_fmt": "83.4",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0015.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0022.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png"
+    ],
+    "item_type": "guard_rail",
+    "line_count": 7,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "named by naming library (perimeter_jamb_symbol \u2192 Guard Rail); vision label unavailable \u2014 verify"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+        "qty": 21.63,
+        "description": "Guard Rail",
+        "formula": "count \u00d7 1.03"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
+        "qty": 8.24,
+        "description": "Guard Rail",
+        "formula": "count \u00d7 1.03"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
+        "qty": 16.48,
+        "description": "Guard Rail",
+        "formula": "count \u00d7 1.03"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0014.png",
+        "qty": 8.24,
+        "description": "Guard Rail",
+        "formula": "count \u00d7 1.03"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0015.png",
+        "qty": 10.3,
+        "description": "Guard Rail",
+        "formula": "count \u00d7 1.03"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0022.png",
+        "qty": 10.3,
+        "description": "Guard Rail",
+        "formula": "count \u00d7 1.03"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png",
+        "qty": 8.24,
+        "description": "Guard Rail",
+        "formula": "count \u00d7 1.03"
+      }
+    ]
+  },
+  {
+    "item": "Guestroom-Wall Covering",
     "quantity": 0.0,
     "quantity_fmt": "\u2014",
     "unit": "SF",
     "source_sheets": [],
-    "item_type": "roof_area",
+    "item_type": "wall_area",
     "line_count": 0,
     "needs_review": true,
     "confidence": "low",
@@ -390,165 +678,8 @@
       {
         "sheet": null,
         "qty": null,
-        "description": "Exposed Structure (expected from manifest, not located on plans)",
+        "description": "Guestroom-Wall Covering (expected from manifest, not located on plans)",
         "formula": "manifest_object_not_found"
-      }
-    ]
-  },
-  {
-    "item": "Flooring",
-    "quantity": 71.05999999999999,
-    "quantity_fmt": "71.1",
-    "unit": "LF",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png"
-    ],
-    "item_type": "flooring",
-    "line_count": 4,
-    "needs_review": true,
-    "confidence": "low",
-    "auto_verified": false,
-    "review_reasons": [
-      "approximate dimension (field verify)"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-        "qty": 6.6,
-        "description": "brick tile",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 38.5,
-        "description": "Tile - Fitness Restroom Elevation D (approximate SF)",
-        "formula": "35 sf \u00d7 1.1 waste = 38 sf [FIELD VERIFY \u00b1]"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 22.0,
-        "description": "Tile - Fitness Elevation B (approximate SF)",
-        "formula": "20 sf \u00d7 1.1 waste = 22 sf [FIELD VERIFY \u00b1]"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png",
-        "qty": 3.96,
-        "description": "Tile wall",
-        "formula": "count \u00d7 1.1"
-      }
-    ]
-  },
-  {
-    "item": "Guard Rail",
-    "quantity": 140.07999999999998,
-    "quantity_fmt": "140.1",
-    "unit": "LF",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0015.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0022.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png"
-    ],
-    "item_type": "guard_rail",
-    "line_count": 6,
-    "needs_review": true,
-    "confidence": "medium",
-    "auto_verified": false,
-    "review_reasons": [
-      "named by naming library (perimeter_jamb_symbol \u2192 Guard Rail); vision label unavailable \u2014 verify"
-    ],
-    "source": "manifest",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 78.28,
-        "description": "Guard Rail",
-        "formula": "count \u00d7 1.03"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-        "qty": 11.33,
-        "description": "Guard Rail",
-        "formula": "count \u00d7 1.03"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-        "qty": 17.51,
-        "description": "Guard Rail",
-        "formula": "count \u00d7 1.03"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0015.png",
-        "qty": 10.3,
-        "description": "Guard Rail",
-        "formula": "count \u00d7 1.03"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0022.png",
-        "qty": 10.3,
-        "description": "Guard Rail",
-        "formula": "count \u00d7 1.03"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png",
-        "qty": 12.36,
-        "description": "Guard Rail",
-        "formula": "count \u00d7 1.03"
-      }
-    ]
-  },
-  {
-    "item": "Guestroom-Wall Covering",
-    "quantity": 15.0,
-    "quantity_fmt": "15",
-    "unit": "SF",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png"
-    ],
-    "item_type": "drywall",
-    "line_count": 5,
-    "needs_review": true,
-    "confidence": "low",
-    "auto_verified": false,
-    "review_reasons": [
-      "approximate dimension (field verify)"
-    ],
-    "source": "manifest",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 5.0,
-        "description": "Gypsum soffit / wallcovering area - Fitness Elevation A (approximate soffit/wall finish area)",
-        "formula": "ceil(120 \u00d7 1.12 / 32sf/sheet) = 5 sheets [FIELD VERIFY \u00b1]"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 3.0,
-        "description": "Gypsum soffit / wallcovering area - Fitness Elevation B (approximate soffit/wall finish area)",
-        "formula": "ceil(80 \u00d7 1.12 / 32sf/sheet) = 3 sheets [FIELD VERIFY \u00b1]"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 3.0,
-        "description": "Gypsum soffit / wallcovering area - Fitness Elevation D (approximate soffit/wall finish area)",
-        "formula": "ceil(80 \u00d7 1.12 / 32sf/sheet) = 3 sheets [FIELD VERIFY \u00b1]"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 2.0,
-        "description": "Gypsum soffit / wallcovering area - Fitness Restroom Elevation A (approximate soffit/wall finish area)",
-        "formula": "ceil(40 \u00d7 1.12 / 32sf/sheet) = 2 sheets [FIELD VERIFY \u00b1]"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 2.0,
-        "description": "Gypsum soffit / wallcovering area - Fitness Restroom Elevation B (approximate soffit/wall finish area)",
-        "formula": "ceil(30 \u00d7 1.12 / 32sf/sheet) = 2 sheets [FIELD VERIFY \u00b1]"
       }
     ]
   },
@@ -578,16 +709,15 @@
   },
   {
     "item": "Gyp Soffit",
-    "quantity": 163.0,
-    "quantity_fmt": "163",
+    "quantity": 36.0,
+    "quantity_fmt": "36",
     "unit": "SF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0016.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0018.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0004.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0006.png"
     ],
-    "item_type": "exterior_soffit",
-    "line_count": 3,
+    "item_type": "drywall",
+    "line_count": 2,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
@@ -597,42 +727,31 @@
     "source": "manifest",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0016.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0004.png",
+        "qty": 29.0,
+        "description": "Gypsum soffit area - approximate estimate based on elevation view of soffit conditions visible at Level 01 lower and canopy areas along South and East elevations",
+        "formula": "ceil(800 \u00d7 1.12 / 32sf/sheet) = 29 sheets [FIELD VERIFY \u00b1]"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0006.png",
         "qty": 7.0,
-        "description": "Gyp soffit / gypsum soffit area - estimated from elevation views showing soffit conditions above entries and open-to-above areas across Main Entry Lounge and Library elevations",
+        "description": "Gyp soffit / gypsum board soffit at canopy/popup hub area - North Drive Court elevation",
         "formula": "ceil(180 \u00d7 1.12 / 32sf/sheet) = 7 sheets [FIELD VERIFY \u00b1]"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0018.png",
-        "qty": 6.0,
-        "description": "Gyp Soffit / GWB Soffit area - estimated from Pop-Up Hub Elevation A and B combined (soffit band visible across full elevation width, approximate depth ~2ft)",
-        "formula": "ceil(150 \u00d7 1.12 / 32sf/sheet) = 6 sheets [FIELD VERIFY \u00b1]"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 150.0,
-        "description": "Gyp bd soffit - estimated total across all Level 7 elevation views shown",
-        "formula": "150 sf \u00d7 1.0 = 150 sf [FIELD VERIFY \u00b1]"
       }
     ]
   },
   {
     "item": "Gyp Wall",
-    "quantity": 2745.16,
-    "quantity_fmt": "2,745.2",
+    "quantity": 191.18,
+    "quantity_fmt": "191.2",
     "unit": "SF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0012.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0021.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png"
     ],
     "item_type": "wall_framing",
-    "line_count": 9,
+    "line_count": 3,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
@@ -642,58 +761,46 @@
     "source": "manifest",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-        "qty": 1498.2,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png",
+        "qty": 84.15,
         "description": "Interior Partition",
         "formula": "count \u00d7 1.1"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-        "qty": 390.28,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
+        "qty": 42.68,
         "description": "partition wall",
         "formula": "count \u00d7 1.1"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 63.47,
-        "description": "partition wall",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 658.35,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png",
+        "qty": 64.35,
         "description": "Interior Partition",
         "formula": "count \u00d7 1.1"
-      },
+      }
+    ]
+  },
+  {
+    "item": "Hand Rail",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "linear",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-        "qty": 6.27,
-        "description": "gypsum board partition",
-        "formula": "count \u00d7 1.12"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0012.png",
-        "qty": 12.1,
-        "description": "partition wall",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-        "qty": 11.99,
-        "description": "partition wall",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0021.png",
-        "qty": 12.1,
-        "description": "Toilet Stall Partition Panel / Stall Enclosure",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png",
-        "qty": 92.4,
-        "description": "Interior Partition",
-        "formula": "count \u00d7 1.1"
+        "sheet": null,
+        "qty": null,
+        "description": "Hand Rail (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
       }
     ]
   },
@@ -703,7 +810,7 @@
     "quantity_fmt": "4.2",
     "unit": "SF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png"
     ],
     "item_type": "wall_framing",
     "line_count": 1,
@@ -714,7 +821,7 @@
     "source": "library",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 4.18,
         "description": "Wall Tag (fire rating / stud size / structural material)",
         "formula": "count \u00d7 1.1"
@@ -722,48 +829,201 @@
     ]
   },
   {
-    "item": "Lift",
-    "quantity": 7.0,
-    "quantity_fmt": "7",
+    "item": "Internally Illuminated Sign",
+    "quantity": 2.0,
+    "quantity_fmt": "2",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0004.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0006.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0016.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0019.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0005.png"
     ],
-    "item_type": "lift",
-    "line_count": 4,
+    "item_type": "component",
+    "line_count": 2,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
     "review_reasons": [
-      "low-confidence count"
+      "unclassified item (no estimation table matched)"
     ],
+    "source": "library",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0005.png",
+        "qty": 1.0,
+        "description": "Internally illuminated brand sign - MOXY hotel sign",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0005.png",
+        "qty": 1.0,
+        "description": "Internally illuminated raised brand sign",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "KING A",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "KING A (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "KING B",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "KING B (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "KING C",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "KING C (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "KING SUITE A",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "KING SUITE A (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "KING SUITE B",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "KING SUITE B (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "KING SUITE C",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "KING SUITE C (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "Lift",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0004.png"
+    ],
+    "item_type": "lift",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
     "source": "manifest",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0004.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0004.png",
         "qty": 1.0,
-        "description": "Elevator - passenger lift",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0006.png",
-        "qty": 1.0,
-        "description": "Lift / Elevator",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0016.png",
-        "qty": 1.0,
-        "description": "Elevator / Lift",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0019.png",
-        "qty": 4.0,
-        "description": "Lift / Elevator",
+        "description": "Lift/Elevator - passenger",
         "formula": "count"
       }
     ]
@@ -793,84 +1053,6 @@
     ]
   },
   {
-    "item": "Mechanical equipment/louvers (rooftop)",
-    "quantity": 2.0,
-    "quantity_fmt": "2",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0005.png"
-    ],
-    "item_type": "component",
-    "line_count": 1,
-    "needs_review": true,
-    "confidence": "medium",
-    "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched)"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0005.png",
-        "qty": 2.0,
-        "description": "Mechanical equipment/louvers (rooftop)",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "Mirror",
-    "quantity": 1.0,
-    "quantity_fmt": "1",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png"
-    ],
-    "item_type": "component",
-    "line_count": 1,
-    "needs_review": true,
-    "confidence": "low",
-    "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched)"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 1.0,
-        "description": "Mirror",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "Mirrors",
-    "quantity": 3.0,
-    "quantity_fmt": "3",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png"
-    ],
-    "item_type": "component",
-    "line_count": 1,
-    "needs_review": true,
-    "confidence": "medium",
-    "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched)"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 3.0,
-        "description": "Mirrors",
-        "formula": "count"
-      }
-    ]
-  },
-  {
     "item": "Mobilization",
     "quantity": 1.0,
     "quantity_fmt": "1",
@@ -893,145 +1075,85 @@
     ]
   },
   {
-    "item": "Paint",
-    "quantity": 4.0,
-    "quantity_fmt": "4",
-    "unit": "SF",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0018.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png"
-    ],
-    "item_type": "component",
-    "line_count": 3,
+    "item": "QQ A",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
     "review_reasons": [
-      "approximate dimension (field verify)",
-      "unclassified item (no estimation table matched)"
+      "manifest object not found in plans"
     ],
-    "source": "library",
+    "source": "manifest_missing",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0018.png",
-        "qty": 1.0,
-        "description": "Painted Mural",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 2.0,
-        "description": "Paint finish - Fitness Elevation C wall area (approximate)",
-        "formula": "ceil(200 sf \u00d7 2 coats / 350 sf/gal) = 2 gal [FIELD VERIFY \u00b1]"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 1.0,
-        "description": "Painted Mural by FF&E",
-        "formula": "count"
+        "sheet": null,
+        "qty": null,
+        "description": "QQ A (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
       }
     ]
   },
   {
-    "item": "ROOM-1",
-    "quantity": 38.9,
-    "quantity_fmt": "38.9",
-    "unit": "SF",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png"
-    ],
-    "item_type": "component",
-    "line_count": 1,
+    "item": "QQ B",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
     "review_reasons": [
-      "unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing)"
+      "manifest object not found in plans"
     ],
-    "source": "vision",
+    "source": "manifest_missing",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-        "qty": 38.9,
-        "description": "ROOM-1",
-        "formula": "count"
+        "sheet": null,
+        "qty": null,
+        "description": "QQ B (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ]
+  },
+  {
+    "item": "QQ C",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "unit_type",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "QQ C (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
       }
     ]
   },
   {
     "item": "SYM-1",
-    "quantity": 4.0,
-    "quantity_fmt": "4",
+    "quantity": 10.0,
+    "quantity_fmt": "10",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png"
-    ],
-    "item_type": "component",
-    "line_count": 1,
-    "needs_review": true,
-    "confidence": "low",
-    "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched); vision label unknown"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
-        "qty": 4.0,
-        "description": "SYM-1",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "SYM-10",
-    "quantity": 16.0,
-    "quantity_fmt": "16",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png"
-    ],
-    "item_type": "component",
-    "line_count": 3,
-    "needs_review": true,
-    "confidence": "low",
-    "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched); vision label unknown"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-        "qty": 6.0,
-        "description": "SYM-10",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-        "qty": 3.0,
-        "description": "SYM-10",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 7.0,
-        "description": "SYM-10",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "SYM-11",
-    "quantity": 12.0,
-    "quantity_fmt": "12",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png"
     ],
     "item_type": "component",
     "line_count": 2,
@@ -1044,14 +1166,94 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
+        "qty": 4.0,
+        "description": "SYM-1",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png",
+        "qty": 6.0,
+        "description": "SYM-1",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-10",
+    "quantity": 15.0,
+    "quantity_fmt": "15",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png"
+    ],
+    "item_type": "component",
+    "line_count": 3,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+        "qty": 6.0,
+        "description": "SYM-10",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
+        "qty": 3.0,
+        "description": "SYM-10",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+        "qty": 6.0,
+        "description": "SYM-10",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-11",
+    "quantity": 16.0,
+    "quantity_fmt": "16",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png"
+    ],
+    "item_type": "component",
+    "line_count": 3,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 6.0,
         "description": "SYM-11",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
         "qty": 6.0,
+        "description": "SYM-11",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
+        "qty": 4.0,
         "description": "SYM-11",
         "formula": "count"
       }
@@ -1063,10 +1265,10 @@
     "quantity_fmt": "18",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png"
     ],
     "item_type": "component",
     "line_count": 4,
@@ -1079,26 +1281,26 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 5.0,
         "description": "SYM-12",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 6.0,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+        "qty": 5.0,
         "description": "SYM-12",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
         "qty": 4.0,
         "description": "SYM-12",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png",
-        "qty": 3.0,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
+        "qty": 4.0,
         "description": "SYM-12",
         "formula": "count"
       }
@@ -1106,17 +1308,16 @@
   },
   {
     "item": "SYM-13",
-    "quantity": 18.0,
-    "quantity_fmt": "18",
+    "quantity": 14.0,
+    "quantity_fmt": "14",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png"
     ],
     "item_type": "component",
-    "line_count": 4,
+    "line_count": 3,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
@@ -1126,25 +1327,19 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 5.0,
         "description": "SYM-13",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
         "qty": 5.0,
         "description": "SYM-13",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-        "qty": 4.0,
-        "description": "SYM-13",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
         "qty": 4.0,
         "description": "SYM-13",
         "formula": "count"
@@ -1153,13 +1348,13 @@
   },
   {
     "item": "SYM-14",
-    "quantity": 13.0,
-    "quantity_fmt": "13",
+    "quantity": 12.0,
+    "quantity_fmt": "12",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png"
     ],
     "item_type": "component",
     "line_count": 3,
@@ -1172,19 +1367,19 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 4.0,
         "description": "SYM-14",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 5.0,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+        "qty": 4.0,
         "description": "SYM-14",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
         "qty": 4.0,
         "description": "SYM-14",
         "formula": "count"
@@ -1193,16 +1388,15 @@
   },
   {
     "item": "SYM-15",
-    "quantity": 12.0,
-    "quantity_fmt": "12",
+    "quantity": 8.0,
+    "quantity_fmt": "8",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png"
     ],
     "item_type": "component",
-    "line_count": 3,
+    "line_count": 2,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
@@ -1212,19 +1406,13 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 4.0,
         "description": "SYM-15",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 4.0,
-        "description": "SYM-15",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
         "qty": 4.0,
         "description": "SYM-15",
         "formula": "count"
@@ -1233,46 +1421,13 @@
   },
   {
     "item": "SYM-16",
-    "quantity": 8.0,
-    "quantity_fmt": "8",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png"
-    ],
-    "item_type": "component",
-    "line_count": 2,
-    "needs_review": true,
-    "confidence": "low",
-    "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched); vision label unknown"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-        "qty": 4.0,
-        "description": "SYM-16",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 4.0,
-        "description": "SYM-16",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "SYM-17",
     "quantity": 11.0,
     "quantity_fmt": "11",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png"
     ],
     "item_type": "component",
     "line_count": 3,
@@ -1285,36 +1440,35 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 4.0,
-        "description": "SYM-17",
+        "description": "SYM-16",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
         "qty": 4.0,
-        "description": "SYM-17",
+        "description": "SYM-16",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
         "qty": 3.0,
-        "description": "SYM-17",
+        "description": "SYM-16",
         "formula": "count"
       }
     ]
   },
   {
-    "item": "SYM-18",
-    "quantity": 7.0,
-    "quantity_fmt": "7",
+    "item": "SYM-17",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png"
     ],
     "item_type": "component",
-    "line_count": 2,
+    "line_count": 1,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
@@ -1324,13 +1478,47 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+        "qty": 4.0,
+        "description": "SYM-17",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-18",
+    "quantity": 10.0,
+    "quantity_fmt": "10",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png"
+    ],
+    "item_type": "component",
+    "line_count": 3,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 4.0,
         "description": "SYM-18",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+        "qty": 3.0,
+        "description": "SYM-18",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
         "qty": 3.0,
         "description": "SYM-18",
         "formula": "count"
@@ -1343,9 +1531,9 @@
     "quantity_fmt": "9",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png"
     ],
     "item_type": "component",
     "line_count": 3,
@@ -1358,19 +1546,19 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 3.0,
         "description": "SYM-19",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
         "qty": 3.0,
         "description": "SYM-19",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
         "qty": 3.0,
         "description": "SYM-19",
         "formula": "count"
@@ -1383,12 +1571,12 @@
     "quantity_fmt": "120",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0014.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0022.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0014.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0022.png"
     ],
     "item_type": "component",
     "line_count": 6,
@@ -1396,42 +1584,43 @@
     "confidence": "low",
     "auto_verified": false,
     "review_reasons": [
+      "unclassified item (no estimation table matched); no vision label for symbol group",
       "unclassified item (no estimation table matched); vision label unknown"
     ],
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 4.0,
         "description": "SYM-2",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 40.0,
         "description": "SYM-2",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
         "qty": 41.0,
         "description": "SYM-2",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
         "qty": 18.0,
         "description": "SYM-2",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0014.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0014.png",
         "qty": 12.0,
         "description": "SYM-2",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0022.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0022.png",
         "qty": 5.0,
         "description": "SYM-2",
         "formula": "count"
@@ -1440,52 +1629,12 @@
   },
   {
     "item": "SYM-20",
-    "quantity": 9.0,
-    "quantity_fmt": "9",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png"
-    ],
-    "item_type": "component",
-    "line_count": 3,
-    "needs_review": true,
-    "confidence": "low",
-    "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched); vision label unknown"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-        "qty": 3.0,
-        "description": "SYM-20",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 3.0,
-        "description": "SYM-20",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-        "qty": 3.0,
-        "description": "SYM-20",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "SYM-21",
     "quantity": 6.0,
     "quantity_fmt": "6",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png"
     ],
     "item_type": "component",
     "line_count": 2,
@@ -1498,13 +1647,39 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 3.0,
-        "description": "SYM-21",
+        "description": "SYM-20",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+        "qty": 3.0,
+        "description": "SYM-20",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-21",
+    "quantity": 3.0,
+    "quantity_fmt": "3",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 3.0,
         "description": "SYM-21",
         "formula": "count"
@@ -1517,7 +1692,7 @@
     "quantity_fmt": "3",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png"
     ],
     "item_type": "component",
     "line_count": 1,
@@ -1530,7 +1705,7 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 3.0,
         "description": "SYM-22",
         "formula": "count"
@@ -1539,17 +1714,15 @@
   },
   {
     "item": "SYM-3",
-    "quantity": 57.0,
-    "quantity_fmt": "57",
+    "quantity": 29.0,
+    "quantity_fmt": "29",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png"
     ],
     "item_type": "component",
-    "line_count": 4,
+    "line_count": 2,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
@@ -1559,26 +1732,14 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 3.0,
         "description": "SYM-3",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 26.0,
-        "description": "SYM-3",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-        "qty": 16.0,
-        "description": "SYM-3",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png",
-        "qty": 12.0,
         "description": "SYM-3",
         "formula": "count"
       }
@@ -1586,13 +1747,13 @@
   },
   {
     "item": "SYM-4",
-    "quantity": 19.0,
-    "quantity_fmt": "19",
+    "quantity": 12.0,
+    "quantity_fmt": "12",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png"
     ],
     "item_type": "component",
     "line_count": 3,
@@ -1600,25 +1761,26 @@
     "confidence": "low",
     "auto_verified": false,
     "review_reasons": [
+      "unclassified item (no estimation table matched); no vision label for symbol group",
       "unclassified item (no estimation table matched); vision label unknown"
     ],
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 3.0,
         "description": "SYM-4",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
         "qty": 6.0,
         "description": "SYM-4",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png",
-        "qty": 10.0,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png",
+        "qty": 3.0,
         "description": "SYM-4",
         "formula": "count"
       }
@@ -1626,17 +1788,18 @@
   },
   {
     "item": "SYM-5",
-    "quantity": 30.0,
-    "quantity_fmt": "30",
+    "quantity": 29.0,
+    "quantity_fmt": "29",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png"
     ],
     "item_type": "component",
-    "line_count": 4,
+    "line_count": 5,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
@@ -1646,26 +1809,32 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0003.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0003.png",
         "qty": 3.0,
         "description": "SYM-5",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 8.0,
         "description": "SYM-5",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
         "qty": 5.0,
         "description": "SYM-5",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 14.0,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+        "qty": 8.0,
+        "description": "SYM-5",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
+        "qty": 5.0,
         "description": "SYM-5",
         "formula": "count"
       }
@@ -1673,14 +1842,47 @@
   },
   {
     "item": "SYM-6",
-    "quantity": 23.0,
-    "quantity_fmt": "23",
+    "quantity": 10.0,
+    "quantity_fmt": "10",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png"
+    ],
+    "item_type": "component",
+    "line_count": 2,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); vision label unknown"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+        "qty": 6.0,
+        "description": "SYM-6",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
+        "qty": 4.0,
+        "description": "SYM-6",
+        "formula": "count"
+      }
+    ]
+  },
+  {
+    "item": "SYM-7",
+    "quantity": 20.0,
+    "quantity_fmt": "20",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0014.png"
     ],
     "item_type": "component",
     "line_count": 4,
@@ -1693,65 +1895,25 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-        "qty": 6.0,
-        "description": "SYM-6",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-        "qty": 4.0,
-        "description": "SYM-6",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 8.0,
-        "description": "SYM-6",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-        "qty": 5.0,
-        "description": "SYM-6",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "SYM-7",
-    "quantity": 14.0,
-    "quantity_fmt": "14",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0014.png"
-    ],
-    "item_type": "component",
-    "line_count": 3,
-    "needs_review": true,
-    "confidence": "low",
-    "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched); vision label unknown"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 6.0,
         "description": "SYM-7",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
         "qty": 4.0,
         "description": "SYM-7",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0014.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
+        "qty": 6.0,
+        "description": "SYM-7",
+        "formula": "count"
+      },
+      {
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0014.png",
         "qty": 4.0,
         "description": "SYM-7",
         "formula": "count"
@@ -1760,17 +1922,16 @@
   },
   {
     "item": "SYM-8",
-    "quantity": 21.0,
-    "quantity_fmt": "21",
+    "quantity": 18.0,
+    "quantity_fmt": "18",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png"
     ],
     "item_type": "component",
-    "line_count": 4,
+    "line_count": 3,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
@@ -1780,26 +1941,20 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 6.0,
         "description": "SYM-8",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
         "qty": 4.0,
         "description": "SYM-8",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-        "qty": 6.0,
-        "description": "SYM-8",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png",
-        "qty": 5.0,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+        "qty": 8.0,
         "description": "SYM-8",
         "formula": "count"
       }
@@ -1807,17 +1962,16 @@
   },
   {
     "item": "SYM-9",
-    "quantity": 21.0,
-    "quantity_fmt": "21",
+    "quantity": 17.0,
+    "quantity_fmt": "17",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png"
     ],
     "item_type": "component",
-    "line_count": 4,
+    "line_count": 3,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
@@ -1827,26 +1981,20 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0008.png",
         "qty": 6.0,
         "description": "SYM-9",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0009.png",
         "qty": 4.0,
         "description": "SYM-9",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 8.0,
-        "description": "SYM-9",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png",
-        "qty": 3.0,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+        "qty": 7.0,
         "description": "SYM-9",
         "formula": "count"
       }
@@ -1854,173 +2002,66 @@
   },
   {
     "item": "Sealed Concrete",
-    "quantity": 11.0,
-    "quantity_fmt": "11",
+    "quantity": 56.7,
+    "quantity_fmt": "56.7",
     "unit": "SF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0022.png"
     ],
-    "item_type": "exposed_structure",
+    "item_type": "sealed_concrete",
     "line_count": 1,
-    "needs_review": false,
+    "needs_review": true,
     "confidence": "medium",
     "auto_verified": false,
-    "review_reasons": [],
+    "review_reasons": [
+      "measured ONE 'L7 CORRIDOR' unit (56.7 SF); how many exist is not stated in the drawing set \u2014 supply the room mix to scale it"
+    ],
     "source": "library",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-        "qty": 11.0,
-        "description": "exposed concrete",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "Single Metal Decorative Sliding Screen w",
-    "quantity": 1.0,
-    "quantity_fmt": "1",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0018.png"
-    ],
-    "item_type": "component",
-    "line_count": 1,
-    "needs_review": true,
-    "confidence": "low",
-    "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched)"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0018.png",
-        "qty": 1.0,
-        "description": "Single Metal Decorative Sliding Screen with Visible Track and Lockable Hardware for Bar",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "Solid Railing / Sliding Section for Fold",
-    "quantity": 1.0,
-    "quantity_fmt": "1",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0018.png"
-    ],
-    "item_type": "component",
-    "line_count": 1,
-    "needs_review": true,
-    "confidence": "low",
-    "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched)"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0018.png",
-        "qty": 1.0,
-        "description": "Solid Railing / Sliding Section for Fold Down Seating",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0022.png",
+        "qty": 56.7,
+        "description": "Sealed Concrete",
         "formula": "count"
       }
     ]
   },
   {
     "item": "Stairs",
-    "quantity": 10.0,
-    "quantity_fmt": "10",
+    "quantity": 0.0,
+    "quantity_fmt": "\u2014",
     "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0016.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0017.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0019.png"
-    ],
-    "item_type": "stairs",
-    "line_count": 3,
-    "needs_review": false,
-    "confidence": "medium",
-    "auto_verified": false,
-    "review_reasons": [],
-    "source": "manifest",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0016.png",
-        "qty": 2.0,
-        "description": "Stairs",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0017.png",
-        "qty": 6.0,
-        "description": "Stairs / Stair Treads",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0019.png",
-        "qty": 2.0,
-        "description": "Stairs / Stairway",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "Storefront",
-    "quantity": 2898.0,
-    "quantity_fmt": "2,898",
-    "unit": "SF",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png"
-    ],
-    "item_type": "component",
-    "line_count": 3,
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
     "review_reasons": [
-      "unclassified item (no estimation table matched); wall class named by naming library (hint bind) \u2014 verify"
+      "manifest object not found in plans"
     ],
-    "source": "library",
+    "source": "manifest_missing",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-        "qty": 2062.5,
-        "description": "Storefront",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-        "qty": 618.0,
-        "description": "Storefront",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png",
-        "qty": 217.5,
-        "description": "Storefront",
-        "formula": "count"
+        "sheet": null,
+        "qty": null,
+        "description": "Stairs (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
       }
     ]
   },
   {
     "item": "Structural Column",
-    "quantity": 470.0,
-    "quantity_fmt": "470",
+    "quantity": 224.0,
+    "quantity_fmt": "224",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png"
     ],
     "item_type": "columns",
-    "line_count": 6,
+    "line_count": 3,
     "needs_review": true,
     "confidence": "medium",
     "auto_verified": false,
@@ -2030,65 +2071,21 @@
     "source": "library",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0008.png",
-        "qty": 128.0,
-        "description": "Structural Column",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0009.png",
-        "qty": 94.0,
-        "description": "Structural Column",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0010.png",
         "qty": 152.0,
         "description": "Structural Column",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0011.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0011.png",
         "qty": 38.0,
         "description": "Structural Column",
         "formula": "count"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0013.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0013.png",
         "qty": 34.0,
         "description": "Structural Column",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0040.png",
-        "qty": 24.0,
-        "description": "Structural Column",
-        "formula": "count"
-      }
-    ]
-  },
-  {
-    "item": "Towel Drop and Water Millwork",
-    "quantity": 1.0,
-    "quantity_fmt": "1",
-    "unit": "EA",
-    "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png"
-    ],
-    "item_type": "component",
-    "line_count": 1,
-    "needs_review": true,
-    "confidence": "low",
-    "auto_verified": false,
-    "review_reasons": [
-      "unclassified item (no estimation table matched)"
-    ],
-    "source": "vision",
-    "detail": [
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0020.png",
-        "qty": 1.0,
-        "description": "Towel Drop and Water Millwork",
         "formula": "count"
       }
     ]
@@ -2287,15 +2284,15 @@
   },
   {
     "item": "Wall Framing",
-    "quantity": 211.52999999999997,
-    "quantity_fmt": "211.5",
+    "quantity": 12.43,
+    "quantity_fmt": "12.4",
     "unit": "LF",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png",
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png"
     ],
     "item_type": "wall_framing",
-    "line_count": 14,
+    "line_count": 3,
     "needs_review": true,
     "confidence": "low",
     "auto_verified": false,
@@ -2305,102 +2302,35 @@
     "source": "vision",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-        "qty": 24.97,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png",
+        "qty": 4.73,
         "description": "WALL-TC3",
         "formula": "count \u00d7 1.1"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-        "qty": 21.34,
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0007.png",
+        "qty": 3.74,
         "description": "WALL-TC4",
         "formula": "count \u00d7 1.1"
       },
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-        "qty": 21.34,
-        "description": "WALL-TC5",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-        "qty": 6.38,
-        "description": "WALL-TC6",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0007.png",
-        "qty": 5.83,
-        "description": "WALL-TC7",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 8.03,
-        "description": "WALL-TC11",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0040.png",
         "qty": 3.96,
-        "description": "WALL-TC12",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 3.96,
-        "description": "WALL-TC13",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 3.96,
-        "description": "WALL-TC14",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 3.96,
-        "description": "WALL-TC16",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 35.97,
         "description": "WALL-TC3",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 27.94,
-        "description": "WALL-TC4",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 23.98,
-        "description": "WALL-TC5",
-        "formula": "count \u00d7 1.1"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0010.png",
-        "qty": 19.91,
-        "description": "WALL-TC6",
         "formula": "count \u00d7 1.1"
       }
     ]
   },
   {
     "item": "Windows",
-    "quantity": 105.0,
-    "quantity_fmt": "105",
+    "quantity": 42.0,
+    "quantity_fmt": "42",
     "unit": "EA",
     "source_sheets": [
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0005.png",
-      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0006.png"
+      "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0005.png"
     ],
     "item_type": "windows",
-    "line_count": 2,
+    "line_count": 1,
     "needs_review": false,
     "confidence": "high",
     "auto_verified": false,
@@ -2408,15 +2338,9 @@
     "source": "library",
     "detail": [
       {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0005.png",
-        "qty": 45.0,
-        "description": "Windows - multi-pane glazed units",
-        "formula": "count"
-      },
-      {
-        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_015307/page_0006.png",
-        "qty": 60.0,
-        "description": "Windows - multi-pane glazed units in building facade",
+        "sheet": "output/screenshots/VisionOnly_Moxy_Knoxville_20260717_044247/page_0005.png",
+        "qty": 42.0,
+        "description": "Windows - multi-pane units in building facade",
         "formula": "count"
       }
     ]

@@ -1193,8 +1193,33 @@ function bindJsonToggles(container) {
 }
 
 function downloadReportFile(folder, filename) {
+  downloadReportBlob(folder, filename).catch((err) => {
+    alert(err.message || 'Download failed');
+  });
+}
+
+/** Fetch an authenticated report file and trigger a browser save dialog. */
+async function downloadReportBlob(folder, filename) {
   const url = '/api/reports/' + encodeURIComponent(folder) + '/' + encodeURIComponent(filename);
-  window.open(url, '_blank');
+  const res = await fetch(url, { credentials: 'same-origin' });
+  if (!res.ok) {
+    let detail = `Download failed (${res.status})`;
+    try {
+      const body = await res.json();
+      if (body?.error) detail = body.error;
+    } catch (_) { /* non-JSON error body */ }
+    throw new Error(detail);
+  }
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = folder + '_' + filename;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
 }
 
 // ── Active Job Mini-Card Polling ───────────────────────────────────────────

@@ -17,6 +17,30 @@ reports_bp = Blueprint("reports", __name__)
 
 ALLOWED_PREVIEW_EXTENSIONS = {'.csv', '.json', '.txt'}
 
+
+def _output_root() -> Path:
+    """Absolute OUTPUT_DIR — required because Flask resolves relative send_file paths against app.root_path (src/bobbytailor/web/), not cwd."""
+    return Path(config.OUTPUT_DIR).resolve()
+
+
+def _resolve_run_file(run_folder: str, filename: str) -> Optional[Path]:
+    """Resolve a run artifact under OUTPUT_DIR; None if invalid or missing."""
+    if ".." in run_folder or ".." in filename:
+        return None
+    if "/" in run_folder or "/" in filename:
+        return None
+    root = _output_root()
+    target = (root / run_folder / filename).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError:
+        logger.warning("Run file path escaped output directory: %s/%s", run_folder, filename)
+        return None
+    if not target.is_file():
+        return None
+    return target
+
+
 def _validate_preview_path(run_folder: str, filename: str) -> Optional[Path]:
     """Validate and resolve preview file path.
 
@@ -39,7 +63,7 @@ def _validate_preview_path(run_folder: str, filename: str) -> Optional[Path]:
         return None
 
     # Resolve and validate containment
-    output_root = Path(config.OUTPUT_DIR).resolve()
+    output_root = _output_root()
     target = (output_root / run_folder / filename).resolve()
 
     try:
@@ -89,7 +113,7 @@ def _preview_csv(path: Path) -> dict:
 def list_reports():
     """List all generated report runs. Each run is its own folder under output/.
     Each folder contains: takeoff.json, raw_items.csv, calculations.csv, summary.txt."""
-    output = Path(config.OUTPUT_DIR)
+    output = _output_root()
     runs = []
 
     # Each subdirectory of output/ that contains takeoff.json is a run
@@ -163,7 +187,7 @@ def get_report(run_folder: str):
     if "/" in run_folder or ".." in run_folder:
         return jsonify({"error": "Invalid path"}), 400
 
-    sub = Path(config.OUTPUT_DIR) / run_folder
+    sub = _output_root() / run_folder
     if not sub.is_dir():
         return jsonify({"error": "Not found"}), 404
 
@@ -215,15 +239,18 @@ def get_report(run_folder: str):
 
 
 @reports_bp.route("/api/reports/<run_folder>/<filename>")
+@login_required
 def download_run_file(run_folder, filename):
     """Download a specific file from a run folder."""
-    # Sanitize: only allow simple folder/file names
-    if "/" in run_folder or ".." in run_folder or "/" in filename or ".." in filename:
-        return jsonify({"error": "Invalid path"}), 400
-    path = Path(config.OUTPUT_DIR) / run_folder / filename
-    if not path.exists() or not path.is_file():
+    path = _resolve_run_file(run_folder, filename)
+    if path is None:
         return jsonify({"error": "Not found"}), 404
-    return send_file(str(path), as_attachment=True)
+    mimetype = {
+        ".csv": "text/csv",
+        ".json": "application/json",
+        ".txt": "text/plain",
+    }.get(path.suffix.lower())
+    return send_file(path, as_attachment=True, download_name=filename, mimetype=mimetype)
 
 
 @reports_bp.route("/api/reports/<run_folder>/preview/<filename>")
@@ -269,7 +296,7 @@ def serve_sheet_image(run_folder: str, relpath: str):
     """Serve a sheet PNG for traceability (path is relative to OUTPUT_DIR)."""
     if ".." in run_folder or ".." in relpath:
         return jsonify({"error": "Invalid path"}), 400
-    output_root = Path(config.OUTPUT_DIR).resolve()
+    output_root = _output_root()
     target = (output_root / relpath).resolve()
     try:
         target.relative_to(output_root)
@@ -279,7 +306,7 @@ def serve_sheet_image(run_folder: str, relpath: str):
     if not target.is_file() or target.suffix.lower() not in (".png", ".jpg", ".jpeg"):
         return jsonify({"error": "Not found"}), 404
     mime = "image/png" if target.suffix.lower() == ".png" else "image/jpeg"
-    return send_file(str(target), mimetype=mime, max_age=3600)
+    return send_file(target, mimetype=mime, max_age=3600)
 
 
 # NOTE (21-REVIEW WR-03): the legacy flat-output download route
