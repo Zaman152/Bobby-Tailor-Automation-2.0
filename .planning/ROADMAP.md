@@ -30,6 +30,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [ ] **Phase 18: Linked Sheet Resolution** — Auto-follow drawing cross-refs; capture/analyze linked detail sheets
 - [ ] **Phase 20: Takeoff Measurement Precision** — Plan-type-agnostic accurate take-offs; ≥97% golden regression; shared PDF+StackCT pipeline
 - [ ] **Phase 21: Accuracy & Learning Engine (v3)** — Plans-only production accuracy: vector-first measurement, auto scale detection v2, ensemble vision, persistent human-verified learning loop replacing manifests, package restructure, live-testing readiness (code complete 2026-07-15 — verification: human_needed; pending 21-UAT.md + live accuracy gate)
+- [ ] **Phase 22: Production Restructure & Cleanup** — Execute .planning/codebase/RESTRUCTURE-SPEC.md: test-isolation fix (golden exclusion + OUTPUT_DIR tmp isolation), ~1.13GB artifact cleanup against the must-survive checklist, paid-run archival, templates/static under the package, dead JS removal, docs/env drift fixes
 
 ## Phase Details
 
@@ -921,6 +922,30 @@ Context: `.planning/phases/21-accuracy-learning-engine/21-CONTEXT.md`
 | 18. Linked Sheet Resolution | 5/5 | Awaiting UAT | 2026-06-02 |
 | 19. Job History & Run Archive | 0/5 | Planned | — |
 | 20. Takeoff Measurement Precision | 8/8 | Verification gaps | 2026-06-04 |
+
+### Phase 22: Production Restructure & Cleanup
+
+**Goal:** The repo is a professionally structured production app: tests can never spend paid API credits or pollute real output/ by accident, ~1.13 GB of regenerable junk is gone while every paid-run artifact / learning DB / upload / manifest survives, templates+static live inside the package (no parents[3] hack), legacy planning docs are archived, dead frontend code is removed, and README/.env.example match the code.
+
+**Depends on:** Phase 21
+
+**Requirements:** RESTRUCTURE-SPEC.md (authoritative: .planning/codebase/RESTRUCTURE-SPEC.md, synthesized 2026-08-02 from ARCHITECTURE/TEST-AUDIT/CLEANUP-MANIFEST/FRONTEND/CONCERNS/DOCS-AUDIT)
+
+**Success Criteria** (what must be TRUE):
+
+1. `pytest tests/` (bare, no flags) runs zero paid golden tests, and a full suite run leaves zero new dirs/files under real output/ or repo root (MagicMock/ class of bug eliminated)
+2. output/ contains only the must-survive set (learning.db, stackct.db, report-referenced run dirs + paired screenshots, one archive zip); ≥1 GB reclaimed; web Reports page still renders every kept run including sheet images
+3. uploads/, human_inputs/, reports/, tests/ suite, and all probe/gate scripts are untouched at their current paths
+4. Flask serves templates/static from inside src/bobbytailor/web/ with the parents[3] root hack deleted; login → dashboard → reports → settings click-through works
+5. Master.md/Masterv2.md/design-system live under docs/ archive locations; grep finds no dangling references
+6. README's 4 wrong claims fixed; .env.example documents all 9 missing env vars; offline suite green (≥1132) after every migration step's commit
+7. GitNexus reindexed after moves
+
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 22 to break down)
 
 ---
 *Roadmap created: 2026-05-26*  

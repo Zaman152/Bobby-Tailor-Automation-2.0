@@ -69,6 +69,10 @@ Progress: [█████████░] 88%
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 22 added (2026-08-02): Production Restructure & Cleanup — executes .planning/codebase/RESTRUCTURE-SPEC.md (full-repo audit by 6 parallel mappers + synthesis); precedes the production-hardening/accuracy revamp program
+
 ### Decisions
 
 From PROJECT.md Key Decisions (roadmap-relevant):
