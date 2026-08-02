@@ -57,7 +57,7 @@ reader; it crash-fails at startup when a required variable is missing.
 | `CLAUDE_MODEL_SCHEDULES` | `CLAUDE_MODEL` | Schedule count/measure passes |
 | `CLAUDE_MODEL_SEMANTIC` | `claude-sonnet-5` | Semantic labeling (rooms/symbols/legends) |
 | `CLAUDE_MODEL_DENSE` | `claude-opus-4-8` | Dense legend/schedule structuring |
-| `CLAUDE_MODEL_CLASSIFY` | `CLAUDE_MODEL` | Sheet-type classification |
+| `CLAUDE_MODEL_CLASSIFY` | `claude-haiku-4-5` | Sheet-type classification |
 | `CLAUDE_MODEL_ESCALATION` | `claude-fable-5` | Escalation (only when `ESCALATION_ENABLED=true`) |
 
 ### Learning store

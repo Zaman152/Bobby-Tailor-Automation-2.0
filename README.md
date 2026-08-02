@@ -47,7 +47,8 @@ src/bobbytailor/
 │                        object_manifest (NEVER used by the production path)
 └── web/                 Flask: app factory (create_app), blueprints/ (auth,
                          projects, runs, reports, verify, settings, jobs),
-                         jobs_runtime, auth, settings, seed_admin
+                         jobs_runtime, auth, settings, seed_admin, plus the
+                         package-local templates/ and static/ UI assets
 ```
 
 Import style is absolute package paths everywhere
@@ -106,7 +107,7 @@ Production deployment on Hostinger VPS or similar Ubuntu hosts.
 ### System requirements
 
 - Ubuntu 20.04+ or Debian 11+
-- Python 3.10+
+- Python 3.9+ (`pyproject.toml` declares `requires-python = ">=3.9"`)
 - 2 GB RAM minimum (4 GB recommended for concurrent jobs)
 - Chromium system dependencies via Playwright
 
@@ -139,7 +140,7 @@ mkdir -p uploads output output/screenshots
 | `STACKCT_PASSWORD` | StackCT login password | (required) |
 | `ANTHROPIC_API_KEY` | Anthropic API key (`sk-ant-...`) | (required) |
 | `CLAUDE_MODEL` | Model for general drawings | `claude-haiku-4-5` |
-| `CLAUDE_MODEL_SCHEDULES` | Model for schedule/panel sheets | `claude-sonnet-4-6` |
+| `CLAUDE_MODEL_SCHEDULES` | Model for schedule/panel sheets | falls back to `CLAUDE_MODEL` |
 | `HEADLESS` | Run browser headless | `true` |
 | `OUTPUT_DIR` | Report output directory | `./output` |
 | `CANVAS_STABILITY_TIMEOUT` | Max seconds waiting for canvas render | `15` |
@@ -153,7 +154,7 @@ mkdir -p uploads output output/screenshots
 | `CLAUDE_MODEL_SEMANTIC` | Model for semantic labeling passes | `claude-sonnet-5` |
 | `CLAUDE_MODEL_DENSE` | Model for dense legend/schedule structuring | `claude-opus-4-8` |
 | `CLAUDE_MODEL_ESCALATION` | Escalation model (`ESCALATION_ENABLED=true`) | `claude-fable-5` |
-| `CLAUDE_MODEL_CLASSIFY` | Model for sheet classification | `CLAUDE_MODEL` |
+| `CLAUDE_MODEL_CLASSIFY` | Model for sheet classification | `claude-haiku-4-5` |
 
 See `.env.example` for the full list and comments, and
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the complete deployment guide
@@ -529,8 +530,18 @@ re-analyze with a new Claude model.
 { "job_id": "a1b2c3d4" }
 ```
 
-**Job object** (`GET /api/jobs/<job_id>`):
-- `mode_detail`: `"full"` or `"analyze_only"` — indicates which mode ran.
+**Job routes.** There is no single-job GET on `/api/jobs/`. The real routes are:
+
+| Route | Returns |
+|-------|---------|
+| `GET /api/status/<job_id>` | Live progress for an in-memory (running/just-finished) job |
+| `GET /api/jobs/active` | The currently running job, if any (sidebar mini-card) |
+| `GET /api/jobs/history` | Paginated list of completed runs (`limit`, `offset`, `outcome`) |
+| `GET /api/jobs/history/<job_id>` | Full detail for one completed run, including log tail |
+
+The persisted history records (`/api/jobs/history` and
+`/api/jobs/history/<job_id>`) include `mode_detail`: `"full"` or
+`"analyze_only"` — indicating which mode ran.
 
 ---
 
@@ -553,8 +564,13 @@ app.py                     Gunicorn/Flask entry (app:app) — 5-line wrapper ove
                            bobbytailor.web.app.create_app()
 main.py                    CLI entry point (StackCT scrape runs)
 src/bobbytailor/           The application package — see "Package layout" above
-templates/, static/        Web UI assets (resolved from repo root by create_app)
+src/bobbytailor/web/templates/, .../static/
+                           Web UI assets — package-local, resolved by Flask's
+                           default `app.root_path` (no repo-root reach-up)
+docs/design/               Design-system contract (bobby-tailor/MASTER.md)
+docs/archive/              Archived legacy planning docs (Master.md, Masterv2.md)
 scripts/                   Dev/CI tools: accuracy_gate.sh, vision_only_benchmark.py
+scripts/archive/           Retired StackCT-era diagnostics (best-effort)
 ```
 
 ## How it works
@@ -680,5 +696,13 @@ A bare `pytest` excludes the paid golden regression tests by default (`pytest.in
 
 ## Cost
 
-With Haiku (default) + prompt caching, a 30-page project runs ~$0.05.
-Set `CLAUDE_MODEL=claude-sonnet-4-6` in `.env` for richer table extraction at ~3× cost.
+> **Stale figure — pre-Phase-21.** The ~$0.05/run number below was measured
+> before the Phase 21 accuracy work (model routing v2, N-run ensemble voting,
+> verify-retry, tiled counting). Real per-run cost is now materially higher and
+> depends on `TAKEOFF_ACCURACY_MODE`, `ENSEMBLE_N`, and sheet mix. Use
+> `API_BUDGET_PER_RUN_USD` (default `10.0`) as the authoritative per-run cap and
+> read the `api_cost` field in `takeoff.json` for the actual spend. This section
+> is scheduled for re-measurement.
+
+With Haiku (default) + prompt caching, a 30-page project ran ~$0.05 (pre-Phase-21).
+Set `CLAUDE_MODEL=claude-sonnet-5` in `.env` for richer table extraction at higher cost.
