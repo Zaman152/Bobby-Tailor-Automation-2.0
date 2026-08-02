@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: milestone
-current_phase: 21
-current_phase_name: Accuracy & Learning Engine v3
+current_phase: 22
+current_phase_name: production-restructure-cleanup
 status: executing
 stopped_at: 21-18 Tasks 1-2 complete (shim-free package + live-testing docs); PENDING Task 3 human checkpoint (21-UAT.md sign-off)
-last_updated: "2026-07-14T20:39:56.302Z"
-last_activity: 2026-07-14
-last_activity_desc: "Completed 21-18 Tasks 1-2: import migration to bobbytailor package paths, 33 root shims deleted, README/DEPLOYMENT docs, 21-UAT.md (V3-STRUCT-01, V3-PROD-02)"
+last_updated: "2026-08-02T18:42:32.819Z"
+last_activity: 2026-08-02
+last_activity_desc: Phase 22 execution started
 progress:
-  total_phases: 22
-  completed_phases: 17
-  total_plans: 100
-  completed_plans: 92
-  percent: 77
+  total_phases: 23
+  completed_phases: 18
+  total_plans: 104
+  completed_plans: 94
+  percent: 78
 ---
 
 # Project State
@@ -25,14 +25,14 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 21 — Accuracy & Learning Engine (v3) planned (18 plans, 10 waves, verified); plans-only 100%-accuracy mandate: vector-geometry-first measurement, zero-calibration scale, ensemble voting, cross-run learning store, package restructure
+**Current focus:** Phase 22 — production-restructure-cleanup
 
 ## Current Position
 
-Phase: 21 of 21 (Accuracy & Learning Engine v3) — In progress  
-Plan: 18/18 code complete (21-01 … 21-18)  
-Status: Code complete + reviewed (10/10 findings fixed) — verification human_needed; awaiting /gsd-verify-work 21 (UAT + live accuracy gate)
-Last activity: 2026-07-14 — Completed 21-18 Tasks 1-2: import migration, shim deletion, live-testing docs + UAT script (V3-STRUCT-01, V3-PROD-02)
+Phase: 22 (production-restructure-cleanup) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-08-02 — Phase 22 execution started
 
 Progress: [█████████░] 88%
 
@@ -66,6 +66,7 @@ Progress: [█████████░] 88%
 | Phase 21-accuracy-learning-engine P16 | 38 min | 3 tasks | 8 files |
 | Phase 21-accuracy-learning-engine P17 | 20 min | 2 tasks | 3 files |
 | Phase 21-accuracy-learning-engine P18 | 36 min | 2 tasks | 113 files |
+| Phase 22 P01 | 17min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -207,6 +208,8 @@ From 14-04 (Two-Step Plan Selection UI):
 - [Phase 21-18]: Shim deletion executed migration-first: all src/tests/scripts imports moved to absolute bobbytailor paths and proven green (833 tests) BEFORE deleting the 33 root shims; root app.py is a 5-line create_app() gunicorn entry
 - [Phase 21-18]: Parity/takeoff-pipeline spec-load mocks are scoped (temp-alias sys.modules key + restore) and conftest pre-imports all stub-targeted real modules — fixes the 21-08/21-16 test-order pollution class (previously-failing forced orders now pass)
 - [Phase 21-18]: 21-UAT.md documents Crow main-plan scale expectation as 1 in = 40 ft per the 21-07 geometric proof (roadmap's ~20 fpi text is the stale research figure)
+- [Phase 22]: 22-01: Step 1d (blueprint-parity uploads isolation) deferred — UPLOADS_DIR override in create_app is a behavior change; goes to SPEC §7 CWD-relative anchoring
+- [Phase 22]: 22-01: OUTPUT_DIR/SCREENSHOTS_DIR test isolation via conftest config module-attribute patch — env pins are defeated by config.py load_dotenv(override=True) with .env defining OUTPUT_DIR
 
 ### Pending Todos
 
@@ -350,6 +353,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-14T20:39:40.403Z
+Last session: 2026-08-02T18:41:47.200Z
 Stopped at: Completed 21-16-PLAN.md — learning retrieval & injection + anti-amplification guardrail
 Resume file: None
