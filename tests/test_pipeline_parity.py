@@ -55,6 +55,9 @@ _CONFIG.CLAUDE_MODEL = "claude-haiku-4-5"
 _CONFIG.CLAUDE_MODEL_SCHEDULES = "claude-sonnet-4-5"
 _CONFIG.ANTHROPIC_API_KEY = "test-key"
 _CONFIG.SCREENSHOTS_DIR = "/tmp/test_screens"
+# Phase 22 (Step 1c): OUTPUT_DIR was left a child mock — a solo run could
+# os.fspath it into a literal "MagicMock/..." repo-root dir. Explicit string.
+_CONFIG.OUTPUT_DIR = "/tmp/test_screens_out"
 _CONFIG.REUSE_SCREENSHOTS = False
 _CONFIG.AUTO_INCLUDE_LINKED_SHEETS = False
 _CONFIG.MAX_LINKED_SHEETS = 0

@@ -64,6 +64,32 @@ os.environ.setdefault("CLAUDE_MODEL_CLASSIFY", "claude-haiku-4-5-classify")
 os.environ.setdefault("ENSEMBLE_N", "3")
 os.environ.setdefault("API_BUDGET_PER_RUN_USD", "10.0")
 
+# Phase 22 (Step 1b): isolate ALL session output writes away from the real repo
+# output/ tree. An env pin does NOT work here — config.py:10 calls
+# load_dotenv(dotenv_path=..., override=True) at import time and .env defines
+# OUTPUT_DIR, so override=True clobbers any os.environ.setdefault made in this
+# file. The working mechanism (proven in test_blueprint_parity.py:162-165) is a
+# module-attribute patch: import config, then overwrite the attributes
+# directly. SCREENSHOTS_DIR must ALSO be attr-patched — config.py:74 derives it
+# from OUTPUT_DIR at import time and it is not env-driven.
+#
+# Placement matters: this block runs BEFORE the _ensure_real pre-import loop
+# below, so bobbytailor.pipeline.reporter (imported there) captures the tmp
+# values by-value via `from ...config import OUTPUT_DIR`; pdf_analyzer is
+# imported lazily by the first test that needs it — always after conftest
+# finishes. The import is wrapped like _ensure_real because config crash-fails
+# on missing env vars in bare CI environments (no .env) — the stub configs in
+# the parity tests fill that gap and now carry explicit tmp-path dir attrs.
+_TEST_OUTPUT_DIR = tempfile.mkdtemp(prefix="bt-test-output-")
+try:
+    import bobbytailor.config as _config
+
+    _config.OUTPUT_DIR = _TEST_OUTPUT_DIR
+    _config.SCREENSHOTS_DIR = os.path.join(_TEST_OUTPUT_DIR, "screenshots")
+except Exception:
+    # config unavailable (missing required env vars) — parity stubs take over.
+    pass
+
 
 def _ensure_real(name: str) -> None:
     """Import *name* into sys.modules if it is not already registered.

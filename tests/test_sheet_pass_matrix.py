@@ -31,6 +31,11 @@ _CONFIG_MOCK.CLAUDE_MODEL_SEMANTIC = "claude-sonnet-5"
 _CONFIG_MOCK.CLAUDE_MODEL_DENSE = "claude-opus-4-8"
 _CONFIG_MOCK.CLAUDE_MODEL_ESCALATION = "claude-fable-5"
 _CONFIG_MOCK.CLAUDE_MODEL_CLASSIFY = "claude-haiku-4-5-classify"
+# Phase 22 (Step 1c): explicit tmp-path strings on every dir attribute so a
+# SOLO run of this file never produces a literal "MagicMock/..." dir at the
+# repo root via os.fspath on a child mock.
+_CONFIG_MOCK.OUTPUT_DIR = "/tmp/bt-spm-out"
+_CONFIG_MOCK.SCREENSHOTS_DIR = "/tmp/bt-spm-out/screenshots"
 
 _CA_MOCK = MagicMock()
 _CA_MOCK._pick_model.return_value = "claude-haiku-4-5"

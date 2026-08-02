@@ -676,6 +676,8 @@ python3 scripts/golden_convergence.py
 pytest -v
 ```
 
+A bare `pytest` excludes the paid golden regression tests by default (`pytest.ini` sets `addopts = -m "not golden"`); opt in explicitly with `pytest -m golden`.
+
 ## Cost
 
 With Haiku (default) + prompt caching, a 30-page project runs ~$0.05.

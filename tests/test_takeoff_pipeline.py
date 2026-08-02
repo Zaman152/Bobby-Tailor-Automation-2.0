@@ -28,6 +28,12 @@ _CONFIG_MOCK = MagicMock()
 _CONFIG_MOCK.CLAUDE_MODEL = "claude-haiku-4-5"
 _CONFIG_MOCK.CLAUDE_MODEL_SCHEDULES = "claude-sonnet-4-5"
 _CONFIG_MOCK.ANTHROPIC_API_KEY = "test-key"
+# Phase 22 (Step 1c): explicit tmp-path strings on every dir attribute so a
+# SOLO run of this file (bare stub wins the import race) never yields
+# os.fspath(mock.SCREENSHOTS_DIR) == literal "MagicMock/..." that
+# pdf_analyzer then mkdir -p's at the repo root.
+_CONFIG_MOCK.OUTPUT_DIR = "/tmp/bt-tp-out"
+_CONFIG_MOCK.SCREENSHOTS_DIR = "/tmp/bt-tp-out/screenshots"
 
 sys.modules.setdefault("bobbytailor.config", _CONFIG_MOCK)
 sys.modules.setdefault("anthropic", MagicMock())
