@@ -982,7 +982,7 @@ Plans:
 
 Plans are listed in EXECUTION order; the wave in each plan's frontmatter is authoritative.
 
-- [ ] 23-01-PLAN.md — Coverage ledger + provenance + verbose classifier + skip veto + coverage probe (wave 1, SP-8)
+- [x] 23-01-PLAN.md — Coverage ledger + provenance + verbose classifier + skip veto + coverage probe (wave 1, SP-8)
 - [ ] 23-02-PLAN.md — Printed-scale parser hardening: anchored paper-inch parse, split stacked fractions (wave 1, SP-2)
 - [ ] 23-03-PLAN.md — Flagged-zero contract: quantity Optional, drop records, flag-don't-drop selector (wave 2, SP-8)
 - [ ] 23-17-PLAN.md — Report surfacing: coverage.json, COVERAGE section, CSV provenance, workbook sheet (wave 2, SP-8)
