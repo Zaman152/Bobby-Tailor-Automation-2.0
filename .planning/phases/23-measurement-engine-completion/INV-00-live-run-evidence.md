@@ -80,6 +80,73 @@ Every fill carries `plan_name`, `plan_kind` (AR/FF/RCP/FC/EM), `scale_fpi=4.0`, 
    drawing's own extent (its border linework or the midpoint to the neighbouring callout), not to
    shrink the constants — shrinking them is the overfit §14.2 explicitly forbids.
 
+### 1c. THE ROOT CAUSE — the title-block window silently deletes 16 of Moxy's 40 sheets
+
+Traced end to end. `run_sheet` (takeoff_pipeline.py:1213) classifies via
+`classify_sheet_type_from_text(title_block_text, full_page_text)`; `plan_passes` returns `[]` for
+`title_sheet`, and an empty pass list means **skip the sheet entirely — zero API, zero geometry**
+(takeoff_pipeline.py:1220-1228). The title-block text comes from
+`pdf_analyzer.get_title_block_text` (pdf_analyzer.py:165-180), which assumes ANSI/ASME Y14.1 and
+takes the bottom-right quadrant:
+
+```python
+w[1] > height * 0.80 and w[0] > width * 0.55     # pdf_analyzer.py:178
+```
+
+Run pipeline-accurately over all 40 Moxy sheets: **18 sheets get `passes=0`, including every one of
+p23–p38 — all 16 guestroom prototypes**, i.e. every sheet that holds a guestroom quantity.
+
+The title block IS in the bottom-right (on p27 `ID-411` sits at 94% W / 96% H). The defect is that
+`x > 55%` of a **3024 pt** wide sheet is far too wide: it swallows the adjacent keynote column, and
+84 words of electrical prose drown the handful of title words. Proven by narrowing only the x bound
+on the same page:
+
+| window | chars | text | classify |
+|---|---|---|---|
+| `x>55%W` (current) | 497 | `BED. COORDINATE LOCATION OF OUTLET WITH RECESS CUTOUT...` | **`title_sheet`** → SKIPPED |
+| `x>88%W` | 115 | `SHEET NO. JOB NO. DATE SHEET TITLE PHASE A KING SUITE B GUESTROOM ID-411` | **`floor_plan`** → processed |
+
+`'KING SUITE'` and `'ID-411'` are present in BOTH strings — the classifier is not failing to see the
+title, it is being outvoted by prose. That makes this a signal-to-noise defect, not a keyword defect,
+so the §12 whole-word fix could not have caught it.
+
+**This single constant explains the entire Moxy failure**: the sheets are discarded before geometry,
+so `_measure_room_fills` never runs on them, so no `room_fills` reach fusion, so `room_mix` has
+nothing to multiply, so every measured item is 0 — while `_measure_room_fills` called directly on the
+same pages returns correct areas (§1b).
+
+### 1d. DO NOT fix it by changing the constant — proven regression
+
+Sweeping the x-fraction across all four real plan sets:
+
+| Plan set | skipped @ `x>55%` (current) | skipped @ `x>88%` |
+|---|---|---|
+| Moxy (40pp) | **18** | **2** — floor_plan 11 → 26 |
+| Crow (4pp) | 0 | 0 (unchanged) |
+| Bob's (7pp) | 1 | 1 (unchanged) |
+| **Chelsea (32pp)** | **2** | **10** — floor_plan 9 → 1, roof_plan 5 → 1 |
+
+Retuning 0.55 → 0.88 fixes Moxy and **breaks Chelsea**, discarding 8 more sheets including nearly
+every floor plan. This is the documented fixture-blindness trap: a constant tuned on one CAD template
+silently destroys another. **Any Phase 23 plan that changes this number is wrong.**
+
+**The principled fix** — identify the title block by its own STRUCTURE, not by a fixed fraction of
+the page. The winning window on Moxy contains the field labels `SHEET NO.`, `JOB NO.`, `DATE`,
+`SHEET TITLE`, `PHASE`; a title block is reliably identifiable by carrying such labels (and/or the
+sheet-ID pattern), whereas keynote prose is long-form sentences. Candidate approaches, cheapest first:
+search progressively narrower bottom-right windows and keep the first whose text looks like a title
+block (label-dense, low average sentence length) rather than prose; or locate the sheet-ID token and
+take its enclosing ruled box; or drop long prose runs from the extracted text before classifying.
+
+**Mandatory acceptance criterion for the fix (all four sets, one command):** Moxy skipped drops to
+≈2 AND Crow (0), Bob's (1), Chelsea (2) do **not** increase. Anything that improves one set while
+regressing another is rejected. This check is free — no API — and must be part of the test suite so
+the regression can never recur.
+
+**Second-order finding (feeds INV-08):** a sheet carrying five measurable room fills was silently
+discarded with only `logger.info`. Any sheet skip must appear in the run's coverage ledger as an
+explicit, reviewable decision — this defect was invisible in every report the project produced.
+
 Reproduce with:
 
 ```python
