@@ -978,13 +978,14 @@ Plans:
 6. Door schedules parse across at least the Crow, Bob's, and Moxy formats
 7. Any sheet that produces zero measurable geometry emits an explicit coverage flag — a blank is never reported as a zero
 
-**Plans:** 16 plans (9 waves)
+**Plans:** 17 plans (9 waves)
 
-Plans:
+Plans are listed in EXECUTION order; the wave in each plan's frontmatter is authoritative.
 
 - [ ] 23-01-PLAN.md — Coverage ledger + provenance + verbose classifier + skip veto + coverage probe (wave 1, SP-8)
 - [ ] 23-02-PLAN.md — Printed-scale parser hardening: anchored paper-inch parse, split stacked fractions (wave 1, SP-2)
-- [ ] 23-03-PLAN.md — Flagged-zero contract: quantity Optional, drop records, coverage.json + COVERAGE section (wave 2, SP-8)
+- [ ] 23-03-PLAN.md — Flagged-zero contract: quantity Optional, drop records, flag-don't-drop selector (wave 2, SP-8)
+- [ ] 23-17-PLAN.md — Report surfacing: coverage.json, COVERAGE section, CSV provenance, workbook sheet (wave 2, SP-8)
 - [ ] 23-04-PLAN.md — Door-schedule unification: phrase materials, count column, legend guard, canonical names (wave 2, gap 7)
 - [ ] 23-05-PLAN.md — Tag-pairing primitives: tag_pairing / finish_tags / room_tags (wave 2, SP-6)
 - [ ] 23-06-PLAN.md — Structural title-block identification + keyword-context guard, four-set gated (wave 2)
