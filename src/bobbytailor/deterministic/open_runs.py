@@ -797,3 +797,481 @@ def run_lf(runs: Sequence[OpenRun], feet_per_point: float) -> float:
     if not feet_per_point or feet_per_point <= 0:
         return 0.0
     return round(sum(r.length_pt for r in runs) * feet_per_point, 2)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SELECTOR 1 — annotated CAD linetypes (INV-04, gap 4)
+#
+# Bob's gas main is drawn on the A3.0 roof plan with the SAME width, colour,
+# dash array (none — the dashing is exploded) and layer (none) as 1,695 other
+# paths. What separates it is the LINETYPE: the line is BROKEN at a regular
+# pitch and each gap holds the word "GAS" rendered as 39 vector micro-strokes
+# the text layer cannot see. The selector below detects that repeating,
+# line-breaking glyph mark — and NOTHING else about the line.
+#
+# The glyph is a GROUPING key, never a name. Template-matching the mark against
+# sheet text was tried and FAILED (the truth ranked 10th of 12 candidates,
+# INV-04 §5), and no OCR exists on this machine. Naming is plan 23-15.
+# ═════════════════════════════════════════════════════════════════════════════
+
+# ── Selector constants — every value records the observation it came from ────
+
+# A micro-stroke takes part in a glyph, never in a line. Observed: the strokes
+# drawing the word "GAS" are < 2.5 pt; the exploded dashes of the line itself
+# are ~3 pt (INV-04 §2/§3 S2). 2.5 sits between the two populations, and the
+# dash floor is the chainer's own MIN_SEG_PT = 3.0, leaving a deliberate
+# no-man's band so one stroke can never be both.
+MICRO_MAX_PT = 2.5
+
+# Micro-strokes whose endpoints sit closer than this are the SAME glyph.
+# Observed: INV-04 §3 S2 (2.0 pt). SHX vector text draws a letter as connected
+# pen strokes; 2.0 pt bridges the pen lifts inside one letter without bridging
+# the ~2 pt gap to the neighbouring letter's strokes being too generous —
+# measured, the GAS word unions into ONE 39-stroke blob per mark.
+MICRO_JOIN_PT = 2.0
+
+# A blob is a candidate glyph mark when its stroke count and bbox span sit in
+# the observed band. Observed: GAS = 39 strokes in a 10 x 4 pt box (INV-04 §2);
+# the band 18..120 and the 24 pt span cap admit other stock annotated linetypes
+# (W, SS, ST, OHE, G) without admitting keynote bubbles or dimension text.
+GLYPH_STROKES_MIN = 18
+GLYPH_STROKES_MAX = 120
+GLYPH_MAX_SPAN_PT = 24.0
+
+# A mark belongs to a line when it sits within this perpendicular distance of
+# it. Observed: INV-04 §3 S6 (9 pt) — the glyph straddles the break, so its
+# centre is ON the line to within half the glyph's own minor span.
+PERP_TOL_PT = 9.0
+
+# Marks are collected inside the merged span extended by this much at each
+# end — the first/last glyph of a run sits one break beyond the last dash.
+# Same value as the merge's own gap tolerance, and for the same physical
+# reason: it is the largest ink gap the linetype produces (INV-04 §3 S6).
+SPAN_PAD_PT = GAP_TOL_PT
+
+# ── The four gates (INV-04 §3 S6 a-d). Do not loosen any of them. ────────────
+
+# (a) A linetype repeats; three identical marks is the observed minimum that
+# cannot be produced by a label pair.
+MIN_MARKS = 3
+
+# (b) The pitch floor and THE DECISIVE RATIO GATE. A linetype's mark pitch is
+# a small multiple of its own glyph span — the mark IS the line's texture. A
+# row of tags SITTING ON a line repeats at the spacing of the tagged objects,
+# far wider than the tag. Observed: the real GAS run's pitch/span ratio is
+# 3.4 (33.7 pt pitch / 10 pt glyph); the Crow "K.O." dock-panel tag row that a
+# naive detector reported as piping is 26.5 (53 pt pitch / 2 pt glyph); the
+# Chelsea three-mark candidates range 8.3-27.0. Six is the widest ratio at
+# which no observed false positive survives (INV-04 §3 iteration table).
+MIN_PITCH_PT = 15.0
+MAX_PITCH_OVER_SPAN = 6.0
+
+# (c) A linetype's pitch is machine-regular; a label row follows the objects
+# it labels. Observed: the GAS pitch CV is ~0.02; rejected candidates measure
+# 0.26-0.92 (INV-04 §3 S6c).
+PITCH_CV_MAX = 0.35
+
+# (d) The line must actually BREAK at the mark: no dash ink under the glyph
+# (within half its span plus a 1 pt pen margin) and dash ink present on BOTH
+# sides within 0.6 x pitch. A tag row drawn ON TOP of an unbroken line fails
+# this even when its pitch is regular. Observed: GAS break_frac = 1.00;
+# candidate rows on Bob's own RCP measure 0.00 (INV-04 §3 S6d).
+BREAK_FRAC_MIN = 0.80
+BREAK_SIDE_FRAC = 0.6
+BREAK_CLEAR_PAD_PT = 1.0
+
+# Ink belongs to a span's own line only when it runs ALONG it. cos(10°): CAD
+# draws the exploded dashes of one line to far better than a degree; anything
+# beyond 10° is crossing linework and must not fill a break.
+ALONG_DIR_MIN = 0.985
+
+# ── Dedupe (S8) ──────────────────────────────────────────────────────────────
+# Near-identical parallel runs of the SAME signature are one line drawn twice
+# (a CAD export artefact), never two pipes 1.5 pt apart. Observed: INV-04 §3
+# S8 (1.5 pt offset, 90% overlap).
+DEDUP_OFFSET_PT = 1.5
+DEDUP_OVERLAP = 0.90
+
+
+def _linetype_gates_pass(
+    mark_count: int,
+    mean_pitch_pt: float,
+    pitch_cv: float,
+    glyph_span_pt: float,
+    break_frac: float,
+) -> bool:
+    """The four S6 gates, in one testable place.
+
+    The rejection fixtures pin this function against the real coincidences the
+    development history caught: the Crow "K.O." dock-panel tag row (34 marks of
+    signature (54, 2, 2) at pitch 53 — ratio 26.5, and the grade line really
+    IS broken at every tag) and the five Chelsea three-mark candidates
+    (pitches 108-237, ratios 8.3-27.0). Loosening any gate here must fail
+    those fixtures before it can ship.
+    """
+    if mark_count < MIN_MARKS:
+        return False
+    if mean_pitch_pt < MIN_PITCH_PT:
+        return False
+    if glyph_span_pt <= 0:
+        return False
+    if mean_pitch_pt > MAX_PITCH_OVER_SPAN * glyph_span_pt:
+        return False
+    if pitch_cv > PITCH_CV_MAX:
+        return False
+    if break_frac < BREAK_FRAC_MIN:
+        return False
+    return True
+
+
+class _DSU:
+    """Union-find over micro-stroke indices — the T-23-46 bounded-work half
+    is the spatial hash in :func:`_glyph_mark_blobs`, which only ever unions
+    endpoints inside a fixed 3x3-cell neighbourhood."""
+
+    __slots__ = ("parent",)
+
+    def __init__(self, n: int) -> None:
+        self.parent = list(range(n))
+
+    def find(self, a: int) -> int:
+        parent = self.parent
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    def union(self, a: int, b: int) -> None:
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[rb] = ra
+
+
+def _glyph_mark_blobs(micro_items: Sequence) -> List[dict]:
+    """S2-S3: union micro-strokes into blobs; keep the glyph-shaped ones.
+
+    Returns ``[{"signature": (strokes, major, minor), "center": (x, y)}]``.
+    The signature is the GROUPING key INV-04 §3 S3 defines — stroke count with
+    the rounded major and minor bbox spans. It is never read as text.
+    """
+    n = len(micro_items)
+    if n == 0:
+        return []
+    dsu = _DSU(n)
+    grid: Dict[Tuple[int, int], List[Tuple[int, float, float]]] = {}
+    for i, s in enumerate(micro_items):
+        for x, y in ((s[0], s[1]), (s[2], s[3])):
+            key = (int(x // MICRO_JOIN_PT), int(y // MICRO_JOIN_PT))
+            grid.setdefault(key, []).append((i, x, y))
+    join_sq = MICRO_JOIN_PT * MICRO_JOIN_PT
+    for (cx, cy), pts in grid.items():
+        neigh: List[Tuple[int, float, float]] = []
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                neigh.extend(grid.get((cx + dx, cy + dy), ()))
+        for i, x, y in pts:
+            for j, x2, y2 in neigh:
+                if j <= i:
+                    continue
+                if (x - x2) ** 2 + (y - y2) ** 2 <= join_sq:
+                    dsu.union(i, j)
+
+    groups: Dict[int, List[int]] = {}
+    for i in range(n):
+        groups.setdefault(dsu.find(i), []).append(i)
+
+    marks: List[dict] = []
+    for idxs in groups.values():
+        count = len(idxs)
+        if not (GLYPH_STROKES_MIN <= count <= GLYPH_STROKES_MAX):
+            continue
+        xs: List[float] = []
+        ys: List[float] = []
+        for i in idxs:
+            s = micro_items[i]
+            xs.extend((s[0], s[2]))
+            ys.extend((s[1], s[3]))
+        w, h = max(xs) - min(xs), max(ys) - min(ys)
+        if max(w, h) > GLYPH_MAX_SPAN_PT:
+            continue
+        marks.append(
+            {
+                "signature": (count, round(max(w, h)), round(min(w, h))),
+                "center": (
+                    (min(xs) + max(xs)) / 2.0,
+                    (min(ys) + max(ys)) / 2.0,
+                ),
+            }
+        )
+    return marks
+
+
+def _span_ink_intervals(span: _Span, dash_items: Sequence) -> List[Tuple[float, float]]:
+    """Projected ink intervals of the dash pieces on *span*'s own line.
+
+    Only pieces within the merge's own offset tolerance of the span line AND
+    running along it count as its ink — crossing linework must not fill a
+    break (S6d).
+    """
+    u = span.direction()
+    nvec = (-u[1], u[0])
+    ox, oy = span.p0
+    out: List[Tuple[float, float]] = []
+    for s in dash_items:
+        mx, my = (s[0] + s[2]) / 2.0, (s[1] + s[3]) / 2.0
+        if abs((mx - ox) * nvec[0] + (my - oy) * nvec[1]) > OFFSET_TOL_PT:
+            continue
+        length = s[4] if len(s) > 4 else _dist((s[0], s[1]), (s[2], s[3]))
+        if length <= _EPS:
+            continue
+        along = abs((s[2] - s[0]) * u[0] + (s[3] - s[1]) * u[1])
+        if along / length < ALONG_DIR_MIN:
+            continue
+        t0 = (s[0] - ox) * u[0] + (s[1] - oy) * u[1]
+        t1 = (s[2] - ox) * u[0] + (s[3] - oy) * u[1]
+        if t1 < t0:
+            t0, t1 = t1, t0
+        out.append((t0, t1))
+    out.sort()
+    return out
+
+
+def _has_ink(intervals: Sequence[Tuple[float, float]], lo: float, hi: float) -> bool:
+    for a, b in intervals:
+        if b < lo:
+            continue
+        return a <= hi
+    return False
+
+
+def extract_linetype_runs(
+    page,
+    doc,
+    clip_pt: Sequence[float],
+    exclude_rects: Optional[Sequence] = None,
+) -> List[OpenRun]:
+    """Detect annotated-linetype runs inside ``clip_pt``. Never raises.
+
+    INV-04 §3 steps S1-S9 on the shared chainer core: the styled harvest is
+    S1, :func:`_merge_collinear` is S4-S5, :func:`clamp_run` is S7 and
+    :func:`_absorb_stubs` is S9. Only the glyph blobs (S2-S3), the four gates
+    (S6) and the parallel dedupe (S8) are selector-specific.
+
+    Lengths come back in POINTS. Scale binding is :func:`run_scale_fpp` — a
+    run is measured at the scale of the drawing that contains it or not at
+    all, never at a borrowed page scale.
+    """
+    if not clip_pt or len(tuple(clip_pt)) != 4:
+        logger.warning("Linetype detection requires a clip rect; skipping")
+        return []
+    clip = tuple(float(c) for c in clip_pt)
+    clip = (
+        min(clip[0], clip[2]),
+        min(clip[1], clip[3]),
+        max(clip[0], clip[2]),
+        max(clip[1], clip[3]),
+    )
+
+    try:
+        styled, _curves, _s_len, _c_len = _harvest_styled(
+            page, doc, exclude_rects, max_segments=MAX_SEGMENTS
+        )
+        inside = [
+            s for s in styled if _mid_in_clip(s[0], s[1], s[2], s[3], clip)
+        ]
+        if not inside:
+            return []
+
+        # S1-S3 — micro-strokes to signed glyph marks.
+        micro = [s for s in inside if s[4] < MICRO_MAX_PT]
+        marks = _glyph_mark_blobs(micro)
+        if not marks:
+            return []
+        sig_census: Dict[tuple, int] = {}
+        for m in marks:
+            sig_census[m["signature"]] = sig_census.get(m["signature"], 0) + 1
+        live = {sig for sig, cnt in sig_census.items() if cnt >= MIN_MARKS}
+        marks = [m for m in marks if m["signature"] in live]
+        if not marks:
+            return []
+
+        # S4-S5 — the chainer core's own collinear merge.
+        dashes = [s for s in inside if s[4] >= MIN_SEG_PT]
+        spans = _merge_collinear(dashes)
+
+        # S6 — the four gates, per (span, signature).
+        accepted: List[dict] = []
+        for span in spans:
+            if span.length < 2 * MIN_PITCH_PT:
+                continue
+            u = span.direction()
+            nvec = (-u[1], u[0])
+            ox, oy = span.p0
+            by_sig: Dict[tuple, List[Tuple[float, dict]]] = {}
+            for m in marks:
+                dx, dy = m["center"][0] - ox, m["center"][1] - oy
+                if abs(dx * nvec[0] + dy * nvec[1]) > PERP_TOL_PT:
+                    continue
+                t = dx * u[0] + dy * u[1]
+                if t < -SPAN_PAD_PT or t > span.length + SPAN_PAD_PT:
+                    continue
+                by_sig.setdefault(m["signature"], []).append((t, m))
+
+            ink: Optional[List[Tuple[float, float]]] = None
+            for sig, t_marks in by_sig.items():
+                if len(t_marks) < MIN_MARKS:
+                    continue
+                t_marks.sort(key=lambda r: r[0])
+                ts = [t for t, _m in t_marks]
+                pitches = [b - a for a, b in zip(ts, ts[1:])]
+                mean_pitch = sum(pitches) / len(pitches)
+                if mean_pitch <= _EPS:
+                    continue
+                var = sum((p - mean_pitch) ** 2 for p in pitches) / len(pitches)
+                pitch_cv = math.sqrt(var) / mean_pitch
+                glyph_span = float(sig[1])
+
+                # S6d needs the span's own ink layout; computed lazily, once.
+                if ink is None:
+                    ink = _span_ink_intervals(span, dashes)
+                half = glyph_span / 2.0 + BREAK_CLEAR_PAD_PT
+                side = BREAK_SIDE_FRAC * mean_pitch
+                broken = 0
+                for t in ts:
+                    under = _has_ink(ink, t - half, t + half)
+                    left = _has_ink(ink, t - side, t - half)
+                    right = _has_ink(ink, t + half, t + side)
+                    if (not under) and left and right:
+                        broken += 1
+                break_frac = broken / float(len(ts))
+
+                if not _linetype_gates_pass(
+                    len(ts), mean_pitch, pitch_cv, glyph_span, break_frac
+                ):
+                    continue
+                accepted.append(
+                    {
+                        "span": span,
+                        "signature": sig,
+                        "ts": ts,
+                        "centers": [m["center"] for _t, m in t_marks],
+                        "pitch": mean_pitch,
+                        "cv": pitch_cv,
+                        "break_frac": break_frac,
+                    }
+                )
+
+        if not accepted:
+            return []
+
+        # S7 — clamp to the marks plus one pitch, inside the merged span.
+        candidates: List[Tuple[dict, OpenRun]] = []
+        for rec in accepted:
+            span = rec["span"]
+            base = OpenRun(
+                polyline_pt=(span.p0, span.p1),
+                length_pt=span.length,
+                ink_pt=span.ink,
+            )
+            lo = max(0.0, rec["ts"][0] - rec["pitch"])
+            hi = min(span.length, rec["ts"][-1] + rec["pitch"])
+            run = clamp_run(base, lo, hi)
+            if run.length_pt <= _EPS:
+                continue
+            run.mark_signature = rec["signature"]
+            run.mark_stats = {
+                "mark_count": len(rec["ts"]),
+                "pitch_pt": round(rec["pitch"], 2),
+                "pitch_cv": round(rec["cv"], 4),
+                "break_frac": round(rec["break_frac"], 4),
+                "glyph_span_pt": float(rec["signature"][1]),
+                "mark_centers": [
+                    (round(x, 1), round(y, 1)) for x, y in rec["centers"]
+                ],
+            }
+            candidates.append((rec, run))
+
+        # S8 — dedupe near-identical parallel runs of the same signature.
+        candidates.sort(key=lambda cr: (-cr[1].length_pt, cr[1].polyline_pt))
+        kept: List[Tuple[dict, OpenRun]] = []
+        for rec, run in candidates:
+            span = rec["span"]
+            duplicate = False
+            for krec, krun in kept:
+                if krec["signature"] != rec["signature"]:
+                    continue
+                if krec["span"].angle_bin != span.angle_bin:
+                    continue
+                if abs(krec["span"].offset - span.offset) >= DEDUP_OFFSET_PT:
+                    continue
+                u = krec["span"].direction()
+                ox, oy = krun.polyline_pt[0]
+                a0, a1 = 0.0, krun.length_pt
+                b0 = (run.polyline_pt[0][0] - ox) * u[0] + (
+                    run.polyline_pt[0][1] - oy
+                ) * u[1]
+                b1 = (run.polyline_pt[-1][0] - ox) * u[0] + (
+                    run.polyline_pt[-1][1] - oy
+                ) * u[1]
+                if b1 < b0:
+                    b0, b1 = b1, b0
+                overlap = min(a1, b1) - max(a0, b0)
+                shorter = min(a1 - a0, b1 - b0)
+                if shorter > _EPS and overlap / shorter > DEDUP_OVERLAP:
+                    duplicate = True
+                    break
+            if not duplicate:
+                kept.append((rec, run))
+
+        # S9 — ONE-hop stub closure through the core's own absorber. Stub
+        # candidates are the leftover merged spans in the chainer's own stub
+        # band; the runs are the hosts. The absorber's endpoint grid is built
+        # once, so a stub's far end can never anchor a second hop — hop two
+        # demonstrably starts absorbing leader arrowheads (INV-04 §4), which
+        # is why the residual against the estimator is ACCEPTED, not chased.
+        used_spans = {id(rec["span"]) for rec, _run in kept}
+        chains: List[dict] = []
+        for rec, run in kept:
+            chains.append(
+                {
+                    "pts": list(run.polyline_pt),
+                    "ink": run.ink_pt,
+                    "paired": False,
+                    "count": 1,
+                    "_run": run,
+                }
+            )
+        for span in spans:
+            if id(span) in used_spans:
+                continue
+            if MIN_SEG_PT <= span.length <= STUB_MAX_PT:
+                chains.append(
+                    {
+                        "pts": [span.p0, span.p1],
+                        "ink": span.ink,
+                        "paired": False,
+                        "count": 1,
+                    }
+                )
+        merged = _absorb_stubs(chains)
+
+        runs: List[OpenRun] = []
+        for chain in merged:
+            run = chain.get("_run")
+            if run is None:
+                continue
+            pts = tuple(chain["pts"])
+            length = _polyline_len(pts)
+            runs.append(
+                _replace_polyline(
+                    run, pts, length, ink=min(chain["ink"], length)
+                )
+            )
+
+        runs.sort(key=lambda r: (-r.length_pt, r.polyline_pt))
+        for rank, run in enumerate(runs, start=1):
+            run.candidate_id = "RUN-%d" % rank
+        return runs
+    except Exception as exc:  # noqa: BLE001 — untrusted PDF must not crash
+        logger.warning("Linetype run detection failed: %s", exc)
+        return []

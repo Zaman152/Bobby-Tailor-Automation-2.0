@@ -16,12 +16,15 @@ import pytest
 from bobbytailor.deterministic.open_runs import (
     CONTINUITY_DEG,
     GAP_TOL_PT,
+    MAX_PITCH_OVER_SPAN,
     MIN_INK_FRACTION,
     PAIR_OFFSET_MAX_FT,
     STUB_HOPS,
     STUB_MAX_PT,
     OpenRun,
+    _linetype_gates_pass,
     clamp_run,
+    extract_linetype_runs,
     extract_open_runs,
     run_lf,
 )
@@ -34,6 +37,15 @@ PAGE = (0.0, 0.0, 600.0, 600.0)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 CROW_PDF = FIXTURES / "crow_cass" / "crow_cass_plans.pdf"
+BOBS_PDF = FIXTURES / "bobs_discount" / "bobs_discount_plans.pdf"
+BOBS_TAKEOFF = FIXTURES / "bobs_discount" / "bobs_discount_takeoff.pdf"
+
+# Chelsea and Moxy carry no committed fixture; the zero-false-positive sweep
+# reads the real uploads and skips cleanly when they are absent (the same
+# convention as tests/test_naming_conventions.py).
+UPLOADS = Path(__file__).parent.parent / "uploads"
+CHELSEA_UPLOAD = UPLOADS / "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf"
+MOXY_UPLOAD = UPLOADS / "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf"
 
 
 def _page(draw):
@@ -489,3 +501,299 @@ def test_the_wall_length_floor_is_not_applied_to_open_runs():
     runs = _runs(draw, min_run_ft=1.0)
     assert len(runs) == 1
     assert runs[0].length_pt == pytest.approx(224.0, abs=0.1)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SELECTOR 1 — annotated linetypes (INV-04)
+#
+# Detection is validated by POSITION against the estimator's own traced markup
+# and by SET (zero false positives across every page of the other three plan
+# sets). No assertion anywhere in this section is made against a golden
+# linear-foot quantity — the LF band assertion lives with run_scale_fpp,
+# because it depends on the scale being right.
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+def _draw_glyph_mark(page, cx, cy, strokes=24, w=10.0, h=1.5):
+    """A synthetic SHX-style glyph: *strokes* micro-strokes in a w x h box."""
+    for i in range(strokes):
+        x = cx - w / 2.0 + i * (w / (strokes - 1))
+        page.draw_line(fitz.Point(x, cy), fitz.Point(x, cy + h), width=0.3)
+
+
+def test_a_synthetic_annotated_linetype_is_detected():
+    """Dashes broken at a regular pitch by identical glyph marks are ONE run."""
+    mark_xs = [133.0, 166.0, 199.0, 232.0, 265.0]  # pitch 33, glyph span 10
+
+    def draw(page):
+        page.draw_line(fitz.Point(100, 300), fitz.Point(mark_xs[0] - 7, 300), width=0.5)
+        for a, b in zip(mark_xs, mark_xs[1:]):
+            page.draw_line(fitz.Point(a + 7, 300), fitz.Point(b - 7, 300), width=0.5)
+        page.draw_line(fitz.Point(mark_xs[-1] + 7, 300), fitz.Point(298, 300), width=0.5)
+        for x in mark_xs:
+            _draw_glyph_mark(page, x, 299.0)
+
+    doc, page = _page(draw)
+    try:
+        runs = extract_linetype_runs(page, doc, PAGE)
+    finally:
+        doc.close()
+    assert len(runs) == 1
+    run = runs[0]
+    assert run.candidate_id == "RUN-1"
+    assert run.mark_signature is not None
+    assert run.mark_signature[0] == 24  # stroke count is the grouping key
+    stats = run.mark_stats
+    assert stats["mark_count"] == 5
+    assert stats["pitch_pt"] == pytest.approx(33.0, abs=0.5)
+    assert stats["break_frac"] == 1.0
+    # Span, not ink: the run is the full merged line, breaks included.
+    assert run.length_pt == pytest.approx(198.0, abs=1.0)
+
+
+def test_a_row_of_tags_on_an_unbroken_line_is_rejected():
+    """Same marks, but the line runs CONTINUOUSLY beneath them: not a linetype.
+
+    The break-fraction gate (S6d) is what fails here — a glyph drawn ON TOP of
+    a line is a label, not the line's own texture.
+    """
+    mark_xs = [133.0, 166.0, 199.0, 232.0, 265.0]
+
+    def draw(page):
+        page.draw_line(fitz.Point(100, 300), fitz.Point(298, 300), width=0.5)
+        for x in mark_xs:
+            _draw_glyph_mark(page, x, 299.0)
+
+    doc, page = _page(draw)
+    try:
+        runs = extract_linetype_runs(page, doc, PAGE)
+    finally:
+        doc.close()
+    assert runs == []
+
+
+def test_evenly_spaced_tags_with_pitch_far_wider_than_the_glyph_are_rejected():
+    """The coincidence trap, synthesised: the line genuinely breaks at every
+    tag and the pitch is machine-regular — break_frac 1.0, cv 0.0 — and ONLY
+    the pitch-over-glyph-span ratio gate rejects it. This is the Crow "K.O."
+    dock-panel shape: a 2 pt tag every 53 pt is a row of tagged objects, not a
+    linetype whose mark IS its texture."""
+    pitch, half_gap = 53.0, 3.0
+    mark_xs = [120.0 + i * pitch for i in range(6)]
+
+    def draw(page):
+        page.draw_line(
+            fitz.Point(80, 300), fitz.Point(mark_xs[0] - half_gap, 300), width=0.5
+        )
+        for a, b in zip(mark_xs, mark_xs[1:]):
+            page.draw_line(
+                fitz.Point(a + half_gap, 300), fitz.Point(b - half_gap, 300),
+                width=0.5,
+            )
+        page.draw_line(
+            fitz.Point(mark_xs[-1] + half_gap, 300), fitz.Point(450, 300),
+            width=0.5,
+        )
+        for x in mark_xs:
+            # 20 strokes crammed into a 2 x 2 box — a tiny tick tag.
+            for i in range(20):
+                px = x - 1.0 + i * (2.0 / 19.0)
+                page.draw_line(
+                    fitz.Point(px, 299), fitz.Point(px, 301), width=0.3
+                )
+
+    doc, page = _page(draw)
+    try:
+        runs = extract_linetype_runs(page, doc, PAGE)
+    finally:
+        doc.close()
+    assert runs == []
+
+
+def test_the_linetype_selector_requires_a_clip():
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=600)
+    page.draw_line(fitz.Point(100, 300), fitz.Point(400, 300), width=0.5)
+    assert extract_linetype_runs(page, doc, None) == []
+    assert extract_linetype_runs(page, doc, (1.0, 2.0)) == []
+    doc.close()
+
+
+# ── The permanent rejection fixtures ─────────────────────────────────────────
+#
+# These literals are the development history's caught coincidences, pinned so
+# no future edit can loosen a gate without failing them first.
+
+
+def test_the_crow_dock_panel_tag_row_stays_rejected():
+    """INV-04 §3, the trap caught in the act: 34 identical tags of signature
+    (54, 2, 2) evenly spaced at 53 pt along Crow page 1's dock grade line —
+    and the grade line really IS broken at every tag, so break_frac is 1.00
+    and the pitch is regular. Rendering it shows a dock elevation, not piping.
+    Only the pitch-over-glyph-span gate rejects it: 53 / 2 = 26.5 > 6."""
+    signature = (54, 2, 2)
+    mark_count = 34
+    pitch_pt = 53.0
+    break_frac = 1.00
+
+    glyph_span = float(signature[1])
+    assert pitch_pt / glyph_span == pytest.approx(26.5)
+    assert pitch_pt / glyph_span > MAX_PITCH_OVER_SPAN
+    assert not _linetype_gates_pass(
+        mark_count, pitch_pt, 0.0, glyph_span, break_frac
+    )
+
+
+def test_the_real_gas_linetype_passes_the_same_gates():
+    """The gate literals INV-04 §2 measured for the run that IS a linetype —
+    the non-vacuity half of the rejection fixtures."""
+    assert _linetype_gates_pass(160, 33.7, 0.02, 10.0, 1.00)
+
+
+@pytest.mark.parametrize(
+    "signature,mark_count,pitch_pt,pitch_cv,break_frac",
+    [
+        # Re-measured on the real Chelsea sheets (INV-04 §6 records the family
+        # as five 3-mark candidates at pitches 108-237): page 14 and 13/16
+        # text-block alignments that a naive pitch-only detector accepts.
+        ((32, 13, 9), 3, 108.1, 0.00, 0.00),
+        ((19, 11, 9), 3, 117.7, 0.27, 0.67),
+        ((31, 13, 5), 3, 122.4, 0.77, 0.00),
+        ((18, 9, 5), 3, 153.1, 0.41, 0.00),
+        ((18, 9, 5), 3, 216.1, 0.00, 0.00),
+    ],
+)
+def test_the_chelsea_three_mark_candidates_stay_rejected(
+    signature, mark_count, pitch_pt, pitch_cv, break_frac
+):
+    glyph_span = float(signature[1])
+    # Each one fails the ratio gate on its own, before cv or break are asked.
+    assert pitch_pt > MAX_PITCH_OVER_SPAN * glyph_span
+    assert not _linetype_gates_pass(
+        mark_count, pitch_pt, pitch_cv, glyph_span, break_frac
+    )
+
+
+# ── Real-PDF position recall: the only honest detection test ─────────────────
+
+
+def _estimator_gas_polyline():
+    """The estimator's own Gas Piping trace, read from the take-off PDF.
+
+    ANSWER KEY ONLY, never pipeline input: 34 line segments in the markup
+    colour (0.47, 0.94, 0.03) at width 4.8 on take-off page 0 (A3.0). The
+    4-segment legend swatch — a small closed box by the legend text — is
+    excluded by its tiny bbox (INV-04 §1).
+    """
+    green = (0.47, 0.94, 0.03)
+    doc = fitz.open(BOBS_TAKEOFF)
+    page = doc[0]
+    segs = []
+    for path in page.get_drawings():
+        col = path.get("color")
+        if col is None or any(abs(a - b) > 0.02 for a, b in zip(col, green)):
+            continue
+        if abs((path.get("width") or 0.0) - 4.8) > 0.5:
+            continue
+        rect = path["rect"]
+        if max(rect.x1 - rect.x0, rect.y1 - rect.y0) < 60.0:
+            continue  # the legend swatch
+        for item in path["items"]:
+            if item[0] == "l":
+                segs.append(
+                    ((item[1].x, item[1].y), (item[2].x, item[2].y))
+                )
+    doc.close()
+    return segs
+
+
+def _dist_to_segment(p, a, b):
+    import math
+
+    ax, ay = a
+    bx, by = b
+    dx, dy = bx - ax, by - ay
+    h2 = dx * dx + dy * dy
+    if h2 == 0:
+        return math.hypot(p[0] - ax, p[1] - ay)
+    t = max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / h2))
+    return math.hypot(p[0] - (ax + t * dx), p[1] - (ay + t * dy))
+
+
+@pytest.mark.skipif(
+    not (BOBS_PDF.is_file() and BOBS_TAKEOFF.is_file()),
+    reason="Bob's fixtures missing",
+)
+def test_bobs_gas_marks_land_on_the_estimators_own_polyline():
+    """POSITION RECALL: >= 95% of detected mark blobs within 12 pt of the
+    polyline the human estimator actually traced (INV-04 observed 162/164 on
+    raw candidate blobs; run-attached marks measure 160/160)."""
+    key = _estimator_gas_polyline()
+    assert len(key) == 34, "the answer key changed shape"
+
+    doc = fitz.open(BOBS_PDF)
+    page = doc[3]  # A3.0 ROOF PLAN
+    rect = page.rect
+    clip = (0.0, 0.0, max(rect.x1, rect.y1), max(rect.x1, rect.y1))
+    runs = extract_linetype_runs(page, doc, clip)
+    doc.close()
+
+    assert runs, "the gas linetype was not detected at all"
+    # One family, INV-04's measured signature.
+    assert {r.mark_signature for r in runs} == {(39, 10, 4)}
+
+    centers = [c for r in runs for c in r.mark_stats["mark_centers"]]
+    assert len(centers) >= 100, "far fewer marks than the ~160 observed"
+    on_key = sum(
+        1
+        for c in centers
+        if min(_dist_to_segment(c, a, b) for a, b in key) <= 12.0
+    )
+    assert on_key / float(len(centers)) >= 0.95
+
+
+@pytest.mark.skipif(not BOBS_PDF.is_file(), reason="Bob's PDF fixture missing")
+def test_the_detector_is_silent_on_every_other_bobs_page():
+    doc = fitz.open(BOBS_PDF)
+    fired = {}
+    for pno in range(len(doc)):
+        if pno == 3:
+            continue
+        page = doc[pno]
+        rect = page.rect
+        clip = (0.0, 0.0, max(rect.x1, rect.y1), max(rect.x1, rect.y1))
+        runs = extract_linetype_runs(page, doc, clip)
+        if runs:
+            fired[pno] = len(runs)
+    doc.close()
+    assert fired == {}
+
+
+@pytest.mark.skipif(
+    not (
+        CROW_PDF.is_file()
+        and CHELSEA_UPLOAD.is_file()
+        and MOXY_UPLOAD.is_file()
+    ),
+    reason="the three-set sweep needs Crow + the Chelsea/Moxy uploads",
+)
+def test_zero_false_positives_across_all_76_pages_of_the_other_three_sets():
+    """THE honesty test: the detector fires on nothing in Crow (4 pages),
+    Chelsea (32) and Moxy (40) — 76 pages of three other drafting offices.
+    A detector that finds annotated linetypes where none exist would be
+    manufacturing quantities (T-23-45)."""
+    fired = {}
+    page_total = 0
+    for path in (CROW_PDF, CHELSEA_UPLOAD, MOXY_UPLOAD):
+        doc = fitz.open(path)
+        for pno in range(len(doc)):
+            page = doc[pno]
+            rect = page.rect
+            clip = (0.0, 0.0, max(rect.x1, rect.y1), max(rect.x1, rect.y1))
+            runs = extract_linetype_runs(page, doc, clip)
+            page_total += 1
+            if runs:
+                fired["%s p%d" % (path.name, pno)] = len(runs)
+        doc.close()
+    assert page_total == 76, "the sweep no longer covers the 76 pages"
+    assert fired == {}
