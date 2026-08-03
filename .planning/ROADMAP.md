@@ -985,7 +985,7 @@ Plans are listed in EXECUTION order; the wave in each plan's frontmatter is auth
 - [x] 23-01-PLAN.md — Coverage ledger + provenance + verbose classifier + skip veto + coverage probe (wave 1, SP-8)
 - [x] 23-02-PLAN.md — Printed-scale parser hardening: anchored paper-inch parse, split stacked fractions (wave 1, SP-2)
 - [x] 23-03-PLAN.md — Flagged-zero contract: quantity Optional, drop records, flag-don't-drop selector (wave 2, SP-8)
-- [ ] 23-17-PLAN.md — Report surfacing: coverage.json, COVERAGE section, CSV provenance, workbook sheet (wave 2, SP-8)
+- [x] 23-17-PLAN.md — Report surfacing: coverage.json, COVERAGE section, CSV provenance, workbook sheet (wave 2, SP-8)
 - [x] 23-04-PLAN.md — Door-schedule unification: phrase materials, count column, legend guard, canonical names (wave 2, gap 7)
 - [x] 23-05-PLAN.md — Tag-pairing primitives: tag_pairing / finish_tags / room_tags (wave 2, SP-6)
 - [x] 23-06-PLAN.md — Structural title-block identification + keyword-context guard, four-set gated (wave 2)

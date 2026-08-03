@@ -145,3 +145,32 @@ individually, per the commit protocol).
 
 **To fix:** generate them into `tmp_path` instead of the repo, or make the writer deterministic
 (`doc.set_metadata({})` plus a fixed `creationDate`), then re-commit the fixtures once.
+
+---
+
+## DEF-23-07 — `door_schedule_coverage` has no production caller
+
+**Found during:** 23-17, wiring the report-side surfacing.
+**Where:** `src/bobbytailor/deterministic/schedule_extraction.py:1029`.
+
+23-04 built `door_schedule_coverage(ds, absent_references)` and it returns exactly the right thing —
+`ItemCoverage` dicts with `status=NOT MEASURED` / `NEEDS REVIEW`, `quantity=None`, and a reason that
+says an input gap is an input gap. **Nothing in `src/` calls it.** `grep -rn door_schedule_coverage
+src/bobbytailor/{pipeline,vision,web}` returns nothing; the only callers are its own warnings wrapper
+and `tests/test_schedule_extraction.py`.
+
+**Consequence:** Chelsea's "a door schedule is referenced on page(s) … but no parsable schedule table
+exists in this PDF" record cannot reach `report["item_coverage"]`, the COVERAGE section, the CSV or
+the workbook — because it is never produced during a run.
+
+**Impact:** 23-04 named 23-17 as the plan that surfaces these records. 23-17 surfaces every
+`ItemCoverage` (object OR dict) it finds on a sheet dict's `_item_coverage`, so the surfacing side is
+done and waiting; the missing half is one call inside the pipeline's schedule path.
+
+**NOT fixed here** because `takeoff_pipeline.py` and `schedule_extraction.py` are not in 23-17's
+`files_modified`, and choosing the call site (which sheet's records, with which `absent_references`)
+is a pipeline decision with its own blast radius rather than a report-rendering one.
+
+**To fix:** where the pipeline builds a sheet's schedules, call `door_schedule_coverage(ds, …)` and
+append the returned dicts to that sheet's `_item_coverage`. Nothing else is required — the report
+already renders them.

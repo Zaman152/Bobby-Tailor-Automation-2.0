@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 23
 current_phase_name: measurement-engine-completion
 status: in-progress
-stopped_at: Completed 23-05-PLAN.md — tag-pairing primitives (SP-6), wave 2
-last_updated: "2026-08-03T08:36:12.095Z"
+stopped_at: Completed 23-17-PLAN.md — report + export emission of the coverage record (SP-8), wave 2
+last_updated: "2026-08-03T16:40:00.000Z"
 last_activity: 2026-08-03
-last_activity_desc: 23-05 landed tag_pairing/finish_tags/room_tags; WC set exact 6/6 sheets, unit mix 4/4; suite 1398 -> 1465
+last_activity_desc: 23-17 landed the client-facing half of the flagged-zero contract — coverage.json, the COVERAGE section, the CSV provenance column and the workbook Coverage sheet; ledger completeness 40/40, 4/4, 7/7, 32/32; suite 1511 -> 1531
 progress:
   total_phases: 28
   completed_phases: 19
   total_plans: 121
-  completed_plans: 102
+  completed_plans: 104
   percent: 68
 ---
 
@@ -30,9 +30,9 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 23 (measurement-engine-completion) — IN PROGRESS
-Plan: 5 of 17 complete (wave 2)
-Status: wave 1 (23-01 ledger, 23-02 scale parser) done; wave 2 has 23-03 (flagged-zero contract), 23-04 (door-schedule unification) and 23-05 (tag-pairing primitives) landed
-Last activity: 2026-08-03 — 23-05 landed tag_pairing/finish_tags/room_tags; WC code set exact on 6/6 Moxy elevation sheets, unit mix 4/4 golden; suite 1398 -> 1465
+Plan: 7 of 17 complete (wave 2)
+Status: wave 1 (23-01 ledger, 23-02 scale parser) done; wave 2 has 23-03 (flagged-zero contract), 23-04 (door-schedule unification), 23-05 (tag-pairing primitives), 23-06 (structural title-block identification) and 23-17 (report + export emission of the coverage record) landed
+Last activity: 2026-08-03 — 23-17 surfaced the coverage ledger in every client artifact; a never-measured quantity is now a BLANK in takeoff.json, coverage.json, summary.txt, the CSV and the workbook; suite 1511 -> 1531
 
 Progress: [██░░░░░░░░] 18%
 
