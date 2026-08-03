@@ -24,7 +24,14 @@ MEASUREMENT CONTRACT
   bathroom + entry/closet. Filling from a single seed stops at the bathroom wall
   and lands a systematic ~30% under.
 * Regions touching the clip edge are the OUTSIDE and are discarded; regions
-  below :data:`MIN_REGION_SF` are fixtures/annotation cells, not rooms.
+  below :data:`MIN_REGION_SF` are fixtures/annotation cells, not rooms. A
+  region ABOVE :data:`MAX_REGION_SF` is kept and flagged — it is implausible
+  as one guest room but perfectly ordinary as a lobby, and dropping it made
+  the engine report nothing at all for the drawing.
+* Every region also reports the perimeter of its outer contour, traced from
+  the same mask its area was counted from, plus the blind shape ratio
+  P/sqrt(A). Wall area is perimeter x height, so a fill that cannot state its
+  perimeter cannot bind to a wall item at all (INV-01 §3).
 * Flag-don't-guess: a measurement whose region structure is implausible for a
   single unit is returned with ``needs_review=True`` rather than silently
   halved or dropped. The human corrects it once and the learning store carries
@@ -70,18 +77,56 @@ DEFAULT_DPI = 160
 INK_THRESHOLD = 170
 
 # A region smaller than this is a fixture outline, a dimension cell or a text
-# box — never a room. Larger than MAX is a sheet-scale region, not a unit.
+# box — never a room. Larger than MAX is a sheet-scale region, not a unit; as
+# of 23-09 such a region is KEPT AND FLAGGED rather than discarded.
 MIN_REGION_SF = 8.0
 MAX_REGION_SF = 900.0
+
+# P / sqrt(A) — the BLIND shape validator. It is computed from geometry alone;
+# no golden quantity is consulted and none may ever be (D-07). Observed values,
+# all from INV-01 §4 on the real Moxy sheets:
+#
+#   4.00        a perfect square — the theoretical floor for any region
+#   4.24        a 1:2 rectangle
+#   4.24-5.08   every HONEST reflected-ceiling guest room measured
+#               (KING SUITE B 4.24, QQ A 4.64, BUNK B 4.84, KING A 5.08)
+#   8.54-9.04   the LEAKING architectural fills on those same four sheets,
+#               where the contour wanders out through a door swing or a
+#               dimension string
+#   11.6-13.4   annotation and dimension cells — a 13.4 SF cell contributes
+#               42 LF, more than a 121.8 SF bedroom's 56 LF
+#
+# 8.0 is therefore roughly a 2x margin on the worst honest room measured
+# (5.08) and still below the best leak measured (8.54). The margin is read off
+# the geometry; it is NOT fitted to any total, and it may not be.
+#
+# It is deliberately NOT applied to AREA. Stripping high-ratio regions from a
+# real Moxy suite moves its measured area by nearly sixty square feet, and
+# whether those slivers are closets or a cancelling error is a separate
+# question — changing area here would be the coincidence trap run in reverse
+# (INV-01 §4). This constant exists for the wall binder (23-13) to consume.
+MAX_HONEST_SHAPE_RATIO = 8.0
 
 
 @dataclass
 class FilledRegion:
-    """One enclosed region measured by flood fill."""
+    """One enclosed region measured by flood fill.
+
+    ``perimeter_lf`` is traced from the SAME mask ``area_sf`` was counted from
+    — not from a parallel re-measurement — so the two can never describe
+    different regions. ``shape_ratio`` is ``perimeter_lf / sqrt(area_sf)``; see
+    :data:`MAX_HONEST_SHAPE_RATIO` for what its values mean.
+
+    A ``perimeter_lf`` of 0.0 on a region with a real area means the trace did
+    not complete (it hit the iteration cap, T-23-34). It is a "not measured",
+    never a "no walls", and :func:`measure_enclosed_area` flags it.
+    """
 
     area_sf: float
     px: int
     touches_edge: bool
+    perimeter_lf: float = 0.0
+    shape_ratio: float = 0.0
 
 
 @dataclass
@@ -98,6 +143,13 @@ class RoomFillResult:
     viewport_title: str = ""       # e.g. "KING SUITE B - RCP PLAN"
     plan_name: str = ""            # "KING SUITE B"
     plan_kind: str = ""            # "RCP" | "AR" | "FF" | "EM" | "FC"
+    # Wall area is perimeter x height, so the perimeter has to leave this
+    # dataclass or the binding cannot be built (INV-01 §3). The two lists are
+    # PARALLEL TO ``regions`` — same order, same length — because a perimeter
+    # that cannot say which region it belongs to cannot be filtered by shape.
+    perimeter_lf: float = 0.0      # sum over the same regions ``area_sf`` sums
+    region_perimeters: List[float] = field(default_factory=list)
+    region_shape_ratios: List[float] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -111,6 +163,9 @@ class RoomFillResult:
             "viewport_title": self.viewport_title,
             "plan_name": self.plan_name,
             "plan_kind": self.plan_kind,
+            "perimeter_lf": self.perimeter_lf,
+            "region_perimeters": self.region_perimeters,
+            "region_shape_ratios": self.region_shape_ratios,
         }
 
 
@@ -357,18 +412,41 @@ def label_mask(mask, width: int, height: int) -> LabelledMask:
     )
 
 
-def _label_regions(samples, width: int, height: int, px_area_sf: float) -> List[FilledRegion]:
+def _label_regions(samples, width: int, height: int, px_area_sf: float,
+                   px_len_ft: float = 0.0) -> List[FilledRegion]:
     """Connected-component label every free (non-ink) region in a gray bitmap.
 
     A thin projection over :func:`label_mask` — the counting view of the one
-    labeller, for callers that want areas and nothing else. The return shape is
-    exactly what it always was, so no caller moves.
+    labeller. The return shape is exactly what it always was, so no caller
+    moves.
+
+    With *px_len_ft* supplied, each region's outer contour is traced from that
+    SAME labelled mask and its perimeter and shape ratio are filled in. The
+    clip is still labelled exactly once: tracing costs O(boundary), while the
+    labelling it reuses costs O(area).
     """
     labelled = label_mask(free_mask(samples, width * height), width, height)
-    return [
-        FilledRegion(area_sf=count * px_area_sf, px=count, touches_edge=edge)
-        for count, edge in zip(labelled.counts, labelled.touches_edge)
-    ]
+    out: List[FilledRegion] = []
+    for k, count in enumerate(labelled.counts):
+        region = FilledRegion(
+            area_sf=count * px_area_sf, px=count,
+            touches_edge=labelled.touches_edge[k],
+        )
+        if px_len_ft > 0.0:
+            contour, truncated = _trace_outer_contour(
+                labelled.labels, width, height, k + 1, labelled.starts[k],
+                max_steps=4 * count + 16,
+            )
+            if not truncated:
+                region.perimeter_lf = _ring_length(
+                    _simplify_ring(contour)
+                ) * px_len_ft
+                if region.area_sf > 0.0:
+                    region.shape_ratio = region.perimeter_lf / math.sqrt(
+                        region.area_sf
+                    )
+        out.append(region)
+    return out
 
 
 # The Moore neighbourhood of a pixel, in one consistent rotational order
@@ -423,6 +501,7 @@ def _trace_outer_contour(labels, width: int, height: int, region_id: int,
     cap = max_steps if max_steps > 0 else 4 * width * height
     steps = 0
     truncated = False
+    first_state = None
     while True:
         moved = False
         for k in range(1, 9):
@@ -445,13 +524,27 @@ def _trace_outer_contour(labels, width: int, height: int, region_id: int,
         if not moved:
             break                   # an isolated pixel has no ring to walk
         steps += 1
-        if (px, py) == (sx, sy) and b_dir == 0:
-            break                   # Jacob: the seed re-entered from the seed's own side
+        state = (px, py, b_dir)
+        # Jacob's criterion, stated on the FIRST TRANSITION rather than on the
+        # seed's initial backtrack. Testing for "back at the seed, facing west
+        # again" looks equivalent and is not: the seed is where the walk STARTS,
+        # not necessarily where the ring passes through it. Measured on Moxy
+        # page 35 (ACC KING TUB, RCP, the dominant 184.3 SF region): the ring
+        # re-enters its seed heading SOUTH, so the state "seed, backtrack west"
+        # lies on the walk's tail and never recurs — the walk then ran to its
+        # iteration cap and that room reported no perimeter at all. Repeating
+        # the first transition is the state the walk is guaranteed to return to,
+        # because the trace is deterministic in (pixel, backtrack).
+        if first_state is None:
+            first_state = state
+        elif state == first_state:
+            break
         points.append((px, py))
         if steps >= cap:
             truncated = True
             break
-    points.append(points[0])
+    if points[-1] != points[0]:
+        points.append(points[0])
     return points, truncated
 
 
@@ -578,19 +671,23 @@ def measure_enclosed_area(
         feet_per_point:  that viewport's OWN scale (never a project default).
         dpi:             render resolution.
         candidate_id:    id carried onto the result for fusion binding.
-        dropped_regions: optional OUT-list. Every region rejected as larger
-            than one unit has its area appended here, so the coverage ledger
-            can say *"3 regions of 1,240 / 980 / 1,510 SF were rejected as
-            larger than one unit"* instead of the rejection existing nowhere
-            (INV-08 §4 step 7 / CONCERNS H1). Purely observational: passing it
-            changes no threshold and no returned value. The size constants are
-            deliberately NOT parameterised away here — INV-08 risk 6 is
-            explicit that recording an oversize rejection is in scope and
-            moving the threshold to make it pass is the coincidence trap.
+        dropped_regions: optional OUT-list. Every region LARGER than
+            *max_region_sf* has its area appended here, so the coverage ledger
+            can say *"3 regions of 1,240 / 980 / 1,510 SF exceeded one unit"*
+            instead of the fact existing nowhere (INV-08 §4 step 7 / CONCERNS
+            H1). Purely observational: passing it changes no threshold and no
+            returned value. Since 23-09 such a region is KEPT AND FLAGGED
+            rather than discarded, so this is an OVERSIZE register, not a
+            rejection register; the parameter keeps its name because renaming
+            it belongs with its caller, which is 23-11's scope. Moving the
+            threshold to make anything pass remains the coincidence trap
+            INV-08 risk 6 forbids, and the constant is unchanged.
 
     Returns:
         A :class:`RoomFillResult`, or ``None`` when the render fails or no
         enclosed region survives (caller keeps its prior behaviour — additive).
+        A result whose regions include an oversize one comes back FLAGGED with
+        its measurement intact — never as ``None``.
     """
     if not feet_per_point or feet_per_point <= 0:
         return None
@@ -613,32 +710,72 @@ def measure_enclosed_area(
 
     zoom = dpi / 72.0
     px_area_sf = (1.0 / (zoom * zoom)) * feet_per_point * feet_per_point
-    regions = _label_regions(pix.samples, pix.width, pix.height, px_area_sf)
+    # The LINEAR analogue of the area factor, beside it so the two can never
+    # drift apart. Area scales by the SQUARE of the scale and length by the
+    # first power; deriving a perimeter from an area factor — or the reverse —
+    # is the same class of error as measuring a 1/4" sheet at 1/8".
+    px_len_ft = (1.0 / zoom) * feet_per_point
+    regions = _label_regions(
+        pix.samples, pix.width, pix.height, px_area_sf, px_len_ft
+    )
 
     # The outside of the drawing touches the clip edge; rooms never do.
-    # The oversize rejection is recorded rather than merely applied: a region
-    # larger than any plausible unit is genuinely not a room, but a silently
-    # discarded 1,510 SF region and a drawing that measured nothing are the
-    # same fact to every consumer, which is the defect this out-list closes.
-    enclosed: List[float] = []
+    #
+    # A region LARGER than the maximum is kept and flagged, never dropped. The
+    # hard drop it replaces made this engine return nothing at all — not a
+    # flagged number, nothing — for every lobby, ballroom and retail floor
+    # plate in the set, and a drawing that measured nothing is indistinguishable
+    # from an item that is genuinely zero. That is the silent-zero failure this
+    # phase exists to abolish (INV-02 §5). The rejection is still recorded in
+    # *dropped_regions* so the coverage ledger can name it.
+    enclosed: List[FilledRegion] = []
+    oversize: List[FilledRegion] = []
     for r in regions:
         if r.touches_edge or r.area_sf < min_region_sf:
             continue
         if r.area_sf > max_region_sf:
+            oversize.append(r)
             if dropped_regions is not None:
                 dropped_regions.append(round(r.area_sf, 1))
-            continue
-        enclosed.append(r.area_sf)
+        enclosed.append(r)
     if not enclosed:
         return None
 
-    total = round(sum(enclosed), 1)
+    ordered = sorted(enclosed, key=lambda r: r.area_sf, reverse=True)
     result = RoomFillResult(
-        area_sf=total,
-        regions=sorted((round(a, 1) for a in enclosed), reverse=True),
+        area_sf=round(sum(r.area_sf for r in enclosed), 1),
+        regions=[round(r.area_sf, 1) for r in ordered],
         candidate_id=candidate_id,
         scale_fpi=round(feet_per_point * 72.0, 4),
+        perimeter_lf=round(sum(r.perimeter_lf for r in ordered), 1),
+        region_perimeters=[round(r.perimeter_lf, 1) for r in ordered],
+        region_shape_ratios=[round(r.shape_ratio, 2) for r in ordered],
     )
+
+    notes: List[str] = []
+    if oversize:
+        notes.append(
+            "%d region(s) of %s SF exceed the %.0f SF maximum for a single unit "
+            "— KEPT AND FLAGGED, never discarded: a lobby, ballroom or retail "
+            "floor plate is legitimately larger than a guest room, and dropping "
+            "it returned nothing at all for the whole drawing. Verify the clip "
+            "names ONE drawing before billing this area"
+            % (len(oversize),
+               ", ".join("%.0f" % r.area_sf
+                         for r in sorted(oversize, key=lambda r: r.area_sf,
+                                         reverse=True)),
+               max_region_sf)
+        )
+    unmeasured = [r for r in ordered if r.perimeter_lf <= 0.0]
+    if px_len_ft > 0.0 and unmeasured:
+        notes.append(
+            "%d of %d region(s) have no traced perimeter (the contour walk hit "
+            "its iteration cap) — their length is UNMEASURED, not zero; the "
+            "areas are unaffected" % (len(unmeasured), len(ordered))
+        )
+    if notes:
+        result.needs_review = True
+        result.review_reason = "; ".join(notes)
     return result
 
 
@@ -649,13 +786,22 @@ def flag_implausible_unit(result: RoomFillResult, expect_max_sf: float) -> RoomF
     and reports ~2x (real: Moxy ID-412/ID-416). Halving it automatically would
     be a guess, so the row is flagged for review instead — the human resolves it
     once and the learning store applies that decision to later runs.
+
+    Any reason already on the result is PRESERVED. This used to overwrite, so
+    an oversize-region flag raised inside :func:`measure_enclosed_area` was
+    erased by the very next call — a flag that silently deletes another flag is
+    the same defect as no flag at all.
     """
     if expect_max_sf and result.area_sf > expect_max_sf:
-        result.needs_review = True
-        result.review_reason = (
+        reason = (
             "measured %.0f SF exceeds the plausible single-unit maximum of %.0f SF — "
             "the viewport may include an adjacent (opposite-hand) plan; verify"
             % (result.area_sf, expect_max_sf)
+        )
+        result.needs_review = True
+        result.review_reason = (
+            "%s; %s" % (result.review_reason, reason)
+            if result.review_reason else reason
         )
     return result
 

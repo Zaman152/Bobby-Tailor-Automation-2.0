@@ -292,13 +292,19 @@ def test_the_region_bound_is_threaded_and_defaults_to_the_module_constant():
     assert param.default == MAX_REGION_SF
 
     doc, page = _sheet_reading_upright(0)
-    assert len(_fills(page)[0]) == 1
-    # A bound below the room's own area rejects it — proof the argument
-    # reaches measure_enclosed_area rather than being decorative.
+    clean_fills, clean_drops = _fills(page)
+    assert len(clean_fills) == 1
+    assert clean_fills[0].needs_review is False and not clean_drops
+    # A bound below the room's own area now FLAGS it rather than deleting it
+    # (23-09) — proof the argument reaches measure_enclosed_area rather than
+    # being decorative, without reintroducing the silent zero.
     tight_fills, tight_drops = TakeoffPipeline(
         analyzer=lambda *a, **k: {}
     )._measure_room_fills(page, [], {}, "SYNTH", max_region_sf=50.0)
-    assert tight_fills == []
+    assert len(tight_fills) == 1, "a tighter bound flags, it does not delete"
+    assert tight_fills[0].area_sf == clean_fills[0].area_sf
+    assert tight_fills[0].needs_review is True
+    assert "KEPT AND FLAGGED" in tight_fills[0].review_reason
     assert tight_drops and "larger than one unit" in tight_drops[0].reason
     doc.close()
 
@@ -402,30 +408,43 @@ def test_total_for_units_without_a_count_returns_the_single_unit():
     assert total_for_units(272.6, 0) == pytest.approx(272.6)
 
 
-def test_max_region_guard_rejects_sheet_scale_regions():
-    """A region larger than any plausible unit is not a room."""
-    doc, page, clip = _page_with_room(60.0, 40.0)  # 2400 SF — sheet-scale
-    r = measure_enclosed_area(page, clip, FPP_QUARTER, max_region_sf=MAX_REGION_SF)
-    assert r is None
+def test_an_oversize_region_is_kept_and_flagged_never_dropped():
+    """23-09: the hard drop is gone, and this is why.
+
+    A 1,200 SF region is implausible as ONE guest room and perfectly ordinary
+    as a lobby, a ballroom or a retail floor plate. Dropping it left `enclosed`
+    empty and the engine returned `None` — so every such drawing in the set
+    reported NOTHING, and a drawing that measured nothing is indistinguishable
+    from an item that is genuinely zero. That is the silent zero this phase
+    exists to abolish (INV-02 §5).
+
+    Drawn at 1/8" = 1'-0" so the whole region fits on an 800 pt page and is
+    genuinely ENCLOSED; a 60x40-at-quarter fixture overflows the page, so its
+    region touches the clip edge and is discarded as the OUTSIDE before the
+    size filter is ever reached.
+    """
+    fpp_eighth = 8.0 / 72.0
+    doc, page, clip = _page_with_room(40.0, 30.0, fpp=fpp_eighth)
+    r = measure_enclosed_area(
+        page, clip, fpp_eighth, max_region_sf=MAX_REGION_SF,
+    )
+    assert r is not None, "the measurement must survive, flagged"
+    assert r.area_sf == pytest.approx(1200.0, rel=0.08)
+    assert r.needs_review is True
+    assert "KEPT AND FLAGGED" in r.review_reason
+    assert "900" in r.review_reason, "the reason names the bound it exceeded"
     doc.close()
 
 
-# ── the oversize rejection leaves a trace (23-03 / INV-08 §4 step 7) ─────────
+# ── the oversize region leaves a trace (23-03 / INV-08 §4 step 7) ────────────
 
 
-def test_oversize_rejection_is_recorded_when_an_out_list_is_supplied():
-    """The rejection is CORRECT and, until now, invisible.
+def test_the_oversize_register_still_records_the_area_for_the_ledger():
+    """Kept and flagged, AND on the record (T-23-36).
 
-    A 2,400 SF region silently discarded and a drawing that measured nothing
-    are the same `None` to every caller, so the ledger could never say *"one
-    region of 2,400 SF was rejected as larger than one unit"*. Recording it is
-    in scope; MOVING the threshold to make it pass is the coincidence trap
-    INV-08 risk 6 forbids, and the constant is asserted untouched below.
+    Flagging the row is what the client sees; the out-list is what the coverage
+    ledger sees. Both, or an oversize region is visible in only one artifact.
     """
-    # 40' x 30' = 1,200 SF at 1/8" = 1'-0". Drawn at EIGHTH so the whole region
-    # fits on the page and is genuinely ENCLOSED — the pre-existing 60x40-at-
-    # quarter fixture overflows an 800 pt page, so its region touches the clip
-    # edge and is discarded as the outside before the size filter is reached.
     fpp_eighth = 8.0 / 72.0
     doc, page, clip = _page_with_room(40.0, 30.0, fpp=fpp_eighth)
     dropped = []
@@ -433,11 +452,21 @@ def test_oversize_rejection_is_recorded_when_an_out_list_is_supplied():
         page, clip, fpp_eighth, max_region_sf=MAX_REGION_SF,
         dropped_regions=dropped,
     )
-    assert r is None, "the return value is unchanged by observing the drop"
+    assert r is not None and r.needs_review is True
     assert len(dropped) == 1
     assert dropped[0] > MAX_REGION_SF
     assert dropped[0] == pytest.approx(1200.0, rel=0.08)
+    assert dropped[0] in r.regions, "the region is in the measurement too"
     doc.close()
+
+
+def test_an_oversize_flag_is_not_erased_by_the_implausible_unit_flag():
+    """Two flags, one reason string. Neither may delete the other."""
+    r = RoomFillResult(area_sf=1200.0, regions=[1200.0], needs_review=True,
+                       review_reason="1 region(s) of 1200 SF exceed the maximum")
+    out = flag_implausible_unit(r, expect_max_sf=420.0)
+    assert "exceed the maximum" in out.review_reason
+    assert "opposite-hand" in out.review_reason
 
 
 def test_the_out_list_is_optional_and_changes_nothing():
@@ -1032,3 +1061,198 @@ def test_on_the_real_drawing_simplification_changes_the_perimeter_by_under_1_5_p
     assert (raw - simple) / raw < 0.015, (
         "raw %.2f LF vs simplified %.2f LF" % (raw, simple)
     )
+
+
+# ── SP-3: perimeter and the blind shape ratio on the fill (23-09 Task 3) ─────
+
+
+def _one_region(width_ft, height_ft, fpp=FPP_QUARTER, wall_pt=1.0, **kw):
+    """Measure a single rectangular room and return its one region's numbers."""
+    doc, page, clip = _page_with_room(width_ft, height_ft, fpp=fpp, wall_pt=wall_pt)
+    r = measure_enclosed_area(page, clip, fpp, **kw)
+    doc.close()
+    assert r is not None and len(r.regions) == 1
+    return r
+
+
+# The ink is a stroke CENTRED on the room's nominal outline, so half of it
+# eats into the room. The enclosed void a fill can see is therefore the
+# nominal rectangle inset by half the stroke on each side — exact by
+# construction, no plan and no golden number involved.
+def _interior(width_ft, height_ft, wall_pt, fpp):
+    inset = wall_pt * fpp
+    return width_ft - inset, height_ft - inset
+
+
+def test_perimeter_of_a_known_rectangle():
+    """10' x 20' at 1/4"=1'-0": 60 LF and 200 SF, both within two percent."""
+    r = _one_region(10.0, 20.0)
+    w, h = _interior(10.0, 20.0, 1.0, FPP_QUARTER)
+    assert r.perimeter_lf == pytest.approx(2.0 * (w + h), rel=0.02)
+    assert r.area_sf == pytest.approx(w * h, rel=0.02)
+    # and still within two percent of the NOMINAL room, since the linework is
+    # thin relative to the room
+    assert r.perimeter_lf == pytest.approx(60.0, rel=0.02)
+    assert r.area_sf == pytest.approx(200.0, rel=0.02)
+    assert r.region_perimeters == [r.perimeter_lf]
+    assert r.needs_review is False
+
+
+def test_perimeter_ignores_an_interior_hole():
+    """A furniture block in the middle of a room is not part of its walls.
+
+    The room is drawn twice — empty, and with a filled block at its centre.
+    The perimeter must not move: the trace walks the OUTER ring only. A
+    boundary-pixel count would rise by the block's whole circumference.
+    """
+    doc, page, clip = _page_with_room(10.0, 20.0, wall_pt=1.0)
+    empty = measure_enclosed_area(page, clip, FPP_QUARTER)
+    # a solid 2' x 2' block at the room's centre
+    cx, cy = 100.0 + 10.0 / FPP_QUARTER / 2.0, 100.0 + 20.0 / FPP_QUARTER / 2.0
+    half = 1.0 / FPP_QUARTER
+    page.draw_rect(fitz.Rect(cx - half, cy - half, cx + half, cy + half),
+                   fill=(0, 0, 0), color=(0, 0, 0))
+    holed = measure_enclosed_area(page, clip, FPP_QUARTER)
+    doc.close()
+    assert empty is not None and holed is not None
+    assert holed.perimeter_lf == pytest.approx(empty.perimeter_lf, rel=0.005)
+    assert holed.area_sf < empty.area_sf, "the block does take away floor area"
+
+
+def test_perimeter_scales_linearly_while_area_scales_quadratically():
+    """The SAME ink read at half the scale: perimeter x2, area x4.
+
+    One page, two scales — the drawing does not change, only the ratio it is
+    read at. That is the measurement contract's rule-2 guard expressed for the
+    new primitive: a perimeter accidentally derived from the AREA factor would
+    come back x4 here and this test would say so.
+    """
+    doc, page, clip = _page_with_room(12.0, 10.0, wall_pt=1.0)
+    quarter = measure_enclosed_area(page, clip, FPP_QUARTER)
+    eighth = measure_enclosed_area(page, clip, 8.0 / 72.0)
+    doc.close()
+    assert quarter is not None and eighth is not None
+    assert eighth.perimeter_lf == pytest.approx(2.0 * quarter.perimeter_lf, rel=0.02)
+    assert eighth.area_sf == pytest.approx(4.0 * quarter.area_sf, rel=0.02)
+
+
+def test_shape_ratio_of_a_square_is_four():
+    """P/sqrt(A) = 4.00 for a square, by definition. Validated by construction."""
+    r = _one_region(15.0, 15.0)
+    assert r.region_shape_ratios[0] == pytest.approx(4.0, abs=0.05)
+
+
+def test_the_shape_ratio_of_a_sliver_exceeds_eight():
+    """The annotation-cell detector: a 1' x 40' cell is not a room.
+
+    P/sqrt(A) = 82/6.32 = 12.97 — the 11.6-13.4 band INV-01 §4 measured on
+    Moxy's real dimension cells, reproduced here from pure geometry with no
+    plan and no golden number involved. Drawn at 1/8"=1'-0" so that 40 real
+    feet fit on an 800 pt page and the cell is genuinely enclosed.
+    """
+    from bobbytailor.deterministic.room_fill import MAX_HONEST_SHAPE_RATIO
+
+    r = _one_region(1.0, 40.0, fpp=8.0 / 72.0, wall_pt=0.5)
+    assert r.region_shape_ratios[0] > MAX_HONEST_SHAPE_RATIO
+    assert r.region_shape_ratios[0] == pytest.approx(13.0, rel=0.10)
+    # and the room-shaped control, measured the same way, is nowhere near it
+    assert _one_region(15.0, 15.0).region_shape_ratios[0] < MAX_HONEST_SHAPE_RATIO
+
+
+def test_the_shape_ratio_threshold_is_read_off_geometry_not_off_a_total():
+    """4.00 is a square; 5.08 was the worst honest room; 8.54 the best leak."""
+    from bobbytailor.deterministic.room_fill import MAX_HONEST_SHAPE_RATIO
+
+    assert MAX_HONEST_SHAPE_RATIO == 8.0
+    assert MAX_HONEST_SHAPE_RATIO > 5.08, "above every honest room measured"
+    assert MAX_HONEST_SHAPE_RATIO < 8.54, "below every leak measured"
+
+
+def test_the_per_region_lists_are_parallel_to_the_region_list():
+    """A perimeter that cannot say which region it belongs to is unusable."""
+    doc, page, clip = _page_with_room(20.0, 15.0, inner=6.0, wall_pt=1.0)
+    r = measure_enclosed_area(page, clip, FPP_QUARTER)
+    doc.close()
+    assert r is not None and len(r.regions) >= 2
+    assert len(r.region_perimeters) == len(r.regions)
+    assert len(r.region_shape_ratios) == len(r.regions)
+    assert r.regions == sorted(r.regions, reverse=True)
+    assert r.perimeter_lf == pytest.approx(sum(r.region_perimeters), abs=0.15)
+    for area, perim, ratio in zip(r.regions, r.region_perimeters,
+                                  r.region_shape_ratios):
+        assert ratio == pytest.approx(perim / area ** 0.5, abs=0.01)
+
+
+def test_the_serialised_form_carries_the_new_geometry():
+    """The report and the learning store both read to_dict()."""
+    r = _one_region(10.0, 20.0)
+    d = r.to_dict()
+    assert d["perimeter_lf"] == r.perimeter_lf
+    assert d["region_perimeters"] == r.region_perimeters
+    assert d["region_shape_ratios"] == r.region_shape_ratios
+    # additive only — every pre-existing key is still there
+    assert {"area_sf", "regions", "candidate_id", "scale_fpi", "needs_review",
+            "review_reason", "sheet_name", "viewport_title", "plan_name",
+            "plan_kind"} <= set(d)
+
+
+def test_the_size_constant_is_still_untouched():
+    """The behaviour changed; the threshold did not (D-07)."""
+    assert MAX_REGION_SF == 900.0
+
+
+# ── the blind bands, on the real drawings (23-09 Task 3) ─────────────────────
+
+
+@pytest.mark.parametrize("page", [23, 27, 29, 33])
+def test_the_dominant_ceiling_region_has_the_shape_of_a_room(moxy_prototype_fills, page):
+    """Blind: geometry only, no golden quantity consulted anywhere.
+
+    A rectilinear room has P/sqrt(A) between 4 (a square) and about 6 (an L
+    with a bath alcove). INV-01 §4 measured 4.24 / 4.64 / 4.84 / 5.08 on these
+    four sheets. A fill that has leaked out through a door swing breaks it.
+
+    P/A is the SAME statement divided by a size — it equals the shape ratio
+    over sqrt(A) — so its band of 0.20-0.45 per foot only holds over the
+    150-400 SF room sizes it was quoted for, and it is asserted over exactly
+    that premise. KING A's dominant reflected-ceiling region is 121.8 SF, so
+    an honest ratio of 5.08 puts it at 0.46 by arithmetic alone; widening the
+    band to swallow that would be fitting a threshold to an output. The
+    identity is pinned below instead, so the relationship cannot drift.
+    """
+    fill = _dominant(moxy_prototype_fills, page, "RCP")
+    area, ratio = fill.regions[0], fill.region_shape_ratios[0]
+    perim = fill.region_perimeters[0]
+    assert 4.0 <= ratio <= 6.0, "%s ratio %.2f" % (fill.plan_name, ratio)
+    assert perim / area == pytest.approx(ratio / area ** 0.5, rel=0.01)
+    if 150.0 <= area <= 400.0:
+        assert 0.20 <= perim / area <= 0.45, (
+            "%s P/A %.3f per ft" % (fill.plan_name, perim / area)
+        )
+
+
+@pytest.mark.parametrize("page", [23, 27, 29])
+def test_the_architectural_fill_reproduces_its_leak_signature(moxy_prototype_fills, page):
+    """The same blind ratio exposes the AR raster leak — INV-01 measured
+    8.62 (KING A), 9.04 (KING SUITE B) and 8.54 (QQ A).
+
+    Nothing here consults a golden value: the AR contour is simply wandering
+    out through door swings and dimension strings, and a wandering contour is
+    long for the area it encloses. This is the §14.2 clip defect surfacing in
+    a second, independent way — and it is why 23-13 must not bill an AR
+    perimeter without checking this number first.
+    """
+    from bobbytailor.deterministic.room_fill import MAX_HONEST_SHAPE_RATIO
+
+    fill = _dominant(moxy_prototype_fills, page, "AR")
+    ratio = fill.region_shape_ratios[0]
+    assert ratio > MAX_HONEST_SHAPE_RATIO, "%s ratio %.2f" % (fill.plan_name, ratio)
+
+
+def test_every_prototype_sheet_reports_a_perimeter_at_all(moxy_prototype_fills):
+    """The primitive that did not exist now exists on every real measurement."""
+    for page, name, _area in MOXY_RCP_AREA_BASELINE:
+        fill = _dominant(moxy_prototype_fills, page, "RCP")
+        assert fill.perimeter_lf > 0.0, name
+        assert len(fill.region_perimeters) == len(fill.regions)
+        assert all(p > 0.0 for p in fill.region_perimeters), name
