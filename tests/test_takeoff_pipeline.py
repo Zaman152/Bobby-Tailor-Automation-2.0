@@ -565,10 +565,15 @@ import tempfile
 import fitz
 
 from bobbytailor.pipeline.coverage import (
+    ERRORED,
+    EXCLUDED_OFF_SCALE,
+    MEASURED,
     MEASURED_PARTIAL,
     NOT_APPLICABLE,
     SKIPPED_CLASSIFIER,
+    SKIPPED_NO_SCALE,
     CoverageLedger,
+    DrawingCoverage,
     SheetCoverage,
 )
 
@@ -911,3 +916,227 @@ class TestRunProjectThreadsTheLedger:
         all_extracted, _est, _ptype = pipeline.run_project(pages)
         assert all_extracted == []
         assert pipeline.coverage_ledger is None
+
+
+# ---------------------------------------------------------------------------
+# 23-03 — every drop inside the pipeline leaves a reason (INV-08 §2 S4-S7).
+#
+# The rule under test is one sentence: a measurement that did not happen must
+# be distinguishable from a measurement that happened and found nothing. Every
+# assertion below is about the RECORD, never about a quantity.
+# ---------------------------------------------------------------------------
+
+
+class TestRoomFillDropsAreRecorded:
+    """_measure_room_fills used to take four bare `continue`s.
+
+    Each one deleted a NAMED drawing — INV-00 §1.3 caught `KING A - FC PLAN`
+    disappearing off a real Moxy sheet with no row, no flag and no count in any
+    artifact, so its ceiling read as a zero rather than as a blank.
+    """
+
+    @staticmethod
+    def _measure(path):
+        pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+        doc = fitz.open(path)
+        try:
+            return pipeline._measure_room_fills(doc[0], [], {}, "SYNTH-1")
+        finally:
+            doc.close()
+
+    def test_a_title_with_no_printed_scale_is_recorded_not_dropped(self):
+        """The exact shape of INV-00 §1.3's `KING A FC -> DROPPED`."""
+        path = _synthetic_sheet(with_scale=False)
+        try:
+            fills, drops = self._measure(path)
+        finally:
+            os.unlink(path)
+
+        assert fills == [], "a drawing with no scale of its own must not be measured"
+        assert len(drops) == 1
+        drop = drops[0]
+        assert drop.disposition == SKIPPED_NO_SCALE
+        assert drop.title == "KING A - RCP PLAN"
+        assert drop.plan_kind == "RCP"
+        assert "no printed scale beneath the title" in drop.reason
+        # The reason must say WHY it was not measured at the page scale, not
+        # merely that it was not measured.
+        assert "squared error" in drop.reason
+        assert drop.area_sf is None, "a drop reports None, never 0.0"
+
+    def test_a_measured_drawing_leaves_no_drop(self):
+        path = _synthetic_sheet()
+        try:
+            fills, drops = self._measure(path)
+        finally:
+            os.unlink(path)
+
+        assert len(fills) == 1
+        assert fills[0].plan_kind == "RCP"
+        assert fills[0].area_sf > 0
+        assert drops == [], "nothing was lost, so nothing is reported lost"
+
+    def test_a_page_with_no_plan_title_reports_nothing_either_way(self):
+        """Silence is correct when there was never a drawing to measure."""
+        path = _synthetic_sheet(with_title=False, with_scale=False)
+        try:
+            fills, drops = self._measure(path)
+        finally:
+            os.unlink(path)
+        assert (fills, drops) == ([], [])
+
+
+class TestDeterministicBundleCoverageKeys:
+    """The bundle carries its own account of what it did not measure.
+
+    Pre-change these keys did not exist at all: INV-08 §1.4's `RETURN KEYS`
+    dump is the proof, and it is why four correctly-excluded Crow viewports
+    could never reach a report.
+    """
+
+    @staticmethod
+    def _bundle(path, resolved_type="floor_plan"):
+        pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+        doc = fitz.open(path)
+        try:
+            return pipeline._deterministic_bundle(
+                doc[0], doc, path, 0, "SYNTH-1", resolved_type
+            )
+        finally:
+            doc.close()
+
+    def test_both_coverage_keys_always_exist(self):
+        path = _synthetic_sheet()
+        try:
+            bundle = self._bundle(path)
+        finally:
+            os.unlink(path)
+        assert "excluded_viewports" in bundle
+        assert "coverage_drops" in bundle
+        assert isinstance(bundle["excluded_viewports"], list)
+        assert isinstance(bundle["coverage_drops"], list)
+
+    def test_an_unsolved_scale_on_a_plan_sheet_is_recorded(self):
+        """walls/rooms/symbols come back empty when fpp <= 0 (INV-08 S5).
+
+        Empty-because-unscaled and empty-because-there-is-nothing-there are the
+        same value and completely different facts.
+        """
+        doc = fitz.open()
+        doc.new_page(width=800, height=800)      # blank: nothing solves a scale
+        path = tempfile.mktemp(suffix=".pdf")
+        doc.save(path)
+        doc.close()
+        try:
+            bundle = self._bundle(path)
+        finally:
+            os.unlink(path)
+
+        assert bundle["fpp"] <= 0, "fixture must genuinely fail to solve a scale"
+        assert bundle["walls"] == [] and bundle["rooms"] == []
+        no_scale = [
+            d for d in bundle["coverage_drops"] if d.disposition == SKIPPED_NO_SCALE
+        ]
+        assert len(no_scale) == 1
+        assert "not measured" in no_scale[0].reason
+        assert "NOT the same as measuring zero" in no_scale[0].reason
+
+    def test_a_non_plan_sheet_without_a_scale_is_not_reported_as_a_loss(self):
+        """A schedule sheet has no geometry to lose — a record there is noise."""
+        doc = fitz.open()
+        doc.new_page(width=800, height=800)
+        path = tempfile.mktemp(suffix=".pdf")
+        doc.save(path)
+        doc.close()
+        try:
+            bundle = self._bundle(path, resolved_type="schedule")
+        finally:
+            os.unlink(path)
+        assert bundle["coverage_drops"] == []
+
+    def test_a_raising_room_fill_engine_is_recorded_not_swallowed(self):
+        """S7: a logger.debug is not a record. Losing every fill on a sheet to a
+        swallowed exception must not read as a building with no ceilings."""
+        path = _synthetic_sheet()
+        pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+
+        def _boom(*_a, **_k):
+            raise RuntimeError("render device is on fire")
+
+        pipeline._measure_room_fills = _boom
+        doc = fitz.open(path)
+        try:
+            bundle = pipeline._deterministic_bundle(
+                doc[0], doc, path, 0, "SYNTH-1", "floor_plan"
+            )
+        finally:
+            doc.close()
+            os.unlink(path)
+
+        errored = [d for d in bundle["coverage_drops"] if d.disposition == ERRORED]
+        assert len(errored) == 1
+        assert "RuntimeError" in errored[0].reason
+        assert "render device is on fire" in errored[0].reason
+        assert "unmeasured, not zero" in errored[0].reason
+
+
+class TestRecordSheetCoverage:
+    """Drop records must reach the ledger row, or they die in the sheet dict."""
+
+    def test_records_are_copied_onto_the_row(self):
+        row = SheetCoverage(page_index=3)
+        extracted = {
+            "_excluded_viewports": [
+                DrawingCoverage(region_id="R3", disposition=EXCLUDED_OFF_SCALE)
+            ],
+            "_coverage_drops": [
+                DrawingCoverage(region_id="FILL-4", disposition=SKIPPED_NO_SCALE)
+            ],
+            "components": [{"name": "x"}, {"name": "y"}],
+            "_cost_usd": 0.25,
+        }
+        TakeoffPipeline._record_sheet_coverage(row, extracted)
+        assert [d.region_id for d in row.drawings] == ["R3", "FILL-4"]
+        assert row.items_emitted == 2
+        assert row.cost_usd == 0.25
+
+    def test_a_dropped_drawing_makes_the_sheet_partial_not_measured(self):
+        row = SheetCoverage(page_index=3, disposition=MEASURED)
+        TakeoffPipeline._record_sheet_coverage(
+            row,
+            {"_coverage_drops": [
+                DrawingCoverage(region_id="FILL-4", disposition=SKIPPED_NO_SCALE)
+            ]},
+        )
+        assert row.disposition == MEASURED_PARTIAL
+        assert "not measured" in row.reason
+
+    def test_a_deliberate_off_scale_exclusion_is_not_a_partial_measurement(self):
+        """The exclusion is CORRECT (§11.1). Recording it must not downgrade a
+        sheet that measured everything it should have."""
+        row = SheetCoverage(page_index=0, disposition=MEASURED)
+        TakeoffPipeline._record_sheet_coverage(
+            row,
+            {"_excluded_viewports": [
+                DrawingCoverage(region_id="R3", disposition=EXCLUDED_OFF_SCALE)
+            ]},
+        )
+        assert row.disposition == MEASURED
+        assert len(row.drawings) == 1
+
+    def test_a_skipped_row_is_never_upgraded(self):
+        """The disposition only ever moves downwards in confidence."""
+        row = SheetCoverage(page_index=1, disposition=SKIPPED_CLASSIFIER,
+                            reason="keyword COVER")
+        TakeoffPipeline._record_sheet_coverage(
+            row, {"components": [{"name": "x"}]},
+        )
+        assert row.disposition == SKIPPED_CLASSIFIER
+        assert row.reason == "keyword COVER"
+
+    def test_a_sheet_with_no_records_leaves_the_row_untouched(self):
+        row = SheetCoverage(page_index=2, disposition=MEASURED)
+        TakeoffPipeline._record_sheet_coverage(row, {})
+        assert row.disposition == MEASURED
+        assert row.drawings == []
+        assert row.items_emitted == 0

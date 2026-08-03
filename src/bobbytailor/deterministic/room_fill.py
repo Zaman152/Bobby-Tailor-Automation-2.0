@@ -199,6 +199,7 @@ def measure_enclosed_area(
     candidate_id: str = "",
     min_region_sf: float = MIN_REGION_SF,
     max_region_sf: float = MAX_REGION_SF,
+    dropped_regions: Optional[List[float]] = None,
 ) -> Optional[RoomFillResult]:
     """Sum every enclosed region inside *clip* -> the unit's floor/ceiling SF.
 
@@ -208,6 +209,15 @@ def measure_enclosed_area(
         feet_per_point:  that viewport's OWN scale (never a project default).
         dpi:             render resolution.
         candidate_id:    id carried onto the result for fusion binding.
+        dropped_regions: optional OUT-list. Every region rejected as larger
+            than one unit has its area appended here, so the coverage ledger
+            can say *"3 regions of 1,240 / 980 / 1,510 SF were rejected as
+            larger than one unit"* instead of the rejection existing nowhere
+            (INV-08 §4 step 7 / CONCERNS H1). Purely observational: passing it
+            changes no threshold and no returned value. The size constants are
+            deliberately NOT parameterised away here — INV-08 risk 6 is
+            explicit that recording an oversize rejection is in scope and
+            moving the threshold to make it pass is the coincidence trap.
 
     Returns:
         A :class:`RoomFillResult`, or ``None`` when the render fails or no
@@ -230,10 +240,19 @@ def measure_enclosed_area(
     regions = _label_regions(pix.samples, pix.width, pix.height, px_area_sf)
 
     # The outside of the drawing touches the clip edge; rooms never do.
-    enclosed = [
-        r.area_sf for r in regions
-        if not r.touches_edge and min_region_sf <= r.area_sf <= max_region_sf
-    ]
+    # The oversize rejection is recorded rather than merely applied: a region
+    # larger than any plausible unit is genuinely not a room, but a silently
+    # discarded 1,510 SF region and a drawing that measured nothing are the
+    # same fact to every consumer, which is the defect this out-list closes.
+    enclosed: List[float] = []
+    for r in regions:
+        if r.touches_edge or r.area_sf < min_region_sf:
+            continue
+        if r.area_sf > max_region_sf:
+            if dropped_regions is not None:
+                dropped_regions.append(round(r.area_sf, 1))
+            continue
+        enclosed.append(r.area_sf)
     if not enclosed:
         return None
 

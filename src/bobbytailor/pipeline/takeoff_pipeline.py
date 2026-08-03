@@ -49,10 +49,15 @@ from bobbytailor.pipeline.sheet_pass_matrix import (
     pick_model_for_pass,
 )
 from bobbytailor.pipeline.coverage import (
+    ERRORED,
+    EXCLUDED_OFF_SCALE,
+    MEASURED,
     MEASURED_PARTIAL,
     NOT_APPLICABLE,
     SKIPPED_CLASSIFIER,
+    SKIPPED_NO_SCALE,
     CoverageLedger,
+    DrawingCoverage,
     SheetCoverage,
 )
 from bobbytailor.pipeline.accuracy_config import count_tiling_enabled, count_tiling_grid
@@ -1944,7 +1949,16 @@ class TakeoffPipeline:
         # would double-count. Exclude any viewport whose OWN printed scale
         # disagrees with the resolved page scale (deterministic; a viewport with
         # no printed scale of its own is left alone).
+        #
+        # The exclusion is CORRECT and, until now, invisible: it existed as a
+        # logger.info and nothing more (INV-08 §1.4 — the returned bundle had no
+        # `excluded_viewports` key, so no consumer could ever surface it). A
+        # client cannot see that four S.C.C.P. details were DELIBERATELY not
+        # measured, which is indistinguishable from the app failing to find
+        # them. Each exclusion now leaves a DrawingCoverage on the bundle.
         geometry_mask = list(mask_rects)
+        excluded_viewports: List[DrawingCoverage] = []
+        coverage_drops: List[DrawingCoverage] = []
         resolved_fpp = fpp
         if resolved_fpp > 0:
             for vp in viewports:
@@ -1956,19 +1970,49 @@ class TakeoffPipeline:
                     continue
                 if abs(vp_fpp - resolved_fpp) > _SCALE_MATCH_TOL * resolved_fpp:
                     geometry_mask.append(vp.bbox_pt)
+                    ratio = max(vp_fpp, resolved_fpp) / min(vp_fpp, resolved_fpp)
+                    reason = (
+                        "its printed scale %.4f ft/pt differs from the resolved "
+                        "page scale %.4f ft/pt; measuring it at the page scale "
+                        "would be %.0fx wrong, so it was deliberately excluded — "
+                        "this is NOT a failed measurement"
+                        % (vp_fpp, resolved_fpp, ratio)
+                    )
+                    excluded_viewports.append(
+                        DrawingCoverage(
+                            region_id=vp.region_id,
+                            title=getattr(ps, "title", "") or vp.kind,
+                            disposition=EXCLUDED_OFF_SCALE,
+                            reason=reason,
+                            printed_scale_fpi=round(vp_fpp * 72.0, 4),
+                        )
+                    )
                     logger.info(
-                        "sheet %r: excluding off-scale viewport %s (%s) — its "
-                        "printed scale %.4f ft/pt differs from the resolved page "
-                        "scale %.4f ft/pt; measuring it here would be %.0fx wrong",
+                        "sheet %r: excluding off-scale viewport %s (%s) — %s",
                         sheet_name, vp.region_id,
-                        getattr(ps, "title", "") or vp.kind,
-                        vp_fpp, resolved_fpp, max(vp_fpp, resolved_fpp) / min(vp_fpp, resolved_fpp),
+                        getattr(ps, "title", "") or vp.kind, reason,
                     )
 
         walls: list = []
         wall_lf: dict = {}
         rooms: list = []
         symbols: list = []
+        if resolved_type in _PLAN_SHEET_TYPES and fpp <= 0:
+            # Every quantity below is gated on a positive feet-per-point, so an
+            # unsolved scale silently leaves walls/rooms/symbols empty — a plan
+            # sheet that measured NOTHING is reported identically to a plan
+            # sheet with nothing on it (INV-08 §2 row S5). Record the reason.
+            coverage_drops.append(
+                DrawingCoverage(
+                    region_id="page",
+                    title=sheet_name,
+                    disposition=SKIPPED_NO_SCALE,
+                    reason="no drawing scale could be resolved for this %s sheet "
+                           "(feet-per-point resolved to %r) — walls, rooms and "
+                           "symbols were not measured, which is NOT the same as "
+                           "measuring zero of them" % (resolved_type, fpp),
+                )
+            )
         if resolved_type in _PLAN_SHEET_TYPES and fpp > 0:
             walls = extract_walls(page, fpp, exclude_rects=geometry_mask)
             wall_lf = wall_lf_by_class(walls, fpp)
@@ -2002,11 +2046,26 @@ class TakeoffPipeline:
         # with its own printed scale (see _measure_room_fills).
         room_fills: list = []
         try:
-            room_fills = self._measure_room_fills(
+            room_fills, fill_drops = self._measure_room_fills(
                 page, viewports, printed_scales_by_region, sheet_name
             )
+            coverage_drops.extend(fill_drops)
         except Exception as exc:  # noqa: BLE001 — measurement is additive
+            # A logger.debug is not a record. Losing EVERY fill on a sheet to a
+            # swallowed exception is INV-08 §2 row S7, and it is the difference
+            # between "this building has no guestroom ceilings" and "we crashed
+            # measuring them".
             logger.debug("room_fill failed on %r: %s", sheet_name, exc)
+            coverage_drops.append(
+                DrawingCoverage(
+                    region_id="page",
+                    title=sheet_name,
+                    disposition=ERRORED,
+                    reason="enclosed-region measurement raised %s: %s — every "
+                           "drawing on this sheet is unmeasured, not zero"
+                           % (type(exc).__name__, exc),
+                )
+            )
 
         return {
             "symbol_groups": symbols,
@@ -2019,6 +2078,12 @@ class TakeoffPipeline:
             "footprint": footprint,
             "fpp": fpp,
             "sheet_name": sheet_name,
+            # Additive coverage keys. `excluded_viewports` is the DELIBERATE
+            # off-scale exclusion (correct, and previously log-only);
+            # `coverage_drops` is everything this sheet failed to measure, each
+            # with a named reason. No existing key is renamed or removed.
+            "excluded_viewports": excluded_viewports,
+            "coverage_drops": coverage_drops,
             "_viewports_with_scales": viewports_with_scales,
             "_main_plan_region": main_id,
             "_scale_result": scale,
@@ -2045,7 +2110,7 @@ class TakeoffPipeline:
         viewports: Sequence,
         printed_scales_by_region: dict,
         sheet_name: str,
-    ) -> list:
+    ) -> tuple:
         """Measure each scaled DRAWING as an enclosed region, at its own scale.
 
         Anchored on the printed scale callouts: one callout marks one drawing,
@@ -2054,6 +2119,14 @@ class TakeoffPipeline:
         details, and area scales by the SQUARE, so one page-level scale corrupts
         every region it touches. A drawing with no printed scale of its own is
         skipped rather than measured with a borrowed one (flag-don't-guess).
+
+        Returns:
+            ``(fills, drops)`` — the measurements, and one
+            :class:`DrawingCoverage` per drawing that was NOT measured, each
+            naming the reason. The four bare ``continue``s this method used to
+            take are exactly INV-08 §2 row S6: a named drawing (e.g.
+            ``KING A - FC PLAN``) vanished with no row, no flag and no count in
+            any artifact, so its item read as a zero rather than as a blank.
         """
         from bobbytailor.deterministic.printed_scale import (  # noqa: PLC0415
             extract_printed_scales,
@@ -2064,10 +2137,28 @@ class TakeoffPipeline:
             plan_titles,
         )
 
+        drops: List[DrawingCoverage] = []
+
+        def _drop(i, plan_name, plan_kind, disposition, reason, fpi=None):
+            drops.append(
+                DrawingCoverage(
+                    region_id="FILL-%d" % (i + 1),
+                    title="%s - %s PLAN" % (plan_name, plan_kind),
+                    plan_kind=plan_kind,
+                    disposition=disposition,
+                    reason=reason,
+                    printed_scale_fpi=fpi,
+                )
+            )
+            logger.info(
+                "sheet %r: FILL-%d %r NOT measured — %s",
+                sheet_name, i + 1, "%s - %s PLAN" % (plan_name, plan_kind), reason,
+            )
+
         try:
             import fitz  # noqa: PLC0415
         except Exception:  # noqa: BLE001
-            return []
+            return [], drops
 
         scales = extract_printed_scales(page)
         titles = plan_titles(page)
@@ -2086,10 +2177,21 @@ class TakeoffPipeline:
                 if -6.0 <= gap < best_gap:
                     ps, best_gap = s, gap
             if ps is None:
+                _drop(
+                    i, plan_name, plan_kind, SKIPPED_NO_SCALE,
+                    "no printed scale beneath the title — measuring it at a "
+                    "borrowed scale would be a squared error",
+                )
                 continue
             fpp = float(getattr(ps, "feet_per_point", 0.0) or 0.0)
             if fpp <= 0:
+                _drop(
+                    i, plan_name, plan_kind, SKIPPED_NO_SCALE,
+                    "the printed scale parsed to a non-positive feet-per-point "
+                    "(%r)" % (getattr(ps, "text", "") or "",),
+                )
                 continue
+            fpi = round(fpp * 72.0, 4)
             clip = fitz.Rect(
                 tx0 - self._FILL_CLIP_SIDE_PT,
                 max(0.0, ty0 - self._FILL_CLIP_UP_PT),
@@ -2097,11 +2199,35 @@ class TakeoffPipeline:
                 max(0.0, ty0 - 8.0),
             )
             if clip.is_empty or clip.height <= 0 or clip.width <= 0:
+                _drop(
+                    i, plan_name, plan_kind, ERRORED,
+                    "the clip rectangle around the title is degenerate "
+                    "(%.1f x %.1f pt) — there is no area to measure"
+                    % (clip.width, clip.height),
+                    fpi,
+                )
                 continue
+            oversize: List[float] = []
             result = measure_enclosed_area(
-                page, clip, fpp, candidate_id="FILL-%d" % (i + 1)
+                page, clip, fpp, candidate_id="FILL-%d" % (i + 1),
+                dropped_regions=oversize,
             )
             if result is None:
+                extra = ""
+                if oversize:
+                    extra = (
+                        "; %d region(s) of %s SF were rejected as larger than one "
+                        "unit" % (
+                            len(oversize),
+                            ", ".join("%.0f" % a for a in sorted(oversize, reverse=True)),
+                        )
+                    )
+                _drop(
+                    i, plan_name, plan_kind, ERRORED,
+                    "no enclosed region survived the minimum and maximum region "
+                    "filter%s" % extra,
+                    fpi,
+                )
                 continue
             result = flag_implausible_unit(result, expect_max_sf=self._MAX_UNIT_SF)
             result.sheet_name = sheet_name
@@ -2109,13 +2235,83 @@ class TakeoffPipeline:
             result.plan_kind = plan_kind
             result.viewport_title = "%s - %s PLAN" % (plan_name, plan_kind)
             out.append(result)
+            if oversize:
+                # Measured, but not everything inside the clip was kept. The
+                # rejection is correct and was invisible; it is now on the record.
+                drops.append(
+                    DrawingCoverage(
+                        region_id=result.candidate_id,
+                        title=result.viewport_title,
+                        plan_kind=plan_kind,
+                        disposition=MEASURED_PARTIAL,
+                        reason="%d region(s) of %s SF were rejected as larger than "
+                               "one unit" % (
+                                   len(oversize),
+                                   ", ".join(
+                                       "%.0f" % a
+                                       for a in sorted(oversize, reverse=True)
+                                   ),
+                               ),
+                        printed_scale_fpi=fpi,
+                        area_sf=result.area_sf,
+                        needs_review=bool(result.needs_review),
+                    )
+                )
             logger.info(
                 "sheet %r: %s %r enclosed area %.1f SF at %.2f ft/in%s",
                 sheet_name, result.candidate_id, result.viewport_title,
                 result.area_sf, result.scale_fpi or 0.0,
                 " [needs review]" if result.needs_review else "",
             )
-        return out
+        return out, drops
+
+    @staticmethod
+    def _record_sheet_coverage(row: SheetCoverage, extracted: dict) -> None:
+        """Copy one processed sheet's coverage records onto its ledger row.
+
+        Additive and total: a sheet dict from a path that produced no records
+        (the raster/legacy flow) leaves the row exactly as the earlier stages
+        wrote it. The disposition is only ever moved DOWNWARDS in confidence —
+        a sheet that dropped a drawing becomes MEASURED_PARTIAL — and never
+        upgraded, so nothing here can quietly relabel a skip as a measurement.
+        """
+        drawings = list(extracted.get("_excluded_viewports") or [])
+        drawings += list(extracted.get("_coverage_drops") or [])
+        if drawings:
+            row.drawings.extend(d for d in drawings if isinstance(d, DrawingCoverage))
+
+        geometry = extracted.get("_geometry")
+        if geometry is not None and not row.measurable_signal.get("geometry"):
+            # Presence, not contents: the ledger stays flat (INV-08 risk 3 —
+            # coverage_ledger rides inside takeoff.json, which the web UI loads
+            # whole, so no bitmaps and no region lists go on this row).
+            row.measurable_signal = dict(row.measurable_signal)
+            row.measurable_signal["geometry"] = 1
+
+        components = extracted.get("components") or []
+        if components:
+            row.items_emitted = len(components)
+
+        cost = extracted.get("_cost_usd")
+        if cost:
+            try:
+                row.cost_usd = float(cost)
+            except (TypeError, ValueError):
+                pass
+
+        # A sheet that measured something AND dropped something is partial, not
+        # whole. Only ever applied to a row still reading the MEASURED default.
+        dropped = [
+            d for d in row.drawings
+            if getattr(d, "disposition", "") not in (MEASURED, EXCLUDED_OFF_SCALE)
+        ]
+        if dropped and row.disposition == MEASURED:
+            row.disposition = MEASURED_PARTIAL
+            if not row.reason:
+                row.reason = (
+                    "%d drawing(s) on this sheet were not measured — see the "
+                    "per-drawing reasons" % len(dropped)
+                )
 
     def _structured_vision_call(
         self,
@@ -2449,6 +2645,14 @@ class TakeoffPipeline:
             geom = self._measure_geometry_safe(pdf_path, page_index, None)
             if geom is not None:
                 merged["_geometry"] = geom
+
+        # Coverage records travel with the sheet so run_project can copy them
+        # onto the ledger row. `fuse_sheet` mutates the SAME bundle dict, so its
+        # own notes and item-coverage rows are read back here after the call.
+        merged["_excluded_viewports"] = bundle.get("excluded_viewports") or []
+        merged["_coverage_drops"] = bundle.get("coverage_drops") or []
+        merged["_coverage_notes"] = bundle.get("coverage_notes") or []
+        merged["_item_coverage"] = bundle.get("item_coverage") or []
 
         merged["_source_sheet"] = image_path
         merged["_sheet_type"] = resolved_type
@@ -3128,12 +3332,35 @@ class TakeoffPipeline:
 
             # Tag original page number for downstream reporters.
             extracted["_page_num"] = page.get("page_num", i)
+            # ...and the SOURCE page index, so a later stage (the errored-sheet
+            # guard below) can find this sheet's ledger row by identity rather
+            # than by matching a display name.
+            extracted["_page_index"] = page_index
 
             if extracted.get("_skipped"):
                 # The sentinel stays OUT of all_extracted (every downstream
                 # contract is preserved) — but the page is no longer invisible:
                 # run_sheet has already written the reason, the deciding keyword
-                # and the measurable signal onto its ledger row.
+                # and the measurable signal onto its ledger row. Backstop that
+                # here so a skip taken on a path that did NOT see the ledger
+                # (a caller passing coverage=None into run_sheet, a future
+                # sentinel) still lands as a recorded disposition rather than a
+                # row that reads `measured` by default — the exact shape of
+                # INV-08 §2 row S2.
+                if sheet_coverage is not None:
+                    if sheet_coverage.disposition == MEASURED:
+                        sheet_coverage.disposition = (
+                            NOT_APPLICABLE
+                            if not sum(
+                                (extracted.get("_measurable_signal") or {}).values()
+                            )
+                            else SKIPPED_CLASSIFIER
+                        )
+                    if not sheet_coverage.reason:
+                        sheet_coverage.reason = str(
+                            extracted.get("_skip_reason") or "no reason recorded"
+                        )
+                    sheet_coverage.items_emitted = 0
                 logger.info(
                     "run_project: skipping %r (sheet_type=%s) — %s",
                     sheet_name, extracted.get("sheet_type"),
@@ -3158,6 +3385,13 @@ class TakeoffPipeline:
                     )
 
             all_extracted.append(extracted)
+
+            # Copy this sheet's coverage records onto its ledger row. Without
+            # this the drawing-level drops recorded in _deterministic_bundle
+            # and _measure_room_fills die inside the sheet dict and never reach
+            # a report — which is the whole defect, one layer down.
+            if sheet_coverage is not None:
+                self._record_sheet_coverage(sheet_coverage, extracted)
 
         # Fallback: a companion take-off is a PROJECT-level authoritative source.
         # If no floor_plan sheet existed to host it (e.g. an all-elevation/detail
@@ -3230,6 +3464,24 @@ class TakeoffPipeline:
 
         all_estimates: list[dict] = []
         for extracted in all_extracted:
+            if "error" in extracted and coverage is not None:
+                # An errored sheet is counted as processed but contributes zero
+                # estimates, and its error never reaches the report (INV-08 §2
+                # row S11) — it renders as a sheet with 0 items, i.e. as a
+                # building with none of those things.
+                row = coverage.sheet(extracted.get("_page_index")) if extracted.get(
+                    "_page_index"
+                ) is not None else None
+                if row is None:
+                    name = extracted.get("_sheet_name") or extracted.get(
+                        "_source_sheet", ""
+                    )
+                    row = next(
+                        (r for r in coverage.sheets if r.sheet_name == name), None
+                    )
+                if row is not None:
+                    row.disposition = ERRORED
+                    row.reason = str(extracted.get("error") or "sheet analysis failed")
             if "error" not in extracted:
                 verifier.verify(
                     extracted,

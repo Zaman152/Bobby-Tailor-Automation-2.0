@@ -149,3 +149,65 @@ def test_max_region_guard_rejects_sheet_scale_regions():
     r = measure_enclosed_area(page, clip, FPP_QUARTER, max_region_sf=MAX_REGION_SF)
     assert r is None
     doc.close()
+
+
+# ── the oversize rejection leaves a trace (23-03 / INV-08 §4 step 7) ─────────
+
+
+def test_oversize_rejection_is_recorded_when_an_out_list_is_supplied():
+    """The rejection is CORRECT and, until now, invisible.
+
+    A 2,400 SF region silently discarded and a drawing that measured nothing
+    are the same `None` to every caller, so the ledger could never say *"one
+    region of 2,400 SF was rejected as larger than one unit"*. Recording it is
+    in scope; MOVING the threshold to make it pass is the coincidence trap
+    INV-08 risk 6 forbids, and the constant is asserted untouched below.
+    """
+    # 40' x 30' = 1,200 SF at 1/8" = 1'-0". Drawn at EIGHTH so the whole region
+    # fits on the page and is genuinely ENCLOSED — the pre-existing 60x40-at-
+    # quarter fixture overflows an 800 pt page, so its region touches the clip
+    # edge and is discarded as the outside before the size filter is reached.
+    fpp_eighth = 8.0 / 72.0
+    doc, page, clip = _page_with_room(40.0, 30.0, fpp=fpp_eighth)
+    dropped = []
+    r = measure_enclosed_area(
+        page, clip, fpp_eighth, max_region_sf=MAX_REGION_SF,
+        dropped_regions=dropped,
+    )
+    assert r is None, "the return value is unchanged by observing the drop"
+    assert len(dropped) == 1
+    assert dropped[0] > MAX_REGION_SF
+    assert dropped[0] == pytest.approx(1200.0, rel=0.08)
+    doc.close()
+
+
+def test_the_out_list_is_optional_and_changes_nothing():
+    """Passing the list must not perturb a measurement that succeeds."""
+    doc, page, clip = _page_with_room(20.0, 15.0)
+    without = measure_enclosed_area(page, clip, FPP_QUARTER, candidate_id="R1")
+    dropped = []
+    with_list = measure_enclosed_area(
+        page, clip, FPP_QUARTER, candidate_id="R1", dropped_regions=dropped,
+    )
+    assert without is not None and with_list is not None
+    assert with_list.to_dict() == without.to_dict()
+    assert dropped == [], "nothing was oversize, so nothing is reported oversize"
+    doc.close()
+
+
+def test_a_region_below_the_minimum_is_not_reported_as_oversize():
+    """MIN and MAX are different rejections. A fixture outline is not a room
+    that was too big; conflating them would make the ledger lie."""
+    doc, page, clip = _page_with_room(20.0, 15.0)
+    dropped = []
+    r = measure_enclosed_area(
+        page, clip, FPP_QUARTER, min_region_sf=1000.0, dropped_regions=dropped,
+    )
+    assert r is None
+    assert dropped == []
+    doc.close()
+
+
+def test_the_size_constant_is_untouched():
+    """INV-08 risk 6 / §14.2: fix the clip, not the threshold."""
+    assert MAX_REGION_SF == 900.0

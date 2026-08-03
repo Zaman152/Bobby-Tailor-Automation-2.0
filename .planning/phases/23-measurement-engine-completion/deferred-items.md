@@ -70,3 +70,28 @@ implements "the label sits at the drawing's bottom" as `y1 <= cy` in *unrotated*
 **Not a deferral — it is scheduled.** Plan 23-07 owns it, and 23-02's constraints explicitly
 forbid starting it here. Logged only so the `main=None` reading in the probe output is not
 mistaken for a defect introduced by SP-2. It is present identically before the change.
+
+---
+
+## DEF-23-04 — `test_max_region_guard_rejects_sheet_scale_regions` passes for the wrong reason
+
+**Found during:** 23-03 Task 1, adding the `dropped_regions` out-list test.
+**Where:** `tests/test_room_fill.py::test_max_region_guard_rejects_sheet_scale_regions`.
+
+The fixture builds a 60' × 40' room at 1/4" = 1'-0", i.e. **1,080 × 720 pt**, on an **800 × 800 pt**
+page starting at (100, 100). The room overflows the page, so its region **touches the clip edge**
+and is discarded as "the outside" — the `max_region_sf` guard the test is named for is never
+reached. Proven by instrumenting `measure_enclosed_area` with the new out-list: `dropped_regions`
+comes back **empty**, which it could not be if the size filter had fired.
+
+**Impact:** the assertion (`is None`) is correct, so nothing is broken today — but the test does not
+in fact pin the behaviour it claims to, and would keep passing if `MAX_REGION_SF` were deleted.
+
+**NOT fixed here** because rewriting an existing pin is out of this plan's scope (the change would
+be indistinguishable from tuning a guard, which INV-08 risk 6 forbids without its own justification).
+The new `test_oversize_rejection_is_recorded_when_an_out_list_is_supplied` draws its 1,200 SF region
+at 1/8" so it genuinely fits on the page, and DOES exercise the size filter — so the behaviour is now
+covered even though the older test remains vacuous.
+
+**To fix:** redraw the fixture at a scale that fits the page (or enlarge the page) and assert
+`dropped_regions` is non-empty, so the guard is what makes the test pass.
