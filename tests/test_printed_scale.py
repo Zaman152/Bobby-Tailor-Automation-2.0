@@ -4,6 +4,9 @@ No PDF, no network, no paid calls — synthetic fitz-like pages and viewports.
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from bobbytailor.deterministic.geometry_takeoff import ScaleResult
@@ -296,6 +299,209 @@ def test_a_leading_measure_is_never_read_as_a_drawing_number(text):
     every stacked-fraction callout out of it.
     """
     assert _number_and_title(text)[0] is None
+
+
+# ── SP-2: the four-fixture invariance pin (real PDFs) ─────────────────────────
+#
+# D-05 / D-07: a scale change is accepted on the four-plan-set diff, never on
+# "closer to a golden quantity". A wrong feet-per-point is a squared error on
+# every area, so the contract is that this parser corrects exactly the seven
+# Bob's callouts INV-03 §4.1 identified and moves NOTHING on the other three
+# drafting offices. The 'before' side is frozen in
+# tests/fixtures/printed_scale_pre_sp2.json, captured from the pre-SP-2 parser.
+
+_PRE_SP2_FIXTURE = (
+    Path(__file__).parent / "fixtures" / "printed_scale_pre_sp2.json"
+)
+
+# The seven corrections, by fixture / page / pre-change fpi / post-change fpi.
+# Every one is on Bob's; INV-03 §4.1 lists them in exactly this order.
+_EXPECTED_CHANGES = [
+    ("Bob's", 1, 0.3333, 10.6667, 'SCALE: 3 32" = 1\'-0"'),
+    ("Bob's", 2, 0.3333, 10.6667, 'SCALE: 3 32" = 1\'-0"'),
+    ("Bob's", 3, 0.3333, 10.6667, 'SCALE: 3 32" = 1\'-0"'),
+    ("Bob's", 4, 0.5, 8.0, '2 SCALE: 18" = 1\'-0" FRONT ELEVATION NEW'),
+    ("Bob's", 4, 0.3333, 8.0, '3 REAR ELEVATION NEW SCALE: 18" = 1\'-0"'),
+    ("Bob's", 4, 0.2, 4.0,
+     '5 ENLARGED GLAZING AND ENTRY DOORS SCALE: 14" = 1\'-0"'
+     ' 4 TRUCK DOCK ELEVATION NEW'),
+    ("Bob's", 5, 1.0, 0.5, '1 SCALE: 2" = 1\'-0"'),
+]
+
+# The three offices whose sheets must not move at all.
+_UNMOVED_FIXTURES = ("Crow", "Moxy", "Invitation to Bid")
+
+
+def _sweep_rows(pre_rows):
+    """Re-parse every pinned callout with TODAY's parser, in fixture order.
+
+    Reads the callout texts from the frozen fixture rather than re-extracting
+    them from the PDFs, so this test isolates the PARSE. Block extraction is
+    covered separately by the probe acceptance in the plan.
+    """
+    from bobbytailor.deterministic.printed_scale import (
+        _number_and_title as nt,
+        parse_scale_ratio as p,
+    )
+    out = []
+    for r in pre_rows:
+        fpi = p(r["text"])
+        number, title = nt(r["text"])
+        out.append({
+            "pdf": r["pdf"], "page": r["page"], "text": r["text"],
+            "fpi": None if fpi is None else round(fpi, 4),
+            "number": number, "title": title,
+        })
+    return out
+
+
+def _load_pre_sp2():
+    if not _PRE_SP2_FIXTURE.exists():
+        pytest.skip(f"pre-SP-2 baseline missing: {_PRE_SP2_FIXTURE}")
+    return json.loads(_PRE_SP2_FIXTURE.read_text())
+
+
+def test_four_fixture_scale_sweep_is_pinned():
+    """changed=7 unchanged=383 across Moxy / Crow / Bob's / Chelsea at once.
+
+    A single assertion over all four plan sets, per D-05: improving one fixture
+    while regressing another is rejected, so the totals are asserted together
+    and not per-office.
+    """
+    pre = _load_pre_sp2()
+    pre_rows = pre["rows"]
+    now_rows = _sweep_rows(pre_rows)
+
+    changed = unchanged = 0
+    for old, new in zip(pre_rows, now_rows):
+        if old["fpi"] is None and new["fpi"] is None:
+            continue  # never parsed either side — "NOT TO SCALE", notes
+        if old["fpi"] != new["fpi"]:
+            changed += 1
+        else:
+            unchanged += 1
+
+    assert (changed, unchanged) == (7, 383), (
+        f"four-fixture scale sweep moved: changed={changed} unchanged={unchanged}, "
+        f"expected changed=7 unchanged=383 (INV-03 §4.1)"
+    )
+
+
+def test_the_seven_changes_are_exactly_the_bobs_corrections():
+    """Each correction is asserted by fixture, page, text and both values.
+
+    A bare total could be satisfied by seven *different* movements, which is
+    precisely the silent corruption T-23-07 registers.
+    """
+    pre_rows = _load_pre_sp2()["rows"]
+    now_rows = _sweep_rows(pre_rows)
+
+    moved = [
+        (old["pdf"], old["page"], old["fpi"], new["fpi"], old["text"])
+        for old, new in zip(pre_rows, now_rows)
+        if not (old["fpi"] is None and new["fpi"] is None)
+        and old["fpi"] != new["fpi"]
+    ]
+    assert len(moved) == len(_EXPECTED_CHANGES)
+    for got, want in zip(moved, _EXPECTED_CHANGES):
+        pdf, page, old_fpi, new_fpi, text = got
+        w_pdf, w_page, w_old, w_new, w_text = want
+        assert pdf.startswith(w_pdf), f"{got} moved on an unexpected fixture"
+        assert page == w_page, f"{got}: page {page} != {w_page}"
+        assert text == w_text, f"{got}: text != {w_text!r}"
+        assert abs(old_fpi - w_old) < 1e-3, f"{got}: pre-change {old_fpi} != {w_old}"
+        assert abs(new_fpi - w_new) < 1e-3, f"{got}: post-change {new_fpi} != {w_new}"
+
+
+@pytest.mark.parametrize("office", _UNMOVED_FIXTURES)
+def test_crow_moxy_and_chelsea_parse_byte_identically(office):
+    """Zero movement on the three offices SP-2 was not aimed at.
+
+    The whole point of the pin is that the parser generalises across four
+    drafting offices — a fix validated on Bob's alone would be the documented
+    fixture-blindness trap.
+    """
+    pre_rows = _load_pre_sp2()["rows"]
+    now_rows = _sweep_rows(pre_rows)
+
+    diffs = [
+        (old["page"], old["fpi"], new["fpi"], old["text"][:70])
+        for old, new in zip(pre_rows, now_rows)
+        if old["pdf"].startswith(office) and old["fpi"] != new["fpi"]
+    ]
+    assert diffs == [], f"{office} scales moved: {diffs}"
+
+
+def test_no_title_string_moved_on_any_fixture():
+    """Recovering a drawing number must not perturb a single extracted title.
+
+    Titles already survived in every INV-03 probe, so any movement here means
+    the number fallback reached into the title picker.
+    """
+    pre_rows = _load_pre_sp2()["rows"]
+    now_rows = _sweep_rows(pre_rows)
+
+    moved = [
+        (old["pdf"][:6], old["page"], old["title"], new["title"])
+        for old, new in zip(pre_rows, now_rows)
+        if old["title"] != new["title"]
+    ]
+    assert moved == [], f"titles moved: {moved}"
+
+
+def test_recovered_drawing_numbers_are_purely_additive():
+    """Every drawing-number movement fills a None — none overwrites a value."""
+    pre_rows = _load_pre_sp2()["rows"]
+    now_rows = _sweep_rows(pre_rows)
+
+    overwritten = [
+        (old["pdf"][:6], old["page"], old["number"], new["number"], old["text"][:60])
+        for old, new in zip(pre_rows, now_rows)
+        if old["number"] is not None and old["number"] != new["number"]
+    ]
+    assert overwritten == [], f"drawing numbers overwritten: {overwritten}"
+
+
+def test_pre_sp2_fixture_matches_todays_block_extraction():
+    """The frozen callout set still matches what the four PDFs actually contain.
+
+    Guards the pin against silently decaying if block extraction or
+    `_looks_like_scale_label` changes: the fixture would then be pinning texts
+    the parser no longer sees. Skips when the upload PDFs are absent.
+    """
+    fitz = pytest.importorskip("fitz")
+    from bobbytailor.deterministic.printed_scale import (
+        _looks_like_scale_label, _normalize, _page_blocks,
+    )
+
+    pre = _load_pre_sp2()
+    uploads = Path(__file__).resolve().parents[1] / "uploads"
+    # Order of FIRST APPEARANCE in the fixture, so `observed` and `pinned` are
+    # directly comparable lists (the fixture is in plan-set order, not sorted).
+    names = list(dict.fromkeys(r["pdf"] for r in pre["rows"]))
+    missing = [n for n in names if not (uploads / n).exists()]
+    if missing:
+        pytest.skip(f"fixture PDFs absent: {missing}")
+
+    observed = []
+    for name in names:
+        doc = fitz.open(str(uploads / name))
+        try:
+            for i in range(doc.page_count):
+                for _x0, _y0, _x1, _y1, text in _page_blocks(doc[i]):
+                    if _looks_like_scale_label(text):
+                        observed.append(
+                            (name, i, " ".join(_normalize(text).split()))
+                        )
+        finally:
+            doc.close()
+
+    pinned = [(r["pdf"], r["page"], r["text"]) for r in pre["rows"]]
+    assert observed == pinned, (
+        "the printed-scale callout set on disk no longer matches the frozen "
+        "pre-SP-2 baseline — regenerate the fixture deliberately, do not "
+        "loosen this assertion"
+    )
 
 
 # ── Synthetic fitz page ───────────────────────────────────────────────────────

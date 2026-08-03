@@ -8,11 +8,20 @@ every viewport whose scale differs from the resolved one is measured WRONG.
 
 Usage:
     python3 scripts/scale_probe.py "uploads/Crow - Cass White Road-Plans.pdf"
+    python3 scripts/scale_probe.py --json A.pdf B.pdf > sweep.json
+
+The human-readable output is BYTE-IDENTICAL to the pre-argparse version — it is
+the diff surface the four-fixture scale invariance is eyeballed on, so nothing
+may be added to it. New per-callout detail (each scale text with its parsed
+feet-per-inch) is carried by ``--json`` instead.
 """
 from __future__ import annotations
 
+import argparse
+import json
 import sys
 from pathlib import Path
+from typing import List, Optional
 
 ROOT = Path(__file__).resolve().parents[1]
 for p in (ROOT, ROOT / "src"):
@@ -29,7 +38,60 @@ from bobbytailor.deterministic.printed_scale import (  # noqa: E402
 from bobbytailor.deterministic.viewports import segment_viewports  # noqa: E402
 
 
+def probe_pages(pdf_path: str) -> List[dict]:
+    """Per-page scale facts for *pdf_path* — the machine-readable probe.
+
+    One dict per page: the printed-scale callouts with their parsed
+    feet-per-inch, the distinct feet-per-inch present, the resolved main scale,
+    and each viewport's own callout. A page that raises records ``error``
+    instead, so one defective page never truncates the sweep.
+    """
+    out: List[dict] = []
+    doc = fitz.open(pdf_path)
+    try:
+        for i in range(doc.page_count):
+            page = doc[i]
+            try:
+                vps = segment_viewports(page)
+                printed = extract_printed_scales(page)
+                by_region = match_scales_to_viewports(printed, vps)
+                main = identify_main_plan_scale(printed)
+            except Exception as exc:  # noqa: BLE001
+                out.append({"page": i, "error": f"{type(exc).__name__}: {exc}"})
+                continue
+            out.append({
+                "page": i,
+                "rotation": getattr(page, "rotation", 0),
+                "viewports": len(vps),
+                "printed_scales": [
+                    {
+                        "scale_text": ps.scale_text,
+                        "feet_per_inch": round(ps.feet_per_inch, 4),
+                        "drawing_number": ps.drawing_number,
+                        "title": ps.title,
+                    }
+                    for ps in printed
+                ],
+                "distinct_fpi": sorted({round(ps.feet_per_inch, 4) for ps in printed}),
+                "main_fpi": getattr(main, "feet_per_inch", None),
+                "viewport_scales": [
+                    {
+                        "region_id": vp.region_id,
+                        "kind": vp.kind,
+                        "own_printed_fpi": getattr(
+                            by_region.get(vp.region_id), "feet_per_inch", None
+                        ),
+                    }
+                    for vp in vps
+                ],
+            })
+    finally:
+        doc.close()
+    return out
+
+
 def probe(pdf_path: str) -> None:
+    """Human-readable report — output shape frozen, see the module docstring."""
     doc = fitz.open(pdf_path)
     print(f"### {Path(pdf_path).name} — {doc.page_count} pages")
     total_multi = 0
@@ -64,6 +126,31 @@ def probe(pdf_path: str) -> None:
     doc.close()
 
 
-if __name__ == "__main__":
-    for arg in (sys.argv[1:] or ["uploads/Crow - Cass White Road-Plans.pdf"]):
+def main(argv: Optional[List[str]] = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Per-page printed-scale probe (zero API).",
+    )
+    parser.add_argument(
+        "pdfs", nargs="*",
+        default=["uploads/Crow - Cass White Road-Plans.pdf"],
+        help="one or more plan PDFs (default: the Crow set)",
+    )
+    parser.add_argument(
+        "--json", action="store_true",
+        help="emit machine-readable per-page scale facts instead of the report",
+    )
+    args = parser.parse_args(argv)
+    paths = args.pdfs or ["uploads/Crow - Cass White Road-Plans.pdf"]
+
+    if args.json:
+        payload = {Path(p).name: probe_pages(p) for p in paths}
+        print(json.dumps(payload, indent=1, sort_keys=True))
+        return 0
+
+    for arg in paths:
         probe(arg)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

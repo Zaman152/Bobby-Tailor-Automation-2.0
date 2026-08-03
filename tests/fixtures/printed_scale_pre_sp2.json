@@ -1,0 +1,3291 @@
+{
+ "_README": "FROZEN pre-SP-2 parse of every printed-scale callout in the four plan sets, captured at commit e2fa735 before printed_scale._paper_inches was anchored. This is the 'before' side of the four-fixture invariance diff pinned by tests/test_printed_scale.py::test_four_fixture_scale_sweep_is_pinned. Regenerate ONLY by checking out the pre-SP-2 parser - never by re-running the current one, which would make the pin tautological.",
+ "_expected": {
+  "changed": 7,
+  "unchanged": 383,
+  "total_parsed": 390,
+  "total_rows": 410
+ },
+ "rows": [
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 0,
+   "text": "VICINITY MAP NOT TO SCALE",
+   "fpi": null,
+   "number": null,
+   "title": "VICINITY MAP NOT TO SCALE"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 0,
+   "text": "ELEVATION - FOR REFERENCE ONLY NOT TO SCALE",
+   "fpi": null,
+   "number": null,
+   "title": "ELEVATION FOR REFERENCE ONLY NOT TO SCALE"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 0,
+   "text": "NOT TO SCALE",
+   "fpi": null,
+   "number": null,
+   "title": "NOT TO SCALE"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 1,
+   "text": "SCALE: 3 32\" = 1'-0\"",
+   "fpi": 0.3333,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 1,
+   "text": "SCALE: NTS 2 FLOORING TRANSITION",
+   "fpi": null,
+   "number": "2",
+   "title": "SCALE: NTS FLOORING TRANSITION"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 2,
+   "text": "1. DO NOT SCALE DRAWINGS. DIMENSIONS ARE FOR CONSTRUCTION REFERENCE. ALL DIMENSIONS SHOULD BE FIELD VERIFIED AT TIME OF BID AND PRIOR TO CONSTRUCTION. ANY DISCREPANCIES SHOULD BE REPORTED IMMEDIATELY TO ARCHITECT.",
+   "fpi": null,
+   "number": "1",
+   "title": "DO NOT SCALE DRAWINGS. DIMENSIONS ARE FOR CONSTRUCTION REFERENCE. ALL DIMENSIONS SHOULD BE FIELD VERIFIED AT TIME OF BID AND PRIOR TO CONSTRUCTION. ANY DISCREPANCIES SHOULD BE REPORTED IMMEDIATELY TO ARCHITECT"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 2,
+   "text": "SCALE: 3 32\" = 1'-0\"",
+   "fpi": 0.3333,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 2,
+   "text": "SCALE: NTS",
+   "fpi": null,
+   "number": null,
+   "title": "SCALE: NTS"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 2,
+   "text": "SCALE: NTS",
+   "fpi": null,
+   "number": null,
+   "title": "SCALE: NTS"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 3,
+   "text": "SCALE: 3 32\" = 1'-0\"",
+   "fpi": 0.3333,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 3,
+   "text": "SCALE: 1\" = 1'-0\" 2 VENT PIPE DETAIL",
+   "fpi": 1.0,
+   "number": "2",
+   "title": "VENT PIPE DETAIL"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 3,
+   "text": "SCALE: 1\" = 1'-0\" 3 EXHAUST HOOD DETAIL",
+   "fpi": 1.0,
+   "number": "3",
+   "title": "EXHAUST HOOD DETAIL"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 3,
+   "text": "SCALE: 1\" = 1'-0\" 4 CURB DETAIL",
+   "fpi": 1.0,
+   "number": "4",
+   "title": "CURB DETAIL"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 4,
+   "text": "SCALE: 18\" = 1'-0\"",
+   "fpi": 8.0,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 4,
+   "text": "2 SCALE: 18\" = 1'-0\" FRONT ELEVATION NEW",
+   "fpi": 0.5,
+   "number": null,
+   "title": "FRONT ELEVATION NEW"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 4,
+   "text": "3 REAR ELEVATION NEW SCALE: 18\" = 1'-0\"",
+   "fpi": 0.3333,
+   "number": null,
+   "title": "REAR ELEVATION NEW"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 4,
+   "text": "5 ENLARGED GLAZING AND ENTRY DOORS SCALE: 14\" = 1'-0\" 4 TRUCK DOCK ELEVATION NEW",
+   "fpi": 0.2,
+   "number": "4",
+   "title": "ENLARGED GLAZING AND ENTRY DOORS TRUCK DOCK ELEVATION NEW"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 4,
+   "text": "SCALE: 18\" = 1'-0\" SCALE: 14\" = 1'-0\"",
+   "fpi": 8.0,
+   "number": null,
+   "title": "SCALE: 14\" = 1'-0\""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 4,
+   "text": "SCALE: 12\" = 1'-0\"",
+   "fpi": 2.0,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 5,
+   "text": "SCALE: 3/8\" = 1'-0\"",
+   "fpi": 2.6667,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 5,
+   "text": "SCALE: 3/8\" = 1'-0\"",
+   "fpi": 2.6667,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 5,
+   "text": "1 SCALE: 2\" = 1'-0\"",
+   "fpi": 1.0,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 5,
+   "text": "HORIZONTAL SECTION 2 SCALE: 2\" = 1'-0\"",
+   "fpi": 0.5,
+   "number": null,
+   "title": "HORIZONTAL SECTION"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 6,
+   "text": "SCALE: 1 1/2\" = 1'-0\"",
+   "fpi": 0.6667,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 6,
+   "text": "SCALE: 3\" = 1'-0\" 8",
+   "fpi": 0.3333,
+   "number": "8",
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 6,
+   "text": "SCALE: 1-1/2\" = 1'-0\"",
+   "fpi": 2.0,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 6,
+   "text": "SCALE: 1-1/2\" = 1'-0\"",
+   "fpi": 2.0,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 6,
+   "text": "NOT USED SCALE: 3\" = 1'-0\"",
+   "fpi": 0.3333,
+   "number": null,
+   "title": "NOT USED"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 6,
+   "text": "SCALE: 3\" = 1'-0\" NOT USED 5 SCALE: 3/4\" = 1'-0\" ROOF LADDER DETAIL",
+   "fpi": 0.3333,
+   "number": "5",
+   "title": "NOT USED SCALE: 3/4\" = 1'-0\" ROOF LADDER DETAIL"
+  },
+  {
+   "pdf": "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+   "page": 6,
+   "text": "4 ROOF LADDER SECTION SCALE: 3/4\" = 1'-0\"",
+   "fpi": 1.3333,
+   "number": null,
+   "title": "ROOF LADDER SECTION"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 0,
+   "text": "SCALE: 1\" = 40'-0\" 1 OVERALL FLOOR PLAN",
+   "fpi": 40.0,
+   "number": "1",
+   "title": "OVERALL FLOOR PLAN"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 0,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 2 TYP. S.C.C.P. MITERED CORNER",
+   "fpi": 0.6667,
+   "number": "2",
+   "title": "TYP. S.C.C.P. MITERED CORNER"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 0,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 4 TYPICAL S.C.C.P. JOINT DETAIL",
+   "fpi": 0.6667,
+   "number": "4",
+   "title": "TYPICAL S.C.C.P. JOINT DETAIL"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 0,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 5 TYPICAL S.C.C.P./ SF DETAIL",
+   "fpi": 0.6667,
+   "number": "5",
+   "title": "TYPICAL S.C.C.P./ SF DETAIL"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 0,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 3 TYPICAL S.C.C.P. CORNER DETAIL",
+   "fpi": 0.6667,
+   "number": "3",
+   "title": "TYPICAL S.C.C.P. CORNER DETAIL"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 1,
+   "text": "SCALE: 1\" = 40'-0\" 1 OVERALL NORTH ELEVATION",
+   "fpi": 40.0,
+   "number": "1",
+   "title": "OVERALL NORTH ELEVATION"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 1,
+   "text": "SCALE: 1\" = 20'-0\" 2 OVERALL EAST ELEVATION",
+   "fpi": 20.0,
+   "number": "2",
+   "title": "OVERALL EAST ELEVATION"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 1,
+   "text": "SCALE: 1\" = 40'-0\" 3 OVERALL SOUTH ELEVATION",
+   "fpi": 40.0,
+   "number": "3",
+   "title": "OVERALL SOUTH ELEVATION"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 1,
+   "text": "SCALE: 1\" = 20'-0\" 4 OVERALL WEST ELEVATION",
+   "fpi": 20.0,
+   "number": "4",
+   "title": "OVERALL WEST ELEVATION"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1/2\" = 1'-0\" 1 SECTION AT DOCK LEVELER (FUTURE)",
+   "fpi": 2.0,
+   "number": "1",
+   "title": "SECTION AT DOCK LEVELER (FUTURE)"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1/2\" = 1'-0\" 2 SIDE SECTION @ LEVELER (FUTURE)",
+   "fpi": 2.0,
+   "number": "2",
+   "title": "SIDE SECTION @ LEVELER (FUTURE)"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1/2\" = 1'-0\" 3 PLAN @ DOCK LEVELER (FUTURE)",
+   "fpi": 2.0,
+   "number": "3",
+   "title": "PLAN @ DOCK LEVELER (FUTURE)"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 3/4\" = 1'-0\" 4 RAMP RAIL SECTION",
+   "fpi": 1.3333,
+   "number": "4",
+   "title": "RAMP RAIL SECTION"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 3/4\" = 1'-0\" 5 SECTION @ PUMP / ELECTRICAL ROOM",
+   "fpi": 1.3333,
+   "number": "5",
+   "title": "SECTION @ PUMP ELECTRICAL ROOM"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1/2\" = 1'-0\" 6 STAIR PLAN",
+   "fpi": 2.0,
+   "number": "6",
+   "title": "STAIR PLAN"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 3/4\" = 1'-0\" 7 TYP. BOLLARD",
+   "fpi": 1.3333,
+   "number": "7",
+   "title": "TYP. BOLLARD"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 8 STAIR RAIL",
+   "fpi": 0.6667,
+   "number": "8",
+   "title": "STAIR RAIL"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 3/4\" = 1'-0\" 9 Z-GUARD DETAIL",
+   "fpi": 1.3333,
+   "number": "9",
+   "title": "Z-GUARD DETAIL"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1/2\" = 1'-0\" 10 STAIR SECTION",
+   "fpi": 2.0,
+   "number": "10",
+   "title": "STAIR SECTION"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1/4\" = 1'-0\" 12 RAMP W/ LANDING SECTION",
+   "fpi": 4.0,
+   "number": "12",
+   "title": "RAMP W/ LANDING SECTION"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1/4\" = 1'-0\" 13 ENLARGED RAMP PLAN",
+   "fpi": 4.0,
+   "number": "13",
+   "title": "ENLARGED RAMP PLAN"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1/2\" = 1'-0\" 11",
+   "fpi": 2.0,
+   "number": "11",
+   "title": ""
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 3,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 1 DOOR JAMBS AND HEADS",
+   "fpi": 0.6667,
+   "number": "1",
+   "title": "DOOR JAMBS AND HEADS"
+  },
+  {
+   "pdf": "Crow - Cass White Road-Plans.pdf",
+   "page": 3,
+   "text": "SCALE: 1/4\" = 1'-0\" 2 DOOR & FRAME TYPES",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "DOOR & FRAME TYPES"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1/8\" = 1'-0\" DRAWING TAG",
+   "fpi": 8.0,
+   "number": null,
+   "title": "DRAWING TAG"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 2,
+   "text": "DETAIL SCALE",
+   "fpi": null,
+   "number": null,
+   "title": "DETAIL SCALE"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 2,
+   "text": "NORTH NATURAL NOT APPLICABLE NOT IN CONTRACT NUMBER NOMINAL NOT TO SCALE",
+   "fpi": null,
+   "number": null,
+   "title": "NORTH NATURAL NOT APPLICABLE NOT IN CONTRACT NUMBER NOMINAL NOT TO SCALE"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 3,
+   "text": "1/8\" = 1'-0\" 1 BUILDING ELEVATION - SOUTH - SUMMIT HILL DR",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "BUILDING ELEVATION SOUTH SUMMIT HILL DR"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 3,
+   "text": "1/8\" = 1'-0\" 2 BUILDING ELEVATION - EAST - S CENTRAL ST",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "BUILDING ELEVATION EAST S CENTRAL ST"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 4,
+   "text": "1/8\" = 1'-0\" 2 BUILDING ELEVATION - WEST, STATE ST",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "BUILDING ELEVATION WEST, STATE ST"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 4,
+   "text": "1/8\" = 1'-0\" 1 BUILDING ELEVATION - NORTH, ACCESS EASEMENT",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "BUILDING ELEVATION NORTH, ACCESS EASEMENT"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 5,
+   "text": "1/8\" = 1'-0\" 4 BUILDING ELEVATION - EAST - DRIVE COURT",
+   "fpi": 8.0,
+   "number": "4",
+   "title": "BUILDING ELEVATION EAST DRIVE COURT"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 5,
+   "text": "1/8\" = 1'-0\" 2 BUILDING ELEVATION - NORTH - DRIVE COURT",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "BUILDING ELEVATION NORTH DRIVE COURT"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 5,
+   "text": "1/8\" = 1'-0\" 1 BUILDING ELEVATION - SOUTH - DRIVE COURT",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "BUILDING ELEVATION SOUTH DRIVE COURT"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 5,
+   "text": "1/8\" = 1'-0\" 3 BUILDING ELEVATION - SOUTH - DRIVEWAY",
+   "fpi": 8.0,
+   "number": "3",
+   "title": "BUILDING ELEVATION SOUTH DRIVEWAY"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 6,
+   "text": "1\" = 1'-0\" 3 ELEVATION - GUEST ENTRY DOOR (GUESTROOM SIDE)",
+   "fpi": 1.0,
+   "number": "3",
+   "title": "ELEVATION GUEST ENTRY DOOR (GUESTROOM SIDE)"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 6,
+   "text": "1 1/2\" = 1'-0\" 2 DTL - ACC. GUESTROOM BARN DOOR",
+   "fpi": 0.6667,
+   "number": "2",
+   "title": "DTL ACC. GUESTROOM BARN DOOR"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 6,
+   "text": "1 1/2\" = 1'-0\" 1 DTL - GUESTROOM BARN DOOR",
+   "fpi": 0.6667,
+   "number": "1",
+   "title": "DTL GUESTROOM BARN DOOR"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 7,
+   "text": "3/32\" = 1'-0\" ID-001 1 LEVEL 01 KEY PLAN",
+   "fpi": 10.6667,
+   "number": "1",
+   "title": "ID-001 LEVEL 01 KEY PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 7,
+   "text": "3/32\" = 1'-0\" ID-001 2 LEVEL 02 KEY PLAN",
+   "fpi": 10.6667,
+   "number": "2",
+   "title": "ID-001 LEVEL 02 KEY PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 7,
+   "text": "3/32\" = 1'-0\" ID-001 3 LEVEL 03 KEY PLAN",
+   "fpi": 10.6667,
+   "number": "3",
+   "title": "ID-001 LEVEL 03 KEY PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 7,
+   "text": "3/32\" = 1'-0\" ID-001 4 LEVEL 04 KEY PLAN",
+   "fpi": 10.6667,
+   "number": "4",
+   "title": "ID-001 LEVEL 04 KEY PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 8,
+   "text": "3/32\" = 1'-0\" ID-002 1 LEVEL 05 KEY PLAN",
+   "fpi": 10.6667,
+   "number": "1",
+   "title": "ID-002 LEVEL 05 KEY PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 8,
+   "text": "3/32\" = 1'-0\" ID-002 2 LEVEL 06 KEY PLAN",
+   "fpi": 10.6667,
+   "number": "2",
+   "title": "ID-002 LEVEL 06 KEY PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 8,
+   "text": "3/32\" = 1'-0\" ID-002 3 LEVEL 07 KEY PLAN",
+   "fpi": 10.6667,
+   "number": "3",
+   "title": "ID-002 LEVEL 07 KEY PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 9,
+   "text": "3/16\" = 1'-0\" ID-100 1 LEVEL 1 LOBBY - AR PLAN",
+   "fpi": 5.3333,
+   "number": "1",
+   "title": "ID-100 LEVEL 1 LOBBY AR PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 9,
+   "text": "3/16\" = 1'-0\" ID-100 2 LEVEL 1 LOBBY - FF PLAN",
+   "fpi": 5.3333,
+   "number": "2",
+   "title": "ID-100 LEVEL 1 LOBBY FF PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 10,
+   "text": "3/16\" = 1'-0\" ID-101 1 LEVEL 01 LOBBY - RCP PLAN",
+   "fpi": 5.3333,
+   "number": "1",
+   "title": "ID-101 LEVEL 01 LOBBY RCP PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 10,
+   "text": "3/16\" = 1'-0\" ID-101 2 LEVEL 1 LOBBY - FC PLAN",
+   "fpi": 5.3333,
+   "number": "2",
+   "title": "ID-101 LEVEL 1 LOBBY FC PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 11,
+   "text": "3/16\" = 1'-0\" ID-102 1 LEVEL 1 LOBBY - EM PLAN",
+   "fpi": 5.3333,
+   "number": "1",
+   "title": "ID-102 LEVEL 1 LOBBY EM PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 12,
+   "text": "3/16\" = 1'-0\" ID-105 1 LEVEL 1 POP-UP HUB - AR PLAN",
+   "fpi": 5.3333,
+   "number": "1",
+   "title": "ID-105 LEVEL 1 POP-UP HUB AR PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 12,
+   "text": "3/16\" = 1'-0\" ID-105 2 LEVEL 1 POP-UP HUB - FF PLAN",
+   "fpi": 5.3333,
+   "number": "2",
+   "title": "ID-105 LEVEL 1 POP-UP HUB FF PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 12,
+   "text": "3/16\" = 1'-0\" ID-105 3 LEVEL 01 POP-UP HUB - RCP PLAN",
+   "fpi": 5.3333,
+   "number": "3",
+   "title": "ID-105 LEVEL 01 POP-UP HUB RCP PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 13,
+   "text": "3/16\" = 1'-0\" ID-107 1 LEVEL 07 BAR - AR PLAN",
+   "fpi": 5.3333,
+   "number": "1",
+   "title": "ID-107 LEVEL 07 BAR AR PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 14,
+   "text": "3/16\" = 1'-0\" ID-109 1 LEVEL 07 ROOFTOP BAR - RCP PLAN",
+   "fpi": 5.3333,
+   "number": "1",
+   "title": "ID-109 LEVEL 07 ROOFTOP BAR RCP PLAN"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 1 MAIN ENTRY LOUNGE ELEVATION A",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "ID-200 MAIN ENTRY LOUNGE ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 2 MAIN ENTRY LOUNGE ELEVATION B",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "ID-200 MAIN ENTRY LOUNGE ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 3 MAIN ENTRY LOUNGE ELEVATION C",
+   "fpi": 4.0,
+   "number": "3",
+   "title": "ID-200 MAIN ENTRY LOUNGE ELEVATION C"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 4 MAIN ENTRY LOUNGE ELEVATION D",
+   "fpi": 4.0,
+   "number": "4",
+   "title": "ID-200 MAIN ENTRY LOUNGE ELEVATION D"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 5 LIBRARY ELEVATION A",
+   "fpi": 4.0,
+   "number": "5",
+   "title": "ID-200 LIBRARY ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 6 LIBRARY ELEVATION B",
+   "fpi": 4.0,
+   "number": "6",
+   "title": "ID-200 LIBRARY ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 7 LIBRARY ELEVATION C",
+   "fpi": 4.0,
+   "number": "7",
+   "title": "ID-200 LIBRARY ELEVATION C"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 8 LIBRARY ELEVATION D",
+   "fpi": 4.0,
+   "number": "8",
+   "title": "ID-200 LIBRARY ELEVATION D"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 9 LOUNGE FIREPLACE ELEVATION",
+   "fpi": 4.0,
+   "number": "9",
+   "title": "ID-200 LOUNGE FIREPLACE ELEVATION"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 10 ELEVATOR LOBBY ELEVATION A",
+   "fpi": 4.0,
+   "number": "10",
+   "title": "ID-200 ELEVATOR LOBBY ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 11 ELEVATOR LOBBY ELEVATION B",
+   "fpi": 4.0,
+   "number": "11",
+   "title": "ID-200 ELEVATOR LOBBY ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 15,
+   "text": "1/4\" = 1'-0\" ID-200 12 ELEVATOR LOBBY ELEVATION C",
+   "fpi": 4.0,
+   "number": "12",
+   "title": "ID-200 ELEVATOR LOBBY ELEVATION C"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 1 BAR LOUNGE ELEVATION A",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "ID-201 BAR LOUNGE ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 2 BAR LOUNGE ELEVATION B",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "ID-201 BAR LOUNGE ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 4 BAR LOUNGE ELEVATION D",
+   "fpi": 4.0,
+   "number": "4",
+   "title": "ID-201 BAR LOUNGE ELEVATION D"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 3 BAR LOUNGE ELEVATION C",
+   "fpi": 4.0,
+   "number": "3",
+   "title": "ID-201 BAR LOUNGE ELEVATION C"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 5 GAME AREA ELEVATION A",
+   "fpi": 4.0,
+   "number": "5",
+   "title": "ID-201 GAME AREA ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 6 GAME AREA ELEVATION B",
+   "fpi": 4.0,
+   "number": "6",
+   "title": "ID-201 GAME AREA ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 7 GAME AREA ELEVATION C",
+   "fpi": 4.0,
+   "number": "7",
+   "title": "ID-201 GAME AREA ELEVATION C"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 8 POP-UP VEST. ELEVATION A",
+   "fpi": 4.0,
+   "number": "8",
+   "title": "ID-201 POP-UP VEST. ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 9 POP-UP VEST. ELEVATION B",
+   "fpi": 4.0,
+   "number": "9",
+   "title": "ID-201 POP-UP VEST. ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 10 POP-UP VEST. ELEVATION C",
+   "fpi": 4.0,
+   "number": "10",
+   "title": "ID-201 POP-UP VEST. ELEVATION C"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 11 UNISEX RESTROOM ELEVATION A",
+   "fpi": 4.0,
+   "number": "11",
+   "title": "ID-201 UNISEX RESTROOM ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 12 UNISEX RESTROOM ELEVATION B",
+   "fpi": 4.0,
+   "number": "12",
+   "title": "ID-201 UNISEX RESTROOM ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 13 UNISEX RESTROOM ELEVATION C",
+   "fpi": 4.0,
+   "number": "13",
+   "title": "ID-201 UNISEX RESTROOM ELEVATION C"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 14 UNISEX RESTROOM ELEVATION D",
+   "fpi": 4.0,
+   "number": "14",
+   "title": "ID-201 UNISEX RESTROOM ELEVATION D"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 16,
+   "text": "1/4\" = 1'-0\" ID-201 15 UNISEX RESTROOM ELEVATION E",
+   "fpi": 4.0,
+   "number": "15",
+   "title": "ID-201 UNISEX RESTROOM ELEVATION E"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 1 POP-UP HUB ELEVATION A",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "ID-202 POP-UP HUB ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 2 POP-UP HUB ELEVATION B",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "ID-202 POP-UP HUB ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 3 HUB CORRIDOR ELEVATION A",
+   "fpi": 4.0,
+   "number": "3",
+   "title": "ID-202 HUB CORRIDOR ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 4 HUB CORRIDOR ELEVATION B",
+   "fpi": 4.0,
+   "number": "4",
+   "title": "ID-202 HUB CORRIDOR ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 5 HUB CORRIDOR ELEVATION C",
+   "fpi": 4.0,
+   "number": "5",
+   "title": "ID-202 HUB CORRIDOR ELEVATION C"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 6 HUB RESTROOM ELEVATION A",
+   "fpi": 4.0,
+   "number": "6",
+   "title": "ID-202 HUB RESTROOM ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 7 HUB RESTROOM ELEVATION B",
+   "fpi": 4.0,
+   "number": "7",
+   "title": "ID-202 HUB RESTROOM ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 8 HUB RESTROOM ELEVATION C",
+   "fpi": 4.0,
+   "number": "8",
+   "title": "ID-202 HUB RESTROOM ELEVATION C"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 9 HUB RESTROOM ELEVATION D",
+   "fpi": 4.0,
+   "number": "9",
+   "title": "ID-202 HUB RESTROOM ELEVATION D"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 10 EMPLOYEE BREAKROOM ELEVATION A",
+   "fpi": 4.0,
+   "number": "10",
+   "title": "ID-202 EMPLOYEE BREAKROOM ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 11 EMPLOYEE BREAKROOM ELEVATION B",
+   "fpi": 4.0,
+   "number": "11",
+   "title": "ID-202 EMPLOYEE BREAKROOM ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 12 EMPLOYEE BREAKROOM ELEVATION C",
+   "fpi": 4.0,
+   "number": "12",
+   "title": "ID-202 EMPLOYEE BREAKROOM ELEVATION C"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 13 EMPLOYEE BREAKROOM ELEVATION D",
+   "fpi": 4.0,
+   "number": "13",
+   "title": "ID-202 EMPLOYEE BREAKROOM ELEVATION D"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 14 EMPLOYEE RESTROOM ELEVATION A",
+   "fpi": 4.0,
+   "number": "14",
+   "title": "ID-202 EMPLOYEE RESTROOM ELEVATION A"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 15 EMPLOYEE RESTROOM ELEVATION B",
+   "fpi": 4.0,
+   "number": "15",
+   "title": "ID-202 EMPLOYEE RESTROOM ELEVATION B"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 16 EMPLOYEE RESTROOM ELEVATION C",
+   "fpi": 4.0,
+   "number": "16",
+   "title": "ID-202 EMPLOYEE RESTROOM ELEVATION C"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 17,
+   "text": "1/4\" = 1'-0\" ID-202 17 EMPLOYEE RESTROOM ELEVATION D",
+   "fpi": 4.0,
+   "number": "17",
+   "title": "ID-202 EMPLOYEE RESTROOM ELEVATION D"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 18,
+   "text": "1/4\" = 1'-0\" ID-203",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-203"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 18,
+   "text": "1/4\" = 1'-0\" ID-203",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-203"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 18,
+   "text": "1/4\" = 1'-0\" ID-203",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-203"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 18,
+   "text": "1/4\" = 1'-0\" ID-203",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-203"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 18,
+   "text": "1/4\" = 1'-0\" ID-203",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-203"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 18,
+   "text": "1/4\" = 1'-0\" ID-203",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-203"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 18,
+   "text": "1/4\" = 1'-0\" ID-203",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-203"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 18,
+   "text": "1/4\" = 1'-0\" ID-203",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-203"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 18,
+   "text": "1/4\" = 1'-0\" ID-203",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-203"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 18,
+   "text": "1/4\" = 1'-0\" ID-203",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-203"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 19,
+   "text": "1/4\" = 1'-0\" ID-204",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-204"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 19,
+   "text": "1/4\" = 1'-0\" ID-204",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-204"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 19,
+   "text": "1/4\" = 1'-0\" ID-204",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-204"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 19,
+   "text": "1/4\" = 1'-0\" ID-204",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-204"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 19,
+   "text": "1/4\" = 1'-0\" ID-204",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-204"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 19,
+   "text": "1/4\" = 1'-0\" ID-204",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-204"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 19,
+   "text": "1/4\" = 1'-0\" ID-204",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-204"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 19,
+   "text": "1/4\" = 1'-0\" ID-204",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-204"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 19,
+   "text": "1/4\" = 1'-0\" ID-204",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-204"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 20,
+   "text": "1/4\" = 1'-0\" ID-205",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-205"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 20,
+   "text": "1/4\" = 1'-0\" ID-205",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-205"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 20,
+   "text": "1/4\" = 1'-0\" ID-205",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-205"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 20,
+   "text": "1/4\" = 1'-0\" ID-205",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-205"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 20,
+   "text": "1/4\" = 1'-0\" ID-205",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-205"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 21,
+   "text": "3/16\" = 1'-0\" ID-401",
+   "fpi": 5.3333,
+   "number": null,
+   "title": "ID-401"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 21,
+   "text": "3/16\" = 1'-0\" ID-401",
+   "fpi": 5.3333,
+   "number": null,
+   "title": "ID-401"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 22,
+   "text": "3/16\" = 1'-0\" ID-403",
+   "fpi": 5.3333,
+   "number": null,
+   "title": "ID-403"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 22,
+   "text": "3/16\" = 1'-0\" ID-403",
+   "fpi": 5.3333,
+   "number": null,
+   "title": "ID-403"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 23,
+   "text": "1/4\" = 1'-0\" ID-407",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-407"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 23,
+   "text": "1/4\" = 1'-0\" ID-407",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-407"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 23,
+   "text": "1/4\" = 1'-0\" ID-407",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-407"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 23,
+   "text": "3 KING A - FF PLAN (LEFT) 1/4\" = 1'-0\" ID-407",
+   "fpi": 4.0,
+   "number": null,
+   "title": "KING A FF PLAN (LEFT) ID-407"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 23,
+   "text": "1/4\" = 1'-0\" ID-407",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-407"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 23,
+   "text": "1/4\" = 1'-0\" ID-407",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-407"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 23,
+   "text": "3/8\" = 1'-0\" ID-407",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-407"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 23,
+   "text": "3/8\" = 1'-0\" ID-407",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-407"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 23,
+   "text": "3/8\" = 1'-0\" ID-407",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-407"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 23,
+   "text": "3/8\" = 1'-0\" ID-407",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-407"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 24,
+   "text": "1/4\" = 1'-0\" ID-408",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-408"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 24,
+   "text": "1/4\" = 1'-0\" ID-408",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-408"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 24,
+   "text": "1/4\" = 1'-0\" ID-408",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-408"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 24,
+   "text": "1/4\" = 1'-0\" ID-408",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-408"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 24,
+   "text": "1/4\" = 1'-0\" ID-408",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-408"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 24,
+   "text": "1/4\" = 1'-0\" ID-408",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-408"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 24,
+   "text": "3/8\" = 1'-0\" ID-408",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-408"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 24,
+   "text": "3/8\" = 1'-0\" ID-408",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-408"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 24,
+   "text": "3/8\" = 1'-0\" ID-408",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-408"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 24,
+   "text": "3/8\" = 1'-0\" ID-408",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-408"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 25,
+   "text": "1/4\" = 1'-0\" ID-409",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-409"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 25,
+   "text": "1/4\" = 1'-0\" ID-409",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-409"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 25,
+   "text": "1/4\" = 1'-0\" ID-409",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-409"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 25,
+   "text": "1/4\" = 1'-0\" ID-409",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-409"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 25,
+   "text": "1/4\" = 1'-0\" ID-409",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-409"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 25,
+   "text": "3/8\" = 1'-0\" ID-409",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-409"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 25,
+   "text": "3/8\" = 1'-0\" ID-409",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-409"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 25,
+   "text": "3/8\" = 1'-0\" ID-409",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-409"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 25,
+   "text": "3/8\" = 1'-0\" ID-409",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-409"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 26,
+   "text": "1/4\" = 1'-0\" ID-410",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-410"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 26,
+   "text": "1/4\" = 1'-0\" ID-410",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-410"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 26,
+   "text": "1/4\" = 1'-0\" ID-410",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-410"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 26,
+   "text": "1/4\" = 1'-0\" ID-410",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-410"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 26,
+   "text": "1/4\" = 1'-0\" ID-410",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-410"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 26,
+   "text": "3/8\" = 1'-0\" ID-410",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-410"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 26,
+   "text": "3/8\" = 1'-0\" ID-410",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-410"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 26,
+   "text": "3/8\" = 1'-0\" ID-410",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-410"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 26,
+   "text": "3/8\" = 1'-0\" ID-410",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-410"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "1/4\" = 1'-0\" ID-411",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "1/4\" = 1'-0\" ID-411",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "1/4\" = 1'-0\" ID-411",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "1/4\" = 1'-0\" ID-411",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "1/4\" = 1'-0\" ID-411",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "3/8\" = 1'-0\" ID-411",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "3/8\" = 1'-0\" ID-411",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "3/8\" = 1'-0\" ID-411",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "3/8\" = 1'-0\" ID-411",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "3/8\" = 1'-0\" ID-411",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "3/8\" = 1'-0\" ID-411",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "3/8\" = 1'-0\" ID-411",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 27,
+   "text": "3/8\" = 1'-0\" ID-411",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-411"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 28,
+   "text": "1/4\" = 1'-0\" ID-412",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-412"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 28,
+   "text": "1/4\" = 1'-0\" ID-412",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-412"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 28,
+   "text": "1/4\" = 1'-0\" ID-412",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-412"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 28,
+   "text": "1/4\" = 1'-0\" ID-412",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-412"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 28,
+   "text": "1/4\" = 1'-0\" ID-412",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-412"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 28,
+   "text": "3/8\" = 1'-0\" ID-412",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-412"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 28,
+   "text": "3/8\" = 1'-0\" ID-412",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-412"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 28,
+   "text": "3/8\" = 1'-0\" ID-412",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-412"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 28,
+   "text": "3/8\" = 1'-0\" ID-412",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-412"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 29,
+   "text": "1/4\" = 1'-0\" ID-413",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-413"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 29,
+   "text": "1/4\" = 1'-0\" ID-413",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-413"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 29,
+   "text": "1/4\" = 1'-0\" ID-413",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-413"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 29,
+   "text": "1/4\" = 1'-0\" ID-413",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-413"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 29,
+   "text": "1/4\" = 1'-0\" ID-413",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-413"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 29,
+   "text": "1/4\" = 1'-0\" ID-413",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-413"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 29,
+   "text": "3/8\" = 1'-0\" ID-413",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-413"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 29,
+   "text": "3/8\" = 1'-0\" ID-413",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-413"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 29,
+   "text": "3/8\" = 1'-0\" ID-413",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-413"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 29,
+   "text": "3/8\" = 1'-0\" ID-413",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-413"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 30,
+   "text": "1/4\" = 1'-0\" ID-414",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-414"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 30,
+   "text": "1/4\" = 1'-0\" ID-414",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-414"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 30,
+   "text": "1/4\" = 1'-0\" ID-414",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-414"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 30,
+   "text": "1/4\" = 1'-0\" ID-414",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-414"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 30,
+   "text": "1/4\" = 1'-0\" ID-414",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-414"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 30,
+   "text": "3/8\" = 1'-0\" ID-414",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-414"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 30,
+   "text": "3/8\" = 1'-0\" ID-414",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-414"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 30,
+   "text": "3/8\" = 1'-0\" ID-414",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-414"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 30,
+   "text": "3/8\" = 1'-0\" ID-414",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-414"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 31,
+   "text": "1/4\" = 1'-0\" ID-415",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-415"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 31,
+   "text": "1/4\" = 1'-0\" ID-415",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-415"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 31,
+   "text": "1/4\" = 1'-0\" ID-415",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-415"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 31,
+   "text": "1/4\" = 1'-0\" ID-415",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-415"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 31,
+   "text": "1/4\" = 1'-0\" ID-415",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-415"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 31,
+   "text": "1/4\" = 1'-0\" ID-415",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-415"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 31,
+   "text": "3/8\" = 1'-0\" ID-415",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-415"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 31,
+   "text": "3/8\" = 1'-0\" ID-415",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-415"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 31,
+   "text": "3/8\" = 1'-0\" ID-415",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-415"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 31,
+   "text": "3/8\" = 1'-0\" ID-415",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-415"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 32,
+   "text": "1/4\" = 1'-0\" ID-416",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-416"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 32,
+   "text": "1/4\" = 1'-0\" ID-416",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-416"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 32,
+   "text": "1/4\" = 1'-0\" ID-416",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-416"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 32,
+   "text": "1/4\" = 1'-0\" ID-416",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-416"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 32,
+   "text": "1/4\" = 1'-0\" ID-416",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-416"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 32,
+   "text": "3/8\" = 1'-0\" ID-416",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-416"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 32,
+   "text": "3/8\" = 1'-0\" ID-416",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-416"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 32,
+   "text": "3/8\" = 1'-0\" ID-416",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-416"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 32,
+   "text": "3/8\" = 1'-0\" ID-416",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-416"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 33,
+   "text": "1/4\" = 1'-0\" ID-417",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-417"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 33,
+   "text": "1/4\" = 1'-0\" ID-417",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-417"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 33,
+   "text": "1/4\" = 1'-0\" ID-417",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-417"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 33,
+   "text": "1/4\" = 1'-0\" ID-417",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-417"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 33,
+   "text": "1/4\" = 1'-0\" ID-417",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-417"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 33,
+   "text": "3/8\" = 1'-0\" ID-417",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-417"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 33,
+   "text": "3/8\" = 1'-0\" ID-417",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-417"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 33,
+   "text": "3/8\" = 1'-0\" ID-417",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-417"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 33,
+   "text": "3/8\" = 1'-0\" ID-417",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-417"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 34,
+   "text": "1/4\" = 1'-0\" ID-418",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-418"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 34,
+   "text": "1/4\" = 1'-0\" ID-418",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-418"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 34,
+   "text": "1/4\" = 1'-0\" ID-418",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-418"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 34,
+   "text": "1/4\" = 1'-0\" ID-418",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-418"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 34,
+   "text": "1/4\" = 1'-0\" ID-418",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-418"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 34,
+   "text": "3/8\" = 1'-0\" ID-418",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-418"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 34,
+   "text": "3/8\" = 1'-0\" ID-418",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-418"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 34,
+   "text": "3/8\" = 1'-0\" ID-418",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-418"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 34,
+   "text": "3/8\" = 1'-0\" ID-418",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-418"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 35,
+   "text": "1/4\" = 1'-0\" ID-419",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-419"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 35,
+   "text": "1/4\" = 1'-0\" ID-419",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-419"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 35,
+   "text": "1/4\" = 1'-0\" ID-419",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-419"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 35,
+   "text": "1/4\" = 1'-0\" ID-419",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-419"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 35,
+   "text": "1/4\" = 1'-0\" ID-419",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-419"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 35,
+   "text": "3/8\" = 1'-0\" ID-419",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-419"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 35,
+   "text": "3/8\" = 1'-0\" ID-419",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-419"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 35,
+   "text": "3/8\" = 1'-0\" ID-419",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-419"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 35,
+   "text": "3/8\" = 1'-0\" ID-419",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-419"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 36,
+   "text": "1/4\" = 1'-0\" ID-420",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-420"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 36,
+   "text": "1/4\" = 1'-0\" ID-420",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-420"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 36,
+   "text": "1/4\" = 1'-0\" ID-420",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-420"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 36,
+   "text": "1/4\" = 1'-0\" ID-420",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-420"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 36,
+   "text": "1/4\" = 1'-0\" ID-420",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-420"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 36,
+   "text": "3/8\" = 1'-0\" ID-420",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-420"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 36,
+   "text": "3/8\" = 1'-0\" ID-420",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-420"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 36,
+   "text": "3/8\" = 1'-0\" ID-420",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-420"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 36,
+   "text": "3/8\" = 1'-0\" ID-420",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-420"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 37,
+   "text": "1/4\" = 1'-0\" ID-421",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-421"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 37,
+   "text": "1/4\" = 1'-0\" ID-421",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-421"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 37,
+   "text": "1/4\" = 1'-0\" ID-421",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-421"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 37,
+   "text": "1/4\" = 1'-0\" ID-421",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-421"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 37,
+   "text": "1/4\" = 1'-0\" ID-421",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-421"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 37,
+   "text": "3/8\" = 1'-0\" ID-421",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-421"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 37,
+   "text": "3/8\" = 1'-0\" ID-421",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-421"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 37,
+   "text": "3/8\" = 1'-0\" ID-421",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-421"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 37,
+   "text": "3/8\" = 1'-0\" ID-421",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-421"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 38,
+   "text": "1/4\" = 1'-0\" ID-422",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-422"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 38,
+   "text": "1/4\" = 1'-0\" ID-422",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-422"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 38,
+   "text": "1/4\" = 1'-0\" ID-422",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-422"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 38,
+   "text": "1/4\" = 1'-0\" ID-422",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-422"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 38,
+   "text": "3/8\" = 1'-0\" ID-422",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-422"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 38,
+   "text": "3/8\" = 1'-0\" ID-422",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-422"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 38,
+   "text": "3/8\" = 1'-0\" ID-422",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-422"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 38,
+   "text": "3/8\" = 1'-0\" ID-422",
+   "fpi": 2.6667,
+   "number": null,
+   "title": "ID-422"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 38,
+   "text": "1/4\" = 1'-0\" ID-422",
+   "fpi": 4.0,
+   "number": null,
+   "title": "ID-422"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 39,
+   "text": "3/4\" = 1'-0\" ID-450",
+   "fpi": 1.3333,
+   "number": null,
+   "title": "ID-450"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 39,
+   "text": "1/2\" = 1'-0\" ID-450",
+   "fpi": 2.0,
+   "number": null,
+   "title": "ID-450"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 39,
+   "text": "1/2\" = 1'-0\" ID-450",
+   "fpi": 2.0,
+   "number": null,
+   "title": "ID-450"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 39,
+   "text": "1/2\" = 1'-0\" ID-450",
+   "fpi": 2.0,
+   "number": null,
+   "title": "ID-450"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 39,
+   "text": "1/2\" = 1'-0\" ID-450",
+   "fpi": 2.0,
+   "number": null,
+   "title": "ID-450"
+  },
+  {
+   "pdf": "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+   "page": 39,
+   "text": "1/2\" = 1'-0\" ID-450",
+   "fpi": 2.0,
+   "number": null,
+   "title": "ID-450"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 0,
+   "text": "SCALE: 01 WOOD WALLS",
+   "fpi": null,
+   "number": "01",
+   "title": "SCALE: WOOD WALLS"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 0,
+   "text": "3\" = 1'-0\"",
+   "fpi": 0.3333,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 0,
+   "text": "SCALE: 02 WOOD WALLS",
+   "fpi": null,
+   "number": "02",
+   "title": "SCALE: WOOD WALLS"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 0,
+   "text": "3\" = 1'-0\"",
+   "fpi": 0.3333,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 1,
+   "text": "1. DO NOT SCALE DRAWINGS.",
+   "fpi": null,
+   "number": "1",
+   "title": "DO NOT SCALE DRAWINGS"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 1,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 FIRST FLOOR PLAN - TYPE A",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "FIRST FLOOR PLAN TYPE A"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 1,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 SECOND FLOOR PLAN - TYPE A",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "SECOND FLOOR PLAN TYPE A"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 2,
+   "text": "1. DO NOT SCALE DRAWINGS.",
+   "fpi": null,
+   "number": "1",
+   "title": "DO NOT SCALE DRAWINGS"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 THIRD FLOOR PLAN - TYPE A",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "THIRD FLOOR PLAN TYPE A"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 2,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 ROOF PLAN - TYPE A",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "ROOF PLAN TYPE A"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 3,
+   "text": "1. DO NOT SCALE DRAWINGS.",
+   "fpi": null,
+   "number": "1",
+   "title": "DO NOT SCALE DRAWINGS"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 3,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 FIRST FLOOR PLAN - TYPE B",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "FIRST FLOOR PLAN TYPE B"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 3,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 SECOND FLOOR PLAN - TYPE B",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "SECOND FLOOR PLAN TYPE B"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 4,
+   "text": "1. DO NOT SCALE DRAWINGS.",
+   "fpi": null,
+   "number": "1",
+   "title": "DO NOT SCALE DRAWINGS"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 4,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 THIRD FLOOR PLAN TYPE - B",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "THIRD FLOOR PLAN TYPE B"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 4,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 ROOF PLAN TYPE - B",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "ROOF PLAN TYPE B"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 5,
+   "text": "1. DO NOT SCALE DRAWINGS.",
+   "fpi": null,
+   "number": "1",
+   "title": "DO NOT SCALE DRAWINGS"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 5,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 FIRST FLOOR PLAN TYPE - C",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "FIRST FLOOR PLAN TYPE C"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 5,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 SECOND FLOOR PLAN - TYPE C",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "SECOND FLOOR PLAN TYPE C"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 6,
+   "text": "1. DO NOT SCALE DRAWINGS.",
+   "fpi": null,
+   "number": "1",
+   "title": "DO NOT SCALE DRAWINGS"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 6,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 THIRD FLOOR PLAN - TYPE C",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "THIRD FLOOR PLAN TYPE C"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 6,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 ROOF PLAN - TYPE C",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "ROOF PLAN TYPE C"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 7,
+   "text": "1. DO NOT SCALE DRAWINGS.",
+   "fpi": null,
+   "number": "1",
+   "title": "DO NOT SCALE DRAWINGS"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 7,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 FIRST FLOOR PLAN - TYPE D",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "FIRST FLOOR PLAN TYPE D"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 7,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 SECOND FLOOR PLAN - TYPE D",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "SECOND FLOOR PLAN TYPE D"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 8,
+   "text": "1. DO NOT SCALE DRAWINGS.",
+   "fpi": null,
+   "number": "1",
+   "title": "DO NOT SCALE DRAWINGS"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 8,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 THIRD FLOOR PLAN - TYPE D",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "THIRD FLOOR PLAN TYPE D"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 8,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 ROOF PLAN - TYPE D",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "ROOF PLAN TYPE D"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 9,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 FRONT ELEVATION - TYPE A - BLDG 8",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "FRONT ELEVATION TYPE A BLDG 8"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 9,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 BACK ELEVATION - TYPE A - BLDG 8",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "BACK ELEVATION TYPE A BLDG 8"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 9,
+   "text": "SCALE: 1/8\" = 1'-0\" 3 SIDE ELEVATION - TYPE A - BLDG 8",
+   "fpi": 8.0,
+   "number": "3",
+   "title": "SIDE ELEVATION TYPE A BLDG 8"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 9,
+   "text": "SCALE: 1/8\" = 1'-0\" 4 SIDE ELEVATION - TYPE A - BLDG 8",
+   "fpi": 8.0,
+   "number": "4",
+   "title": "SIDE ELEVATION TYPE A BLDG 8"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 10,
+   "text": "SCALE: 1/8\" = 1'-0\" 3 SIDE ELEVATION - TYPE B - BLDG 2",
+   "fpi": 8.0,
+   "number": "3",
+   "title": "SIDE ELEVATION TYPE B BLDG 2"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 10,
+   "text": "SCALE: 1/8\" = 1'-0\" 4 SIDE ELEVATION - TYPE B - BLDG 2",
+   "fpi": 8.0,
+   "number": "4",
+   "title": "SIDE ELEVATION TYPE B BLDG 2"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 10,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 FRONT ELEVATION - TYPE B - BLDG 2",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "FRONT ELEVATION TYPE B BLDG 2"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 10,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 BACK ELEVATION - TYPE B - BLDG 2",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "BACK ELEVATION TYPE B BLDG 2"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 11,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 BACK ELEVATION - TYPE C - BLDG 3",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "BACK ELEVATION TYPE C BLDG 3"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 11,
+   "text": "SCALE: 1/8\" = 1'-0\" 3 SIDE ELEVATION - TYPE C - BLDG 3",
+   "fpi": 8.0,
+   "number": "3",
+   "title": "SIDE ELEVATION TYPE C BLDG 3"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 11,
+   "text": "SCALE: 1/8\" = 1'-0\" 4 SIDE ELEVATION - TYPE C - BLDG 3",
+   "fpi": 8.0,
+   "number": "4",
+   "title": "SIDE ELEVATION TYPE C BLDG 3"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 11,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 FRONT ELEVATION - TYPE C - BLDG 3",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "FRONT ELEVATION TYPE C BLDG 3"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 12,
+   "text": "SCALE: 1/8\" = 1'-0\" 2 BACK ELEVATION - TYPE C - BLDG 9",
+   "fpi": 8.0,
+   "number": "2",
+   "title": "BACK ELEVATION TYPE C BLDG 9"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 12,
+   "text": "SCALE: 1/8\" = 1'-0\" 3 SIDE ELEVATION - TYPE C - BLDG 9",
+   "fpi": 8.0,
+   "number": "3",
+   "title": "SIDE ELEVATION TYPE C BLDG 9"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 12,
+   "text": "SCALE: 1/8\" = 1'-0\" 4 SIDE ELEVATION - TYPE C - BLDG 9",
+   "fpi": 8.0,
+   "number": "4",
+   "title": "SIDE ELEVATION TYPE C BLDG 9"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 12,
+   "text": "SCALE: 1/8\" = 1'-0\" 1 FRONT ELEVATION - TYPE C - BLDG 9",
+   "fpi": 8.0,
+   "number": "1",
+   "title": "FRONT ELEVATION TYPE C BLDG 9"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 13,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 SIDE ELEVATION - CLUBHOUSE",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "SIDE ELEVATION CLUBHOUSE"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 13,
+   "text": "SCALE: 1/4\" = 1'-0\" 2 FRONT ELEVATION - CLUBHOUSE",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "FRONT ELEVATION CLUBHOUSE"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 14,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 LEASING ELEVATION - FRONT",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "LEASING ELEVATION FRONT"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 14,
+   "text": "SCALE: 1/4\" = 1'-0\" 2 LEASING ELEVATION - SIDE",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "LEASING ELEVATION SIDE"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 15,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 FITNESS ELEVATION - FRONT",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "FITNESS ELEVATION FRONT"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 15,
+   "text": "SCALE: 1/4\" = 1'-0\" 2 FITNESS ELEVATION - SIDE",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "FITNESS ELEVATION SIDE"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 16,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 8-BAY SINGLE GARAGE ELEVATION - FRONT",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "8-BAY SINGLE GARAGE ELEVATION FRONT"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 16,
+   "text": "SCALE: 1/4\" = 1'-0\" 2 8-BAY SINGLE GARAGE ELEVATION - BACK",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "8-BAY SINGLE GARAGE ELEVATION BACK"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 16,
+   "text": "SCALE: 1/4\" = 1'-0\" 3 8-BAY SINGLE GARAGE ELEVATION SIDE",
+   "fpi": 4.0,
+   "number": "3",
+   "title": "8-BAY SINGLE GARAGE ELEVATION SIDE"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 17,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 16-BAY GARAGE ROOF PLAN",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "16-BAY GARAGE ROOF PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 17,
+   "text": "SCALE: 1/4\" = 1'-0\" 2 16-BAY GARAGE FLOOR PLAN",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "16-BAY GARAGE FLOOR PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 18,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 16-BAY GARAGE ELEVATION - FRONT",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "16-BAY GARAGE ELEVATION FRONT"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 18,
+   "text": "SCALE: 1/4\" = 1'-0\" 2 16-BAY GARAGE ELEVATION - BACK",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "16-BAY GARAGE ELEVATION BACK"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 18,
+   "text": "SCALE: 1/4\" = 1'-0\" 3 16-BAY GARAGE ELEVATION - SIDE",
+   "fpi": 4.0,
+   "number": "3",
+   "title": "16-BAY GARAGE ELEVATION SIDE"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 18,
+   "text": "SCALE: 1/4\" = 1'-0\" 4 16-BAY GARAGE ELEVATION - SIDE1",
+   "fpi": 4.0,
+   "number": "4",
+   "title": "16-BAY GARAGE ELEVATION SIDE1"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 21,
+   "text": "SCALE: 01 ARCHITECTURAL SITE PLAN",
+   "fpi": null,
+   "number": "01",
+   "title": "SCALE: ARCHITECTURAL SITE PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 21,
+   "text": "1\" = 40'",
+   "fpi": 40.0,
+   "number": null,
+   "title": ""
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 22,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 FITNESS CENTER FINISH PLAN",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "FITNESS CENTER FINISH PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 23,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 FITNESS CENTER REFLECTED CEILING PLAN",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "FITNESS CENTER REFLECTED CEILING PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 23,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 2 CEILING DETAIL",
+   "fpi": 0.6667,
+   "number": "2",
+   "title": "CEILING DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 23,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 3 CEILING DETAIL.",
+   "fpi": 0.6667,
+   "number": "3",
+   "title": "CEILING DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 23,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 4 BULKHEAD DETAIL",
+   "fpi": 0.6667,
+   "number": "4",
+   "title": "BULKHEAD DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 24,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 LEASING OFFICE FINISH PLAN",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "LEASING OFFICE FINISH PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 25,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 LEASING OFFICE REFLECTED CEILING PLAN",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "LEASING OFFICE REFLECTED CEILING PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 25,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 2 CEILING DETAIL.",
+   "fpi": 0.6667,
+   "number": "2",
+   "title": "CEILING DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 25,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 3 CEILING DETAIL",
+   "fpi": 0.6667,
+   "number": "3",
+   "title": "CEILING DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 25,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 4 CEILING DETAIL",
+   "fpi": 0.6667,
+   "number": "4",
+   "title": "CEILING DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 25,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 5 CEILING DETAIL",
+   "fpi": 0.6667,
+   "number": "5",
+   "title": "CEILING DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 26,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 CLUBHOUSE FINISH PLAN",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "CLUBHOUSE FINISH PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 27,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 CLUBHOUSE REFLECTED CEILING PLAN",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "CLUBHOUSE REFLECTED CEILING PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 27,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 2 CEILING DETAIL",
+   "fpi": 0.6667,
+   "number": "2",
+   "title": "CEILING DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 27,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 3 CEILING DETAIL",
+   "fpi": 0.6667,
+   "number": "3",
+   "title": "CEILING DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 27,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 4 CEILING DETAIL.",
+   "fpi": 0.6667,
+   "number": "4",
+   "title": "CEILING DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 27,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 5 CEILING DETAIL",
+   "fpi": 0.6667,
+   "number": "5",
+   "title": "CEILING DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 27,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 6 CEILING DETAIL.",
+   "fpi": 0.6667,
+   "number": "6",
+   "title": "CEILING DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 27,
+   "text": "SCALE: 1 1/2\" = 1'-0\" 7 BULKHEAD DETAIL",
+   "fpi": 0.6667,
+   "number": "7",
+   "title": "BULKHEAD DETAIL"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 28,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 ENLARGED UNIT A1 PLAN",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "ENLARGED UNIT A1 PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 28,
+   "text": "SCALE: 1/4\" = 1'-0\" 2 ENLARGED UNIT A1+ PLAN",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "ENLARGED UNIT A1+ PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 28,
+   "text": "SCALE: 1/4\" = 1'-0\" 3 ENLARGED UNIT A2 PLAN",
+   "fpi": 4.0,
+   "number": "3",
+   "title": "ENLARGED UNIT A2 PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 28,
+   "text": "SCALE: 1/4\" = 1'-0\" 4 ENLARGED ANSI UNIT A2 PLAN",
+   "fpi": 4.0,
+   "number": "4",
+   "title": "ENLARGED ANSI UNIT A2 PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 28,
+   "text": "SCALE: 1/4\" = 1'-0\" 5 ENLARGED UNIT A2a PLAN",
+   "fpi": 4.0,
+   "number": "5",
+   "title": "ENLARGED UNIT A2a PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 29,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 ENLARGED B1 UNIT PLAN",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "ENLARGED B1 UNIT PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 29,
+   "text": "SCALE: 1/4\" = 1'-0\" 3 ENLARGED B1a UNIT PLAN",
+   "fpi": 4.0,
+   "number": "3",
+   "title": "ENLARGED B1a UNIT PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 29,
+   "text": "SCALE: 1/4\" = 1'-0\" 4 ENLARGED B1b UNIT PLAN",
+   "fpi": 4.0,
+   "number": "4",
+   "title": "ENLARGED B1b UNIT PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 29,
+   "text": "SCALE: 1/4\" = 1'-0\" 2 ENLARGED B1+ UNIT PLAN",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "ENLARGED B1+ UNIT PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 30,
+   "text": "SCALE: 1/4\" = 1'-0\" 3 ENLARGED B2a UNIT PLAN",
+   "fpi": 4.0,
+   "number": "3",
+   "title": "ENLARGED B2a UNIT PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 30,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 ENLARGED B2 UNIT PLAN",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "ENLARGED B2 UNIT PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 30,
+   "text": "SCALE: 1/4\" = 1'-0\" 2 ENLARGED ANSI UNIT B2 PLAN",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "ENLARGED ANSI UNIT B2 PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 31,
+   "text": "SCALE: 1/4\" = 1'-0\" 1 ENLARGED C1 UNIT PLAN",
+   "fpi": 4.0,
+   "number": "1",
+   "title": "ENLARGED C1 UNIT PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 31,
+   "text": "SCALE: 1/4\" = 1'-0\" 2 ENLARGED C2 UNIT PLAN",
+   "fpi": 4.0,
+   "number": "2",
+   "title": "ENLARGED C2 UNIT PLAN"
+  },
+  {
+   "pdf": "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+   "page": 31,
+   "text": "SCALE: 1/4\" = 1'-0\" 3 ENLARGED ANSI UNIT C2 PLAN",
+   "fpi": 4.0,
+   "number": "3",
+   "title": "ENLARGED ANSI UNIT C2 PLAN"
+  }
+ ]
+}
