@@ -348,7 +348,7 @@ def page_measurable_signal(page) -> dict:
     scaled_viewports = 0
     try:
         vps = segment_viewports(page) or []
-        by_region = match_scales_to_viewports(scales, vps) or {}
+        by_region = match_scales_to_viewports(scales, vps, page=page) or {}
         for vp in vps:
             if vp.kind in _MASK_VIEWPORT_KINDS:
                 continue
@@ -1953,7 +1953,7 @@ class TakeoffPipeline:
         try:
             printed_list = extract_printed_scales(page)
             printed_scales_by_region = match_scales_to_viewports(
-                printed_list, viewports
+                printed_list, viewports, page=page
             )
             main_plan_printed = identify_main_plan_scale(printed_list)
         except Exception as exc:  # noqa: BLE001 — printed scale is additive

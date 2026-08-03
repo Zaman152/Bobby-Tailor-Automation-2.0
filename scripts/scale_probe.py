@@ -54,7 +54,7 @@ def probe_pages(pdf_path: str) -> List[dict]:
             try:
                 vps = segment_viewports(page)
                 printed = extract_printed_scales(page)
-                by_region = match_scales_to_viewports(printed, vps)
+                by_region = match_scales_to_viewports(printed, vps, page=page)
                 main = identify_main_plan_scale(printed)
             except Exception as exc:  # noqa: BLE001
                 out.append({"page": i, "error": f"{type(exc).__name__}: {exc}"})
@@ -100,7 +100,7 @@ def probe(pdf_path: str) -> None:
         try:
             vps = segment_viewports(page)
             printed = extract_printed_scales(page)
-            by_region = match_scales_to_viewports(printed, vps)
+            by_region = match_scales_to_viewports(printed, vps, page=page)
             main = identify_main_plan_scale(printed)
         except Exception as exc:  # noqa: BLE001
             print(f"\npage {i}: ERROR {type(exc).__name__}: {exc}")

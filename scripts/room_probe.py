@@ -204,7 +204,9 @@ def probe_fill(pdf_path: str, only_pages=None) -> None:
         stype = classify_sheet_type_from_text("", page.get_text())
         try:
             vps = segment_viewports(page)
-            by_region = match_scales_to_viewports(extract_printed_scales(page), vps)
+            by_region = match_scales_to_viewports(
+                extract_printed_scales(page), vps, page=page
+            )
             fills, drops = pipeline._measure_room_fills(
                 page, vps, by_region, "page%d" % i
             )

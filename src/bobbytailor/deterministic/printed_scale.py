@@ -25,7 +25,15 @@ records the RANSAC-solved value alongside as a CROSS-CHECK — a disagreement
 > 5% keeps the printed value but flags ``needs_review`` in the detail string.
 
 Coordinate space: PyMuPDF text/block coordinates are UNROTATED page points,
-consistent with ``viewports.Viewport.bbox_pt``.
+consistent with ``viewports.Viewport.bbox_pt``. That is fine for reading a
+label, and WRONG for deciding which drawing a label sits beneath: "beneath" is
+a statement about the sheet as it is READ, and a sheet with ``/Rotate 270``
+is read 90 degrees away from the space its coordinates are stored in. The two
+functions that make that judgement — :func:`_title_above` and
+:func:`match_scales_to_viewports` — therefore take an OPTIONAL ``page``. Given
+one they work in page space; given nothing they behave exactly as before, and
+on an unrotated page the two are the same computation because the rotation
+matrix is the identity there.
 """
 from __future__ import annotations
 
@@ -34,7 +42,35 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from bobbytailor.deterministic.room_fill import to_page_space
+
 logger = logging.getLogger(__name__)
+
+
+def _in_page_space(page, bbox) -> tuple:
+    """*bbox* as a page-space 4-tuple, or unchanged when *page* is ``None``.
+
+    Delegates to the single transform in ``room_fill`` (D-03): this module
+    does not own a second copy of the rotation matrix.
+    """
+    if page is None:
+        return tuple(float(v) for v in bbox)
+    try:
+        import fitz  # noqa: PLC0415
+
+        box = to_page_space(page, fitz.Rect(*bbox))
+        return float(box.x0), float(box.y0), float(box.x1), float(box.y1)
+    except Exception:  # noqa: BLE001 — binding must never raise
+        return tuple(float(v) for v in bbox)
+
+
+def _point_in_page_space(page, point) -> tuple:
+    """One point in page space, via a degenerate rectangle. Identity if unrotated."""
+    x, y = float(point[0]), float(point[1])
+    if page is None:
+        return x, y
+    px0, py0, _px1, _py1 = _in_page_space(page, (x, y, x, y))
+    return px0, py0
 
 POINTS_PER_INCH = 72.0
 
@@ -424,22 +460,45 @@ def _looks_like_scale_label(text: str) -> bool:
     return bool(_BARE_RATIO_RE.search(_normalize(text)))
 
 
-def _title_above(blocks: List[tuple], x0: float, y0: float, x1: float) -> str:
+def _title_above(
+    blocks: List[tuple],
+    x0: float,
+    y0: float,
+    x1: float,
+    page=None,
+    y1: Optional[float] = None,
+) -> str:
     """Nearest text line directly ABOVE a bare ratio — its viewport title.
 
     Moxy stacks the callout as two lines ("KING SUITE B - AR PLAN" / "1/4\" =
     1'-0\""), so the title the main-plan picker needs lives in the previous
     block, not in the ratio block itself.
+
+    Args:
+        page: optional. When supplied, "above" and "horizontally aligned with"
+            are evaluated on PAGE-space rectangles — the sheet as it is read —
+            instead of on the unrotated coordinates ``get_text`` reports. A
+            rotation-zero page yields the identical computation, so supplying
+            it is free on the unrotated majority. ``None`` keeps today's exact
+            behaviour for any caller without a page in hand.
+        y1: optional. The ratio block's own bottom edge, needed only to
+            complete the rectangle a rotation has to map; a raw y-comparison
+            never needed it. Defaults to *y0* (a degenerate box), which is
+            harmless because only the mapped TOP edge is read.
     """
+    rx0, ry0, rx1, _ry1 = _in_page_space(
+        page, (x0, y0, x1, y0 if y1 is None else y1)
+    )
     best, best_gap = "", None
     for bx0, by0, bx1, by1, btext in blocks:
         txt = " ".join(_normalize(btext).split())
         if not txt or _looks_like_scale_label(btext):
             continue
-        gap = y0 - by1                      # block sits above the ratio
+        cx0, _cy0, cx1, cy1 = _in_page_space(page, (bx0, by0, bx1, by1))
+        gap = ry0 - cy1                     # block sits above the ratio
         if gap < -2.0 or gap > _TITLE_MAX_GAP_PT:
             continue
-        if bx1 < x0 - _TITLE_X_TOL_PT or bx0 > x1 + _TITLE_X_TOL_PT:
+        if cx1 < rx0 - _TITLE_X_TOL_PT or cx0 > rx1 + _TITLE_X_TOL_PT:
             continue                        # not horizontally aligned with it
         if best_gap is None or gap < best_gap:
             best, best_gap = txt, gap
@@ -470,8 +529,11 @@ def extract_printed_scales(page) -> List[PrintedScale]:
             continue
         number, title = _number_and_title(text)
         if not title:
-            # Bare ratio ("1/4\" = 1'-0\"") — its title is the line above.
-            title = _title_above(blocks, x0, y0, x1)
+            # Bare ratio ("1/4\" = 1'-0\"") — its title is the line above, and
+            # "above" is decided as the sheet is READ. The page is always in
+            # hand here, so it is always supplied; on the unrotated majority
+            # that is the identical computation.
+            title = _title_above(blocks, x0, y0, x1, page=page, y1=y1)
             if not number:
                 number, _t = _number_and_title(title)
         out.append(
@@ -505,6 +567,7 @@ def _contains(bbox, x: float, y: float, margin: float = 0.0) -> bool:
 def match_scales_to_viewports(
     printed_scales: Sequence[PrintedScale],
     viewports: Sequence,
+    page=None,
 ) -> Dict[str, PrintedScale]:
     """Bind each printed scale to its drawing viewport -> {region_id: scale}.
 
@@ -514,27 +577,46 @@ def match_scales_to_viewports(
     labels sit at a drawing's bottom edge). Mask regions (title block, legend,
     schedule) are never drawing owners. Deterministic and tolerant of a label
     that sits slightly outside its bbox.
+
+    Args:
+        page: optional, ``None``-defaulted. When supplied, BOTH the
+            containment test and the "region directly above the label"
+            fallback run on PAGE-space rectangles — which is what "above"
+            means to the person reading the sheet. Without it, behaviour is
+            exactly today's. A rotation-zero page makes the two paths converge
+            by construction (the rotation matrix is the identity), which is
+            why 61 of the 83 pages across the four real fixtures cannot move.
+
+            This matters on the 22 that can: Bob's page 3 bound a vent-pipe
+            detail's 1" callout to the main roof-plan viewport, so the sheet
+            resolved 1.0 feet per inch instead of its printed 10.667 — a 10x
+            linear, 114x area error on every quantity the sheet carries
+            (INV-04 BUG-C).
     """
     candidates = [vp for vp in viewports if getattr(vp, "kind", "") not in _MASK_KINDS]
     result: Dict[str, PrintedScale] = {}
     dist_by_region: Dict[str, float] = {}
+    # Mapped once per viewport, not once per (viewport, label) pair: the
+    # transform is pure, and recomputing it inside the inner loop would make
+    # the cost quadratic in a page's label count for no benefit.
+    boxes = {id(vp): _in_page_space(page, vp.bbox_pt) for vp in candidates}
 
     for ps in printed_scales:
-        cx, cy = ps.center_pt
+        cx, cy = _point_in_page_space(page, ps.center_pt)
         target = None
         dist = 0.0
 
         containing = [
-            vp for vp in candidates if _contains(vp.bbox_pt, cx, cy, margin=6.0)
+            vp for vp in candidates if _contains(boxes[id(vp)], cx, cy, margin=6.0)
         ]
         if containing:
-            target = min(containing, key=lambda vp: (_area(vp.bbox_pt), vp.region_id))
+            target = min(containing, key=lambda vp: (_area(boxes[id(vp)]), vp.region_id))
             dist = 0.0
         else:
             best = None
             best_d = float("inf")
             for vp in candidates:
-                x0, y0, x1, y1 = vp.bbox_pt
+                x0, y0, x1, y1 = boxes[id(vp)]
                 # x-overlap with the label center and the region above it.
                 if x0 - 6.0 <= cx <= x1 + 6.0 and y1 <= cy + 6.0:
                     d = cy - y1

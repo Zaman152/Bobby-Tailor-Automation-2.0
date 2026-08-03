@@ -588,6 +588,130 @@ def test_match_skips_mask_kinds():
     assert matched == {"R2": ps}
 
 
+# ── rotation-aware binding (23-07 / SP-1 / INV-04 BUG-C) ────────────────────
+#
+# A callout binds to the drawing it sits beneath AS THE SHEET IS READ. Block
+# coordinates are unrotated, so on a /Rotate 270 sheet "beneath" in raw y is a
+# question about a space nobody looks at: Bob's page 3 bound a vent-pipe
+# detail's 1" callout to the main roof-plan viewport, and the sheet's whole
+# geometry inherited a 10x linear error.
+
+
+def _rot_page(rot, width=600.0, height=800.0):
+    import fitz
+
+    doc = fitz.open()
+    page = doc.new_page(width=width, height=height)
+    page.set_rotation(rot)
+    return doc, page
+
+
+def _label(cx, cy, half=(50.0, 20.0), fpi=4.0, title="ENLARGED PLAN"):
+    return PrintedScale(
+        scale_text='1/4" = 1\'-0"', feet_per_inch=fpi, feet_per_point=fpi / 72.0,
+        center_pt=(cx, cy),
+        bbox_pt=(cx - half[0], cy - half[1], cx + half[0], cy + half[1]),
+        drawing_number="1", title=title,
+    )
+
+
+def test_the_page_argument_is_optional_and_none_defaulted():
+    """R8: an unrotated sheet must take a literally unchanged code path, and a
+    caller with no page in hand must keep today's behaviour exactly."""
+    import inspect
+
+    from bobbytailor.deterministic import printed_scale as ps_mod
+
+    params = inspect.signature(ps_mod.match_scales_to_viewports).parameters
+    assert "page" in params
+    assert params["page"].default is None
+    title_params = inspect.signature(ps_mod._title_above).parameters
+    assert title_params["page"].default is None
+    assert title_params["y1"].default is None
+
+
+@pytest.mark.parametrize("rot", [0, 90, 180, 270])
+def test_supplying_a_page_never_changes_an_unrotated_binding(rot):
+    """The two paths converge by construction at rotation zero, and a rotated
+    page must still bind SOMETHING sane rather than silently returning {}."""
+    ps = _label(300.0, 630.0)
+    above = _vp("R1", (100.0, 100.0, 500.0, 600.0))
+    far = _vp("R2", (100.0, 1000.0, 500.0, 1400.0))
+    doc, page = _rot_page(rot)
+    with_page = match_scales_to_viewports([ps], [above, far], page=page)
+    without = match_scales_to_viewports([ps], [above, far])
+    if rot == 0:
+        assert with_page == without == {"R1": ps}
+    doc.close()
+
+
+def test_a_rotated_sheet_binds_the_drawing_the_label_sits_under_when_read():
+    """INV-04 BUG-C in miniature, on a /Rotate 270 page.
+
+    Two viewports and one callout. In PAGE space the callout sits just under
+    ``PLAN`` and far from ``DETAIL``; in the unrotated block space it reads the
+    other way round. Without the page the binding is wrong; with it, right.
+    """
+    import fitz
+
+    doc, page = _rot_page(270, width=600.0, height=800.0)
+    # rot 270 sends drawing (x, y) -> page (y, 600 - x).
+    def draw(px, py):
+        return (600.0 - py, px)
+
+    def box(px0, py0, px1, py1):
+        a, b = draw(px0, py0), draw(px1, py1)
+        r = fitz.Rect(min(a[0], b[0]), min(a[1], b[1]),
+                      max(a[0], b[0]), max(a[1], b[1]))
+        return (r.x0, r.y0, r.x1, r.y1)
+
+    plan = _vp("PLAN", box(100.0, 100.0, 500.0, 400.0))
+    detail = _vp("DETAIL", box(100.0, 600.0, 500.0, 780.0))
+    cx, cy = draw(300.0, 430.0)          # 30 pt under PLAN, as the sheet reads
+    ps = _label(cx, cy)
+
+    assert match_scales_to_viewports([ps], [plan, detail], page=page) == {"PLAN": ps}
+    blind = match_scales_to_viewports([ps], [plan, detail])
+    assert blind != {"PLAN": ps}, (
+        "the unrotated-space binding must be demonstrably wrong here, or this "
+        "test is not testing anything"
+    )
+    doc.close()
+
+
+def test_a_stacked_title_is_found_above_the_ratio_as_the_sheet_reads():
+    """`_title_above` answers the same question and needed the same fix.
+
+    Moxy stacks "KING SUITE B - AR PLAN" over its bare ratio; on a rotated
+    sheet the block that is visually above sits sideways in the mediabox.
+    """
+    from bobbytailor.deterministic.printed_scale import _title_above
+
+    doc, page = _rot_page(270, width=600.0, height=800.0)
+
+    def draw(px, py):
+        return (600.0 - py, px)
+
+    def block(px0, py0, px1, py1, text):
+        a, b = draw(px0, py0), draw(px1, py1)
+        return (min(a[0], b[0]), min(a[1], b[1]),
+                max(a[0], b[0]), max(a[1], b[1]), text)
+
+    title = block(200.0, 380.0, 400.0, 396.0, "KING SUITE B - AR PLAN")
+    decoy = block(200.0, 700.0, 400.0, 716.0, "SOMETHING ELSE ENTIRELY")
+    ratio = block(200.0, 402.0, 320.0, 418.0, '1/4" = 1\'-0"')
+    blocks = [title, decoy, ratio]
+
+    found = _title_above(
+        blocks, ratio[0], ratio[1], ratio[2], page=page, y1=ratio[3],
+    )
+    assert found == "KING SUITE B - AR PLAN"
+    assert _title_above(blocks, ratio[0], ratio[1], ratio[2]) != (
+        "KING SUITE B - AR PLAN"
+    ), "the unrotated-space search must be demonstrably wrong here"
+    doc.close()
+
+
 def test_identify_main_plan_prefers_overall_floor_plan():
     main = PrintedScale(
         scale_text='1" = 40\'-0"', feet_per_inch=40.0, feet_per_point=40.0 / 72.0,

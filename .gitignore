@@ -41,3 +41,6 @@ output/_archive/
 
 # Human-in-the-loop inputs (estimator-supplied manifests; not plans-only pipeline inputs)
 !human_inputs/
+
+# Probe scratch output (scripts/geom_probe.py writes this on every run).
+scratch_*.json

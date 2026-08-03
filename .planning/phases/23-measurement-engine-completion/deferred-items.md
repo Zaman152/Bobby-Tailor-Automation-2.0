@@ -174,3 +174,85 @@ is a pipeline decision with its own blast radius rather than a report-rendering 
 **To fix:** where the pipeline builds a sheet's schedules, call `door_schedule_coverage(ds, …)` and
 append the returned dicts to that sheet's `_item_coverage`. Nothing else is required — the report
 already renders them.
+
+---
+
+## DEF-23-08 — Bob's page 3 binds its own scale but the SHEET still resolves 1.0 ft/in
+
+**Found during:** 23-07 Task 3, verifying the plan's own acceptance criteria against the real PDF.
+**Where:** `printed_scale.identify_main_plan_scale` (`_MAIN_PATTERNS`) and
+`scale_solver.select_main_plan`.
+
+23-07 fixed what it set out to fix: on Bob's page 3 the main roof-plan viewport now binds its **own**
+`3/32" = 1'-0"` callout (10.667 ft/in) instead of a vent-pipe detail's `1"` callout, and the detail
+callout binds to the detail viewport. That is INV-04 BUG-C, and it is closed.
+
+The **page-level** resolved scale did **not** move: `geom_probe` still reports page 3
+`fpp = 0.013889` (1.0 ft/in), not the 0.148148 the plan predicted. The viewport binding is not what
+decides it. Traced on the real page:
+
+```
+main_id (select_main_plan)      -> None
+identify_main_plan_scale(...)   -> None
+resolve_scale_v2                -> 0.0138889  source: "printed notation only — unverified by
+                                    dimensions"  (1 ft/in, share 100% of 1 scales)
+```
+
+With no main viewport and no main-plan printed scale, `resolve_scale_v2` falls through to the
+text-scan tier (`scale_extraction.dominant_scale`), which is a different code path this plan never
+touched.
+
+**Two independent blockers, both measured, neither a rotation defect:**
+
+1. `_MAIN_PATTERNS` is `('overall floor plan', 'floor plan', 'site plan', 'overall plan',
+   'key plan')` — it has no `roof plan`, and page 3 is `A3.0 ROOF PLAN`.
+2. Even with that word added, the title could not be found. The plan expected the rotation fix to let
+   "the main-plan scale identification find the roof-plan title it currently cannot see". It cannot:
+   the block `1 ROOF PLAN` sits at page-space `(120, 2096)-(314, 2121)` while its callout is at
+   `(2178, 2100)-(2286, 2115)` — the **same baseline, ~1,900 pt apart horizontally**. `_title_above`
+   requires a gap of ≤ 40 pt ABOVE and an x-overlap within 120 pt, so no rotation-correct version of
+   it can pair them. The only block inside that window is `NORTH` (gap 23.8 pt), which is what the
+   callout's title now reads.
+
+**NOT fixed here.** Adding `roof plan` to `_MAIN_PATTERNS` changes main-plan identification on every
+sheet of all four fixtures, and pairing a title to a callout on the same baseline is a NEW binding
+rule (side-by-side, not stacked) with its own blast radius. Both are exactly the "retune a constant
+and see if the number improves" move that 23-CONTEXT forbids, and neither is a coordinate-space
+defect — which is all this plan is scoped to.
+
+**Consequence today, and why it is not a regression.** Page 3's roof-plan viewport now carries an own
+scale that disagrees with the resolved page scale by 10.7x, so the multi-scale guard **excludes** it
+and 23-03 records the exclusion with its reason. Before this change the viewport agreed with the
+resolved 1.0 and was measured at a 10.7x-too-small linear scale. Measured on the real page, the
+quantities are unchanged either way (`n_walls` 1, `wall_lf_by_class {'TC1': 30.5}`, `footprint None`
+before and after) — the sheet's roof plan yields almost no vector wall geometry. So the change is
+one honest exclusion record gained and no quantity lost, which is the direction 23-CONTEXT asks for.
+
+**To fix:** a plan that owns `scale_solver.select_main_plan` / `_MAIN_PATTERNS` should decide whether
+a roof plan is a main plan, and whether a callout may claim a title beside it rather than above it —
+gated, as always, on the four-set regression check.
+
+---
+
+## DEF-23-09 — the "region above the label" fallback has no distance bound
+
+**Found during:** 23-07 Task 3, reading the four-fixture diff.
+**Where:** `printed_scale.match_scales_to_viewports`, the non-containment branch.
+
+Chelsea page 0 (`/Rotate 270`, the title sheet) is the ONE page outside Bob's that moved: viewport
+`R5` gained an own printed scale of `0.333333` from a `DOOR DETAILS AT` callout **947 pt away** — 13
+inches of paper. It binds only because `R5` is the sole non-mask viewport whose x-range overlaps the
+label, and the "directly above" fallback ranks by nearest without ever asking *how far is too far*.
+
+The unbounded distance is **pre-existing** — the same label could bind to a viewport 947 pt above it
+in unrotated space too. This plan only changed which axis "above" is measured on, which is why the
+page surfaced now rather than being caused now. Measured consequence on Chelsea page 0: no geometry,
+no room fill, no drop and no coverage disposition changes; the four-set gate is green with Chelsea at
+**0** skips against a ceiling of 2.
+
+**NOT fixed here** because a distance cap is a new constant, and any value for it would move
+unrotated sheets — which is precisely what this plan's whole safety argument (T-23-26) rests on not
+doing. Choosing it needs its own four-set sweep.
+
+**To fix:** cap the fallback distance at a justified multiple of the label height, or require the
+label's x-span to overlap the viewport's rather than merely its centre, and re-run the four-set diff.
