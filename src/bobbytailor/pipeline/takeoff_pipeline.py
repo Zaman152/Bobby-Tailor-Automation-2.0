@@ -75,6 +75,7 @@ from bobbytailor.vision.claude_analyzer import (  # noqa: F401 (re-exported for 
 # Deterministic measurement engine (21-03/06/07/10) — module-level names so
 # tests can patch e.g. `takeoff_pipeline.extract_dimension_samples`.
 from bobbytailor.deterministic.dimensions import extract_dimension_samples
+from bobbytailor.deterministic.finish_tags import extract_material_tags
 from bobbytailor.deterministic.footprint_takeoff import footprint_from_page
 from bobbytailor.deterministic.rooms import extract_rooms
 from bobbytailor.deterministic.scale_extraction import (
@@ -111,7 +112,12 @@ from bobbytailor.vision.ensemble import (
     run_ensemble,
     vote,
 )
-from bobbytailor.vision.fusion import build_registry, fuse_sheet, merge_with_provenance
+from bobbytailor.vision.fusion import (
+    MaterialTagLedger,
+    build_registry,
+    fuse_sheet,
+    merge_with_provenance,
+)
 
 # Learned-context retrieval + anti-amplification guardrail (21-16,
 # V3-LEARN-02/03/04). Module-level imports so tests can patch
@@ -1252,6 +1258,11 @@ class TakeoffPipeline:
         self._project_wall_height_source: Optional[str] = None
         # Optional reliable drawing scale (feet per inch) for geometry measurement.
         self._scale_fpi = None
+        # Finish-code review ledger: one per run so the cap on how many
+        # distinct codes may open a review row is a run-level guarantee.
+        # Replaced by run_project; this default keeps standalone run_sheet
+        # callers bounded too.
+        self._material_tag_ledger = MaterialTagLedger()
         # One BudgetGuard per run (set by run_project). The scraper path
         # threads its own run-level guard via run_sheet(budget=...) —
         # 21-REVIEW WR-05 parity. The per-sheet fallback in run_sheet exists
@@ -2248,12 +2259,32 @@ class TakeoffPipeline:
                 )
             )
 
+        # Finish/material callouts (INV-05 §2 Key A). The masks the bundle
+        # already computed are MANDATORY here — a door-schedule tag column and a
+        # legend key look exactly like a plan-body callout (threat T-23-30).
+        #
+        # NOT gated on the sheet type. Every wall-covering quantity in the Moxy
+        # take-off lives on an interior-elevation sheet, those sheets classify
+        # as elevations, and a plan-type gate would skip precisely the sheets
+        # holding the entire quantity. Additive: any failure leaves the list
+        # empty and the sheet behaves exactly as before.
+        material_tags: list = []
+        try:
+            material_tags = extract_material_tags(
+                page,
+                mask_rects=list(table_bboxes) + list(mask_rects),
+                page_index=page_index,
+            )
+        except Exception as exc:  # noqa: BLE001 — material tags are additive
+            logger.debug("material-tag reading failed on %r: %s", sheet_name, exc)
+
         return {
             "symbol_groups": symbols,
             "walls": walls,
             "wall_lf_by_class": wall_lf,
             "rooms": rooms,
             "room_fills": room_fills,
+            "material_tags": material_tags,
             "viewports": viewports,
             "schedules": schedules,
             "footprint": footprint,
@@ -2801,6 +2832,7 @@ class TakeoffPipeline:
             vocabulary=getattr(self, "_project_vocabulary", None),
             wall_height_ft=getattr(self, "_project_wall_height", None),
             wall_height_source=getattr(self, "_project_wall_height_source", None),
+            material_tag_ledger=getattr(self, "_material_tag_ledger", None),
             room_mix=dict(room_mix_resolution.counts),
             room_mix_meta={
                 name: {
@@ -3418,6 +3450,12 @@ class TakeoffPipeline:
         self._run_budget = BudgetGuard(self._settings.budget_usd)
         # Deterministic table cache is per-run (avoid stale cross-run reuse).
         self._schedules_cache = {}
+        # Same for the document-level unit-mix resolution.
+        self._room_mix_cache = {}
+        # ONE finish-code review ledger per run: the cap on how many distinct
+        # codes may open a review row is a RUN-level guarantee, and a per-sheet
+        # ledger would be no cap at all (threat T-23-31).
+        self._material_tag_ledger = MaterialTagLedger()
         # Learned-context retrieval (21-16, V3-LEARN-03): ONE bundle at run
         # start (project_type inferred from prior corrections for repeat
         # runs) — injected into prompt hints, the per-sheet scale-prior feed,

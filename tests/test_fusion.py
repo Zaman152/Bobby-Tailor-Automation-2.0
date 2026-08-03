@@ -911,3 +911,209 @@ def test_a_clean_binding_writes_no_notes_and_no_item_coverage():
     assert len(rows) == 1 and rows[0]["quantity"] == pytest.approx(341.7)
     assert not (bundle.get("coverage_notes") or [])
     assert not (bundle.get("item_coverage") or [])
+
+
+# ---------------------------------------------------------------------------
+# 23-08 — a finish code the drawing calls out gets a NAMED, FLAGGED, ZERO row.
+#
+# Moxy's WC-1..WC-10 (7,432 SF of golden quantity) live on interior-elevation
+# sheets and the pipeline emits NOTHING for them today. Silence is
+# indistinguishable from zero, and it is the worst of the three states.
+#
+# The area is NOT recoverable and must never be invented: INV-05 §3 seeded a
+# flood fill at every WC tag and every one leaked to the clip edge at 4-10x the
+# estimator's own figure. The row therefore carries quantity ZERO and the tag
+# positions the human workspace uses to pre-place the shapes.
+# ---------------------------------------------------------------------------
+
+from bobbytailor.vision.fusion import (          # noqa: E402
+    MaterialTagLedger,
+    _fuse_material_tags,
+)
+
+
+def _material_tag(code, bbox, page_index=18):
+    from bobbytailor.deterministic.finish_tags import MaterialTag
+    prefix, number = code.split("-")
+    return MaterialTag(code=code, prefix=prefix, number=number.zfill(2),
+                       bbox_pt=bbox, page_index=page_index, text_dir=(1, 0))
+
+
+def _elevation_bundle(codes_and_boxes, sheet_name="ID-203"):
+    return {
+        "sheet_name": sheet_name,
+        "material_tags": [_material_tag(c, b) for c, b in codes_and_boxes],
+    }
+
+
+def test_a_called_out_finish_code_becomes_a_named_flagged_zero_row():
+    bundle = _elevation_bundle([
+        ("WC-6", (908.4, 217.4, 943.6, 228.8)),
+        ("WC-7", (1208.4, 517.4, 1243.6, 528.8)),
+    ])
+    result = fuse_sheet(bundle, {"matches": []})
+    rows = {c["name"]: c for c in result["components"]
+            if c.get("name_source") == "material_tag"}
+
+    assert set(rows) == {"WC-6", "WC-7"}
+    for code, row in rows.items():
+        assert row["quantity"] == 0, "no area may be synthesized for a finish"
+        assert row["unit"] == "SF"
+        assert row["needs_review"] is True
+        assert row["provenance"] == "text_layer", "the code is printed, not guessed"
+        assert row["confidence"] == "low"
+        assert row["candidate_id"] == "FINISH-%s" % code
+        assert code in row["review_reason"]
+        assert "not a closed region" in row["review_reason"]
+
+
+def test_the_row_carries_the_tag_positions_the_workspace_pre_places():
+    """This is the point of the row: an absent item is invisible, a flagged
+    named item seeded with its positions is a task closed in seconds."""
+    boxes = [(908.4, 217.4, 943.6, 228.8), (1108.4, 917.4, 1143.6, 928.8)]
+    bundle = _elevation_bundle([("WC-7", boxes[0]), ("WC-7", boxes[1])])
+    result = fuse_sheet(bundle, {"matches": []})
+    rows = [c for c in result["components"] if c.get("name_source") == "material_tag"]
+
+    assert len(rows) == 1, "one component per DISTINCT code on the sheet"
+    assert rows[0]["tag_count"] == 2
+    assert rows[0]["tag_positions_pt"] == [list(boxes[0]), list(boxes[1])]
+
+
+def test_no_finish_row_ever_carries_a_quantity_above_zero():
+    bundle = _elevation_bundle([("WC-%d" % n, (100.0 * n, 200.0, 100.0 * n + 30, 212.0))
+                                for n in range(1, 11)])
+    result = fuse_sheet(bundle, {"matches": []})
+    rows = [c for c in result["components"] if c.get("name_source") == "material_tag"]
+    assert len(rows) == 10
+    assert all(r["quantity"] == 0 for r in rows), (
+        "only a human /measurements POST may give a finish code a quantity"
+    )
+
+
+def test_a_sheet_with_no_material_tags_emits_nothing_and_says_nothing():
+    result = fuse_sheet({"sheet_name": "A1.0", "material_tags": []}, {"matches": []})
+    assert not [c for c in result["components"] if c.get("name_source") == "material_tag"]
+
+
+def test_two_sheets_sharing_a_code_group_under_one_ledger_entry():
+    """Grouping is by CODE across sheets — that is what the cap counts.
+
+    Each sheet still emits its own row, because the workspace needs THAT
+    sheet's positions to place THAT sheet's shapes; what is bounded is how many
+    distinct codes may ever open a review row (T-23-31).
+    """
+    ledger = MaterialTagLedger(cap=1)
+    first, second = [], []
+    _fuse_material_tags(
+        _elevation_bundle([("WC-1", (10, 20, 40, 32))], sheet_name="ID-200"),
+        first, ledger,
+    )
+    bundle2 = _elevation_bundle(
+        [("WC-1", (50, 60, 80, 72)), ("WC-2", (90, 60, 120, 72))],
+        sheet_name="ID-201",
+    )
+    _fuse_material_tags(bundle2, second, ledger)
+
+    assert ledger.sheets_by_code == {"WC-1": ["ID-200", "ID-201"]}, (
+        "one entry for the code, naming both sheets"
+    )
+    assert [c["name"] for c in first] == ["WC-1"]
+    assert [c["name"] for c in second] == ["WC-1"], "WC-2 is over the cap"
+    assert ledger.suppressed == {"WC-2": 1}
+
+
+def test_a_suppressed_code_is_recorded_as_unmeasured_and_not_as_zero():
+    ledger = MaterialTagLedger(cap=0)
+    components = []
+    bundle = _elevation_bundle([("WC-1", (10, 20, 40, 32))], sheet_name="ID-200")
+    _fuse_material_tags(bundle, components, ledger)
+    assert components == []
+    notes = bundle.get("coverage_notes") or []
+    assert len(notes) == 1
+    assert "WC-1" in notes[0] and "unmeasured, not zero" in notes[0]
+
+
+def test_the_emitted_order_follows_the_sheet_and_is_deterministic():
+    boxes = [("WC-7", (900.0, 200.0, 930.0, 212.0)),
+             ("WC-6", (100.0, 200.0, 130.0, 212.0)),
+             ("WC-7", (500.0, 400.0, 530.0, 412.0))]
+    rows = []
+    _fuse_material_tags(_elevation_bundle(boxes), rows, MaterialTagLedger())
+    assert [r["name"] for r in rows] == ["WC-7", "WC-6"]
+
+
+# ── The real elevation sheet ────────────────────────────────────────────────
+
+
+def test_moxy_elevation_sheet_emits_one_flagged_row_per_wall_covering_code():
+    """Real PDF, real masks, zero API. INV-05 §2 Key A records the estimator's
+    own Legend box for page index 18 as exactly {WC-6, WC-7}."""
+    import os
+
+    import fitz
+
+    from bobbytailor.deterministic.finish_tags import extract_material_tags
+    from bobbytailor.deterministic.tag_pairing import sheet_mask_rects
+
+    moxy = os.path.join(
+        os.path.dirname(__file__), os.pardir, "uploads",
+        "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+    )
+    if not os.path.exists(moxy):
+        pytest.skip("Moxy plans PDF not present")
+
+    doc = fitz.open(moxy)
+    try:
+        page = doc[18]
+        tags = extract_material_tags(page, sheet_mask_rects(page), 18)
+        page_rect = tuple(page.rect)
+    finally:
+        doc.close()
+
+    assert tags, "the bundle's material-tag list must not be empty on ID-203"
+    bundle = {"sheet_name": "ID-203", "material_tags": tags}
+    result = fuse_sheet(bundle, {"matches": []})
+    rows = {c["name"]: c for c in result["components"]
+            if c.get("name_source") == "material_tag"}
+
+    wc_rows = {name: row for name, row in rows.items() if name.startswith("WC-")}
+    assert set(wc_rows) == {"WC-6", "WC-7"}, "the estimator's own legend set"
+    for row in wc_rows.values():
+        assert row["quantity"] == 0 and row["needs_review"] is True
+        assert row["tag_positions_pt"], "the workspace needs somewhere to start"
+        for x0, y0, x1, y1 in row["tag_positions_pt"]:
+            assert page_rect[0] <= x0 < x1 <= page_rect[2]
+            assert page_rect[1] <= y0 < y1 <= page_rect[3]
+
+
+def test_a_tag_inside_a_schedule_or_legend_mask_never_becomes_a_row():
+    """T-23-30: a door-schedule tag column looks exactly like a plan callout.
+
+    A false positive costs a review; the masks keep it from costing even that.
+    """
+    from bobbytailor.deterministic.finish_tags import extract_material_tags
+
+    class _Page:
+        number = 18
+
+        def get_text(self, kind):
+            assert kind == "dict"
+            lines = [
+                # The MEASURED Moxy p18 tag geometry, inside a schedule table.
+                {"bbox": (908.4, 217.4, 923.7, 228.8), "dir": (1, 0),
+                 "spans": [{"text": "WC"}]},
+                {"bbox": (934.2, 217.4, 943.6, 228.8), "dir": (1, 0),
+                 "spans": [{"text": "07"}]},
+            ]
+            return {"blocks": [{"lines": lines}]}
+
+    page = _Page()
+    schedule_bbox = (800.0, 180.0, 1200.0, 300.0)
+    assert extract_material_tags(page, (), 18), "unmasked, the tag reads"
+
+    bundle = {"sheet_name": "A7-01",
+              "material_tags": extract_material_tags(page, [schedule_bbox], 18)}
+    result = fuse_sheet(bundle, {"matches": []})
+    assert not [c for c in result["components"]
+                if c.get("name_source") == "material_tag"]

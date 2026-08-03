@@ -1880,6 +1880,131 @@ def _fuse_schedules(bundle: dict, components: List[dict]) -> None:
             )
 
 
+# ── Finish/material callouts → named, flagged, ZERO-quantity rows ────────────
+#
+# Every wall-covering quantity in the Moxy take-off (WC-1..WC-10, 7,432 SF) sits
+# on an interior-elevation sheet, and the pipeline emits NOTHING for any of them
+# today — the worst of the three possible states, because silence is
+# indistinguishable from zero. The area is NOT recoverable: INV-05 §3 seeded a
+# flood fill at every WC tag and every fill leaked to the clip edge at four to
+# ten times the estimator's own figure, because an elevation's wall face is
+# bounded above and below and open laterally — it is not a closed ink region.
+#
+# So the honest output is a NAMED row with quantity zero, flagged for review and
+# carrying the tag positions, which the measure workspace uses to pre-place the
+# shapes. A flagged named row is a task a human closes in seconds; an absent row
+# is invisible. NO AREA IS SYNTHESIZED, anywhere on this path.
+
+#: Distinct finish codes that may open a review row in one run. Steps 2 and 8 of
+#: the INV-05 map add roughly ten WC rows plus the PT/WD/AT/T/ST/RB vocabulary
+#: per elevation sheet, and a review queue that becomes noise gets ignored —
+#: which returns us to silent zeros by another route (INV-05 risk 5 / T-23-31).
+#: Codes already admitted keep emitting on later sheets, because the workspace
+#: needs THAT sheet's tag positions to place THAT sheet's shapes; the cap bounds
+#: how many distinct codes may ever be admitted.
+MAX_MATERIAL_TAG_CODES = 40
+
+
+class MaterialTagLedger:
+    """Which finish codes have opened a review row, across the whole run.
+
+    Grouping is by CODE, not by row: the same code recurs on several sheets and
+    each recurrence needs its own tag positions, but the review queue is bounded
+    by how many distinct codes may ever be admitted. Threading one ledger
+    through a run is what makes the cap a run-level guarantee rather than a
+    per-sheet one.
+    """
+
+    def __init__(self, cap: int = MAX_MATERIAL_TAG_CODES) -> None:
+        self.cap = int(cap)
+        self.sheets_by_code: Dict[str, List[str]] = {}
+        self.suppressed: Dict[str, int] = {}
+
+    def admit(self, code: str, sheet_name: str) -> bool:
+        """True when *code* may emit a row for *sheet_name*."""
+        seen = self.sheets_by_code.get(code)
+        if seen is None:
+            if len(self.sheets_by_code) >= self.cap:
+                self.suppressed[code] = self.suppressed.get(code, 0) + 1
+                return False
+            self.sheets_by_code[code] = [sheet_name]
+            return True
+        if sheet_name not in seen:
+            seen.append(sheet_name)
+        return True
+
+
+def _fuse_material_tags(
+    bundle: dict,
+    components: List[dict],
+    ledger: Optional[MaterialTagLedger] = None,
+) -> None:
+    """Finish codes the sheet prints → one flagged zero-quantity row per code.
+
+    The row is named from the TEXT LAYER — ``WC-7`` is what the drawing prints,
+    not what a model guessed — and its quantity is zero because the extent of a
+    finish on an elevation is not a measurable region. ``tag_positions_pt``
+    seeds the human measure workspace so the shapes can be pre-placed.
+
+    A false positive here costs one review; it can never cost a wrong number,
+    because there is no path from this function to a non-zero quantity
+    (threat T-23-30).
+    """
+    tags = bundle.get("material_tags") or []
+    if not tags:
+        return
+    sheet_name = str(bundle.get("sheet_name") or "")
+    ledger = ledger if ledger is not None else MaterialTagLedger()
+
+    # One entry per distinct code, in the order the sheet first prints it, so
+    # the emitted set is deterministic.
+    grouped: Dict[str, List[object]] = {}
+    for tag in tags:
+        code = str(_field(tag, "code", "") or "").strip()
+        if not code:
+            continue
+        grouped.setdefault(code, []).append(tag)
+
+    for code, code_tags in grouped.items():
+        if not ledger.admit(code, sheet_name):
+            bundle.setdefault("coverage_notes", []).append(
+                "finish %s is called out %d time(s) on %s and was NOT given a "
+                "review row: %d distinct finish codes already have one, which is "
+                "the cap. It is unmeasured, not zero."
+                % (code, len(code_tags), sheet_name or "this sheet", ledger.cap)
+            )
+            continue
+        positions = []
+        for tag in code_tags:
+            bbox = _field(tag, "bbox_pt", None)
+            if bbox:
+                positions.append([float(v) for v in bbox])
+        components.append(
+            {
+                "name": code,
+                "quantity": 0,
+                "unit": "SF",
+                "provenance": "text_layer",
+                "confidence": "low",
+                "candidate_id": "FINISH-%s" % code,
+                "name_source": "material_tag",
+                "finish_code": code,
+                "tag_count": len(code_tags),
+                "tag_positions_pt": positions,
+                "needs_review": True,
+                "review_reason": (
+                    "finish %s is called out %d time(s) on %s, but its extent is "
+                    "not a closed region on this drawing — an elevation's wall "
+                    "face is open laterally, so every seeded fill leaks. The "
+                    "area was NOT measured and was NOT estimated; measure it in "
+                    "the workspace, where the %d tag position(s) are pre-placed."
+                    % (code, len(code_tags), sheet_name or "this sheet",
+                       len(positions))
+                ),
+            }
+        )
+
+
 def _fuse_footprint(bundle: dict, components: List[dict]) -> None:
     """Printed overall dimensions (footprint) → text_layer components."""
     footprint = bundle.get("footprint")
@@ -1925,6 +2050,7 @@ def fuse_sheet(
     wall_height_source: Optional[str] = None,
     room_mix: Optional[Dict[str, int]] = None,
     room_mix_meta: Optional[Dict[str, dict]] = None,
+    material_tag_ledger: Optional["MaterialTagLedger"] = None,
 ) -> dict:
     """Apply vision ID→label answers to deterministic candidates for a sheet.
 
@@ -1970,6 +2096,10 @@ def fuse_sheet(
             source lands in the formula string and on the row; the note flags
             the row that uses the disputed number. Omitting it leaves the
             binding behaviour unchanged.
+        material_tag_ledger: Run-level :class:`MaterialTagLedger` bounding how
+            many DISTINCT finish codes may open a review row across the whole
+            run (threat T-23-31). None gives each sheet a fresh ledger, so a
+            single-sheet caller behaves as if it were the whole run.
 
     Returns:
         Extraction dict mirroring the analyze_drawing result shape:
@@ -2031,6 +2161,7 @@ def fuse_sheet(
     )
     _fuse_rooms(deterministic_bundle, room_labels, components, rejected)
     _fuse_schedules(deterministic_bundle, components)
+    _fuse_material_tags(deterministic_bundle, components, material_tag_ledger)
     _fuse_footprint(deterministic_bundle, components)
 
     result: dict = {
