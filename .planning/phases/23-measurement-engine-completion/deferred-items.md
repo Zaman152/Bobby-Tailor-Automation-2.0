@@ -95,3 +95,53 @@ covered even though the older test remains vacuous.
 
 **To fix:** redraw the fixture at a scale that fits the page (or enlarge the page) and assert
 `dropped_regions` is non-empty, so the guard is what makes the test pass.
+
+---
+
+## DEF-23-05 — a non-HM door FRAME canonicalises into a DOOR bucket
+
+**Found during:** 23-04 Task 3, checking the emitted item names against
+`aggregator.ITEM_NAME_MAP`.
+**Where:** `src/bobbytailor/pipeline/aggregator.py:119-126`.
+
+`ITEM_NAME_MAP` has exactly ONE frame rule —
+`hollow.?metal.*frame|frame.*hollow.?metal|frame.*\bhm\b|\bhm\b.*frame` → `Frame-HM` — and it fires
+only for hollow metal. Every other frame material falls through to the DOOR rules below it:
+
+| Emitted item | Canonicalises to | Correct? |
+|---|---|---|
+| `Door Frames-HM` | `Frame-HM` | yes |
+| `Door Frames-AL` | `Doors-AL` (via `door.*alum`) | **no — a frame is billed as a door** |
+| `Door Frames-STL` | `Doors` (generic catch-all) | **no** |
+
+Measured: Bob's emits `Door Frames-AL 2`, Moxy emits `Door Frames-AL 5` and `Door Frames-STL 6`.
+Those six-to-eleven units are currently added to a door line item.
+
+**Impact is bounded and pre-existing.** `component_library` already emitted `Door Frames-AL` before
+23-04 (`_MAT_CODE_ALIAS` mapped `ALUM → AL`), so this is not a regression — 23-04 only makes it
+visible on two more plan sets. Neither Bob's nor Moxy's golden carries a non-HM frame row, so
+nothing scores worse.
+
+**NOT fixed here** because `aggregator.py` is not in 23-04's `files_modified`, and adding
+`Frame-AL` / `Frame-STL` canonical names changes the item vocabulary every scored fixture matches
+against — that is a naming decision with its own blast radius, not a door-schedule fix.
+
+**To fix:** add generic frame rules (`frame.*\balum?\b` → `Frame-AL`, `frame.*\bstl\b|frame.*steel`
+→ `Frame-STL`) ABOVE the door rules in `ITEM_NAME_MAP`, and re-score all four saved runs.
+
+---
+
+## DEF-23-06 — the synthetic fixture PDFs are rewritten by every test run
+
+**Found during:** 23-04, staging each commit.
+**Where:** `tests/fixtures/synthetic/{dimensions,floorplan,symbols}_synthetic.pdf`.
+
+`git status` reports all three as modified after any full `pytest -q`, because the fixtures are
+regenerated on use and PyMuPDF embeds a creation timestamp. The bytes differ, the content does not.
+
+**Impact:** every run dirties the working tree, so a `git add -A` would sweep three unrelated binary
+files into an unrelated commit. Pre-existing; not introduced by 23-04 (which staged files
+individually, per the commit protocol).
+
+**To fix:** generate them into `tmp_path` instead of the repo, or make the writer deterministic
+(`doc.set_metadata({})` plus a fixed `creationDate`), then re-commit the fixtures once.
