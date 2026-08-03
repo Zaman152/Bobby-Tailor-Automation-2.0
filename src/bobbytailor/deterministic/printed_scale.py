@@ -314,6 +314,19 @@ def parse_scale_ratio(text: str) -> Optional[float]:
 # ── Drawing number + title ────────────────────────────────────────────────────
 
 
+# A drawing number printed BEFORE the ratio, e.g. Bob's
+# ``'2 SCALE: 18" = 1'-0" FRONT ELEVATION NEW'``. The left-side digit strip in
+# ``_number_and_title`` deletes every digit run, so such a number is lost — the
+# strip cannot tell it from the paper-inch measure it exists to remove.
+# Recovered only as a fallback, and only when it is a LONE integer: it must be
+# followed by whitespace and then a non-numeric character, so a leading measure
+# ("1/4\" = ...", "1 1/2\" = ...", "3 32\" = ...") is never mistaken for one.
+# Bounded to 3 digits — the largest drawing number in any of the four plan sets
+# is single-digit, and no sheet numbers drawings past a few dozen — which also
+# keeps the pattern linear-time on adversarial text (T-23-06).
+_LEADING_DRAWING_NUMBER_RE = re.compile(r"^\s*(\d{1,3})\s+(?=[^\d./\"'\s])")
+
+
 def _number_and_title(text: str) -> Tuple[Optional[str], str]:
     """Extract the drawing number (a lone integer) and descriptive title.
 
@@ -321,6 +334,12 @@ def _number_and_title(text: str) -> Tuple[Optional[str], str]:
     the drawing number is a lone integer sitting between the ratio and the
     title. Scan the block text with the whole scale expression removed; the
     first standalone integer is the number, the remaining words are the title.
+
+    Bob's prints the number BEFORE the ratio instead, where the left-side digit
+    strip deletes it. When that scan finds no number, recover a leading lone
+    integer from the original text (INV-03 §5 step 2). Title extraction is
+    untouched by the fallback — ``FRONT ELEVATION NEW`` already survived every
+    INV-03 probe; only ``drawing_number`` is restored.
     """
     t = _normalize(text)
     # Strip the "SCALE ... = X'-Y"" expression so its digits are not mistaken
@@ -346,6 +365,14 @@ def _number_and_title(text: str) -> Tuple[Optional[str], str]:
             continue
         title_tokens.append(raw.strip())
     title = " ".join(title_tokens).strip(" .,:;-|/")
+
+    if number is None:
+        # Fall back to a drawing number printed ahead of the ratio. Deliberately
+        # AFTER the title is built, so this can only add a number and can never
+        # move a title string.
+        lead = _LEADING_DRAWING_NUMBER_RE.match(t)
+        if lead:
+            number = lead.group(1)
     return number, title
 
 

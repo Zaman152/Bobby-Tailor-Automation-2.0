@@ -9,6 +9,7 @@ import pytest
 from bobbytailor.deterministic.geometry_takeoff import ScaleResult
 from bobbytailor.deterministic.printed_scale import (
     PrintedScale,
+    _number_and_title,
     extract_printed_scales,
     identify_main_plan_scale,
     match_scales_to_viewports,
@@ -215,6 +216,86 @@ def test_anchored_parse_is_linear_on_adversarial_text():
     t0 = time.time()
     parse_scale_ratio(nasty)
     assert time.time() - t0 < 1.0
+
+
+# ── SP-2: a drawing number printed BEFORE the ratio ───────────────────────────
+#
+# The left-side digit strip in _number_and_title removes every digit run — it
+# cannot tell a leading drawing number from the paper-inch measure it exists to
+# delete — so Bob's, which prints the number first, lost it entirely. Crow
+# prints the number AFTER the ratio and was never affected. Titles already
+# survived in every INV-03 probe; the fallback runs after the title is built so
+# it can only add a number, never move a title string.
+#
+# Each expected TITLE below is the value the pre-change parser produced on the
+# real PDF, so these rows double as the byte-identical-title assertion.
+
+_NUMBER_AND_TITLE_ROWS = [
+    # (text, expected_number, expected_title_unchanged_by_this_change, note)
+    ('2 SCALE: 18" = 1\'-0" FRONT ELEVATION NEW', "2", "FRONT ELEVATION NEW",
+     "Bob's A4.0 — number leads, title trails"),
+    ('3 REAR ELEVATION NEW SCALE: 18" = 1\'-0"', "3", "REAR ELEVATION NEW",
+     "Bob's A4.0 — number leads, title sits between number and ratio"),
+    ('5 ENLARGED GLAZING AND ENTRY DOORS SCALE: 14" = 1\'-0"'
+     ' 4 TRUCK DOCK ELEVATION NEW', "4",
+     "ENLARGED GLAZING AND ENTRY DOORS TRUCK DOCK ELEVATION NEW",
+     "Bob's A4.0 — two callouts in one block; the trailing 4 already won, "
+     "so the fallback must NOT fire and overwrite it with the leading 5"),
+    ('SCALE: 1" = 40\'-0"  1  OVERALL FLOOR PLAN', "1", "OVERALL FLOOR PLAN",
+     "Crow-shaped — number FOLLOWS the ratio, unchanged by this change"),
+    ('SCALE: 1 1/2" = 1\'-0"  2  TYP. S.C.C.P. MITERED CORNER', "2",
+     "TYP. S.C.C.P. MITERED CORNER",
+     "Crow-shaped detail — number FOLLOWS the ratio, unchanged"),
+    ('SCALE: 3 32" = 1\'-0"', None, "",
+     "Bob's plan sheets — a bare callout has neither number nor title; the "
+     "leading token is the paper-inch measure, not a drawing number"),
+]
+
+
+@pytest.mark.parametrize(
+    "text,number,title,note",
+    _NUMBER_AND_TITLE_ROWS,
+    ids=[n[:44] for _t, _n, _ti, n in _NUMBER_AND_TITLE_ROWS],
+)
+def test_number_and_title_rows(text, number, title, note):
+    got_number, got_title = _number_and_title(text)
+    assert got_number == number, f"{note}: number {got_number!r} != {number!r}"
+    assert got_title == title, f"{note}: title {got_title!r} != {title!r}"
+
+
+@pytest.mark.parametrize("text,title", [
+    ('2 SCALE: 18" = 1\'-0" FRONT ELEVATION NEW', "FRONT ELEVATION NEW"),
+    ('3 REAR ELEVATION NEW SCALE: 18" = 1\'-0"', "REAR ELEVATION NEW"),
+    ('5 ENLARGED GLAZING AND ENTRY DOORS SCALE: 14" = 1\'-0"'
+     ' 4 TRUCK DOCK ELEVATION NEW',
+     "ENLARGED GLAZING AND ENTRY DOORS TRUCK DOCK ELEVATION NEW"),
+])
+def test_leading_number_recovery_never_moves_a_title(text, title):
+    """The three Bob's page-4 callouts keep byte-identical titles.
+
+    These strings are pasted from the real PDF and the expectations are the
+    pre-change parser's own output. Recovering the drawing number restores
+    ONLY ``drawing_number``; the title picker is untouched.
+    """
+    assert _number_and_title(text)[1] == title
+
+
+@pytest.mark.parametrize("text", [
+    '1/4" = 1\'-0"',            # leading token is a fraction numerator
+    '3/32" = 1\'-0"',           # leading token is a fraction numerator
+    '1 1/2" = 1\'-0"',          # leading token is the whole part of a mixed no.
+    'SCALE: 3 32" = 1\'-0"',    # leading token is the split stacked numerator
+    'SCALE: 18" = 1\'-0"',      # leading token is a concatenated stacked frac.
+])
+def test_a_leading_measure_is_never_read_as_a_drawing_number(text):
+    """The fallback requires a LONE integer: digits, whitespace, non-numeric.
+
+    A leading paper-inch measure is always followed by a digit, '/', '.' or an
+    inch mark — never by whitespace and a word — so it cannot reach the
+    fallback. This is the guard that keeps Moxy's 40 sheets of bare ratios and
+    every stacked-fraction callout out of it.
+    """
+    assert _number_and_title(text)[0] is None
 
 
 # ── Synthetic fitz page ───────────────────────────────────────────────────────
