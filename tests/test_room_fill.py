@@ -722,3 +722,313 @@ def test_the_sixteen_sheet_moxy_area_baseline_is_byte_identical(moxy_prototype_f
         for page, _, _ in MOXY_RCP_AREA_BASELINE
     ]
     assert measured == MOXY_RCP_AREA_BASELINE
+
+
+# ── SP-3: the outer-contour trace and the ring-safe simplifier (Task 2) ──────
+
+
+def _traced(rows):
+    """(contour, labelled) for the single component of an ASCII picture."""
+    from bobbytailor.deterministic.room_fill import _trace_outer_contour
+
+    mask, w, h = _mask(rows)
+    labelled = label_mask(mask, w, h)
+    assert labelled.count == 1, "the fixture must draw exactly one component"
+    contour, truncated = _trace_outer_contour(
+        labelled.labels, w, h, 1, labelled.starts[0],
+        max_steps=4 * labelled.counts[0] + 16,
+    )
+    assert truncated is False
+    return contour, labelled
+
+
+def _solid(width, height):
+    return ["#" * width for _ in range(height)]
+
+
+def test_the_traced_ring_of_a_rectangle_has_its_exact_pixel_perimeter():
+    """Exact ground truth by construction, in pixels — no scale involved yet.
+
+    A trace through pixel CENTRES of a solid w x h block walks a rectangle of
+    (w-1) x (h-1), so its ring length is exactly 2*((w-1) + (h-1)).
+    """
+    from bobbytailor.deterministic.room_fill import _ring_length
+
+    for w, h in ((9, 5), (12, 12), (20, 3)):
+        contour, _ = _traced(_solid(w, h))
+        assert contour[0] == contour[-1], "the trace returns a CLOSED ring"
+        assert _ring_length(contour) == pytest.approx(2.0 * ((w - 1) + (h - 1)))
+
+
+def test_the_trace_walks_the_outer_ring_and_ignores_an_interior_hole():
+    """A furniture outline or a room number inside a room is not a wall.
+
+    The identical outer boundary with and without a hole is the whole reason
+    the trace is a boundary FOLLOWER rather than a boundary-pixel COUNT: INV-05
+    section 3 measured the counting method at roughly six times the truth
+    precisely because it cannot tell an outer edge from an inner one.
+    """
+    from bobbytailor.deterministic.room_fill import _ring_length
+
+    solid, _ = _traced(_solid(11, 9))
+    holed, _ = _traced([
+        "###########",
+        "###########",
+        "###########",
+        "####...####",
+        "####...####",
+        "####...####",
+        "###########",
+        "###########",
+        "###########",
+    ])
+    assert _ring_length(holed) == pytest.approx(_ring_length(solid))
+    assert _ring_length(holed) == pytest.approx(2.0 * (10 + 8))
+
+
+def test_a_diagonal_edge_is_traced_as_a_diagonal_not_as_a_staircase():
+    """Each 8-connected step across a 45-degree face measures root two.
+
+    A 4-connected trace would climb the staircase and over-read that face by
+    41 percent, which is the error the simplifier's root-two comment names.
+    """
+    from bobbytailor.deterministic.room_fill import _ring_length
+
+    contour, _ = _traced([
+        "#....",
+        "##...",
+        "###..",
+        "####.",
+        "#####",
+    ])
+    # the hypotenuse is walked in 4 diagonal steps, the two legs in 4 each
+    assert _ring_length(contour) == pytest.approx(4 * 2 ** 0.5 + 8.0)
+
+
+def test_an_isolated_pixel_terminates_instead_of_spinning():
+    """T-23-34: a degenerate component must flag, never loop."""
+    from bobbytailor.deterministic.room_fill import _ring_length
+
+    contour, _ = _traced([".....", "..#..", "....."])
+    assert _ring_length(contour) == 0.0
+
+
+def test_the_iteration_cap_flags_rather_than_looping(monkeypatch):
+    """The cap is the safety net under Jacob's criterion, not a substitute.
+
+    Forced here with an absurdly small cap, because no real region approaches
+    it: the ring of an n-pixel component cannot exceed roughly 2n steps.
+    """
+    from bobbytailor.deterministic.room_fill import _trace_outer_contour
+
+    mask, w, h = _mask(_solid(20, 20))
+    labelled = label_mask(mask, w, h)
+    contour, truncated = _trace_outer_contour(
+        labelled.labels, w, h, 1, labelled.starts[0], max_steps=5,
+    )
+    assert truncated is True, "the walk must report that it was cut short"
+    assert len(contour) <= 7
+
+
+# ── the closed-ring collapse (INV-01 section 6 step 3) ───────────────────────
+
+
+def test_plain_simplification_of_a_closed_ring_collapses_it():
+    """The hazard, reproduced — this is what the split repair exists to avoid.
+
+    A ring's first and last points are the SAME point, so its base chord runs
+    from a point to itself. Under the ordinary reading — a degenerate chord
+    means every deviation is zero — nothing survives the tolerance and the
+    whole ring vanishes. INV-01's prototype hit exactly this and reported every
+    perimeter as 0.0 while every area was correct, which reads as "this room
+    has no walls" rather than as a bug.
+    """
+    from bobbytailor.deterministic.room_fill import _ring_length
+
+    contour, _ = _traced(_solid(12, 12))
+
+    def _naive(points, eps):
+        """Textbook Douglas-Peucker with the usual degenerate-chord guard."""
+        if len(points) < 3:
+            return list(points)
+        ax, ay = points[0]
+        bx, by = points[-1]
+        norm = ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5
+        if norm == 0.0:
+            return [points[0], points[-1]]      # <- the collapse
+        best, best_d = 0, 0.0
+        for k in range(1, len(points) - 1):
+            cx, cy = points[k]
+            d = abs((bx - ax) * (ay - cy) - (ax - cx) * (by - ay)) / norm
+            if d > best_d:
+                best, best_d = k, d
+        if best_d <= eps:
+            return [points[0], points[-1]]
+        return _naive(points[:best + 1], eps)[:-1] + _naive(points[best:], eps)
+
+    assert _ring_length(_naive(contour, 2.0)) == 0.0, "the hazard is real"
+
+
+def test_the_ring_safe_simplifier_does_not_collapse_a_traced_square():
+    """The regression guard: at least four vertices and a non-zero length."""
+    from bobbytailor.deterministic.room_fill import _ring_length, _simplify_ring
+
+    contour, _ = _traced(_solid(12, 12))
+    simple = _simplify_ring(contour, eps_px=2.0)
+    assert len(simple) >= 4
+    assert _ring_length(simple) > 0.0
+    assert _ring_length(simple) == pytest.approx(_ring_length(contour))
+    assert simple[0] == simple[-1], "the simplified ring is still closed"
+
+
+def test_simplification_is_lossless_on_straight_faces_and_drops_the_vertices():
+    """On rectilinear ink it removes vertices and NOTHING else.
+
+    637 traced pixel corners become the 4 corners of the rectangle they
+    describe, and the length does not move — which is why adding the
+    simplifier cannot perturb a guest room's measured perimeter.
+    """
+    from bobbytailor.deterministic.room_fill import _ring_length, _simplify_ring
+
+    contour, _ = _traced(_solid(200, 120))
+    simple = _simplify_ring(contour, eps_px=2.0)
+    assert len(contour) == 637
+    assert len(simple) == 5, "four corners plus the closing point"
+    assert _ring_length(simple) == pytest.approx(_ring_length(contour))
+
+
+def test_simplification_recovers_the_true_length_of_a_shallow_diagonal():
+    """THE reason the simplifier is kept — exact ground truth by construction.
+
+    A face rising one pixel every four columns is traced as a staircase, and a
+    staircase is longer than the line it approximates. The shape drawn here is
+    a quadrilateral whose exact perimeter is 9 + 120 + 39 + hypot(120, 30);
+    the raw trace over-reads it by three percent and the simplified ring lands
+    on it to floating point. On a rectilinear guest room the correction is
+    under one and a half percent (INV-01 section 4) — it is the diagonal wall
+    that needs this.
+    """
+    import math
+
+    from bobbytailor.deterministic.room_fill import _ring_length, _simplify_ring
+
+    rows = [
+        "".join("#" if y >= 30 - x // 4 else "." for x in range(121))
+        for y in range(40)
+    ]
+    contour, _ = _traced(rows)
+    exact = 9.0 + 120.0 + 39.0 + math.hypot(120.0, 30.0)
+    raw = _ring_length(contour)
+    simple = _ring_length(_simplify_ring(contour, eps_px=2.0))
+    assert simple == pytest.approx(exact)
+    assert raw > exact
+    assert (raw - exact) / exact == pytest.approx(0.030, abs=0.005)
+
+
+def test_a_ring_that_is_already_a_point_is_not_turned_into_garbage():
+    from bobbytailor.deterministic.room_fill import _ring_length, _simplify_ring
+
+    assert _ring_length(_simplify_ring([(3, 3), (3, 3)], 2.0)) == 0.0
+    assert _simplify_ring([], 2.0) == []
+
+
+# ── the same trace, on the real drawing (23-09 Task 2) ───────────────────────
+
+
+def _moxy_viewport_mask(pno, kind):
+    """Render the exact viewport the pipeline clips, and label it.
+
+    The clip recipe is the pipeline's OWN — its two public inputs
+    (`plan_titles` / `extract_printed_scales`) and its two clip constants — so
+    this is not a parallel measurement path. It is anchored by asserting the
+    resulting area against the pinned baseline: if the recipe ever drifts, this
+    helper measures a different rectangle and says so loudly.
+    """
+    import os
+
+    if not os.path.exists(MOXY_PDF):
+        pytest.skip("the real Moxy plan set is not present")
+    from bobbytailor.deterministic.printed_scale import extract_printed_scales
+    from bobbytailor.deterministic.room_fill import (
+        DEFAULT_DPI,
+        free_mask,
+        plan_titles,
+    )
+    from bobbytailor.pipeline.takeoff_pipeline import (
+        TakeoffPipeline,
+        _page_space_box,
+        _page_space_point,
+    )
+
+    doc = fitz.open(MOXY_PDF)
+    page = doc[pno]
+    scales = extract_printed_scales(page)
+    for name, plan_kind, tb in plan_titles(page):
+        if plan_kind != kind:
+            continue
+        tx0, ty0, tx1, ty1 = _page_space_box(page, tb)
+        mid = (tx0 + tx1) / 2.0
+        ps, best = None, float("inf")
+        for s in scales:
+            cx, cy = _page_space_point(page, *s.center_pt)
+            if abs(cx - mid) > TakeoffPipeline._FILL_CLIP_SIDE_PT:
+                continue
+            gap = cy - ty1
+            if -6.0 <= gap < best:
+                ps, best = s, gap
+        assert ps is not None
+        fpp = float(ps.feet_per_point)
+        clip = fitz.Rect(
+            tx0 - TakeoffPipeline._FILL_CLIP_SIDE_PT,
+            max(0.0, ty0 - TakeoffPipeline._FILL_CLIP_UP_PT),
+            tx1 + TakeoffPipeline._FILL_CLIP_SIDE_PT,
+            max(0.0, ty0 - 8.0),
+        )
+        pix = page.get_pixmap(
+            clip=to_page_space(page, from_page_space(page, clip)),
+            dpi=DEFAULT_DPI, colorspace=fitz.csGRAY,
+        )
+        labelled = label_mask(
+            free_mask(pix.samples, pix.width * pix.height), pix.width, pix.height
+        )
+        zoom = DEFAULT_DPI / 72.0
+        doc.close()
+        return labelled, (1.0 / (zoom * zoom)) * fpp * fpp, (1.0 / zoom) * fpp, name
+    doc.close()
+    raise AssertionError("no %s drawing on page %d" % (kind, pno))
+
+
+def test_on_the_real_drawing_simplification_changes_the_perimeter_by_under_1_5_percent():
+    """Moxy page 27, the KING SUITE B reflected-ceiling plan.
+
+    The dominant region is identified by area alone, and the area is asserted
+    against the pinned 216.8 SF baseline first — so this measures the same
+    region the shipped engine measures, not a lookalike.
+    """
+    from bobbytailor.deterministic.room_fill import (
+        _ring_length,
+        _simplify_ring,
+        _trace_outer_contour,
+    )
+
+    labelled, px_area_sf, px_len_ft, name = _moxy_viewport_mask(27, "RCP")
+    assert name == "KING SUITE B"
+    best = max(
+        (k for k in range(labelled.count) if not labelled.touches_edge[k]),
+        key=lambda k: labelled.counts[k],
+    )
+    assert round(labelled.counts[best] * px_area_sf, 1) == 216.8, (
+        "the dominant enclosed region must be the one the engine publishes"
+    )
+    contour, truncated = _trace_outer_contour(
+        labelled.labels, labelled.width, labelled.height, best + 1,
+        labelled.starts[best], max_steps=4 * labelled.counts[best] + 16,
+    )
+    assert truncated is False
+    raw = _ring_length(contour) * px_len_ft
+    simple = _ring_length(_simplify_ring(contour)) * px_len_ft
+    assert raw > 0.0 and simple > 0.0
+    assert simple <= raw, "simplification can only ever shorten a polyline"
+    assert (raw - simple) / raw < 0.015, (
+        "raw %.2f LF vs simplified %.2f LF" % (raw, simple)
+    )
