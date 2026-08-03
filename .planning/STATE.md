@@ -6,14 +6,14 @@ current_phase: 23
 current_phase_name: measurement-engine-completion
 status: in-progress
 stopped_at: Completed 23-17-PLAN.md — report + export emission of the coverage record (SP-8), wave 2
-last_updated: "2026-08-03T14:24:07.609Z"
+last_updated: "2026-08-03T15:35:17.353Z"
 last_activity: 2026-08-03
 last_activity_desc: 23-17 surfaced the coverage ledger in every client artifact; a never-measured quantity is now a BLANK in takeoff.json, coverage.json, summary.txt, the CSV and the workbook; suite 1511 -> 1531
 progress:
   total_phases: 28
   completed_phases: 19
   total_plans: 121
-  completed_plans: 105
+  completed_plans: 106
   percent: 68
 ---
 
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 23 (measurement-engine-completion) — IN PROGRESS
-Plan: 8 of 17 complete (wave 2)
+Plan: 9 of 17 complete (wave 2)
 Status: wave 1 (23-01 ledger, 23-02 scale parser) done; wave 2 has 23-03 (flagged-zero contract), 23-04 (door-schedule unification), 23-05 (tag-pairing primitives), 23-06 (structural title-block identification) and 23-17 (report + export emission of the coverage record) landed
 Last activity: 2026-08-03 — 23-17 surfaced the coverage ledger in every client artifact; a never-measured quantity is now a BLANK in takeoff.json, coverage.json, summary.txt, the CSV and the workbook; suite 1511 -> 1531
 
@@ -74,6 +74,7 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 | Phase 23 P03 | ~3h | 3 tasks | 10 files |
 | Phase 23 P05 | 140 | 3 tasks | 6 files |
 | Phase 23 P07 | 4h | 3 tasks | 10 files |
+| Phase 23 P08 | ~2h05m | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,9 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 - [Phase ?]: 23-07: measure_enclosed_area keeps ONE clip contract (drawing space, mapped internally); a page-space caller maps back via from_page_space rather than passing a space flag a future caller could forget
 - [Phase 23]: 23-07: the rotation census is 61 unrotated / 22 rotated of 83 pages, not the plan's 76/7 — Chelsea has 4 rotated pages INV-03 never counted
 - [Phase 23]: 23-07: DEF-23-08 — Bob's p3 binds its own 10.667 callout but the PAGE scale still resolves 1.0; that is select_main_plan/_MAIN_PATTERNS, not a coordinate defect, and was logged rather than forced
+- [Phase ?]: 23-08: a unit key plan is identified by its own printed DRAWING TITLE (a title bound to a scale callout), not by a page-text search — Moxy p3 prints KEY PLAN in its title block and is correctly not selected
+- [Phase ?]: 23-08: the in-plan census supersedes the manifest per D-10; every count carries unit_count_source and disagreement is flagged on the row that uses the number — human_inputs/ is never edited
+- [Phase ?]: 23-08: no area is ever synthesized for a finish code; a called-out code becomes a named zero-quantity row seeded with its tag positions, and the finish-schedule path emits the same contract (D-03)
 
 ### 22-04 Decisions
 
@@ -377,7 +381,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-03T14:23:48.900Z
+Last session: 2026-08-03T15:34:53.453Z
 Stopped at: Completed 23-05-PLAN.md — tag-pairing primitives (SP-6), wave 2
 Resume file: None
 
