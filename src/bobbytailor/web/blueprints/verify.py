@@ -31,6 +31,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required
 
 from bobbytailor import config
+from bobbytailor.pipeline.coverage import ITEM_HUMAN_INPUT, ITEM_MEASURED
 
 logger = logging.getLogger(__name__)
 
@@ -484,6 +485,12 @@ def _rebuild_summary(run_folder: str) -> dict:
             "unit": (entry["unit"] or row.get("unit") or "").upper(),
             "confidence": "high", "needs_review": False, "review_reasons": [],
             "source": "measured_auto" if is_auto else "measured_verified",
+            # The row's provenance is REBUILT with its quantity, never left
+            # behind it: an item that was NOT MEASURED and then measured against
+            # a verified scale must not keep publishing NOT MEASURED next to a
+            # real number (23-17 — the CSV and the workbook both render this).
+            "provenance": ITEM_MEASURED,
+            "measured": True,
             "auto_verified": is_auto,
             "line_count": entry["line_count"],
             "measured_sheets": entry.get("sheets", []),
@@ -504,6 +511,10 @@ def _rebuild_summary(run_folder: str) -> dict:
         row["needs_review"] = False
         row["review_reasons"] = []
         row["source"] = "user_verified"
+        # A number a human entered or confirmed is a HUMAN INPUT, and the
+        # take-off says so — the app did not earn it by measuring the drawing.
+        row["provenance"] = ITEM_HUMAN_INPUT
+        row["measured"] = False
         row["auto_verified"] = False  # explicit human confirmation, not auto
         if ov.get("note"):
             row["verify_note"] = ov["note"]

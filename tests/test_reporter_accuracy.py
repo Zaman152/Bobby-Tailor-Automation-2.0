@@ -600,6 +600,165 @@ def test_a_discarded_measurement_is_escalated_not_logged():
         )
 
 
+class _ManifestEntry:
+    def __init__(self, name, unit="EA", measure="count"):
+        self.name = name
+        self.unit = unit
+        self.measure = measure
+
+
+class _Manifest:
+    """Minimal stand-in for object_manifest.Manifest (same stub as
+    tests/test_aggregator.py) — enough to exercise the completeness guarantee
+    that gives a never-measured item a row at all."""
+
+    def __init__(self, entries):
+        self._entries = entries
+
+    def resolve(self, description, unit=""):
+        for e in self._entries:
+            if e.name.lower() in str(description).lower():
+                return e
+        return None
+
+    def missing(self, found_names):
+        found = {str(n).strip().lower() for n in found_names}
+        return [e for e in self._entries if e.name.strip().lower() not in found]
+
+
+def _read_summary_csv(report) -> list:
+    import csv
+    path = Path(report["_files"]["takeoff_summary_csv"])
+    with open(path, newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def test_the_summary_states_in_words_that_a_blank_is_not_a_zero():
+    with _isolated_output_dir():
+        report = generate_report(
+            "Ledger Proj", _baseline_extracted(), _cmu_estimate(),
+            manifest=_Manifest([_ManifestEntry("Lintels")]),
+            coverage=_three_page_ledger(),
+        )
+        text = Path(report["_files"]["summary_txt"]).read_text()
+
+        assert "COVERAGE" in text
+        assert "a blank is NOT a zero" in text
+        assert "do NOT read these as zero" in text
+
+        # Positioned between API USAGE and SCALE CONFIDENCE (INV-08 §3.3).
+        assert (
+            text.index("API USAGE")
+            < text.index("COVERAGE")
+            < text.index("SCALE CONFIDENCE")
+        )
+
+        assert "Pages in source PDF:              3" in text
+        assert "Drawings dropped (no printed scale of their own):" in text
+        assert "Viewports excluded as off-scale" in text
+
+
+def test_the_coverage_section_names_the_pages_that_were_not_measured():
+    with _isolated_output_dir():
+        report = generate_report(
+            "Ledger Proj", _baseline_extracted(), [],
+            coverage=_three_page_ledger(),
+        )
+        text = Path(report["_files"]["summary_txt"]).read_text()
+        assert "!!" in text
+        # Page 1 carries six plan drawings and was discarded on a keyword.
+        assert "were NOT measured" in text
+        assert "pages 1" in text
+        assert "COVER" in text
+
+
+def test_a_never_measured_quantity_is_an_empty_cell_never_a_zero():
+    """T-23-74: an empty cell must reach the scorer as nothing, end to end."""
+    from scripts.score_report_dir import _num
+
+    estimates = _cmu_estimate()
+    manifest = _Manifest([_ManifestEntry("Lintels")])
+    with _isolated_output_dir():
+        report = generate_report(
+            "CSV Proj", _baseline_extracted(), estimates, manifest=manifest,
+        )
+        rows = {r["item"]: r for r in _read_summary_csv(report)}
+
+    lintels = rows["Lintels"]
+    assert lintels["quantity"] == "", "a blank is a blank — never '—', never 0"
+    assert lintels["provenance"] == ITEM_NOT_MEASURED
+    assert _num(lintels["quantity"]) is None, (
+        "the offline scorer must read the cell as nothing rather than zero"
+    )
+
+
+def test_a_measured_zero_and_a_blank_stay_distinguishable_in_the_csv():
+    """The two facts a client bids from: 'the building has none of this' and
+    'we did not measure this'. They must not render alike."""
+    estimates = [{
+        "item_type": "masonry", "description": "CMU Wall", "quantity": 0.0,
+        "unit": "SF", "source_sheet": "A-101", "table_used": "masonry",
+    }]
+    manifest = _Manifest([_ManifestEntry("Lintels")])
+    with _isolated_output_dir():
+        report = generate_report(
+            "CSV Proj", _baseline_extracted(), estimates, manifest=manifest,
+        )
+        rows = {r["item"]: r for r in _read_summary_csv(report)}
+
+    from scripts.score_report_dir import _num
+
+    assert rows["CMU Wall"]["quantity"] == "0"
+    assert rows["CMU Wall"]["provenance"] == ITEM_MEASURED
+    assert _num(rows["CMU Wall"]["quantity"]) == 0.0
+
+    assert rows["Lintels"]["quantity"] == ""
+    assert rows["Lintels"]["provenance"] == ITEM_NOT_MEASURED
+
+
+def test_the_csv_keeps_every_existing_column_in_its_existing_position():
+    """T-23-70 for the CSV: provenance is appended LAST."""
+    import csv
+    with _isolated_output_dir():
+        report = generate_report("CSV Proj", _baseline_extracted(), _cmu_estimate())
+        with open(report["_files"]["takeoff_summary_csv"], newline="") as f:
+            fieldnames = csv.DictReader(f).fieldnames
+    assert fieldnames == [
+        "item", "quantity", "unit", "confidence", "needs_review", "source",
+        "review_notes", "source_sheets", "line_count", "provenance",
+    ]
+
+
+def test_a_human_entered_quantity_never_publishes_a_stale_provenance():
+    """The verification workspace rebuilds a row's quantity in layers; the
+    provenance must be rebuilt WITH it. Publishing a real number under
+    NOT MEASURED is the same lie as publishing a blank as a zero."""
+    from bobbytailor import config
+    from bobbytailor.web.blueprints import verify as verify_bp
+
+    with _isolated_output_dir():
+        report = generate_report("Verify Proj", _baseline_extracted(), [],
+                                 manifest=_Manifest([_ManifestEntry("Lintels")]))
+        run_dir = Path(report["_files"]["run_folder"])
+        base = next(r for r in report["takeoff_summary"] if r["item"] == "Lintels")
+        assert base["provenance"] == ITEM_NOT_MEASURED and base["quantity"] is None
+
+        (run_dir / "verification_overrides.json").write_text(json.dumps({"overrides": {
+            "lintels": {"item": "Lintels", "quantity": 12.0, "unit": "EA",
+                        "verified": True},
+        }}))
+
+        # verify.py resolves the run folder against config.OUTPUT_DIR at call
+        # time (the reporter captured its own copy at import).
+        config.OUTPUT_DIR = str(run_dir.parent)
+        rebuilt = verify_bp._rebuild_summary(run_dir.name)
+
+    row = next(r for r in rebuilt if r["item"] == "Lintels")
+    assert row["quantity"] == 12.0
+    assert row["provenance"] == "HUMAN INPUT"
+    assert row["measured"] is False
+
+
 def test_an_errored_page_is_reported_as_errored_not_as_zero():
     led = CoverageLedger(pages_in_source=1)
     led.register_page(0, sheet_name="A-104", disposition=ERRORED,

@@ -884,17 +884,45 @@ def _write_raw_csv(items: list, path: Path):
             w.writerows(items)
 
 
+def _takeoff_summary_csv_quantity(row: dict):
+    """The quantity cell for one take-off row. A blank is written BLANK.
+
+    The old cell was ``quantity_fmt or quantity``, and ``quantity_fmt`` is the
+    em-dash for a never-measured item — so the CSV said "—" where the JSON said
+    ``0.0`` and the workbook inferred NOT MEASURED from the value. Writing the
+    EMPTY STRING is the honest cell, and it keeps scoring correct BY
+    CONSTRUCTION rather than by a compensating change on the scorer side:
+    ``scripts/score_report_dir._num`` already maps ``""`` to nothing.
+
+    A measured zero still writes ``0``. That is the whole distinction this phase
+    exists to preserve — a building with no CMU is a finding, not an absence.
+    """
+    quantity = row.get("quantity")
+    if quantity is None or quantity == "":
+        return ""
+    return row.get("quantity_fmt") or quantity
+
+
 def _write_takeoff_summary_csv(aggregated: list, path: Path):
-    """StackCT-style consolidated takeoff summary."""
+    """StackCT-style consolidated takeoff summary.
+
+    ``provenance`` is appended LAST so every existing column keeps its position
+    for a consumer reading by index rather than by name.
+    """
     fields = ["item", "quantity", "unit", "confidence", "needs_review",
-              "source", "review_notes", "source_sheets", "line_count"]
+              "source", "review_notes", "source_sheets", "line_count",
+              "provenance"]
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
         for row in aggregated:
             w.writerow({
                 "item": row.get("item"),
-                "quantity": row.get("quantity_fmt") or row.get("quantity"),
+                "quantity": _takeoff_summary_csv_quantity(row),
+                # Read from the record; provenance_of_row is consulted only for
+                # a pre-23 row the aggregator never classified. ONE place
+                # decides this vocabulary (INV-08 §5).
+                "provenance": row.get("provenance") or provenance_of_row(row),
                 "unit": row.get("unit"),
                 "confidence": row.get("confidence") or "",
                 "needs_review": "yes" if row.get("needs_review") else "",
@@ -927,6 +955,80 @@ def _write_calculated_csv(items: list, path: Path):
 # Provenance values counted as deterministic — the numerator of the share the
 # accuracy gate asserts ≥97% accurate (geometry/text-derived quantities).
 _DETERMINISTIC_PROVENANCES = ("geometry", "text_layer", "schedule_table")
+
+
+def _coverage_lines(report: dict) -> list:
+    """COVERAGE section: what the run did NOT measure (23-17, INV-08 §3.3).
+
+    Returns an EMPTY list when the report carries no ledger, so a pre-23 report
+    renders byte-identically — the section simply does not exist, exactly as it
+    did not exist before.
+
+    Everything above this section is an account of what WAS found. This is the
+    only part of ``summary.txt`` that states what was not, and it says so in
+    words rather than leaving a client to infer it from a missing row.
+    """
+    cov = report.get("coverage")
+    if not isinstance(cov, dict) or not cov:
+        return []
+
+    import textwrap
+
+    def _n(key):
+        value = cov.get(key)
+        return 0 if value is None else value
+
+    lines = [
+        "─" * 70,
+        "COVERAGE  (a blank is NOT a zero — an unmeasured item has no number,",
+        "           which is a different fact from a measured zero)",
+        "─" * 70,
+        f"Pages in source PDF:          {_n('pages_in_source'):>5}",
+        f"  measured (geometry):        {_n('sheets_measured'):>5}",
+        f"  vision-only (no geometry):  {_n('sheets_vision_only'):>5}",
+        f"  skipped by classifier:      {_n('sheets_skipped'):>5}",
+        f"  not applicable (cover/idx): {_n('sheets_not_applicable'):>5}",
+        f"  errored:                    {_n('sheets_errored'):>5}",
+        "{:<64}{:>5}".format("Drawings measured:", _n("drawings_measured")),
+        "{:<64}{:>5}".format(
+            "Drawings dropped (no printed scale of their own):",
+            _n("drawings_dropped_no_scale"),
+        ),
+        "{:<64}{:>5}".format(
+            "Viewports excluded as off-scale (measuring them would be wrong):",
+            _n("drawings_excluded_off_scale"),
+        ),
+    ]
+
+    silent = cov.get("silent_loss_pages") or []
+    if silent:
+        lines.append("{:<64}{:>5}".format(
+            "Pages carrying measurable drawings that were NOT measured:",
+            len(silent),
+        ))
+
+    warnings = report.get("coverage_warnings") or []
+    if warnings:
+        lines.append("")
+        for warning in warnings:
+            wrapped = textwrap.wrap(str(warning), width=66) or [""]
+            lines.append(f"!! {wrapped[0]}")
+            for cont in wrapped[1:]:
+                lines.append(f"   {cont}")
+
+    items = report.get("item_coverage") or []
+    if items:
+        lines.append("")
+        lines.append(f"Expected line items:          {len(items):>5}")
+        lines.append(f"  MEASURED                    {_n('items_measured'):>5}")
+        lines.append(f"  NEEDS REVIEW                {_n('items_needs_review'):>5}")
+        lines.append(f"  HUMAN INPUT                 {_n('items_human_input'):>5}")
+        not_measured = _n("items_not_measured")
+        marker = "   ← do NOT read these as zero" if not_measured else ""
+        lines.append(f"  NOT MEASURED                {not_measured:>5}{marker}")
+
+    lines.append("")
+    return lines
 
 
 def _scale_confidence_lines(report: dict) -> list:
@@ -1039,6 +1141,8 @@ def _write_summary(report: dict, path: Path):
         )
     lines.append("")
 
+    # Between API USAGE and SCALE CONFIDENCE, and empty on a pre-23 report.
+    lines.extend(_coverage_lines(report))
     lines.extend(_scale_confidence_lines(report))
     lines.extend(_provenance_breakdown_lines(report))
 
