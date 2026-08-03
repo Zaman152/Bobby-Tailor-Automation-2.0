@@ -8,44 +8,656 @@ This module recovers that structured data with PyMuPDF's table finder and a set 
 content-based heuristics that do not depend on a fixed column order, so the same
 parser works across drawing sets from different architects.
 
+Three real schedule FORMATS, one parser (INV-07)
+------------------------------------------------
+1. **type + count** (Crow) — one row per door TYPE with a printed ``Count``
+   column; the quantity is that column.
+2. **per-opening** (Moxy) — one row per opening tag, no count column; the
+   quantity is one door per printed row.
+3. **split-cell per-opening** (Bob's) — as (2), but the materials are printed as
+   free text with punctuation (``HM-STL.``, ``S.C. WOOD``, ``ALUM. & GLASS``) and
+   the frame material is split across two PyMuPDF cells (``'--- H.'`` +
+   ``'M. 6A'``).
+
+The three differences are absorbed by three concepts rather than three parsers:
+a phrase-based material reader (:func:`_material_code`), a column-role reader
+with a content fallback (:func:`_column_roles` / :func:`_material_columns`), and
+a count column whose ABSENCE is a valid answer meaning one door per row
+(:func:`_count_column`).
+
+The two-part legend guard (INV-07 §4.3)
+---------------------------------------
+Reading materials by phrase is deliberately permissive, so it must be paired with
+a guard or an interior-elevation drawing grid that PyMuPDF happens to read as a
+table starts fabricating doors (Moxy page index 15: the column of grid letters
+reads as a tag column and the word WOOD inside prose supplies a pseudo material).
+The guard is two-part and both parts are required:
+
+  1. a STANDALONE door-schedule title band whose horizontal span contains the
+     table (:func:`_door_title_bands`), and
+  2. column-role evidence — at least two distinct door-material columns, or at
+     least one header cell carrying a door role (:func:`_is_door_table`).
+
 IMPORTANT — what schedules can and cannot tell you:
   * A door schedule enumerates door *openings/types* with their exact materials.
-    Counting its rows gives the exact count of *scheduled* openings.
+    Counting its rows (or summing its count column) gives the exact count of
+    *scheduled* openings.
   * It does NOT always equal the total *installed* count: in repetitive buildings
     (e.g. hotels) guest-room doors repeat per unit/floor and are counted on the
     plans, not re-listed per instance. So treat schedule counts as an exact LOWER
     bound / type breakdown, and flag the residual for plan-based verification.
+
+Python 3.9 compatible: typing.Optional/List/Dict/Tuple, no ``X | Y`` runtime
+annotations, no walrus in comprehensions.
 """
 from __future__ import annotations
 
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
-# A door/opening tag: 003, 006A, 101B, 113A, T1, T7B, D-12, etc.
-_TAG_RE = re.compile(r"^[A-Z]{0,2}[-]?\d{1,4}[A-Z]?$|^T\d+[A-Z]?$")
+# A door/opening tag OR a door TYPE code. The first two alternatives are the
+# per-opening tags (003, 006A, 101B, 113A, T1, T7B, D-12); the last two are the
+# door TYPE code a type+count schedule prints in the same position (OD1, P1,
+# DSF, SF). One parser reads all three formats, so one shape has to cover both —
+# a type schedule's letters-only code is a door row exactly as much as an
+# opening tag is.
+#
+# The letters-only form is capped at THREE characters and requires at least two:
+# four letters admits ordinary words ("WORK", "AREA", "DATA"), and one letter
+# admits the elevation grid letters A..H that make Moxy page 15's drawing grid
+# read as a tag column.
+_TAG_RE = re.compile(
+    r"^[A-Z]{0,2}[-]?\d{1,4}[A-Z]?$"
+    r"|^T\d+[A-Z]?$"
+    r"|^[A-Z]{1,3}\d{1,2}[A-Z]?$"
+    r"|^[A-Z]{2,3}$"
+)
 
-# Door LEAF (panel) materials.
-_PANEL_MATS = {"SCW", "HM", "HC", "WD", "GLASS", "GL", "FRP", "ALUM", "AL", "HMG", "WG"}
-# Door FRAME materials.
-_FRAME_MATS = {"HM", "GALV", "ALUM", "AL", "KD", "WD", "HMG"}
-# Tokens that ONLY make sense as a leaf material (disambiguates the panel column).
-_PANEL_ONLY = {"SCW", "HC", "WD", "GLASS", "GL", "FRP", "WG"}
-# Tokens that ONLY make sense as a frame material.
-_FRAME_ONLY = {"GALV", "KD"}
+# A small integer cell — the shape of a printed door COUNT.
+_INT_CELL_RE = re.compile(r"^\d{1,3}$")
+
+# Bound the column scan so a pathological table cannot dominate a run (T-23-15).
+_MAX_TABLE_COLS = 80
+# Schedules stack 2-3 header rows (Moxy t5, Crow t0) — read at most four.
+_MAX_HEADER_ROWS = 4
+# The count column is looked for in a narrow window right of the tag column.
+_COUNT_WINDOW = 3
+
+# ── Material reading: normalise, then resolve by PHRASE ───────────────────────
+
+# Two or more single-letter groups written as an initialism: "H.M.", "H. M. ",
+# "S.C. ". Collapsed to one token so a split/punctuated material cell is
+# readable ("--- H. M. 6A" -> "HM 6A", "S.C. WOOD" -> "SC WOOD").
+_DOTTED_INITIALISM_RE = re.compile(r"\b(?:[A-Z]\.\s*){2,}")
+
+
+def _normalise_material_text(cell) -> str:
+    """Uppercase a schedule cell and reduce its punctuation to readable tokens.
+
+    Three transforms, in order:
+      1. uppercase;
+      2. collapse dotted initialisms of two or more single-letter groups into one
+         token (``H. M.`` -> ``HM``, ``S.C.`` -> ``SC``);
+      3. reduce every remaining non-alphanumeric run to a single space.
+
+    Pure function, no I/O. Verified against the five INV-07 §4.1 rows::
+
+        '--- H. M. 6A'               -> 'HM 6A'
+        'HM-STL.'                    -> 'HM STL'
+        'S.C. WOOD & GLASS'          -> 'SC WOOD GLASS'
+        'ALUM. & 1" INSULATED GLASS' -> 'ALUM 1 INSULATED GLASS'
+        '*'                          -> ''
+    """
+    if cell is None:
+        return ""
+    text = str(cell).upper()
+    if not text:
+        return ""
+    # Keep a trailing space so the collapsed initialism stays its own token.
+    text = _DOTTED_INITIALISM_RE.sub(
+        lambda m: re.sub(r"[^A-Z0-9]", "", m.group(0)) + " ", text
+    )
+    text = re.sub(r"[^A-Z0-9]+", " ", text)
+    return " ".join(text.split())
+
+
+# Phrase -> canonical material code. Resolution is LEFTMOST then LONGEST, which
+# is load-bearing: a solid-core wood leaf with a glass lite must resolve to the
+# LEAF material (SCW, not GLASS), and an aluminium door with insulated glazing
+# must resolve to ALUM. Canonical codes: HM SCW WD HC ALUM GALV GLASS STL KD
+# FRP IM. Extend by adding a row — order inside the list does not matter
+# (leftmost-then-longest decides), it is grouped for readability only.
+_MAT_PHRASES = [
+    ("SOLID CORE WOOD", "SCW"),
+    ("SOLID CORE", "SCW"),
+    ("SC WOOD", "SCW"),
+    ("SCW", "SCW"),
+    ("HOLLOW CORE WOOD", "HC"),
+    ("HOLLOW CORE", "HC"),
+    ("HC", "HC"),
+    ("HOLLOW METAL", "HM"),
+    ("HM STL", "HM"),
+    ("HMG", "HM"),
+    ("HM", "HM"),
+    ("ALUMINUM", "ALUM"),
+    ("ALUMINIUM", "ALUM"),
+    ("ALUM", "ALUM"),
+    ("AL", "ALUM"),
+    ("GALVANIZED", "GALV"),
+    ("GALVANISED", "GALV"),
+    ("GALV", "GALV"),
+    ("GLASS", "GLASS"),
+    ("GL", "GLASS"),
+    ("WOOD", "WD"),
+    ("WD", "WD"),
+    ("WG", "WD"),
+    ("STEEL", "STL"),
+    ("STL", "STL"),
+    ("KNOCK DOWN", "KD"),
+    ("KD", "KD"),
+    ("FRP", "FRP"),
+    ("IM", "IM"),
+]
+
+_MAT_PHRASE_RE = [
+    (re.compile(r"\b" + phrase.replace(" ", r"\s+") + r"\b"), code)
+    for phrase, code in _MAT_PHRASES
+]
+
+# Every canonical code the resolver can emit.
+MATERIAL_CODES = tuple(sorted({code for _, code in _MAT_PHRASES}))
+
+
+def _material_code(cell) -> str:
+    """The door/frame material a schedule cell names, or ``""``.
+
+    Leftmost match wins; ties at the same offset go to the longest phrase. Every
+    bare-token membership test in this module resolves through here.
+    """
+    text = _normalise_material_text(cell)
+    if not text:
+        return ""
+    best_key = None
+    best_code = ""
+    for pattern, code in _MAT_PHRASE_RE:
+        m = pattern.search(text)
+        if m is None:
+            continue
+        key = (m.start(), -(m.end() - m.start()))
+        if best_key is None or key < best_key:
+            best_key = key
+            best_code = code
+    return best_code
+
 
 # Human-readable names for material codes.
 _PANEL_LABEL = {
     "SCW": "Solid Core Wood", "WD": "Wood", "HC": "Hollow Core Wood",
     "HM": "Hollow Metal", "GLASS": "Glass / Aluminum", "GL": "Glass / Aluminum",
-    "ALUM": "Aluminum", "AL": "Aluminum", "FRP": "FRP", "HMG": "Hollow Metal (Glazed)",
-    "WG": "Wood / Glass",
+    "ALUM": "Aluminum", "AL": "Aluminum", "FRP": "FRP", "STL": "Steel",
+    "IM": "Intermediate Metal", "KD": "Knock-Down", "GALV": "Galvanized Steel",
 }
 _FRAME_LABEL = {
     "HM": "Hollow Metal", "GALV": "Galvanized Steel", "ALUM": "Aluminum",
-    "AL": "Aluminum", "KD": "Knock-Down", "WD": "Wood", "HMG": "Hollow Metal (Glazed)",
+    "AL": "Aluminum", "KD": "Knock-Down", "WD": "Wood", "STL": "Steel",
+    "SCW": "Solid Core Wood", "GLASS": "Glass / Aluminum", "GL": "Glass / Aluminum",
+    "IM": "Intermediate Metal", "HC": "Hollow Core Wood", "FRP": "FRP",
 }
+
+
+# ── The two-part legend guard, part 1: standalone door-schedule title bands ───
+
+_DOOR_WORD_RE = re.compile(r"\bDOORS?\b", re.IGNORECASE)
+_SCHEDULE_WORD_RE = re.compile(r"\b(SCHEDULE|TYPES?)\b", re.IGNORECASE)
+# DOOR sitting directly beside the schedule word ("DOOR SCHEDULE", "SCHEDULE OF
+# DOORS", "WINDOW & DOOR SCHEDULE"). Only non-letters may separate them.
+_DOOR_ADJACENT_RE = re.compile(
+    r"\bDOORS?\b[^A-Za-z]{0,20}\b(SCHEDULE|TYPES?)\b"
+    r"|\b(SCHEDULE|TYPES?)\b[^A-Za-z]{0,20}\bDOORS?\b",
+    re.IGNORECASE,
+)
+# A legend that is about something else. Present + DOOR not adjacent to the
+# schedule word => the line titles a different legend (a DOOR HARDWARE SCHEDULE
+# is a hardware-set schedule, not a door schedule).
+_TITLE_DENY_RE = re.compile(
+    r"\b(FLOORING|FINISH(?:ES)?|PAINT|COLOU?RS?|RCP|REFLECTED|CEILING|LIGHTING"
+    r"|PLUMBING|EQUIPMENT|HARDWARE|WINDOWS?|LOUVERS?|SIGNAGE|ROOMS?"
+    r"|WALL\s+COVERING)\b",
+    re.IGNORECASE,
+)
+# A line that POINTS AT a schedule rather than titling one ("REF: DOOR SCHEDULE
+# (ABOVE)", "SEE DOOR SCHEDULE"). A callout must not own a band, or the table
+# that happens to sit beneath the callout inherits a door schedule's authority.
+_TITLE_REFERENCE_RE = re.compile(r"^(REF\.?|REFER|SEE|PER)\b", re.IGNORECASE)
+# A title is a LINE OF ITS OWN. Anything longer is prose that happens to contain
+# the phrase ("REFER TO ARCHITECTURAL DOOR SCHEDULE WC 01 FOR ...").
+_MAX_TITLE_CHARS = 60
+# A table qualifies under a band when the band covers this much of its width.
+_BAND_WIDTH_OVERLAP = 0.6
+
+
+def _is_door_title_line(text: str) -> bool:
+    """True when *text* reads as a STANDALONE door-schedule / door-type title.
+
+    Three requirements, all necessary (INV-07 §4.3.1):
+      * a line of its own, at most :data:`_MAX_TITLE_CHARS` characters, and not a
+        reference callout — this is what rejects a schedule phrase buried inside
+        an elevation note, and a "REF: DOOR SCHEDULE" pointer;
+      * it names a door AND a schedule/type word;
+      * it carries no deny word unless the door word sits directly beside the
+        schedule word — this rejects unrelated legends and hardware schedules.
+    """
+    line = " ".join((text or "").split())
+    if not line or len(line) > _MAX_TITLE_CHARS:
+        return False
+    if _TITLE_REFERENCE_RE.match(line):
+        return False
+    if not _DOOR_WORD_RE.search(line):
+        return False
+    if not _SCHEDULE_WORD_RE.search(line):
+        return False
+    if _TITLE_DENY_RE.search(line) and not _DOOR_ADJACENT_RE.search(line):
+        return False
+    return True
+
+
+def _text_lines(page) -> List[Tuple[str, tuple]]:
+    """``[(line_text, bbox)]`` for every text line on *page*. Never raises."""
+    try:
+        data = page.get_text("dict")
+    except Exception:  # noqa: BLE001
+        return []
+    out: List[Tuple[str, tuple]] = []
+    for block in (data.get("blocks") or []):
+        for line in (block.get("lines") or []):
+            text = "".join(s.get("text", "") for s in (line.get("spans") or []))
+            bbox = line.get("bbox")
+            if text.strip() and bbox and len(bbox) == 4:
+                out.append((text.strip(), tuple(bbox)))
+    return out
+
+
+def _door_title_bands(page, table_bboxes: Optional[List[tuple]] = None) -> List[dict]:
+    """Horizontal bands of the page owned by a standalone door-schedule title.
+
+    A band is ``{"x0", "x1", "y0", "title"}`` for every qualifying title line.
+    Each band's horizontal range is then EXTENDED with the bounding box of any
+    table it directly titles, so a header-less continuation fragment inherits its
+    parent's band (Moxy p6 t10/t13/t14). Never raises.
+    """
+    bands: List[dict] = []
+    for text, bbox in _text_lines(page):
+        if not _is_door_title_line(text):
+            continue
+        bands.append({
+            "x0": float(bbox[0]), "x1": float(bbox[2]), "y0": float(bbox[1]),
+            "title": " ".join(text.split()),
+        })
+    if not bands or not table_bboxes:
+        return bands
+    # A printed title line is typically far NARROWER than the table it titles
+    # ("DOOR SCHEDULE" is 80pt wide over a 900pt table), so the >=60% rule can
+    # never fire on the raw line. First attach each band to the table it DIRECTLY
+    # titles — the nearest table below it that it overlaps at all — and adopt
+    # that table's width.
+    for band in bands:
+        titled = _directly_titled_table(band, table_bboxes)
+        if titled is not None:
+            band["x0"] = min(band["x0"], float(titled[0]))
+            band["x1"] = max(band["x1"], float(titled[2]))
+    # Then two widening passes: a stacked continuation fragment that qualifies
+    # under the widened band contributes its own width in turn, so a column of
+    # header-less fragments stitches onto its parent's band.
+    for _ in range(2):
+        for band in bands:
+            for bb in table_bboxes:
+                if _band_covers(band, bb):
+                    band["x0"] = min(band["x0"], float(bb[0]))
+                    band["x1"] = max(band["x1"], float(bb[2]))
+    return bands
+
+
+def _directly_titled_table(band: dict, table_bboxes: List[tuple]) -> Optional[tuple]:
+    """The table *band* directly titles: nearest below it, with any x-overlap."""
+    best = None
+    best_dy = None
+    for bb in table_bboxes:
+        x0, y0, x1, y1 = (float(bb[0]), float(bb[1]), float(bb[2]), float(bb[3]))
+        if band["y0"] > y1:
+            continue  # the title sits BELOW the table — it does not title it
+        if min(band["x1"], x1) - max(band["x0"], x0) <= 0:
+            continue  # no horizontal relationship at all
+        dy = max(y0 - band["y0"], 0.0)
+        if best_dy is None or dy < best_dy:
+            best, best_dy = bb, dy
+    return best
+
+
+def _band_covers(band: dict, bbox) -> bool:
+    """True when *band* sits at/above *bbox* and spans most of its width."""
+    x0, y0, x1, y1 = float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
+    width = x1 - x0
+    if width <= 0:
+        return False
+    if band["y0"] > y1:
+        return False  # the title sits BELOW the table — it does not title it
+    overlap = min(band["x1"], x1) - max(band["x0"], x0)
+    return (overlap / width) >= _BAND_WIDTH_OVERLAP
+
+
+def _table_in_door_band(bbox, bands: List[dict]) -> bool:
+    """True when any door-title band qualifies the table at *bbox*."""
+    for band in bands or []:
+        if _band_covers(band, bbox):
+            return True
+    return False
+
+
+# ── Column roles (advisory) + content detection (authoritative fallback) ──────
+
+_ROLE_COUNT_RE = re.compile(r"\b(QTY|QUANTITY|COUNT|NO OF|NUMBER OF)\b")
+_ROLE_TAG_RE = re.compile(r"\b(TAG|MARK|DOOR NO|NUMBER|NO)\b")
+
+
+def _header_role(header: str) -> str:
+    """The door role a NORMALISED header string names, or ``""``.
+
+    Order is the contract: count, then frame material, then panel material
+    (a bare MATERIAL is the panel), then tag.
+    """
+    if not header:
+        return ""
+    if _ROLE_COUNT_RE.search(header):
+        return "count"
+    if "FRAME" in header and "MATERIA" in header:
+        return "frame_mat"
+    if "MATERIA" in header:
+        return "panel_mat"
+    if _ROLE_TAG_RE.search(header):
+        return "tag"
+    return ""
+
+
+def _column_roles(rows: List[List[str]]) -> Dict[int, str]:
+    """``{column_index: role}`` read from the table's stacked header rows.
+
+    Schedules stack two or three header rows, so the first
+    :data:`_MAX_HEADER_ROWS` rows of each column are joined before the role is
+    read. Roles are ADVISORY — content detection fills every gap, and a role is
+    never trusted over content that contradicts it (see :func:`_resolve_columns`).
+    """
+    roles: Dict[int, str] = {}
+    if not rows:
+        return roles
+    width = min(max((len(r) for r in rows), default=0), _MAX_TABLE_COLS)
+    header_rows = rows[:_MAX_HEADER_ROWS]
+    for c in range(width):
+        joined = " ".join(
+            r[c] for r in header_rows if c < len(r) and r[c]
+        )
+        role = _header_role(_normalise_material_text(joined))
+        if role:
+            roles[c] = role
+    return roles
+
+
+def _cells(row) -> List[str]:
+    return [(str(c).strip() if c is not None else "") for c in row]
+
+
+def _is_tag_token(token: str) -> bool:
+    """True when *token* reads as a door tag / type code and not as a MATERIAL.
+
+    A letters-only type code and a material abbreviation share a shape (``SCW``,
+    ``HM``, ``AL`` all match the type-code form), so a material column two
+    columns from the left would otherwise win the tag role. The material reader
+    is the arbiter: anything it can name is a material, not a tag.
+    """
+    if not _TAG_RE.match(token):
+        return False
+    if token.isalpha() and _material_code(token):
+        return False
+    return True
+
+
+def _tag_tokens(cell: str) -> List[str]:
+    """Split a (possibly merged) tag cell into individual valid tags."""
+    return [t for t in cell.split() if _is_tag_token(t)]
+
+
+def _is_header_row(row: List[str]) -> bool:
+    """True when a row reads as a stacked HEADER rather than a door row.
+
+    Two or more cells naming a door column role is a header, not data. Needed
+    because a type code and a header word share a shape: ``TAG`` matches the
+    type-code form, so Moxy's ``['TAG','ROOM NAME','LEAF QTY.',...]`` header
+    would otherwise be counted as an opening.
+    """
+    hits = 0
+    for cell in row or []:
+        if cell and _header_role(_normalise_material_text(cell)):
+            hits += 1
+            if hits >= 2:
+                return True
+    return False
+
+
+def _data_rows(rows: List[List[str]], tag_col: int) -> List[List[str]]:
+    """The rows of *rows* that carry a door tag and are not a header."""
+    return [
+        r for r in rows
+        if tag_col < len(r) and _tag_tokens(r[tag_col]) and not _is_header_row(r)
+    ]
+
+
+def _tag_column(rows: List[List[str]]) -> Optional[int]:
+    """The LEFT-MOST of columns 0-3 with at least three tag-shaped cells.
+
+    Left-most, not most-hits: a type+count schedule prints its Count column
+    immediately right of the Type column, and a column of small integers is
+    itself tag-shaped, so "most hits" hands the tag role to the COUNT column
+    (Crow: 9 integer counts beat 7 type codes) and the schedule reads as five
+    openings instead of one hundred and five.
+    """
+    if not rows:
+        return None
+    width = max(len(r) for r in rows)
+    for c in range(min(width, 4)):  # tag is always near the left
+        hits = 0
+        for r in rows:
+            if c < len(r) and _tag_tokens(r[c]) and not _is_header_row(r):
+                hits += 1
+        if hits >= 3:
+            return c
+    return None
+
+
+def _cell_material(row: List[str], c: int) -> str:
+    """The material at column *c* of *row*, joining a SPLIT neighbour cell.
+
+    PyMuPDF sometimes splits one printed material across two cells (Bob's frame
+    column: ``'--- H.'`` + ``'M. 6A'``). The neighbour is only joined when it
+    carries no material of its OWN — otherwise a dimension column would read the
+    next column's material and masquerade as a material column (Crow's thickness
+    column sitting left of ``IM``).
+    """
+    if c >= len(row):
+        return ""
+    code = _material_code(row[c])
+    if code:
+        return code
+    if c + 1 < len(row) and not _material_code(row[c + 1]):
+        return _material_code(row[c] + " " + row[c + 1])
+    return ""
+
+
+def _material_column_scores(rows: List[List[str]], tag_col: int) -> "Counter[int]":
+    """Per-column count of data rows carrying a readable door material."""
+    scores: "Counter[int]" = Counter()
+    width = min(max((len(r) for r in rows), default=0), _MAX_TABLE_COLS)
+    for r in _data_rows(rows, tag_col):
+        for c in range(width):
+            if c == tag_col:
+                continue
+            if _cell_material(r, c):
+                scores[c] += 1
+    return scores
+
+
+def _material_columns(rows: List[List[str]], tag_col: int, exclude=()):
+    """``(panel_col, frame_col)`` by content — leftmost, then rightmost != it.
+
+    Schedules print the leaf material before the frame material, so position is
+    the classifier once the materials are readable. Columns in *exclude* are
+    already claimed by a header role.
+    """
+    scores = _material_column_scores(rows, tag_col)
+    cols = [c for c in sorted(scores) if scores[c] >= 2 and c not in exclude]
+    if not cols:
+        return None, None
+    panel_col = cols[0]
+    frame_col = cols[-1] if cols[-1] != panel_col else None
+    return panel_col, frame_col
+
+
+def _count_column(rows: List[List[str]], tag_col: Optional[int],
+                  roles: Optional[Dict[int, str]] = None) -> Optional[int]:
+    """The printed COUNT column, or ``None`` meaning ONE DOOR PER ROW.
+
+    Header role first; else a column within :data:`_COUNT_WINDOW` of the tag
+    column that is at least sixty percent small integers.
+
+    Returning ``None`` is a VALID and expected answer — it is what makes a
+    per-opening schedule (Bob's, Moxy) readable at all, and it is the concept
+    whose absence made ``_parse_count_door_rows`` give up on both of them.
+    """
+    for col, role in sorted((roles or {}).items()):
+        # A merged header cell can put the count role on the TAG column itself
+        # (Moxy's guestroom fragment). A column cannot be both.
+        if role == "count" and col != tag_col:
+            return col
+    if tag_col is None:
+        return None
+    width = min(max((len(r) for r in rows), default=0), _MAX_TABLE_COLS)
+    data_rows = _data_rows(rows, tag_col)
+    if len(data_rows) < 3:
+        return None
+    for c in range(tag_col + 1, min(tag_col + 1 + _COUNT_WINDOW, width)):
+        hits = 0
+        for r in data_rows:
+            value = (r[c] or "").strip() if c < len(r) else ""
+            if _INT_CELL_RE.match(value):
+                hits += 1
+        if hits >= 3 and (hits / len(data_rows)) >= 0.6:
+            return c
+    return None
+
+
+def _resolve_columns(rows: List[List[str]], roles: Dict[int, str]):
+    """``(tag_col, count_col, panel_col, frame_col)`` — roles first, content fills.
+
+    Content detection runs PER MISSING ROLE, not only when every role is missing:
+    Bob's finds its panel column from a ``MATERIAL`` header but its frame header
+    is split across two cells, so the frame column must still come from content.
+    """
+    role_tag = next((c for c, r in sorted(roles.items()) if r == "tag"), None)
+    tag_col = None
+    if role_tag is not None:
+        if len(_data_rows(rows, role_tag)) >= 3:
+            tag_col = role_tag
+    if tag_col is None:
+        tag_col = _tag_column(rows)
+    if tag_col is None:
+        return None, None, None, None
+
+    count_col = _count_column(rows, tag_col, roles)
+    panel_col = next((c for c, r in sorted(roles.items()) if r == "panel_mat"), None)
+    frame_col = next((c for c, r in sorted(roles.items()) if r == "frame_mat"), None)
+
+    claimed = set(c for c in (panel_col, frame_col, count_col) if c is not None)
+    if panel_col is None or frame_col is None:
+        content_panel, content_frame = _material_columns(rows, tag_col, exclude=claimed)
+        if panel_col is None:
+            panel_col = content_panel
+            if frame_col is None:
+                frame_col = content_frame
+        elif frame_col is None:
+            # The panel came from a header; the frame must still come from
+            # content, and it is the RIGHT-most readable material column.
+            frame_col = content_frame if content_frame is not None else content_panel
+            if frame_col == panel_col:
+                frame_col = None
+    return tag_col, count_col, panel_col, frame_col
+
+
+def _material_coverage(rows, tag_col, panel_col, frame_col) -> tuple:
+    """(door_rows, covered_rows): how many tag rows carry a panel/frame material.
+
+    Floor-plan door *callouts* have tags but no material columns, so coverage is
+    near zero there; a real schedule table covers most of its rows.
+    """
+    door_rows = 0
+    covered = 0
+    for r in _data_rows(rows, tag_col):
+        door_rows += 1
+        pm = _cell_material(r, panel_col) if panel_col is not None else ""
+        fm = _cell_material(r, frame_col) if frame_col is not None else ""
+        if pm or fm:
+            covered += 1
+    return door_rows, covered
+
+
+def _is_door_table(rows, tag_col, panel_col, frame_col, roles=None) -> bool:
+    """Part 2 of the legend guard: statistical gate PLUS column-role evidence.
+
+    The statistical gate (>=3 tag rows, >=40% material coverage) is unchanged.
+    The evidence requirement is new and is what keeps the widened material reader
+    from fabricating doors out of an interior-elevation drawing grid: the table
+    must present at least TWO distinct door-material columns, or at least ONE
+    header cell carrying a door role.
+    """
+    if tag_col is None or (panel_col is None and frame_col is None):
+        return False
+    door_rows, covered = _material_coverage(rows, tag_col, panel_col, frame_col)
+    if door_rows < 3:
+        return False
+    # A genuine door schedule lists a material on most rows. Floor-plan tag
+    # clusters do not — this gate rejects those false positives.
+    if covered < 3 or (covered / door_rows) < 0.4:
+        return False
+    distinct_material_cols = len({c for c in (panel_col, frame_col) if c is not None})
+    if distinct_material_cols >= 2:
+        return True
+    return bool(roles)
+
+
+_MATERIAL_ROLES = ("panel_mat", "frame_mat")
+
+
+def _has_material_role(roles: Dict[int, str]) -> bool:
+    return any(r in _MATERIAL_ROLES for r in (roles or {}).values())
+
+
+def _inherit_roles(roles: Dict[int, str], siblings: List[Dict[int, str]],
+                   width: int) -> Dict[int, str]:
+    """Borrow a sibling table's column roles when this table names no materials.
+
+    Mitigates the merged-header fragment (INV-07 risk 6): Moxy's guestroom
+    schedule prints its whole header inside ONE cell, so its only role is a
+    spurious ``count`` on the tag column and its frame column cannot be told from
+    its panel column. A sibling table under the same title band DID yield real
+    material roles at the same column indices — inherit those by index rather
+    than guessing. A table that already names a material column keeps its own
+    reading; inheritance never overrules content.
+    """
+    if _has_material_role(roles):
+        return roles
+    usable = [s for s in siblings if _has_material_role(s) and max(s) < width]
+    if not usable:
+        return roles
+    return dict(max(usable, key=len))
 
 
 @dataclass
@@ -70,156 +682,122 @@ class DoorSchedule:
         return self.openings > 0
 
 
-def _cells(row) -> List[str]:
-    return [(str(c).strip() if c is not None else "") for c in row]
-
-
-def _tag_tokens(cell: str) -> List[str]:
-    """Split a (possibly merged) tag cell into individual valid tags."""
-    toks = [t for t in cell.split() if _TAG_RE.match(t)]
-    return toks
-
-
-def _tag_column(rows: List[List[str]]) -> Optional[int]:
-    """The column whose cells most consistently look like door tags."""
-    if not rows:
-        return None
-    width = max(len(r) for r in rows)
-    best_col, best_hits = None, 0
-    for c in range(min(width, 4)):  # tag is always near the left
-        hits = 0
-        for r in rows:
-            if c < len(r) and _tag_tokens(r[c]):
-                hits += 1
-        if hits > best_hits:
-            best_col, best_hits = c, hits
-    return best_col if best_hits >= 3 else None
-
-
-def _material_columns(rows: List[List[str]], tag_col: int):
-    """Identify (panel_col, frame_col) by content, order-independent.
-
-    Picks the two columns with the highest density of door-material tokens, then
-    classifies them: a column carrying leaf-only tokens (SCW/GLASS/...) is the
-    panel; one carrying frame-only tokens (GALV/KD) is the frame. When both are
-    ambiguous (e.g. both full of HM) the earlier column is the panel, the later
-    is the frame — matching how schedules are laid out (panel before frame).
-    """
-    width = max((len(r) for r in rows), default=0)
-    panel_score = Counter()
-    frame_score = Counter()
-    panel_only = Counter()
-    frame_only = Counter()
-    for r in rows:
-        toks = _tag_tokens(r[tag_col]) if tag_col < len(r) else []
-        if not toks:
+def _page_tables(page):
+    """``([rows_per_table], [bbox_per_table])`` for a page. Never raises."""
+    try:
+        tables = list(page.find_tables().tables)
+    except Exception:  # noqa: BLE001
+        return [], []
+    table_rows: List[List[List[str]]] = []
+    table_bboxes: List[tuple] = []
+    for t in tables:
+        try:
+            rows = [_cells(r) for r in t.extract()]
+            bbox = tuple(t.bbox)
+        except Exception:  # noqa: BLE001
             continue
-        for c in range(width):
-            if c == tag_col or c >= len(r):
-                continue
-            for v in r[c].split():
-                vu = v.upper()
-                if vu in _PANEL_MATS:
-                    panel_score[c] += 1
-                if vu in _FRAME_MATS:
-                    frame_score[c] += 1
-                if vu in _PANEL_ONLY:
-                    panel_only[c] += 1
-                if vu in _FRAME_ONLY:
-                    frame_only[c] += 1
-    if not panel_score and not frame_score:
-        return None, None
-
-    # Panel column: prefer the column with the most leaf-only tokens; else the
-    # earliest material-heavy column.
-    if panel_only:
-        panel_col = panel_only.most_common(1)[0][0]
-    else:
-        panel_col = min(panel_score, key=lambda c: c) if panel_score else None
-
-    # Frame column: prefer frame-only tokens; else the latest material-heavy
-    # column that isn't the panel column.
-    if frame_only:
-        frame_col = frame_only.most_common(1)[0][0]
-    else:
-        cands = [c for c in frame_score if c != panel_col]
-        frame_col = max(cands) if cands else None
-    return panel_col, frame_col
-
-
-def _material_coverage(rows, tag_col, panel_col, frame_col) -> tuple:
-    """(door_rows, covered_rows): how many tag rows carry a panel/frame material.
-
-    Floor-plan door *callouts* have tags but no material columns, so coverage is
-    near zero there; a real schedule table covers most of its rows.
-    """
-    door_rows = 0
-    covered = 0
-    for r in rows:
-        toks = _tag_tokens(r[tag_col]) if tag_col < len(r) else []
-        if not toks:
+        if not rows or len(bbox) != 4:
             continue
-        door_rows += 1
-        pm = r[panel_col].upper().split() if (panel_col is not None and panel_col < len(r)) else []
-        fm = r[frame_col].upper().split() if (frame_col is not None and frame_col < len(r)) else []
-        if any(v in _PANEL_MATS for v in pm) or any(v in _FRAME_MATS for v in fm):
-            covered += 1
-    return door_rows, covered
+        table_rows.append(rows)
+        table_bboxes.append(bbox)
+    return table_rows, table_bboxes
 
 
-def _is_door_table(rows, tag_col, panel_col, frame_col) -> bool:
-    if tag_col is None or (panel_col is None and frame_col is None):
-        return False
-    door_rows, covered = _material_coverage(rows, tag_col, panel_col, frame_col)
-    if door_rows < 3:
-        return False
-    # A genuine door schedule lists a material on most rows. Floor-plan tag
-    # clusters do not — this gate rejects those false positives.
-    return covered >= 3 and (covered / door_rows) >= 0.4
+def accepted_door_tables(page) -> List[dict]:
+    """Every table on *page* that BOTH parts of the legend guard accept.
+
+    Returns ``[{rows, bbox, roles, own_roles, tag_col, count_col, panel_col,
+    frame_col}]`` — empty when the page carries no standalone door-schedule
+    title band, or when every table under one fails the guard (Moxy page index
+    15's interior-elevation drawing grid).
+
+    Public because it is the unit of the guard: a negative assertion wants to
+    say "this page contributes zero door rows", not "the whole document's total
+    happens to be unchanged".
+    """
+    table_rows, table_bboxes = _page_tables(page)
+    bands = _door_title_bands(page, table_bboxes)
+    if not bands:
+        return []
+    qualified = [
+        idx for idx, bb in enumerate(table_bboxes)
+        if _table_in_door_band(bb, bands)
+    ]
+    if not qualified:
+        return []
+
+    # Roles of every qualified table on this page, so a merged-header fragment
+    # can inherit a sibling's columns by index.
+    own_roles = {idx: _column_roles(table_rows[idx]) for idx in qualified}
+    sibling_roles = [r for r in own_roles.values() if r]
+
+    accepted: List[dict] = []
+    for idx in qualified:
+        rows = table_rows[idx]
+        width = min(max((len(r) for r in rows), default=0), _MAX_TABLE_COLS)
+        roles = own_roles[idx]
+        tag_col, count_col, panel_col, frame_col = _resolve_columns(rows, roles)
+        if tag_col is None:
+            continue
+        distinct = len({c for c in (panel_col, frame_col) if c is not None})
+        if distinct < 2 and not _has_material_role(roles):
+            # A single material column with no material header of its own —
+            # borrow a sibling's roles before rejecting (INV-07 risk 6).
+            inherited = _inherit_roles(roles, sibling_roles, width)
+            if inherited is not roles:
+                roles = inherited
+                tag_col, count_col, panel_col, frame_col = _resolve_columns(rows, roles)
+                if tag_col is None:
+                    continue
+        if not _is_door_table(rows, tag_col, panel_col, frame_col, roles):
+            continue
+        accepted.append({
+            "rows": rows,
+            "bbox": table_bboxes[idx],
+            "roles": roles,
+            "own_roles": own_roles[idx],
+            "tag_col": tag_col,
+            "count_col": count_col,
+            "panel_col": panel_col,
+            "frame_col": frame_col,
+        })
+    return accepted
 
 
 def extract_door_schedule(doc) -> DoorSchedule:
-    """Extract a deterministic door schedule from an open fitz.Document."""
+    """Extract a deterministic door schedule from an open fitz.Document.
+
+    Per page: compute the standalone door-schedule title bands, keep only the
+    tables those bands qualify, resolve the tag / count / panel / frame columns
+    by header role with a content fallback, then read one row at a time.
+    """
     out = DoorSchedule()
     seen_tags = set()
     for i in range(doc.page_count):
         page = doc[i]
-        try:
-            tables = list(page.find_tables().tables)
-        except Exception:
-            tables = []
         page_used = False
-        for t in tables:
-            try:
-                rows = [_cells(r) for r in t.extract()]
-            except Exception:
-                continue
-            tag_col = _tag_column(rows)
-            if tag_col is None:
-                continue
-            panel_col, frame_col = _material_columns(rows, tag_col)
-            if not _is_door_table(rows, tag_col, panel_col, frame_col):
-                continue
-            for r in rows:
-                toks = _tag_tokens(r[tag_col]) if tag_col < len(r) else []
-                if not toks:
-                    continue
+        for table in accepted_door_tables(page):
+            rows = table["rows"]
+            tag_col = table["tag_col"]
+            panel_col = table["panel_col"]
+            frame_col = table["frame_col"]
+            for r in _data_rows(rows, tag_col):
+                toks = _tag_tokens(r[tag_col])
                 room = r[tag_col + 1] if tag_col + 1 < len(r) else ""
-                pm = r[panel_col].split() if (panel_col is not None and panel_col < len(r)) else []
-                fm = r[frame_col].split() if (frame_col is not None and frame_col < len(r)) else []
-                for k, tg in enumerate(toks):
+                panel = _cell_material(r, panel_col) if panel_col is not None else ""
+                frame = _cell_material(r, frame_col) if frame_col is not None else ""
+                for tg in toks:
                     if tg in seen_tags:
                         continue
                     seen_tags.add(tg)
-                    p = (pm[k] if k < len(pm) else (pm[0] if pm else "")).upper()
-                    f = (fm[k] if k < len(fm) else (fm[0] if fm else "")).upper()
                     out.records.append(DoorRecord(
-                        tag=tg, room=room, panel_material=p, frame_material=f, page=i + 1,
+                        tag=tg, room=room, panel_material=panel,
+                        frame_material=frame, page=i + 1,
                     ))
-                    if p in _PANEL_MATS:
-                        out.panel_counts[p] += 1
-                    if f in _FRAME_MATS:
-                        out.frame_counts[f] += 1
+                    if panel:
+                        out.panel_counts[panel] += 1
+                    if frame:
+                        out.frame_counts[frame] += 1
                     page_used = True
         if page_used:
             out.pages.append(i + 1)

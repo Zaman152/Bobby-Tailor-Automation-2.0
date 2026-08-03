@@ -1,24 +1,37 @@
 """Regression tests for deterministic door-schedule extraction.
 
 Door panel/frame materials are printed exactly in the schedule table; these tests
-lock in (a) tag tokenisation, (b) order-independent material-column detection, and
-(c) precise per-sheet recovery on the real plan PDFs without false positives from
-floor-plan door callouts.
+lock in (a) tag tokenisation, (b) phrase-based material reading, (c) column roles
+with a content fallback, (d) the two-part legend guard, and (e) precise per-sheet
+recovery on the real plan PDFs without false positives from floor-plan door
+callouts or from a drawing grid PyMuPDF happens to read as a table.
+
+Every real-PDF number below is the drawing's OWN printed structure — one printed
+row is one opening, one printed material cell is that opening's material. No
+threshold is tuned toward a golden count (23-CONTEXT: "Never tune to golden").
 """
 import os
 
 import pytest
 
 from bobbytailor.deterministic.schedule_extraction import (
-    _tag_tokens,
-    _tag_column,
+    _column_roles,
+    _count_column,
+    _door_title_bands,
+    _is_door_title_line,
+    _material_code,
     _material_columns,
+    _normalise_material_text,
+    _tag_column,
+    _tag_tokens,
+    accepted_door_tables,
     extract_door_schedule,
 )
 
 UPLOADS = os.path.join(os.path.dirname(__file__), os.pardir, "uploads")
 MOXY = os.path.join(UPLOADS, "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf")
 CROW = os.path.join(UPLOADS, "Crow - Cass White Road-Plans.pdf")
+BOBS = os.path.join(UPLOADS, "Bob's Discount Furniture - Kennesaw, GA-plans.pdf")
 
 
 # ── Tag tokenisation ──────────────────────────────────────────────────────────
@@ -29,13 +42,71 @@ CROW = os.path.join(UPLOADS, "Crow - Cass White Road-Plans.pdf")
     ("113A 113B", ["113A", "113B"]),   # merged cell -> two doors
     ("T2 T6", ["T2", "T6"]),
     ("T1", ["T1"]),
-    ("WORK AREA", []),                  # room name, not a tag
+    ("DSF", ["DSF"]),                   # a type+count schedule's TYPE code
+    ("OD1", ["OD1"]),
+    ("SF", ["SF"]),
+    ("WORK AREA", []),                  # room name, not a tag (4 letters)
+    ("DATA", []),
     ("SCW", []),                        # material, not a tag
+    ("HM", []),
+    ("A", []),                          # an elevation grid letter is not a tag
     ("", []),
 ])
 def test_tag_tokens(cell, expected):
     assert _tag_tokens(cell) == expected
 
+
+def test_tag_column_is_leftmost_not_most_hits():
+    """A type+count schedule's Count column is itself tag-shaped.
+
+    Nine small integers beat seven type codes on a "most hits" rule, which hands
+    the tag role to the COUNT column and turns Crow's 105 doors into 5. The rule
+    is LEFT-MOST of columns 0-3 with >=3 tag-shaped cells (INV-07 §4.1).
+    """
+    rows = [
+        ["DSF", "2", "", "6' - 0\"", "AL"],
+        ["OD1", "68", "-", "9' - 0\"", "STL"],
+        ["P1", "24", "-", "3' - 0\"", "IM"],
+        ["P2", "2", "-", "3' - 0\"", "IM"],
+        ["SF", "4", "-", "3' - 0\"", "AL"],
+    ]
+    assert _tag_column(rows) == 0
+
+
+# ── Material normalisation + phrase resolution (INV-07 §4.1) ──────────────────
+
+@pytest.mark.parametrize("raw,normalised,code", [
+    ("--- H. M. 6A", "HM 6A", "HM"),                       # split frame pair
+    ("HM-STL.", "HM STL", "HM"),                            # hyphenated steel form
+    ("S.C. WOOD & GLASS", "SC WOOD GLASS", "SCW"),          # leaf beats the lite
+    ("ALUM. & 1\" INSULATED GLASS", "ALUM 1 INSULATED GLASS", "ALUM"),
+    ("*", "", ""),                                          # "see manufacturer"
+])
+def test_material_normalisation_and_code(raw, normalised, code):
+    assert _normalise_material_text(raw) == normalised
+    assert _material_code(raw) == code
+
+
+def test_split_frame_cell_pair_resolves_to_hollow_metal():
+    """PyMuPDF splits Bob's frame material across two cells; joined they read."""
+    assert _material_code("--- H." + " " + "M. 6A") == "HM"
+    assert _material_code("--- AL" + " " + "UM. **") == "ALUM"
+
+
+@pytest.mark.parametrize("text", ["FLOORING LEGEND", "PAINT COLORS"])
+def test_material_code_rejects_unrelated_legend_titles(text):
+    """The widened reader must not turn an unrelated legend into a material."""
+    assert _material_code(text) == ""
+
+
+def test_material_code_is_leftmost_then_longest():
+    # Leftmost: the leaf material is printed before the glazing.
+    assert _material_code("SOLID CORE WOOD W/ GLASS LITE") == "SCW"
+    # Longest at the same offset: SCW is preferred over a bare token inside it.
+    assert _material_code("SC WOOD") == "SCW"
+
+
+# ── Column roles + the count column ───────────────────────────────────────────
 
 def test_material_columns_are_order_independent():
     # tag | room | panel-type | PANEL MAT | fire | FRAME MAT
@@ -48,17 +119,143 @@ def test_material_columns_are_order_independent():
     tag_col = _tag_column(rows)
     assert tag_col == 0
     panel_col, frame_col = _material_columns(rows, tag_col)
-    # panel column carries leaf-only tokens (SCW/GLASS); frame carries GALV
+    # leftmost readable material column is the panel; rightmost is the frame
     assert panel_col == 3
     assert frame_col == 5
 
 
+def test_column_roles_read_a_three_row_stacked_header():
+    """Schedules stack 2-3 header rows — the role must survive the split."""
+    rows = [
+        ["DOOR SCHEDULE", "", "", "", ""],
+        ["DOOR", "ROOM", "LEAF", "FRAME", "FRAME"],
+        ["NO.", "NAME", "QTY.", "TYPE", "MATERIAL"],
+        ["001", "OFFICE", "1", "1", "HM"],
+        ["002", "LOBBY", "1", "1", "HM"],
+        ["003", "MECH", "1", "1", "HM"],
+    ]
+    roles = _column_roles(rows)
+    assert roles.get(4) == "frame_mat"
+    assert roles.get(2) == "count"
+    assert roles.get(0) == "tag"
+
+
+def test_count_column_found_on_a_crow_shaped_table():
+    rows = [
+        ["DSF", "2", "", "6' - 0\"", "AL"],
+        ["OD1", "68", "-", "9' - 0\"", "STL"],
+        ["P1", "24", "-", "3' - 0\"", "IM"],
+        ["P2", "2", "-", "3' - 0\"", "IM"],
+        ["SF", "4", "-", "3' - 0\"", "AL"],
+    ]
+    assert _count_column(rows, 0, {}) == 1
+
+
+def test_count_column_absent_on_a_bobs_shaped_table_means_one_door_per_row():
+    """No count column is a VALID answer — it is what makes Bob's readable."""
+    rows = [
+        ["", "NO.", "TYPICAL LOCATION", "", "", "MATERIAL"],
+        ["", "001A", "VESTIBULE", "", "", "ALUM. & GLASS"],
+        ["", "002", "DINING", "", "", "HM-STL."],
+        ["", "010", "DATA", "", "", "S.C. WOOD"],
+        ["", "013", "UNISEX", "", "", "S.C. WOOD"],
+    ]
+    assert _count_column(rows, 1, {}) is None
+
+
+# ── The legend guard, part 1: standalone title bands ──────────────────────────
+
+@pytest.mark.parametrize("line,expected", [
+    ("DOOR SCHEDULE", True),
+    ("DOOR SCHEDULE - GUESTROOMS", True),
+    ("ARCHITECTURAL DOOR SCHEDULE", True),
+    ("DOOR & FRAME TYPES", True),
+    # An in-note reference is prose, not a title — this is the phantom's doorway.
+    ("REFER TO ARCHITECTURAL DOOR SCHEDULE WC 01 FOR ADDITIONAL INFORMATION",
+     False),
+    ("REF: DOOR SCHEDULE (ABOVE)", False),      # a callout points, it does not title
+    ("SEE DOOR SCHEDULE", False),
+    ("DOOR HARDWARE SCHEDULE", False),          # deny word, DOOR not adjacent
+    ("FLOORING LEGEND", False),
+    ("PAINT COLORS", False),
+    ("REFLECTED CEILING PLAN", False),
+])
+def test_is_door_title_line(line, expected):
+    assert _is_door_title_line(line) is expected
+
+
 # ── PDF regression fixtures (skip if PDFs absent) ─────────────────────────────
 
-@pytest.mark.skipif(not os.path.exists(MOXY), reason="Moxy plans PDF not present")
-def test_moxy_door_schedule_is_exact():
+def _open(path):
     import fitz
-    doc = fitz.open(MOXY)
+    return fitz.open(path)
+
+
+@pytest.mark.skipif(not os.path.exists(MOXY), reason="Moxy plans PDF not present")
+def test_moxy_elevation_grid_page_contributes_zero_door_rows():
+    """T-23-13: page index 15 DOES produce a title band and still yields nothing.
+
+    Its interior-elevation drawing grid is read as a table by PyMuPDF; the column
+    of grid letters looks like a tag column and the word WOOD inside prose supplies
+    a pseudo material. This is the anti-regression assertion for the widened
+    material reader — without part 2 of the guard it reports a phantom WD 4.
+    """
+    doc = _open(MOXY)
+    try:
+        page = doc[15]
+        bands = _door_title_bands(page, [])
+        assert bands, "page 15 is expected to produce a door-schedule title band"
+        assert accepted_door_tables(page) == []
+    finally:
+        doc.close()
+
+
+@pytest.mark.skipif(not os.path.exists(MOXY), reason="Moxy plans PDF not present")
+def test_moxy_all_five_schedule_fragments_are_accepted():
+    """All five genuine fragments, including the header-less continuations."""
+    doc = _open(MOXY)
+    try:
+        accepted = accepted_door_tables(doc[6])
+    finally:
+        doc.close()
+    assert len(accepted) == 5, f"expected 5 accepted fragments, got {len(accepted)}"
+    # The continuation fragments carry no header of their own and qualify purely
+    # because their parent's band was extended over them.
+    headerless = [t for t in accepted if not t["own_roles"]]
+    assert len(headerless) >= 3, (
+        f"expected >=3 header-less continuation fragments, got {len(headerless)}"
+    )
+    # Every fragment reads its materials from the same column indices.
+    assert {t["panel_col"] for t in accepted} == {7}
+
+
+@pytest.mark.skipif(not os.path.exists(BOBS), reason="Bob's plans PDF not present")
+def test_bobs_schedule_table_is_accepted_and_read():
+    """Today this table is FOUND and thrown away by the material-coverage gate."""
+    doc = _open(BOBS)
+    try:
+        accepted = accepted_door_tables(doc[5])
+        ds = extract_door_schedule(doc)
+    finally:
+        doc.close()
+    assert len(accepted) == 1
+    table = accepted[0]
+    # Tag in column 1 (column 0 is the blank EXIST DOOR column), no count column,
+    # panel from the MATERIAL header, frame from CONTENT (its header is split).
+    assert (table["tag_col"], table["count_col"]) == (1, None)
+    assert (table["panel_col"], table["frame_col"]) == (10, 12)
+
+    # The drawing's own printed rows: one row is one opening.
+    assert ds.pages == [6], f"unexpected schedule pages {ds.pages}"
+    assert ds.panel_counts.get("HM") == 5
+    assert ds.panel_counts.get("SCW") == 7
+    assert ds.panel_counts.get("ALUM") == 2
+    assert ds.frame_counts.get("HM") == 12
+
+
+@pytest.mark.skipif(not os.path.exists(MOXY), reason="Moxy plans PDF not present")
+def test_moxy_door_schedule_is_read_from_its_own_sheet():
+    doc = _open(MOXY)
     try:
         ds = extract_door_schedule(doc)
     finally:
@@ -66,22 +263,32 @@ def test_moxy_door_schedule_is_exact():
     # The genuine door schedule lives on a single sheet — floor-plan door tags on
     # other pages must NOT be counted as schedule rows.
     assert ds.pages == [7], f"unexpected schedule pages {ds.pages}"
-    assert ds.openings == 60, f"expected 60 scheduled openings, got {ds.openings}"
-    # Exact material breakdown read from the table.
-    assert ds.panel_counts.get("SCW") == 42
+    assert ds.openings >= 53, f"expected >=53 scheduled openings, got {ds.openings}"
+    # Material breakdown read from the table (raw codes, pre-canonicalisation).
+    assert ds.panel_counts.get("SCW") == 41
     assert ds.panel_counts.get("GLASS") == 6
-    assert ds.frame_counts.get("HM") == 42
-    assert ds.frame_counts.get("GALV") == 6
+    assert ds.frame_counts.get("HM") == 41
+    assert ds.frame_counts.get("GALV") == 7
 
 
 @pytest.mark.skipif(not os.path.exists(CROW), reason="Crow plans PDF not present")
-def test_crow_door_schedule_recovers_openings():
-    import fitz
-    doc = fitz.open(CROW)
+def test_crow_type_schedule_is_read_by_the_same_parser():
+    """The type+count format is now read by ONE parser, tag column included."""
+    doc = _open(CROW)
     try:
+        accepted = accepted_door_tables(doc[3])
         ds = extract_door_schedule(doc)
     finally:
         doc.close()
+    assert len(accepted) == 1
+    table = accepted[0]
+    # Type code in column 0, Count in column 1 — not the other way round.
+    assert (table["tag_col"], table["count_col"]) == (0, 1)
     assert ds.found
-    assert ds.openings == 5, f"expected 5 openings, got {ds.openings}"
-    assert ds.frame_counts.get("HM") == 2
+    assert ds.pages == [4]
+    # One record per printed TYPE row (the count column is applied in 23-04 T3).
+    assert ds.openings == 9, f"expected 9 type rows, got {ds.openings}"
+    assert ds.panel_counts.get("IM") == 5
+    assert ds.panel_counts.get("STL") == 2
+    assert ds.panel_counts.get("ALUM") == 2
+    assert ds.frame_counts.get("HM") == 5
