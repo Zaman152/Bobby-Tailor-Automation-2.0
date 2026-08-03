@@ -6,14 +6,14 @@ current_phase: 23
 current_phase_name: measurement-engine-completion
 status: in-progress
 stopped_at: Completed 23-17-PLAN.md — report + export emission of the coverage record (SP-8), wave 2
-last_updated: "2026-08-03T16:40:00.000Z"
+last_updated: "2026-08-03T14:24:07.609Z"
 last_activity: 2026-08-03
-last_activity_desc: 23-17 landed the client-facing half of the flagged-zero contract — coverage.json, the COVERAGE section, the CSV provenance column and the workbook Coverage sheet; ledger completeness 40/40, 4/4, 7/7, 32/32; suite 1511 -> 1531
+last_activity_desc: 23-17 surfaced the coverage ledger in every client artifact; a never-measured quantity is now a BLANK in takeoff.json, coverage.json, summary.txt, the CSV and the workbook; suite 1511 -> 1531
 progress:
   total_phases: 28
   completed_phases: 19
   total_plans: 121
-  completed_plans: 104
+  completed_plans: 105
   percent: 68
 ---
 
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 23 (measurement-engine-completion) — IN PROGRESS
-Plan: 7 of 17 complete (wave 2)
+Plan: 8 of 17 complete (wave 2)
 Status: wave 1 (23-01 ledger, 23-02 scale parser) done; wave 2 has 23-03 (flagged-zero contract), 23-04 (door-schedule unification), 23-05 (tag-pairing primitives), 23-06 (structural title-block identification) and 23-17 (report + export emission of the coverage record) landed
 Last activity: 2026-08-03 — 23-17 surfaced the coverage ledger in every client artifact; a never-measured quantity is now a BLANK in takeoff.json, coverage.json, summary.txt, the CSV and the workbook; suite 1511 -> 1531
 
@@ -73,6 +73,7 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 | Phase 23 P02 | ~2h | 3 tasks | 5 files |
 | Phase 23 P03 | ~3h | 3 tasks | 10 files |
 | Phase 23 P05 | 140 | 3 tasks | 6 files |
+| Phase 23 P07 | 4h | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 - [Phase 23]: 23-05: a room tag pairs ACROSS the reading axis (name over number), not along it — pair_two_token_tags takes an axis selector; still ONE projection, asserted by source inspection
 - [Phase 23]: 23-05: derive_room_mix takes an explicit pages scope and its whole-document default REFUSES on Moxy — picking unit key plans is sheet classification, which belongs to 23-08
 - [Phase 23]: 23-05: the unit multiplier IS recoverable from the plans — 214 room tags / 214 distinct numbers on Moxy pages 7-8 give QQ A 90 / KING A 26 / K SUITE B 2 / BUNK B 1 (4/4 golden); the docstring and ground-truth corrections are 23-08 and 23-16
+- [Phase ?]: 23-07: measure_enclosed_area keeps ONE clip contract (drawing space, mapped internally); a page-space caller maps back via from_page_space rather than passing a space flag a future caller could forget
+- [Phase 23]: 23-07: the rotation census is 61 unrotated / 22 rotated of 83 pages, not the plan's 76/7 — Chelsea has 4 rotated pages INV-03 never counted
+- [Phase 23]: 23-07: DEF-23-08 — Bob's p3 binds its own 10.667 callout but the PAGE scale still resolves 1.0; that is select_main_plan/_MAIN_PATTERNS, not a coordinate defect, and was logged rather than forced
 
 ### 22-04 Decisions
 
@@ -373,7 +377,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-03T08:36:12.089Z
+Last session: 2026-08-03T14:23:48.900Z
 Stopped at: Completed 23-05-PLAN.md — tag-pairing primitives (SP-6), wave 2
 Resume file: None
 
