@@ -30,7 +30,7 @@ Brownfield upgrade of the Flask + Playwright take-off monolith to a shippable es
 - [ ] **Phase 18: Linked Sheet Resolution** — Auto-follow drawing cross-refs; capture/analyze linked detail sheets
 - [ ] **Phase 20: Takeoff Measurement Precision** — Plan-type-agnostic accurate take-offs; ≥97% golden regression; shared PDF+StackCT pipeline
 - [ ] **Phase 21: Accuracy & Learning Engine (v3)** — Plans-only production accuracy: vector-first measurement, auto scale detection v2, ensemble vision, persistent human-verified learning loop replacing manifests, package restructure, live-testing readiness (code complete 2026-07-15 — verification: human_needed; pending 21-UAT.md + live accuracy gate)
-- [ ] **Phase 22: Production Restructure & Cleanup** — Execute .planning/codebase/RESTRUCTURE-SPEC.md: test-isolation fix (golden exclusion + OUTPUT_DIR tmp isolation), ~1.13GB artifact cleanup against the must-survive checklist, paid-run archival, templates/static under the package, dead JS removal, docs/env drift fixes
+- [x] **Phase 22: Production Restructure & Cleanup** — Execute .planning/codebase/RESTRUCTURE-SPEC.md: test-isolation fix (golden exclusion + OUTPUT_DIR tmp isolation), ~1.13GB artifact cleanup against the must-survive checklist, paid-run archival, templates/static under the package, dead JS removal, docs/env drift fixes
 
 ## Phase Details
 
@@ -922,6 +922,7 @@ Context: `.planning/phases/21-accuracy-learning-engine/21-CONTEXT.md`
 | 18. Linked Sheet Resolution | 5/5 | Awaiting UAT | 2026-06-02 |
 | 19. Job History & Run Archive | 0/5 | Planned | — |
 | 20. Takeoff Measurement Precision | 8/8 | Verification gaps | 2026-06-04 |
+| 22. Production Restructure & Cleanup | 4/4 | Complete | 2026-08-03 |
 
 ### Phase 22: Production Restructure & Cleanup
 
@@ -941,7 +942,7 @@ Context: `.planning/phases/21-accuracy-learning-engine/21-CONTEXT.md`
 6. README's 4 wrong claims fixed; .env.example documents all 9 missing env vars; offline suite green (≥1132) after every migration step's commit
 7. GitNexus reindexed after moves
 
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans executed — **Phase complete (2026-08-03)**
 
 | Wave | Plan | Steps | Description |
 |------|------|-------|-------------|
@@ -955,7 +956,7 @@ Plans:
 - [x] 22-01-PLAN.md — Safety rails: golden exclusion + output isolation + stub hardening (wave 1, RESTRUCTURE-SPEC-S1)
 - [x] 22-02-PLAN.md — DELETE bucket + ARCHIVE bucket + scripts/archive relocation (wave 2, RESTRUCTURE-SPEC-S2/S3)
 - [x] 22-03-PLAN.md — Legacy docs archive + web asset move into package (wave 3, RESTRUCTURE-SPEC-S4/S5)
-- [ ] 22-04-PLAN.md — Doc truth fixes + dead JS removal + GitNexus reindex (wave 4, RESTRUCTURE-SPEC-S6/S7/S8)
+- [x] 22-04-PLAN.md — Doc truth fixes + dead JS removal + GitNexus reindex (wave 4, RESTRUCTURE-SPEC-S6/S7/S8)
 
 ---
 *Roadmap created: 2026-05-26*  
