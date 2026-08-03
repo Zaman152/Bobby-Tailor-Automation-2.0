@@ -147,6 +147,49 @@ the regression can never recur.
 discarded with only `logger.info`. Any sheet skip must appear in the run's coverage ledger as an
 explicit, reviewable decision — this defect was invisible in every report the project produced.
 
+### 1e. End-to-end proof that the classifier fix unlocks the accuracy (free simulation)
+
+Simulated the complete chain the pipeline would run if the sheets were not discarded — for each
+prototype page, take its **RCP** fill (the discipline that carries ceiling, per §14 rule 3) and
+multiply by the manifest room mix:
+
+| page | unit type | SF/unit | × n | subtotal |
+|---|---|---|---|---|
+| p23 | KING A | 229.4 | 26 | 5,964 |
+| p24 | KING B | 235.5 | 15 | 3,532 |
+| p25 | KING C | 217.6 | 5 | 1,088 |
+| p26 | KING SUITE A | 362.5 | 5 | 1,812 |
+| p27 | KING SUITE B | 341.7 | 2 | 683 |
+| p28 | KING SUITE C | **458.3** | 2 | 917 |
+| p29 | QQ A | 272.6 | **90** | **24,534** |
+| p30 | QQ B | 309.5 | 6 | 1,857 |
+| p31 | QQ C | 284.3 | 15 | 4,264 |
+| p32 | BUNK A | **454.7** | 2 | 909 |
+| p33 | BUNK B | 274.6 | 1 | 275 |
+| p34 | ADA KING RIS | 347.2 | 1 | 347 |
+| p35 | ACC KING TUB | 347.7 | 3 | 1,043 |
+| p36 | ACC QQ RIS | **451.1** | 2 | 902 |
+| p38 | ACC BUNK | **458.5** | 2 | 917 |
+| | | | **TOTAL** | **49,046 SF** |
+
+Golden Gyp Ceiling = **58,680 SF** → **16.4% error, versus the pipeline currently reporting the item
+as absent.** The §13.2 typical-unit × count model is confirmed end-to-end on real geometry.
+
+Two honest caveats, both pointing at real remaining work rather than at this number:
+- The golden 58,680 covers **all** ceilings, not just guestrooms. The prototypes legitimately cannot
+  sum to it; the missing ~9,600 SF should come from the non-prototype plans (Level 1 lobby, Pop-Up
+  Hub, Level 7). So a chunk of the residual is coverage, not error — which is exactly why INV-08's
+  coverage ledger matters for interpreting any score.
+- **The clip defect affects FOUR sheets, not two.** p28/p32/p36/p38 all measure ~451–459 SF where a
+  guestroom is ~230. §14.2 named only ID-412/ID-416; ID-420 and ID-422 show the same signature.
+  Correcting them *lowers* the total (~-1,800 SF), moving it away from this golden — further evidence
+  the residual is missing coverage elsewhere, and a warning that "closer to golden" must never be the
+  acceptance test for the clip fix (§14.3's peeking trap).
+
+**Bottom line for planning: the highest-value single change in the entire programme is the
+title-block/classifier fix.** It converts an item reporting nothing into one reporting within ~16%,
+and it is a signal-to-noise fix in one function, gated by a free four-plan-set regression check.
+
 Reproduce with:
 
 ```python
