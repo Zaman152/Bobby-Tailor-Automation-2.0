@@ -36,6 +36,11 @@ MEASUREMENT CONTRACT
   single unit is returned with ``needs_review=True`` rather than silently
   halved or dropped. The human corrects it once and the learning store carries
   the correction forward.
+* Plausibility is a RATIO against the drawing's OWN printed overall dimensions
+  (:func:`printed_extent_bound` / :func:`cross_check_extent`), never a size in
+  square feet. A guest-room-sized constant is right for a guest room and wrong
+  for a lobby; ``fill / (max printed horizontal x max printed vertical)`` is
+  ~1.0 for both and ~2.0 for a clip that really has swallowed a second plan.
 """
 from __future__ import annotations
 
@@ -107,6 +112,26 @@ MAX_REGION_SF = 900.0
 # (INV-01 §4). This constant exists for the wall binder (23-13) to consume.
 MAX_HONEST_SHAPE_RATIO = 8.0
 
+# fill / (max printed horizontal dim x max printed vertical dim). A RATIO —
+# dimensionless, scale-free and building-type-free. It replaces the 900 SF
+# "largest plausible guest unit" threshold, which was a guest-room-shaped
+# constant: correct for a guest room, wrong for a lobby, and applied on the
+# WRONG SIDE of the room-mix multiplication so it never saw the number that was
+# actually wrong (INV-02 §5).
+#
+# Read off the DISTRIBUTION, not fitted to a total (INV-02 §4, all sixteen real
+# Moxy prototype sheets, measured before any golden value was consulted):
+#
+#   0.976 - 1.073   thirteen sheets that print an overall dimension pair
+#   ~2.0            what a clip that had swallowed a second plan would read
+#   2.479           ID-410, where only PARTIAL interior dimensions paired and
+#                   the BOUND — not the fill — is wrong; flagged, as it must be
+#
+# 1.25 sits clear above every honest sheet measured (1.073) and far below both
+# failure modes, so it discriminates without overfitting to a room size. It is
+# not a quantity in square feet and must never become one.
+EXTENT_TOLERANCE = 1.25
+
 
 @dataclass
 class FilledRegion:
@@ -150,6 +175,13 @@ class RoomFillResult:
     perimeter_lf: float = 0.0      # sum over the same regions ``area_sf`` sums
     region_perimeters: List[float] = field(default_factory=list)
     region_shape_ratios: List[float] = field(default_factory=list)
+    # The drawing's OWN statement of its extent, and how the measurement
+    # compares to it. Both are ``None`` when the drawing prints no overall
+    # dimension pair — which is a NEEDS REVIEW, never a dropped measurement
+    # (INV-02 risk 2: a bound-derived rejection of a good fill would be worse
+    # than the bug it is meant to catch).
+    bound_sf: Optional[float] = None
+    extent_ratio: Optional[float] = None
 
     def to_dict(self) -> dict:
         return {
@@ -166,6 +198,8 @@ class RoomFillResult:
             "perimeter_lf": self.perimeter_lf,
             "region_perimeters": self.region_perimeters,
             "region_shape_ratios": self.region_shape_ratios,
+            "bound_sf": self.bound_sf,
+            "extent_ratio": self.extent_ratio,
         }
 
 
@@ -779,29 +813,157 @@ def measure_enclosed_area(
     return result
 
 
-def flag_implausible_unit(result: RoomFillResult, expect_max_sf: float) -> RoomFillResult:
-    """Flag (never silently correct) a measurement too large for one unit.
+def _add_reason(result: RoomFillResult, reason: str) -> RoomFillResult:
+    """Flag *result* and APPEND *reason*, preserving anything already there.
 
-    A clip that overlaps the neighbouring opposite-hand plan measures TWO units
-    and reports ~2x (real: Moxy ID-412/ID-416). Halving it automatically would
-    be a guess, so the row is flagged for review instead — the human resolves it
-    once and the learning store applies that decision to later runs.
-
-    Any reason already on the result is PRESERVED. This used to overwrite, so
-    an oversize-region flag raised inside :func:`measure_enclosed_area` was
-    erased by the very next call — a flag that silently deletes another flag is
-    the same defect as no flag at all.
+    A flag that silently overwrites another flag is the same defect as no flag
+    at all: the oversize-region note raised inside :func:`measure_enclosed_area`
+    used to be erased by the very next call.
     """
-    if expect_max_sf and result.area_sf > expect_max_sf:
-        reason = (
-            "measured %.0f SF exceeds the plausible single-unit maximum of %.0f SF — "
-            "the viewport may include an adjacent (opposite-hand) plan; verify"
-            % (result.area_sf, expect_max_sf)
+    result.needs_review = True
+    result.review_reason = (
+        "%s; %s" % (result.review_reason, reason) if result.review_reason else reason
+    )
+    return result
+
+
+def printed_extent_bound(
+    page,
+    clip,
+    plan_name: str = "",
+    mask_rects: Sequence = (),
+    sibling_rects: Sequence = (),
+    samples: Optional[Sequence] = None,
+) -> Optional[float]:
+    """The drawing's OWN printed overall extent, in square feet.
+
+    ``max(printed horizontal dimension) x max(printed vertical dimension)`` over
+    the dimension strings this drawing prints. It is the drawing's own statement
+    of how big it is, harvested from the sheet and independent of any golden
+    quantity — which is the whole point: a measurement can then be cross-checked
+    against the drawing rather than against a remembered room size.
+
+    Args:
+        page:          a PyMuPDF page.
+        clip:          this drawing's clip, in DRAWING space (the space
+            ``page.get_text`` reports, which is where the samples' own
+            bounding boxes live). Used only when *sibling_rects* is empty.
+        plan_name:     carried only into the review reason.
+        mask_rects:    title-block / legend / schedule rectangles, excluded
+            from the harvest exactly as the scale solver excludes them.
+        sibling_rects: other drawings of the SAME plan name whose dimensions
+            describe the same unit — in this drawing set the overall dimensions
+            are printed on the ARCHITECTURAL plan and nowhere else, so a
+            reflected-ceiling fill has no dimension of its own to check against
+            and would be unbounded without them. Restricting to the
+            architectural sibling is what separates an OVERALL dimension from
+            the partial furniture dimensions the FF/EM/FC plans carry, and from
+            the partial interior dimensions a reflected-ceiling plan carries:
+            adding this drawing's own clip to the set turns ID-415 from "no
+            bound" (correct) into 9'-0" x 1'-3" = 11.2 SF, a bound 25x too
+            small, which reports a good measurement as a 25x overrun.
+        samples:       pre-harvested :class:`DimensionSample` list. The harvest
+            walks every segment on the page, so a caller measuring several
+            drawings on one sheet passes it once instead of five times.
+
+    Returns:
+        The bound in SF, or ``None`` when no horizontal/vertical PAIR is found.
+        ``None`` means "this drawing does not say how big it is" and must be
+        flagged, never guessed and never used to drop a measurement.
+    """
+    box = _rect(clip)
+    if box is None:
+        return None
+    if samples is None:
+        try:
+            from bobbytailor.deterministic.dimensions import (  # noqa: PLC0415
+                extract_dimension_samples,
+            )
+
+            samples = extract_dimension_samples(page, exclude_rects=list(mask_rects))
+        except Exception:  # noqa: BLE001 — a cross-check must never kill a run
+            return None
+    # The architectural sibling IS the dimensioned drawing — and for an
+    # architectural fill it is this drawing's own clip, so the two cases are one
+    # rule rather than a union. Falling back to the drawing itself only when the
+    # set has no architectural plan of this name keeps a lobby sheet measurable
+    # instead of unbounded by construction.
+    rects = [r for r in (_rect(s) for s in sibling_rects) if r is not None] or [box]
+
+    max_h = 0.0
+    max_v = 0.0
+    for s in samples or ():
+        bbox = getattr(s, "text_bbox", None)
+        feet = float(getattr(s, "feet", 0.0) or 0.0)
+        if not bbox or len(bbox) < 4 or feet <= 0.0:
+            continue
+        cx = (float(bbox[0]) + float(bbox[2])) / 2.0
+        cy = (float(bbox[1]) + float(bbox[3])) / 2.0
+        if not any(r.x0 <= cx <= r.x1 and r.y0 <= cy <= r.y1 for r in rects):
+            continue
+        # A dimension string reads ALONG the dimension it measures, so the
+        # text's own writing direction is its orientation.
+        rot = getattr(s, "rotation", (1.0, 0.0)) or (1.0, 0.0)
+        dx, dy = float(rot[0]), float(rot[1])
+        if abs(dx) >= abs(dy):
+            max_h = max(max_h, feet)
+        else:
+            max_v = max(max_v, feet)
+    if max_h <= 0.0 or max_v <= 0.0:
+        return None
+    return round(max_h * max_v, 1)
+
+
+def cross_check_extent(
+    result: RoomFillResult, bound_sf: Optional[float]
+) -> RoomFillResult:
+    """Cross-check a measured area against the drawing's own printed extent.
+
+    THE SUPERSEDED STORY, corrected (D-01 / INV-02). This function replaces
+    ``flag_implausible_unit``, whose docstring asserted that Moxy ID-412 and
+    ID-416 measured ~2x because the clip reached into the neighbouring
+    opposite-hand plan. That claim is FALSE and three independent geometric
+    probes falsified it: those two sheets are bit-identical across a 240 pt
+    range of clip widths (while three others move 17-20%), every counted region
+    sits inside 47% of the clip, and the fill matches the drawing's own printed
+    overall dimensions at a ratio of 1.007. The ~2x came one layer later, from
+    a room-mix ``unit_count`` of 2 that counted a suite's entry + connecting
+    door as two units.
+
+    The old guard was also on the WRONG SIDE of that multiplication — it saw
+    458 SF and passed it, never the 917 SF that was actually wrong — and its
+    threshold was a size in square feet, i.e. a guest-room-shaped constant that
+    a lobby breaks. This one is a RATIO (:data:`EXTENT_TOLERANCE`), so it reads
+    ~1.0 for a guest room, ~1.0 for a ballroom, and ~2.0 for a clip that really
+    has swallowed a second plan.
+
+    It is a FLAG, never a FILTER. No bound is a NEEDS REVIEW carrying the
+    measured area, not a dropped row: two of the sixteen prototype sheets print
+    no dimension pair at all and one produced a bound 2.5x too small from
+    partial interior dimensions, so a bound-derived rejection of a good fill
+    would be worse than the bug it is meant to catch (INV-02 risk 2).
+
+    Any reason already on the result is preserved.
+    """
+    if not bound_sf or bound_sf <= 0.0:
+        result.bound_sf = None
+        result.extent_ratio = None
+        return _add_reason(
+            result,
+            "this drawing prints no overall dimension pair, so there is no "
+            "printed extent to cross-check the measured %.0f SF against — the "
+            "measurement stands, unverified" % result.area_sf,
         )
-        result.needs_review = True
-        result.review_reason = (
-            "%s; %s" % (result.review_reason, reason)
-            if result.review_reason else reason
+    result.bound_sf = round(float(bound_sf), 1)
+    ratio = result.area_sf / float(bound_sf) if bound_sf else 0.0
+    result.extent_ratio = round(ratio, 3)
+    if ratio > EXTENT_TOLERANCE:
+        return _add_reason(
+            result,
+            "measured %.0f SF is %.2fx the drawing's OWN printed overall extent "
+            "of %.0f SF (tolerance %.2f) — either the clip names more than one "
+            "drawing, or the printed dimensions found were partial; verify "
+            "before billing" % (result.area_sf, ratio, bound_sf, EXTENT_TOLERANCE),
         )
     return result
 

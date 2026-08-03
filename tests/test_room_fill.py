@@ -12,12 +12,14 @@ import fitz
 import pytest
 
 from bobbytailor.deterministic.room_fill import (
+    EXTENT_TOLERANCE,
     MAX_REGION_SF,
     RoomFillResult,
-    flag_implausible_unit,
+    cross_check_extent,
     from_page_space,
     label_mask,
     measure_enclosed_area,
+    printed_extent_bound,
     select_fill_for_basis,
     to_page_space,
     total_for_units,
@@ -294,7 +296,13 @@ def test_the_region_bound_is_threaded_and_defaults_to_the_module_constant():
     doc, page = _sheet_reading_upright(0)
     clean_fills, clean_drops = _fills(page)
     assert len(clean_fills) == 1
-    assert clean_fills[0].needs_review is False and not clean_drops
+    assert not clean_drops
+    # This fixture draws a room and a scale but NO dimension string, so since
+    # 23-11 it is flagged for exactly one reason: the drawing does not say how
+    # big it is, and a check that cannot run must say so rather than pass
+    # silently. The oversize bound has not fired.
+    assert "no overall dimension pair" in clean_fills[0].review_reason
+    assert "KEPT AND FLAGGED" not in clean_fills[0].review_reason
     # A bound below the room's own area now FLAGS it rather than deleting it
     # (23-09) — proof the argument reaches measure_enclosed_area rather than
     # being decorative, without reintroducing the silent zero.
@@ -376,22 +384,113 @@ def test_zero_or_missing_scale_returns_none():
 # ── flag-don't-guess ─────────────────────────────────────────────────────────
 
 
-def test_oversize_unit_is_flagged_never_silently_halved():
-    """A clip overlapping the neighbouring opposite-hand plan measures TWO units
-    and reports ~2x (real: Moxy ID-412 = 458 SF vs 231). Halving it would be a
-    guess, so it is FLAGGED for the human instead."""
-    r = RoomFillResult(area_sf=458.3, regions=[292.0, 64.0, 63.0], candidate_id="ID-412-RCP")
-    out = flag_implausible_unit(r, expect_max_sf=420.0)
+def test_the_measured_area_is_checked_against_the_drawings_own_printed_extent():
+    """Moxy ID-412, with the story corrected (D-01 / INV-02).
+
+    The superseded test here asserted that 458.3 SF was ~2x because the clip had
+    reached the neighbouring opposite-hand plan, and pinned a fabricated 420 SF
+    cap to "prove" it. Three probes falsified that: ID-412 is bit-identical
+    across a 240 pt range of clip widths, every counted region sits inside 47%
+    of the clip, and the drawing's OWN printed 17'-0 1/8" x 26'-9 1/8" = 455.2
+    SF matches the fill at a ratio of 1.007. The fill was right; the ~2x came
+    from a room-mix multiplier one layer later.
+
+    So the cross-check is against the drawing's own statement of its size, and
+    455.2 vs 458.3 must NOT be flagged.
+    """
+    r = RoomFillResult(area_sf=458.3, regions=[292.0, 64.0, 63.0],
+                       candidate_id="ID-412-RCP")
+    out = cross_check_extent(r, 455.2)
+    assert out.needs_review is False
+    assert out.review_reason == ""
+    assert out.bound_sf == 455.2
+    assert out.extent_ratio == pytest.approx(1.007, abs=0.001)
+
+
+def test_a_fill_of_twice_its_printed_extent_is_flagged_never_halved():
+    """The genuine two-plan leak this check exists for — ~2.0, not ~1.0.
+
+    458.3 x 2 against the same 455.2 SF printed extent. Halving it would be a
+    guess, so the row is FLAGGED with its measurement intact.
+    """
+    r = RoomFillResult(area_sf=916.6, regions=[584.0, 128.0], candidate_id="LEAK")
+    out = cross_check_extent(r, 455.2)
     assert out.needs_review is True
-    assert out.area_sf == 458.3, "the measurement is preserved, never rewritten"
+    assert out.area_sf == 916.6, "the measurement is preserved, never rewritten"
+    assert out.extent_ratio == pytest.approx(2.014, abs=0.001)
     assert "verify" in out.review_reason.lower()
 
 
-def test_plausible_unit_is_not_flagged():
-    r = RoomFillResult(area_sf=341.7, regions=[217.0, 38.0], candidate_id="ID-411-RCP")
-    out = flag_implausible_unit(r, expect_max_sf=420.0)
-    assert out.needs_review is False
-    assert out.review_reason == ""
+def test_the_discrimination_holds_seven_percent_either_side():
+    """The plan's own discrimination case: ~2x flags, within 7% does not."""
+    for area in (455.2 * 0.93, 455.2, 455.2 * 1.07):
+        assert cross_check_extent(
+            RoomFillResult(area_sf=round(area, 1)), 455.2
+        ).needs_review is False
+    assert cross_check_extent(
+        RoomFillResult(area_sf=round(455.2 * 2.0, 1)), 455.2
+    ).needs_review is True
+
+
+def test_no_printed_extent_flags_and_never_drops_the_measurement():
+    """INV-02 risk 2: a bound-derived rejection would be worse than the bug.
+
+    Two of the sixteen prototype sheets print no dimension pair at all, so
+    "no bound" must mean NEEDS REVIEW carrying the measured area — never a
+    dropped row and never a guessed bound.
+    """
+    for missing in (None, 0.0, -1.0):
+        out = cross_check_extent(RoomFillResult(area_sf=451.1), missing)
+        assert out.area_sf == 451.1, "the measurement survives"
+        assert out.bound_sf is None and out.extent_ratio is None
+        assert out.needs_review is True
+        assert "no overall dimension pair" in out.review_reason
+
+
+def test_the_plausibility_bound_is_a_ratio_and_not_a_size_in_square_feet():
+    """V4-MEAS-02, stated as an assertion.
+
+    A guest-room-sized threshold is right for a guest room and wrong for a
+    lobby. The replacement is dimensionless, so the SAME number governs a
+    250 SF guest room and a 12,000 SF ballroom — pinned here by checking that
+    scaling BOTH sides by fifty changes no verdict.
+    """
+    assert EXTENT_TOLERANCE == 1.25
+    assert 1.073 < EXTENT_TOLERANCE < 2.0, (
+        "above every honest sheet INV-02 §4 measured, below a two-plan leak"
+    )
+    for factor in (1.0, 50.0):
+        assert cross_check_extent(
+            RoomFillResult(area_sf=round(455.2 * factor, 1)), 455.2 * factor
+        ).needs_review is False
+        assert cross_check_extent(
+            RoomFillResult(area_sf=round(910.4 * factor, 1)), 455.2 * factor
+        ).needs_review is True
+
+
+def test_the_guest_room_sized_plausibility_constant_is_gone():
+    """It was a size in SF, and it sat on the WRONG SIDE of the multiplication.
+
+    `flag_implausible_unit` saw 458.3 and passed it; the 916.6 that was
+    actually wrong was produced later, in fusion, and no guard ever saw it
+    (INV-02 §5). Both the constant and the function it fed are deleted, and
+    no module-level constant in room_fill may replace it with another size.
+    """
+    import re
+
+    from bobbytailor.deterministic import room_fill as rf
+    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+    assert not hasattr(TakeoffPipeline, "_MAX_UNIT_SF")
+    assert not hasattr(rf, "flag_implausible_unit")
+    src = open(rf.__file__, encoding="utf-8").read()
+    for line in src.splitlines():
+        m = re.match(r"^([A-Z][A-Z0-9_]*)\s*=\s*([0-9.]+)\s*$", line)
+        if not m or m.group(1) in ("MIN_REGION_SF", "MAX_REGION_SF"):
+            continue
+        assert "_SF" not in m.group(1), (
+            "%s is a new square-foot bound — V4-MEAS-02 forbids it" % m.group(1)
+        )
 
 
 # ── prototype-unit x count ───────────────────────────────────────────────────
@@ -460,13 +559,17 @@ def test_the_oversize_register_still_records_the_area_for_the_ledger():
     doc.close()
 
 
-def test_an_oversize_flag_is_not_erased_by_the_implausible_unit_flag():
+def test_an_oversize_flag_is_not_erased_by_the_extent_cross_check():
     """Two flags, one reason string. Neither may delete the other."""
     r = RoomFillResult(area_sf=1200.0, regions=[1200.0], needs_review=True,
                        review_reason="1 region(s) of 1200 SF exceed the maximum")
-    out = flag_implausible_unit(r, expect_max_sf=420.0)
+    out = cross_check_extent(r, 455.2)
     assert "exceed the maximum" in out.review_reason
-    assert "opposite-hand" in out.review_reason
+    assert "printed overall extent" in out.review_reason
+    # and the same holds for the no-bound branch
+    r2 = RoomFillResult(area_sf=1200.0, needs_review=True,
+                        review_reason="1 region(s) of 1200 SF exceed the maximum")
+    assert "exceed the maximum" in cross_check_extent(r2, None).review_reason
 
 
 def test_the_out_list_is_optional_and_changes_nothing():
@@ -1190,6 +1293,8 @@ def test_the_serialised_form_carries_the_new_geometry():
     assert d["perimeter_lf"] == r.perimeter_lf
     assert d["region_perimeters"] == r.region_perimeters
     assert d["region_shape_ratios"] == r.region_shape_ratios
+    assert d["bound_sf"] == r.bound_sf
+    assert d["extent_ratio"] == r.extent_ratio
     # additive only — every pre-existing key is still there
     assert {"area_sf", "regions", "candidate_id", "scale_fpi", "needs_review",
             "review_reason", "sheet_name", "viewport_title", "plan_name",
@@ -1247,6 +1352,84 @@ def test_the_architectural_fill_reproduces_its_leak_signature(moxy_prototype_fil
     fill = _dominant(moxy_prototype_fills, page, "AR")
     ratio = fill.region_shape_ratios[0]
     assert ratio > MAX_HONEST_SHAPE_RATIO, "%s ratio %.2f" % (fill.plan_name, ratio)
+
+
+# ── the extent cross-check on the real drawings (23-11 Task 3) ───────────────
+#
+# INV-02 §4 harvested the largest printed horizontal x the largest printed
+# vertical dimension inside each sheet's ARCHITECTURAL viewport and scored the
+# reflected-ceiling fill against it. Thirteen sheets landed in 0.98-1.07; two
+# print no dimension pair at all; ID-410 paired only PARTIAL interior dimensions
+# and produced a bound 2.5x too small. Every number below was measured from the
+# PDF before any golden quantity was read, and none of them may be tuned.
+
+MOXY_EXTENT_BOUND = {
+    23: 223.7, 24: 219.7, 25: 214.5, 26: 146.2, 27: 350.1, 28: 455.2,
+    29: 254.0, 30: 311.5, 31: None, 32: 455.2, 33: 275.4, 34: 350.3,
+    35: 350.3, 36: None, 37: 455.2, 38: 455.2,
+}
+MOXY_NO_PRINTED_EXTENT = (31, 36)          # ID-415 QQ C, ID-420 ACC QQ RIS
+MOXY_PARTIAL_EXTENT = (26,)                # ID-410, a BOUND failure not a fill one
+
+
+def test_the_printed_extent_bound_is_the_drawings_own_statement_of_its_size(
+    moxy_prototype_fills,
+):
+    """Reproduces INV-02 §4 sheet for sheet, from the PDF alone."""
+    measured = {
+        page: _dominant(moxy_prototype_fills, page, "RCP").bound_sf
+        for page in MOXY_EXTENT_BOUND
+    }
+    assert measured == MOXY_EXTENT_BOUND
+
+
+def test_thirteen_prototype_sheets_measure_their_own_printed_extent(
+    moxy_prototype_fills,
+):
+    """The blind validator: fill / printed extent, with no golden consulted.
+
+    Thirteen of the sixteen land inside 0.9-1.15 — including ID-412 and ID-416,
+    the two sheets §14.2 accused the clip of doubling, which are among the
+    TIGHTEST fits in the whole set at 1.007 and 0.999.
+    """
+    inside = []
+    for page in MOXY_EXTENT_BOUND:
+        fill = _dominant(moxy_prototype_fills, page, "RCP")
+        if page in MOXY_NO_PRINTED_EXTENT or page in MOXY_PARTIAL_EXTENT:
+            continue
+        assert 0.9 <= fill.extent_ratio <= 1.15, (
+            "%s ratio %.3f" % (fill.plan_name, fill.extent_ratio)
+        )
+        assert fill.needs_review is False, fill.review_reason
+        inside.append(page)
+    assert len(inside) == 13
+
+
+@pytest.mark.parametrize("page", MOXY_NO_PRINTED_EXTENT)
+def test_a_sheet_with_no_printed_extent_is_flagged_and_still_reports_its_area(
+    moxy_prototype_fills, page,
+):
+    """FLAG, never FILTER. The measurement is the point; the bound is a check."""
+    fill = _dominant(moxy_prototype_fills, page, "RCP")
+    assert fill.bound_sf is None and fill.extent_ratio is None
+    assert fill.area_sf > 0.0, "the measured area is still reported"
+    assert fill.needs_review is True
+    assert "no overall dimension pair" in fill.review_reason
+
+
+@pytest.mark.parametrize("page", MOXY_PARTIAL_EXTENT)
+def test_a_partial_printed_extent_flags_the_row_rather_than_the_measurement(
+    moxy_prototype_fills, page,
+):
+    """ID-410: only partial interior dimensions paired, so the BOUND is wrong.
+
+    The row is flagged and the area is untouched — which is the correct
+    behaviour for a check that can be wrong about a fill that is right.
+    """
+    fill = _dominant(moxy_prototype_fills, page, "RCP")
+    assert fill.extent_ratio > EXTENT_TOLERANCE
+    assert fill.needs_review is True
+    assert fill.area_sf == 362.5, "the measurement is never rewritten by a check"
 
 
 def test_every_prototype_sheet_reports_a_perimeter_at_all(moxy_prototype_fills):

@@ -2301,9 +2301,14 @@ class TakeoffPipeline:
             "_scale_result": scale,
         }
 
-    # Largest plausible single dwelling/guest unit. Above this a "unit" fill has
-    # almost certainly swallowed a neighbouring drawing — flagged, never halved.
-    _MAX_UNIT_SF = 900.0
+    # There is deliberately NO plausible-single-unit constant here any more
+    # (23-11 / V4-MEAS-02). The 900 SF bound that used to live at this line was
+    # a guest-room-shaped number — correct for a guest room, wrong for a lobby —
+    # and it was applied on the WRONG SIDE of the room-mix multiplication, so it
+    # never saw the quantity that was actually wrong (INV-02 §5). It is replaced
+    # by room_fill.cross_check_extent, a scale-free RATIO against the drawing's
+    # OWN printed overall dimensions. Re-introducing a size in square feet here
+    # would re-introduce the defect.
 
     # A drawing occupies the space ABOVE its scale callout. These bound the clip
     # around one callout; the generic viewport segmentation cuts a unit plan into
@@ -2315,6 +2320,44 @@ class TakeoffPipeline:
     # the rule _measure_room_fills uses, so the oracle cannot drift from the
     # thing it is the oracle for.
     _FILL_CLIP_SIDE_PT = _TITLE_SCALE_SIDE_PT
+
+    def _fill_clip_for_title(self, page, scales, title_bbox) -> tuple:
+        """``(printed_scale, clip)`` for one plan title, both in PAGE space.
+
+        THE one definition of "which scale is this drawing's, and what rectangle
+        is this drawing" (D-03). It is called twice per sheet — once to locate
+        the architectural sibling whose printed dimensions bound the
+        cross-check, and once per drawing to measure — and a second copy would
+        let the rectangle the bound is harvested from drift away from the
+        rectangle the area is measured in.
+
+        Everything here is PAGE space: the space the sheet is read in, and the
+        space the rasteriser's clip lives in. Identity on the 61 unrotated pages
+        of the four fixtures. Returns ``(None, None)`` when no scale is printed
+        beneath the title — measuring at a borrowed scale is a squared error.
+        """
+        import fitz  # noqa: PLC0415
+
+        tx0, ty0, tx1, ty1 = _page_space_box(page, title_bbox)
+        mid = (tx0 + tx1) / 2.0
+        # This drawing's OWN scale = the ratio printed directly beneath its
+        # title. Borrowing another drawing's scale is a squared error.
+        ps, best_gap = None, float("inf")
+        for s in scales:
+            cx, cy = _page_space_point(page, *s.center_pt)
+            if abs(cx - mid) > self._FILL_CLIP_SIDE_PT:
+                continue
+            gap = cy - ty1
+            if _TITLE_SCALE_ABOVE_TOL_PT <= gap < best_gap:
+                ps, best_gap = s, gap
+        if ps is None:
+            return None, None
+        return ps, fitz.Rect(
+            tx0 - self._FILL_CLIP_SIDE_PT,
+            max(0.0, ty0 - self._FILL_CLIP_UP_PT),
+            tx1 + self._FILL_CLIP_SIDE_PT,
+            max(0.0, ty0 - 8.0),
+        )
 
     def _measure_room_fills(
         self,
@@ -2364,9 +2407,11 @@ class TakeoffPipeline:
             extract_printed_scales,
         )
         from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
-            flag_implausible_unit,
+            BASIS_PLAN_KIND,
+            cross_check_extent,
             measure_enclosed_area,
             plan_titles,
+            printed_extent_bound,
         )
 
         drops: List[DrawingCoverage] = []
@@ -2394,23 +2439,44 @@ class TakeoffPipeline:
 
         scales = extract_printed_scales(page)
         titles = plan_titles(page)
+
+        # The drawing's own printed OVERALL dimensions are what the measurement
+        # is cross-checked against, and on this drawing set they are printed on
+        # the ARCHITECTURAL plan only — a reflected-ceiling drawing carries no
+        # dimension of its own. So the architectural sibling of the SAME plan
+        # name is located first, by exactly the same clip recipe, and its
+        # rectangle travels with every fill of that name.
+        #
+        # The dimension harvest walks every segment on the page, so it runs ONCE
+        # here rather than once per drawing.
+        ar_kind = BASIS_PLAN_KIND.get("floor_area")
+        ar_rects: dict = {}
+        for plan_name, plan_kind, tb in titles:
+            if plan_kind != ar_kind:
+                continue
+            _ps, ar_clip = self._fill_clip_for_title(page, scales, tb)
+            if ar_clip is not None:
+                ar_rects.setdefault(plan_name, []).append(
+                    from_page_space(page, ar_clip)
+                )
+        mask_rects = [
+            vp.bbox_pt for vp in (viewports or ())
+            if getattr(vp, "kind", "") in _MASK_VIEWPORT_KINDS
+            and getattr(vp, "bbox_pt", None)
+        ]
+        dim_samples = None
+        try:
+            dim_samples = extract_dimension_samples(page, exclude_rects=mask_rects)
+        except Exception as exc:  # noqa: BLE001 — a cross-check never kills a run
+            logger.debug("room_fill: dimension harvest failed: %s", exc)
+
         out: list = []
         for i, (plan_name, plan_kind, tb) in enumerate(titles):
             # Everything below is PAGE space: the space the sheet is read in,
             # and the space the rasteriser's clip lives in. Identity on the 61
             # unrotated pages of the four fixtures.
             tx0, ty0, tx1, ty1 = _page_space_box(page, tb)
-            mid = (tx0 + tx1) / 2.0
-            # This drawing's OWN scale = the ratio printed directly beneath its
-            # title. Borrowing another drawing's scale is a squared error.
-            ps, best_gap = None, float("inf")
-            for s in scales:
-                cx, cy = _page_space_point(page, *s.center_pt)
-                if abs(cx - mid) > self._FILL_CLIP_SIDE_PT:
-                    continue
-                gap = cy - ty1
-                if -6.0 <= gap < best_gap:
-                    ps, best_gap = s, gap
+            ps, clip = self._fill_clip_for_title(page, scales, tb)
             if ps is None:
                 _drop(
                     i, plan_name, plan_kind, SKIPPED_NO_SCALE,
@@ -2427,18 +2493,12 @@ class TakeoffPipeline:
                 )
                 continue
             fpi = round(fpp * 72.0, 4)
-            clip = fitz.Rect(
-                tx0 - self._FILL_CLIP_SIDE_PT,
-                max(0.0, ty0 - self._FILL_CLIP_UP_PT),
-                tx1 + self._FILL_CLIP_SIDE_PT,
-                max(0.0, ty0 - 8.0),
-            )
-            if clip.is_empty or clip.height <= 0 or clip.width <= 0:
+            if clip is None or clip.is_empty or clip.height <= 0 or clip.width <= 0:
                 _drop(
                     i, plan_name, plan_kind, ERRORED,
                     "the clip rectangle around the title is degenerate "
                     "(%.1f x %.1f pt) — there is no area to measure"
-                    % (clip.width, clip.height),
+                    % ((clip.width, clip.height) if clip is not None else (0.0, 0.0)),
                     fpi,
                 )
                 continue
@@ -2473,7 +2533,20 @@ class TakeoffPipeline:
                     fpi,
                 )
                 continue
-            result = flag_implausible_unit(result, expect_max_sf=self._MAX_UNIT_SF)
+            # Cross-check against the drawing's OWN printed overall extent — a
+            # scale-free RATIO, never a size in square feet, and a FLAG, never
+            # a filter. No printed dimension pair means NEEDS REVIEW carrying
+            # the measured area, not a dropped row.
+            result = cross_check_extent(
+                result,
+                printed_extent_bound(
+                    page, from_page_space(page, clip),
+                    plan_name=plan_name,
+                    mask_rects=mask_rects,
+                    sibling_rects=ar_rects.get(plan_name, ()),
+                    samples=dim_samples,
+                ),
+            )
             result.sheet_name = sheet_name
             result.plan_name = plan_name
             result.plan_kind = plan_kind
