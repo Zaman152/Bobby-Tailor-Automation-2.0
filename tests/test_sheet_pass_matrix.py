@@ -713,3 +713,162 @@ class TestClassifierIsTotal:
             bad, "EXTERIOR ELEVATION"
         )
         assert (sheet_type, source) == ("elevation", "full_page_text")
+
+
+# ---------------------------------------------------------------------------
+# Plan 23-06 Task 1 — the STRUCTURAL title-block test (text_shape)
+#
+# These are pure-text unit tests of the predicate that decides which
+# bottom-right window is the title block. The real-PDF consequences are pinned
+# in tests/test_four_set_coverage.py; the window search itself is pinned in
+# tests/test_sheet_name.py.
+# ---------------------------------------------------------------------------
+
+from bobbytailor.pipeline.text_shape import (  # noqa: E402
+    FUNCTION_WORDS,
+    MIN_TITLE_BLOCK_EVIDENCE,
+    PROSE_MIN_FUNCTION_WORDS,
+    PROSE_MIN_RUN_TOKENS,
+    has_sheet_identifier,
+    is_prose_shaped,
+    is_title_shaped_match,
+    looks_like_title_block,
+    run_containing,
+    title_block_field_labels,
+    word_runs,
+)
+
+
+class TestLooksLikeTitleBlock:
+    """A labelled field grid passes; a paragraph of keynote prose fails.
+
+    Both strings below are the REAL text extracted from Moxy page 27 by two
+    different bottom-right windows (INV-00 §1c). They are the two populations
+    the predicate has to separate, and they are of comparable length — the
+    defect was never that the title was absent, it was that prose outvoted it.
+    """
+
+    # x > 88% of a 3024 pt sheet: the actual title block.
+    MOXY_P27_TITLE_BLOCK = (
+        "CUTOUT AND AT SHEET NO. JOB NO. DATE SHEET TITLE PHASE A "
+        "KING SUITE B GUESTROOM ID-411 NOT Knoxville, 90% SUBMITTAL"
+    )
+    # x > 55% of the same sheet: the adjacent electrical keynote column.
+    MOXY_P27_KEYNOTE_PROSE = (
+        "BED. COORDINATE LOCATION OF OUTLET WITH RECESS CUTOUT IN BED "
+        "PLATFORM. COORDINATE LOCATION AND INSTALLATION OF OUTLET AND "
+        "SWITCHES WITH PEG WALL SYSTEM. PROVIDE DEDICATED OUTLET FOR MINI "
+        "FRIDGE. GANG OUTLET & SWITCHES TOGETHER AT THIS LOCATION AT HEIGHT "
+        "SHOWN. MASTER SWITCH, IF REQUIRED."
+    )
+
+    def test_a_labelled_field_grid_is_a_title_block(self):
+        assert looks_like_title_block(self.MOXY_P27_TITLE_BLOCK) is True
+
+    def test_keynote_prose_of_similar_length_is_not(self):
+        assert looks_like_title_block(self.MOXY_P27_KEYNOTE_PROSE) is False
+
+    def test_both_windows_contain_the_title_words(self):
+        """The point of INV-00 §1c: this is signal-to-noise, not a blind spot.
+
+        If the losing window did NOT contain the title, this whole plan would
+        be unnecessary — so the test asserts the premise it is built on.
+        """
+        assert "CUTOUT" in self.MOXY_P27_TITLE_BLOCK
+        assert "CUTOUT" in self.MOXY_P27_KEYNOTE_PROSE
+
+    def test_crow_title_block_convention_passes(self):
+        """A second drafting office, lower-cased labels, different field names."""
+        crow = (
+            "NOT ISSUED FOR CONSTRUCTION Sheet No. Sheet Title Issue Date "
+            "Job No. 04/24/2026 2601014 OVERALL FLOOR PLAN A-101"
+        )
+        assert looks_like_title_block(crow) is True
+
+    def test_empty_and_blank_are_not_title_blocks(self):
+        assert looks_like_title_block("") is False
+        assert looks_like_title_block("   ") is False
+
+    def test_one_piece_of_evidence_is_not_enough(self):
+        """A cross-reference "SEE A-101" must not pass a window off as a title
+        block: one sheet-ID token is one piece of evidence, and two are required."""
+        assert MIN_TITLE_BLOCK_EVIDENCE == 2
+        assert has_sheet_identifier("SEE A-101") is True
+        assert looks_like_title_block("SEE A-101") is False
+
+    def test_a_bare_three_digit_id_is_not_evidence(self):
+        """"A111" without a hyphen is indistinguishable from a wall type or a
+        keynote number, so it is deliberately not accepted as a sheet ID."""
+        assert has_sheet_identifier("SEAL SHEET PROJECT INFO 24103 A111") is False
+
+    def test_field_labels_are_reported_by_name(self):
+        labels = title_block_field_labels(self.MOXY_P27_TITLE_BLOCK)
+        assert {"sheet_number", "sheet_title", "job_number", "date", "phase"} <= labels
+
+
+class TestProseShape:
+    """Two INDEPENDENT signals — neither alone separates the populations."""
+
+    def test_thresholds_are_the_documented_ones(self):
+        assert (PROSE_MIN_RUN_TOKENS, PROSE_MIN_FUNCTION_WORDS) == (6, 2)
+
+    def test_length_alone_would_reject_the_correct_window(self):
+        """The genuine Moxy title block contains a 9-token run — longer than the
+        threshold — and is saved only by carrying no function words. This is the
+        measurement that proves one signal is not enough."""
+        run = [r for r in word_runs(TestLooksLikeTitleBlock.MOXY_P27_TITLE_BLOCK)
+               if "GUESTROOM" in [t for t, _s, _e in r]][0]
+        assert len(run) >= PROSE_MIN_RUN_TOKENS
+        assert is_prose_shaped(TestLooksLikeTitleBlock.MOXY_P27_TITLE_BLOCK) is False
+
+    def test_the_keynote_paragraph_is_prose_shaped(self):
+        assert is_prose_shaped(
+            TestLooksLikeTitleBlock.MOXY_P27_KEYNOTE_PROSE
+        ) is True
+
+    def test_a_single_letter_is_a_designator_not_an_article(self):
+        """"PHASE A" / "KING TYPE A" — counting a lone "A" as the English
+        article made four genuine Moxy title blocks read as prose."""
+        assert "A" not in FUNCTION_WORDS
+        assert "AN" not in FUNCTION_WORDS
+
+    def test_function_words_are_grammar_not_drawing_phrases(self):
+        """A deny list of unlucky phrases fixes the collisions we have seen and
+        misses the next one. Nothing domain-specific may enter this set."""
+        for banned in ("COVER", "PLATE", "SWITCH", "WALL", "COVERING", "INDEX"):
+            assert banned not in FUNCTION_WORDS
+
+    def test_runs_are_broken_by_numbers_and_punctuation(self):
+        runs = word_runs("CS-00 COVER SHEET 25-13.01 ELEVATE")
+        assert [[t for t, _s, _e in r] for r in runs] == [
+            ["COVER", "SHEET"], ["ELEVATE"],
+        ]
+
+    def test_run_containing_finds_the_enclosing_run(self):
+        text = "CS-00 COVER SHEET 25-13.01"
+        start = text.index("COVER")
+        run = run_containing(text, start, start + len("COVER"))
+        assert [t for t, _s, _e in run] == ["COVER", "SHEET"]
+
+    def test_run_containing_returns_none_outside_any_run(self):
+        text = "SHEET TITLE: COVER 25-13.01"
+        assert run_containing(text, 0, 1) is not None
+        start = text.index("25-13.01")
+        assert run_containing(text, start, start + 3) is None
+
+
+class TestIsTitleShapedMatch:
+    """The predicate Task 2's keyword guard is built on."""
+
+    def test_a_short_field_value_is_title_shaped(self):
+        text = "SHEET NO. A-000 SHEET TITLE COVER JOB NO. 25-13"
+        start = text.index("COVER")
+        assert is_title_shaped_match(text, start, start + len("COVER")) is True
+
+    def test_a_word_inside_a_sentence_is_not(self):
+        text = (
+            'MASTER SWITCH, IF REQUIRED. PROVIDE LABEL ON THE LIGHT SWITCH '
+            'COVER PLATE INDICATING "MASTER SWITCH".'
+        )
+        start = text.index("COVER")
+        assert is_title_shaped_match(text, start, start + len("COVER")) is False

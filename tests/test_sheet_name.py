@@ -272,3 +272,76 @@ class TestGetTitleBlockText:
         doc = _make_doc(title_block_words=[], full_text="Body text only.")
         tb_text = get_title_block_text(doc, 0)
         assert tb_text.strip() == ""
+
+
+# ---------------------------------------------------------------------------
+# Plan 23-06 Task 1 — the structural window search
+#
+# get_title_block_text no longer assumes a fixed fraction of the page. It walks
+# progressively WIDER bottom-right candidates and keeps the first whose text
+# looks like a title block; when none does it returns the widest candidate,
+# which is the historical window. That fallback is what makes the change a
+# strict refinement, so it is pinned here as behaviour, not as source text.
+# ---------------------------------------------------------------------------
+
+from bobbytailor.pipeline.pdf_analyzer import (  # noqa: E402
+    _TITLE_BLOCK_WINDOWS,
+    _window_text,
+)
+
+
+class TestTitleBlockWindowLadder:
+    def test_the_widest_candidate_is_the_historical_window(self):
+        """FORBIDDEN by 23-CONTEXT: changing this number as the fix. INV-00 §1d
+        measured that sweeping it 0.55 -> 0.88 fixes Moxy and BREAKS Chelsea
+        (2 -> 10 skips, floor plans 9 -> 1). Asserted on RESOLVED VALUES so a
+        refactor of the search cannot break the pin for the wrong reason."""
+        windows = [tuple(map(float, c)) for c in _TITLE_BLOCK_WINDOWS]
+        assert windows[-1] == (0.55, 0.80), (
+            "the widest candidate must remain the current window, got %r"
+            % (windows[-1],)
+        )
+
+    def test_the_search_evaluates_at_least_one_tighter_candidate(self):
+        windows = [tuple(map(float, c)) for c in _TITLE_BLOCK_WINDOWS]
+        assert any(x > 0.55 for x, _y in windows[:-1])
+
+    def test_candidates_run_narrow_to_wide(self):
+        widths = [float(x) for x, _y in _TITLE_BLOCK_WINDOWS]
+        assert widths == sorted(widths, reverse=True)
+
+    def test_the_height_fraction_is_never_varied(self):
+        """Only the width strip is searched; the 0.80 height bound is untouched."""
+        assert {float(y) for _x, y in _TITLE_BLOCK_WINDOWS} == {0.80}
+
+
+class TestTitleBlockFallbackIsUnchangedBehaviour:
+    """A page whose bottom-right region is pure keynote prose must extract
+    EXACTLY what it extracted before the search existed."""
+
+    KEYNOTE_WORDS = (
+        "PROVIDE LABEL ON THE LIGHT SWITCH COVER PLATE INDICATING MASTER "
+        "SWITCH AND COORDINATE LOCATION OF OUTLET WITH THE RECESS CUTOUT"
+    ).split()
+
+    def test_pure_prose_falls_back_to_the_widest_window(self):
+        doc = _make_doc(title_block_words=list(self.KEYNOTE_WORDS))
+        extracted = get_title_block_text(doc, 0)
+        legacy = _window_text(doc[0], *_TITLE_BLOCK_WINDOWS[-1])
+        assert extracted == legacy
+        assert extracted == " ".join(self.KEYNOTE_WORDS)
+
+    def test_an_empty_bottom_right_region_still_returns_empty(self):
+        doc = _make_doc(title_block_words=[], full_text="Body text only.")
+        assert get_title_block_text(doc, 0) == _window_text(
+            doc[0], *_TITLE_BLOCK_WINDOWS[-1]
+        )
+
+    def test_a_structured_title_block_is_still_extracted(self):
+        """The stub places every word at x = 0.60 W, i.e. only the widest
+        candidate can see it — so a title-block-shaped page also resolves via
+        the fallback, and the text is identical either way."""
+        doc = _make_doc(
+            title_block_words="SHEET NO. A-101 JOB NO. 2601014 DATE".split()
+        )
+        assert get_title_block_text(doc, 0) == "SHEET NO. A-101 JOB NO. 2601014 DATE"

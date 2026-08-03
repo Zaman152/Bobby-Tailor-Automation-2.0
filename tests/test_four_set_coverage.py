@@ -91,6 +91,14 @@ def _require(audits, key):
     return audits[key]
 
 
+def _require_pdf(key):
+    """Skip unless the fixture PDF exists — for tests that read one page and so
+    must not pay for the module-wide audit."""
+    if not _pdf_path(key).exists():
+        pytest.skip("fixture PDF for %r is not present in uploads/" % key)
+    return _pdf_path(key)
+
+
 # ---------------------------------------------------------------------------
 # THE GATE — one assertion, all four sets at once
 # ---------------------------------------------------------------------------
@@ -144,17 +152,45 @@ def test_four_plan_set_skip_counts_do_not_regress(audits):
 # ---------------------------------------------------------------------------
 
 
-def test_moxy_guestroom_prototypes_are_recovered(audits):
+# Moxy pages 23-38 inclusive are the 16 guestroom prototypes. Every guestroom
+# quantity in the building (Gyp Ceiling, Gyp Wall) lives on these sheets, and
+# all 16 were discarded before geometry ran. Read off the drawings, not fitted.
+MOXY_GUESTROOM_PROTOTYPES = tuple(range(23, 39))
+
+
+def test_moxy_guestroom_prototypes_reach_the_engine(audits):
     """The 16 sheets holding every guestroom quantity reach the engine.
 
-    Validated by POSITION/SHAPE — each recovered page must carry at least one
-    plan title with a printed scale beneath it — never by a quantity.
+    Asserted as an OUTCOME, deliberately not as a mechanism. Plan 23-01
+    delivered the skip veto and this test originally required >= 16 pages to be
+    *recovered by the veto*. Plan 23-06 then repaired the classifier itself, so
+    the pages are never misclassified in the first place and the veto correctly
+    recovers nothing — which failed a test asserting the backstop had fired.
+    A test that only passes while the bug is still present is measuring the
+    wrong thing. What matters is that the sheet is measured, by whichever route.
+
+    Validated by POSITION/SHAPE — each page must carry at least one plan title
+    with a printed scale beneath it, or a scaled viewport — never by a quantity.
     """
     result = _require(audits, "moxy")
-    recovered = result["pages_overruled"]
-    assert len(recovered) >= 16, (
-        "expected >= 16 recovered guestroom prototype pages, got %s" % recovered
+    by_index = {row["page_index"]: row for row in result["pages"]}
+
+    not_reaching = [i for i in MOXY_GUESTROOM_PROTOTYPES if by_index[i]["skipped"]]
+    assert not not_reaching, (
+        "guestroom prototype pages %s are still discarded before geometry"
+        % not_reaching
     )
+
+    unmeasurable = [
+        i for i in MOXY_GUESTROOM_PROTOTYPES
+        if not (by_index[i]["measurable_signal"]["plan_titles"] > 0
+                or by_index[i]["measurable_signal"]["viewports"] > 0)
+    ]
+    assert not unmeasurable, (
+        "guestroom prototype pages %s reach the engine with no scaled plan "
+        "geometry — they would be measured at a borrowed scale" % unmeasurable
+    )
+
     for row in result["pages"]:
         if row["classifier_overruled"]:
             assert row["measurable_signal"]["plan_titles"] > 0 or \
@@ -247,3 +283,135 @@ def test_the_probe_spends_nothing(audits):
             assert token not in source.replace(
                 '"%s"' % token, ""
             ).replace("'%s'" % token, ""), "%s references %r" % (path.name, token)
+
+
+# ---------------------------------------------------------------------------
+# Plan 23-06 Task 1 — real-PDF assertions on the structural window search
+#
+# Pre-change values below were MEASURED on the four real PDFs immediately
+# before the change landed, by re-running the probe's own computation. They are
+# page counts read off the drawings, never fitted to a quantity, a golden
+# take-off or an accuracy score.
+# ---------------------------------------------------------------------------
+
+# Sheet identifiers per page, BEFORE the window search existed — the exact
+# sequence _sheet_name_from_doc returned on today's HEAD, dumped page by page.
+# get_title_block_text feeds sheet NAMING as well as classification (gitnexus
+# impact: _sheet_name_from_doc is a direct caller, blast radius HIGH), so a
+# narrower window that renamed sheets would silently corrupt every report.
+#
+# These are RECORDED OUTPUTS, not desired ones. Several are plainly poor —
+# Moxy's title blocks yield "Page_3"… and its page 0 yields the accessibility
+# standard "A117.1" — but repairing sheet NAMING is not this plan's job, and
+# pinning the honest current output is what makes the invariance claim mean
+# something. Any improvement to naming must update this list deliberately.
+PRE_CHANGE_SHEET_IDS = {
+    "moxy": [
+        'A117.1', 'S001', 'Page_3', 'Page_4', 'Page_5', 'Page_6',
+        'Page_7', 'Page_8', 'Page_9', 'Page_10', 'Page_11', 'Page_12',
+        'Page_13', 'Page_14', 'Page_15', 'Page_16', 'Page_17', 'Page_18',
+        'Page_19', 'Page_20', 'Page_21', 'Page_22', 'Page_23', 'Page_24',
+        'Page_25', 'Page_26', 'Page_27', 'Page_28', 'Page_29', 'Page_30',
+        'Page_31', 'Page_32', 'Page_33', 'Page_34', 'Page_35', 'Page_36',
+        'Page_37', 'Page_38', 'Page_39', 'Page_40',
+    ],
+    "crow": ['A-101', 'A-201', 'A-401', 'A-601'],
+    "bobs": ['A2.0', 'A8.0', 'A2.0', 'D1.0', 'C402.4', 'A156.10', 'A8.3'],
+    "chelsea": [
+        'A061', 'A311', 'A112', 'A311', 'A122', 'A311', 'A132', 'A311',
+        'A142', 'A211', 'A221', 'A231', 'A232', 'A251', 'A253', 'A255',
+        'A902', 'A903', 'A904', 'G000', 'G001', 'A200', 'F108', 'F108',
+        'L112', 'L112', 'C103', 'C104', 'Page_29', 'Page_30', 'Page_31',
+        'Page_32',
+    ],
+}
+
+
+def test_moxy_page_27_extracts_its_title_block_not_the_keynote_column():
+    """THE root cause, asserted on the real PDF (INV-00 §1c).
+
+    Page 27 (ID-411, KING SUITE B) is one of the 16 guestroom prototypes that
+    carried every guestroom quantity in the building and were discarded before
+    geometry ever ran. Both the correct and the incorrect window contain the
+    sheet ID and the unit name — the classifier was outvoted by 84 words of
+    electrical keynote prose, not blind. So this asserts BOTH: that the field
+    labels are present, and that the verdict is a plan type.
+    """
+    import fitz
+
+    from bobbytailor.pipeline.pdf_analyzer import get_title_block_text
+    from bobbytailor.pipeline.sheet_pass_matrix import (
+        classify_sheet_type_from_text,
+        plan_passes,
+    )
+
+    _require_pdf("moxy")
+    doc = fitz.open(str(_pdf_path("moxy")))
+    try:
+        text = get_title_block_text(doc, 27)
+    finally:
+        doc.close()
+
+    upper = text.upper()
+    assert "SHEET TITLE" in upper, text
+    assert "SHEET NO" in upper, text
+    assert "KING SUITE" in upper, text     # the unit name
+    assert "ID-411" in upper, text         # the sheet identifier
+
+    sheet_type = classify_sheet_type_from_text(text)
+    assert sheet_type != "title_sheet", (
+        "page 27 classified %r — the guestroom prototype is being discarded "
+        "again" % sheet_type
+    )
+    assert plan_passes(sheet_type, title_block_text=text), (
+        "page 27 has an empty pass list, i.e. it is skipped entirely"
+    )
+
+
+def test_sheet_identifiers_are_unchanged_on_every_page_of_every_set():
+    """The second consumer of the title-block window must not move.
+
+    _sheet_name_from_doc reads the same region, so a narrower window could
+    silently rename sheets across every report. Measured: 83 pages, 0 changes.
+    """
+    import fitz
+
+    from bobbytailor.pipeline.pdf_analyzer import _sheet_name_from_doc
+
+    checked = 0
+    for key, expected in PRE_CHANGE_SHEET_IDS.items():
+        if not _pdf_path(key).exists():
+            continue
+        checked += 1
+        doc = fitz.open(str(_pdf_path(key)))
+        try:
+            actual = [_sheet_name_from_doc(doc, i) for i in range(doc.page_count)]
+        finally:
+            doc.close()
+        assert actual == expected, (
+            "%s sheet identifiers changed: %s"
+            % (key, [(i, a, b) for i, (a, b) in enumerate(zip(expected, actual))
+                     if a != b])
+        )
+    if not checked:
+        pytest.skip("no plan-set fixtures in uploads/")
+
+
+def test_no_page_fraction_was_changed_to_achieve_any_of_this():
+    """23-CONTEXT's hard prohibition, pinned on resolved values.
+
+    Sweeping the width fraction is the documented fixture-blindness trap: it
+    fixes Moxy and destroys Chelsea (INV-00 §1d). The ladder may use fractions
+    as CANDIDATES, but the widest one must still be today's window so a sheet
+    whose title block cannot be identified behaves exactly as it did.
+    """
+    from bobbytailor.pipeline.pdf_analyzer import _TITLE_BLOCK_WINDOWS
+
+    windows = [tuple(map(float, c)) for c in _TITLE_BLOCK_WINDOWS]
+    assert windows[-1] == (0.55, 0.80), (
+        "the widest candidate must remain the current window, got %r"
+        % (windows[-1],)
+    )
+    assert any(x > 0.55 for x, _y in windows[:-1]), (
+        "the search must evaluate at least one strictly tighter candidate"
+    )

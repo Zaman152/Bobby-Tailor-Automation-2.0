@@ -22,6 +22,7 @@ from bobbytailor.pipeline.takeoff_pipeline import (
     page_measurable_signal,
 )
 from bobbytailor.pipeline.page_text_enrichment import enrich_components_from_page_text
+from bobbytailor.pipeline.text_shape import looks_like_title_block
 from bobbytailor.config import RENDER_TARGET_PX, SCREENSHOTS_DIR
 
 logger = logging.getLogger(__name__)
@@ -167,22 +168,75 @@ def render_clip_crop(
     return Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
 
 
-def get_title_block_text(doc: fitz.Document, page_num: int) -> str:
-    """Return the raw text of the title-block region (bottom-right quadrant).
+# Candidate bottom-right windows, NARROWEST FIRST, as (width_frac, height_frac):
+# a word is inside a candidate when x0 > width*width_frac and y0 > height*height_frac.
+#
+# The ladder is GEOMETRIC, not fitted. ANSI/ASME Y14.1 puts the title block in a
+# strip against the right edge; on the 42 in (3024 pt) sheets all four plan sets
+# use, a standard 5-6 in title-block strip is 12-14 % of the width, i.e. x > ~0.87.
+# The ladder walks outward from that standard strip to the historical
+# bottom-right quadrant.
+#
+# The LAST entry is today's window and is the FALLBACK: when no candidate passes
+# the structural test in text_shape.looks_like_title_block, this function
+# extracts exactly what it extracted before this search existed. The change is
+# therefore a strict refinement — a sheet whose title block cannot be identified
+# is treated precisely as it was.
+#
+# **The selection among candidates is made by the STRUCTURE of the extracted
+# text, never by the fraction.** INV-00 §1d proves retuning the fraction is the
+# wrong fix: sweeping 0.55 -> 0.88 outright fixes Moxy (18 -> 2 skipped sheets)
+# and BREAKS Chelsea (2 -> 10, floor plans 9 -> 1). Measured on today's HEAD,
+# this search leaves Chelsea, Crow and Bob's byte-identical because none of
+# their pages has a tighter window that reads as a title block, while Moxy's
+# guestroom prototypes do. Pinned by tests/test_four_set_coverage.py.
+_TITLE_BLOCK_WINDOWS: tuple = (
+    (0.88, 0.80),   # standard ~5 in title-block strip on a 42 in sheet
+    (0.80, 0.80),   # wider strip / two-column title block
+    (0.70, 0.80),
+    (0.55, 0.80),   # FALLBACK — the historical window; must stay last
+)
 
-    Construction drawings per ANSI/ASME Y14.1 place the title block in the
-    bottom-right ~20 % (height) × 45 % (width) of the sheet.  Using
-    word-level bounding boxes avoids merging text from unrelated regions.
-    """
-    page = doc[page_num]
+
+def _window_text(page: "fitz.Page", width_frac: float, height_frac: float) -> str:
+    """Join the words whose top-left corner falls inside one candidate window."""
     words = page.get_text("words")   # (x0, y0, x1, y1, word, ...)
     height = page.rect.height
     width = page.rect.width
-    title_block_words = [
+    return " ".join(
         w[4] for w in words
-        if w[1] > height * 0.80 and w[0] > width * 0.55
-    ]
-    return " ".join(title_block_words)
+        if w[1] > height * height_frac and w[0] > width * width_frac
+    )
+
+
+def get_title_block_text(doc: fitz.Document, page_num: int) -> str:
+    """Return the raw text of the title-block region, found by its STRUCTURE.
+
+    Construction drawings per ANSI/ASME Y14.1 place the title block in a strip
+    against the bottom-right of the sheet, but drafting offices differ by more
+    than 30 % of the page width in how wide that strip is — and a window that is
+    too wide swallows the adjacent keynote column, so the prose outvotes the
+    title and the sheet is misclassified as a title sheet and DISCARDED
+    (INV-00 §1c: 16 Moxy guestroom prototypes, every guestroom quantity in the
+    building).
+
+    So the window is not assumed. Progressively wider bottom-right candidates
+    are extracted and the FIRST whose text looks like a title block — label
+    dense, low prose density, see ``text_shape.looks_like_title_block`` — wins.
+    When none does, the widest candidate is returned, which is the historical
+    behaviour unchanged.
+
+    Word-level bounding boxes are used so text from unrelated regions is never
+    merged. ``page.get_text("words")`` is called once per candidate on the same
+    page object and PyMuPDF serves it from the page's parsed display list, so
+    the search does not re-parse the page.
+    """
+    page = doc[page_num]
+    for width_frac, height_frac in _TITLE_BLOCK_WINDOWS[:-1]:
+        candidate = _window_text(page, width_frac, height_frac)
+        if looks_like_title_block(candidate):
+            return candidate
+    return _window_text(page, *_TITLE_BLOCK_WINDOWS[-1])
 
 
 def _sheet_name_from_doc(doc: fitz.Document, page_num: int) -> str:
