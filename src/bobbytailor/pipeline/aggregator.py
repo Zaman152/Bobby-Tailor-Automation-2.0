@@ -3,10 +3,35 @@ Consolidate per-sheet takeoff items into project-level totals (StackCT summary f
 """
 import logging
 import re
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from typing import Dict, List, Optional
 
+from bobbytailor.pipeline.coverage import (
+    ITEM_HUMAN_INPUT,
+    ITEM_MEASURED,
+    ITEM_NEEDS_REVIEW,
+    ITEM_NOT_MEASURED,
+)
+from bobbytailor.pipeline.provenance import provenance_of_row
+
 logger = logging.getLogger(__name__)
+
+# Bucket ``source`` values that mean "this item was EXPECTED and never
+# measured". Their quantity is ``None``, never the defaultdict's 0.0:
+# ``manifest_missing`` shipped a numeric zero for a blank (INV-08 §2 row S12),
+# which every consumer — takeoff.json, the exporter, scoring — read as "the
+# building has none of this".
+_UNMEASURED_SOURCES = frozenset({"manifest_missing", "expected_not_measured"})
+
+# A learned expectation weaker than this is a one-off, not a pattern. Same
+# threshold the learned-context prompt renderer applies, so an item cannot be
+# "expected enough to enumerate" and "too weak to mention" at once.
+_MIN_LEARNED_EXPECTATION = 0.5
+
+
+def _norm_item_key(name: str) -> str:
+    """Loose canonical key for 'have we already got a row for this?'."""
+    return re.sub(r"[^a-z0-9]+", " ", str(name or "").lower()).strip()
 
 # Confidence ordering, worst -> best. Used to roll a bucket's confidence up to
 # the lowest (most cautious) confidence among the rows that built it.
@@ -232,6 +257,95 @@ def _resolve_library_name(description: str, library) -> Optional[tuple]:
         return None
 
 
+def _expected_items_without_a_manifest(learned, library) -> "OrderedDict":
+    """Line items this run had reason to expect, from evidence other than a manifest.
+
+    The completeness guarantee used to be gated on ``if manifest:``, so in
+    **plans-only mode — the mission mode — nothing enumerated what was expected**
+    and an unmeasured item had no row of any kind (INV-08 §2 row S13). That is
+    why Bob's civil, elevation and lintel items are absent rather than blank:
+    ``Lintels`` is right there in the harvested component library with basis
+    ``linear``, and the take-off never mentions it.
+
+    Two sources, both already available at this call site:
+
+    * ``learned.expected_items`` — items seen in prior VERIFIED runs of this
+      project type. Filtered at the same expectation threshold the prompt
+      renderer uses, so an item cannot be strong enough to enumerate here and
+      too weak to mention there.
+    * ``library`` — the deterministic component library merged with the LLM
+      project vocabulary (``pipeline._project_vocabulary``; the same object
+      ``pdf_analyzer`` and ``scraper`` already pass in). Only entries carrying a
+      measure ``basis`` count: a basis is the app's own statement that it knows
+      what measuring this item would MEAN, which is precisely what makes its
+      absence a gap rather than noise. Measured on the real sets this is 10
+      entries for Bob's and 25 for Crow — bounded, not a flood.
+
+    Returns:
+        ``OrderedDict`` of canonical name -> ``{unit, measure, expected_from}``,
+        in a deterministic order (learned first, then library) so two runs over
+        the same inputs produce the same take-off.
+    """
+    out: "OrderedDict" = OrderedDict()
+
+    for row in getattr(learned, "expected_items", None) or []:
+        if not isinstance(row, dict):
+            continue
+        try:
+            if float(row.get("expectation") or 0.0) < _MIN_LEARNED_EXPECTATION:
+                continue
+        except (TypeError, ValueError):
+            continue
+        name = str(row.get("item_name") or "").strip()
+        if not name or _norm_item_key(name) in {_norm_item_key(k) for k in out}:
+            continue
+        out[name] = {
+            "unit": str(row.get("unit") or "").strip(),
+            "measure": str(row.get("basis") or row.get("measure") or "").strip(),
+            "expected_from": "learned",
+        }
+
+    for entry in library or []:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name") or "").strip()
+        basis = str(entry.get("basis") or "").strip()
+        if not name or not basis:
+            continue
+        if _norm_item_key(name) in {_norm_item_key(k) for k in out}:
+            continue
+        out[name] = {
+            "unit": str(entry.get("unit") or "").strip(),
+            "measure": basis,
+            "expected_from": "library",
+        }
+
+    return out
+
+
+def _row_status(bucket: Dict, is_unknown: bool) -> str:
+    """The four-value client status, COMPUTED FROM THE RECORD.
+
+    The old exporter inferred it from the value (``float(qty or 0) <= 0 -> NOT
+    MEASURED``), which made a building with genuinely no CMU indistinguishable
+    from one whose CMU was never measured. Nothing here looks at the number.
+    """
+    if is_unknown:
+        return ITEM_NOT_MEASURED
+    if bucket.get("item_type") == "standard_line_item" and not bucket.get("has_rows"):
+        # A convention (1 EA Mobilization), not something taken off a drawing.
+        return ITEM_HUMAN_INPUT
+    if not bucket.get("has_rows"):
+        return ITEM_NOT_MEASURED
+    if bucket.get("needs_review"):
+        return ITEM_NEEDS_REVIEW
+    if bucket.get("source") == "plan_schedule_legend":
+        # The authoritative companion take-off: a human's own quantity, kept
+        # verbatim. The app did not earn this number off the drawing.
+        return ITEM_HUMAN_INPUT
+    return ITEM_MEASURED
+
+
 def aggregate_takeoff(
     calculated_items: List[Dict], manifest=None, learned=None, library=None,
 ) -> List[Dict]:
@@ -284,23 +398,32 @@ def aggregate_takeoff(
     # `legend_names` holds the NORMALISED legend labels; it is used only to suppress
     # vision/room-derived duplicates of items the legend already covers.
     legend_names: set = set()
+    # Which legend BUCKET each alias belongs to, so a suppressed duplicate can
+    # be recorded on the row that survived it (INV-08 §2 row S14). Without this
+    # the suppression is correct and completely silent: a measured row is
+    # deleted and the report shows no sign it ever existed.
+    legend_bucket_by_name: Dict[str, str] = {}
     for item in calculated_items:
         if item.get("qty_source") == "plan_schedule_legend":
             desc = item.get("description", "")
+            bucket_key = _clean_legend_label(desc)
             name, _ = normalize_item_name(
                 desc, item.get("item_type", ""), item.get("unit", ""), learned=learned,
             )
             legend_names.add(name)
+            legend_bucket_by_name.setdefault(name, bucket_key)
+            legend_bucket_by_name.setdefault(bucket_key, bucket_key)
             # A legend bucket is keyed by its cleaned label, and a vision row binds
             # to its manifest name. Add BOTH so a vision/measured duplicate of a
             # legend item is suppressed regardless of which naming path it took
             # (otherwise the two same-named buckets silently SUM — e.g. a measured
             # footprint area doubling on top of a vision-read area).
-            legend_names.add(_clean_legend_label(desc))
+            legend_names.add(bucket_key)
             if manifest:
                 entry = manifest.resolve(desc, item.get("unit", ""))
                 if entry:
                     legend_names.add(entry.name)
+                    legend_bucket_by_name.setdefault(entry.name, bucket_key)
 
     for item in calculated_items:
         desc = item.get("description", "")
@@ -359,15 +482,29 @@ def aggregate_takeoff(
             # canonical names and base-vs-spec variants (e.g. vision "Columns" when
             # the legend reports "Columns-H-35'") so the authoritative legend isn't
             # shadowed by a coarser vision count of the same physical item.
-            if (
-                canonical_name in legend_names
-                or any(
-                    ln == canonical_name
+            shadowed_by = next(
+                (
+                    ln for ln in sorted(legend_names)
+                    if ln == canonical_name
                     or ln.startswith(canonical_name + "-")
                     or canonical_name.startswith(ln + "-")
-                    for ln in legend_names
-                )
-            ):
+                ),
+                None,
+            )
+            if shadowed_by is not None:
+                # Suppressing the duplicate is CORRECT — the legend is the
+                # authoritative source and letting both through would silently
+                # SUM them. But the deletion must leave a trace on the row that
+                # survived, or a client cannot tell a suppressed duplicate from
+                # a reading the app never made.
+                target = legend_bucket_by_name.get(shadowed_by)
+                if target:
+                    buckets[target]["review_reasons"].add(
+                        "a separate %r reading of this item (%s) was suppressed "
+                        "as a duplicate of the authoritative legend row %r — it "
+                        "was NOT added to this quantity"
+                        % (canonical_name, bucket_source or "detected", shadowed_by)
+                    )
                 continue
         if (canonical_unit or unit or "").lower() in ("ea", "each"):
             qty = float(round(qty))
@@ -419,18 +556,54 @@ def aggregate_takeoff(
                 "formula": "manifest_object_not_found",
             })
 
+    # ...and the SAME guarantee with no manifest at all. A plans-only run is
+    # the mission mode, and until now it enumerated nothing: an expected item
+    # that never appeared had no row, so "we did not measure your lintels" and
+    # "your building has no lintels" were the same artifact (INV-08 S13).
+    expected = _expected_items_without_a_manifest(learned, library)
+    if expected:
+        present = {_norm_item_key(k) for k in buckets}
+        present |= {_norm_item_key(n) for n in legend_names}
+        for name, info in expected.items():
+            if _norm_item_key(name) in present:
+                continue
+            present.add(_norm_item_key(name))
+            bucket = buckets[name]
+            bucket["unit"] = info["unit"]
+            bucket["item_type"] = info["measure"] or "expected_object"
+            bucket["needs_review"] = True
+            bucket["confidence"] = "low"
+            bucket["source"] = "expected_not_measured"
+            bucket["review_reasons"].add(
+                "expected from the %s but never measured on the plans — this is "
+                "a BLANK, not a zero" % info["expected_from"]
+            )
+            bucket["source_rows"].append({
+                "sheet": None,
+                "qty": None,
+                "description": "%s (expected from the %s, not measured on the plans)"
+                               % (name, info["expected_from"]),
+                "formula": "expected_object_not_measured",
+            })
+
     result = []
     for name in sorted(buckets.keys()):
         b = buckets[name]
-        qty = b["quantity"]
-        is_unknown = b.get("source") == "manifest_missing"
-        if is_unknown:
+        is_unknown = b.get("source") in _UNMEASURED_SOURCES
+        # THE one-line change INV-08 calls the highest-value in its map: a
+        # never-measured item ships None, not the defaultdict's 0.0. `is None`
+        # is the only test any consumer should apply — a measured 0.0 is a real,
+        # publishable finding (a building with genuinely no CMU) and must stay
+        # distinguishable from an absence.
+        qty = None if is_unknown else b["quantity"]
+        if qty is None:
             qty_fmt = "—"
         elif qty == int(qty):
             qty_fmt = f"{qty:,.0f}"
         else:
             qty_fmt = f"{qty:,.1f}"
-        result.append({
+        status = _row_status(b, is_unknown)
+        row = {
             "item": name,
             "quantity": qty,
             "quantity_fmt": qty_fmt,
@@ -445,5 +618,14 @@ def aggregate_takeoff(
             "review_reasons": sorted(b.get("review_reasons") or []),
             "source": b.get("source", ""),
             "detail": b["source_rows"],
-        })
+        }
+        # Provenance is READ FROM THE RECORD, never sniffed from the value:
+        # provenance_of_row's first branch returns the status this run computed
+        # from what it actually did. Passing the status is what keeps a measured
+        # zero MEASURED and a manifest-NAMED measurement from being relabelled
+        # as a human input (the aggregator's `source` is a NAMING marker — its
+        # own docstring says quantity provenance is never altered here).
+        row["provenance"] = provenance_of_row(dict(row, status=status))
+        row["measured"] = bool(qty is not None and b.get("has_rows"))
+        result.append(row)
     return result
