@@ -46,6 +46,9 @@ IMPORTANT — what schedules can and cannot tell you:
     (e.g. hotels) guest-room doors repeat per unit/floor and are counted on the
     plans, not re-listed per instance. So treat schedule counts as an exact LOWER
     bound / type breakdown, and flag the residual for plan-based verification.
+  * A plan set that REFERENCES a door schedule it does not contain reports an
+    honest zero with a stated reason (:func:`door_schedule_coverage`), never a
+    fabricated count and never a silent nothing.
 
 Python 3.9 compatible: typing.Optional/List/Dict/Tuple, no ``X | Y`` runtime
 annotations, no walrus in comprehensions.
@@ -1018,6 +1021,79 @@ def door_schedule_to_legend(ds: "DoorSchedule") -> Optional[dict]:
         "rows": rows,
         "_source_pages": list(ds.pages),
     }
+
+
+# ── Honest zero: an input gap is reported as an input gap ────────────────────
+
+
+def door_schedule_coverage(ds: "DoorSchedule", absent_references=()) -> List[dict]:
+    """Coverage records for a door schedule that could NOT produce a quantity.
+
+    Two shapes of input gap, both reported the same way:
+
+    1. **Title present, table absent.** The plan set names a door schedule and
+       the sheet holding it is not in the PDF. Chelsea's 32-page set prints
+       ``DOOR SCHEDULE GENERAL NOTES`` and thirteen ``SEE SCHEDULE`` callouts,
+       and contains no opening-tag table on any page. Its golden asks for 236 /
+       2,378 / 2,687 doors — multifamily per-unit-type numbers that are simply
+       unreachable from this input.
+    2. **Schedule parsed, a referenced sheet absent.** A schedule that prints a
+       per-type multiplier reference the PDF does not contain reports the
+       reference and the absence. It does NOT reconstruct the multiplier —
+       inventing one is the coincidence trap this phase exists to refuse.
+
+    Returns ``[]`` when the schedule produced openings and nothing is missing,
+    which is the case for Bob's, Crow and Moxy.
+
+    The status vocabulary is IMPORTED from :mod:`bobbytailor.pipeline.coverage`
+    (23-01), never redefined here: a second flag shape for the same fact is how a
+    report ends up with two disagreeing accounts of the same gap (D-03).
+    """
+    from bobbytailor.pipeline import coverage as _coverage
+
+    out: List[dict] = []
+    if ds is None:
+        return out
+
+    if ds.titled_pages and ds.openings == 0:
+        pages = _coverage._compact_ranges(list(ds.titled_pages))
+        out.append(_coverage.ItemCoverage(
+            name="Doors (door schedule)",
+            unit="EA",
+            status=_coverage.ITEM_NOT_MEASURED,
+            quantity=None,
+            basis="count",
+            reason=(
+                "a door schedule is referenced on page(s) %s but no parsable "
+                "schedule table exists in this PDF — the sheet holding it is not "
+                "in the file. This is an INPUT gap, not a count of zero." % pages
+            ),
+            expected_from="schedule",
+        ).to_dict())
+
+    for reference in absent_references or ():
+        label = str(reference).strip()
+        if not label:
+            continue
+        out.append(_coverage.ItemCoverage(
+            name="Doors (door schedule)",
+            unit="EA",
+            status=_coverage.ITEM_NEEDS_REVIEW,
+            quantity=float(ds.openings) if ds.openings else None,
+            basis="count",
+            reason=(
+                "the door schedule references %r, which is not in this PDF. The "
+                "scheduled count stands as a lower bound; the per-type multiplier "
+                "it would supply was NOT reconstructed." % label
+            ),
+            expected_from="schedule",
+        ).to_dict())
+    return out
+
+
+def door_schedule_coverage_warnings(ds: "DoorSchedule", absent_references=()) -> List[str]:
+    """Human-readable escalation strings for the records above."""
+    return [record["reason"] for record in door_schedule_coverage(ds, absent_references)]
 
 
 def extract_door_legend_from_pdf(pdf_path: str) -> Optional[dict]:

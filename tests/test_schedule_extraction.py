@@ -26,6 +26,8 @@ from bobbytailor.deterministic.schedule_extraction import (
     _tag_tokens,
     accepted_door_tables,
     canonical_material_code,
+    door_schedule_coverage,
+    door_schedule_coverage_warnings,
     door_schedule_to_legend,
     extract_door_schedule,
     reclassified_panel_counts,
@@ -35,6 +37,9 @@ UPLOADS = os.path.join(os.path.dirname(__file__), os.pardir, "uploads")
 MOXY = os.path.join(UPLOADS, "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf")
 CROW = os.path.join(UPLOADS, "Crow - Cass White Road-Plans.pdf")
 BOBS = os.path.join(UPLOADS, "Bob's Discount Furniture - Kennesaw, GA-plans.pdf")
+CHELSEA = os.path.join(
+    UPLOADS, "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf"
+)
 
 
 # ── Tag tokenisation ──────────────────────────────────────────────────────────
@@ -375,3 +380,78 @@ def test_the_type_plus_count_parser_is_gone():
     from bobbytailor.deterministic import component_library
 
     assert not hasattr(component_library, "_parse_count_door_rows")
+
+
+# ── Honest zero: an input gap is reported as an input gap ─────────────────────
+
+@pytest.mark.skipif(not os.path.exists(CHELSEA), reason="Chelsea plans PDF not present")
+def test_chelsea_reports_zero_with_a_stated_reason():
+    """Chelsea's schedule SHEET is not in the PDF. Zero is correct; silence is not.
+
+    Its golden asks for 236 / 2,378 / 2,687 doors — per-unit-type multifamily
+    numbers unreachable from this input. The difference this test pins is between
+    reporting nothing and reporting that we looked, found the reference, and
+    could not find the table.
+    """
+    doc = _open(CHELSEA)
+    try:
+        ds = extract_door_schedule(doc)
+    finally:
+        doc.close()
+    assert ds.openings == 0
+    assert ds.titled_pages, "Chelsea references a door schedule and must say so"
+    warnings = door_schedule_coverage_warnings(ds)
+    assert len(warnings) == 1
+    for page in ds.titled_pages:
+        assert str(page) in warnings[0]
+    assert "no parsable schedule table" in warnings[0]
+
+
+@pytest.mark.parametrize("pdf", [BOBS, CROW, MOXY])
+def test_a_parsable_schedule_produces_no_coverage_warning(pdf):
+    if not os.path.exists(pdf):
+        pytest.skip(f"{pdf} not present")
+    doc = _open(pdf)
+    try:
+        ds = extract_door_schedule(doc)
+    finally:
+        doc.close()
+    assert ds.openings > 0
+    assert door_schedule_coverage_warnings(ds) == []
+
+
+def test_coverage_records_use_the_shared_item_status_vocabulary():
+    """The status must be IMPORTED from the coverage module, not redefined.
+
+    A second flag shape for the same fact is how a report ends up carrying two
+    disagreeing accounts of one gap (D-03).
+    """
+    from bobbytailor.deterministic.schedule_extraction import DoorSchedule
+    from bobbytailor.pipeline import coverage
+
+    ds = DoorSchedule(openings=0, titled_pages=[1, 18])
+    records = door_schedule_coverage(ds)
+    assert len(records) == 1
+    assert records[0]["status"] == coverage.ITEM_NOT_MEASURED
+    assert records[0]["status"] in coverage.ITEM_STATUSES
+    # None is not zero — the whole point of the 23-03 contract.
+    assert records[0]["quantity"] is None
+    assert "1, 18" in records[0]["reason"]
+
+
+def test_an_absent_referenced_sheet_is_stated_never_reconstructed():
+    """A schedule that parses but references a sheet the PDF lacks says so.
+
+    The scheduled count stands as a LOWER BOUND. Scaling it by a multiplier that
+    is not in the input would be a fabrication, so no multiplier is invented.
+    """
+    from bobbytailor.deterministic.schedule_extraction import DoorSchedule
+    from bobbytailor.pipeline import coverage
+
+    ds = DoorSchedule(openings=40, titled_pages=[7])
+    records = door_schedule_coverage(ds, absent_references=["CS-04 UNIT MATRIX"])
+    assert len(records) == 1
+    assert records[0]["status"] == coverage.ITEM_NEEDS_REVIEW
+    assert records[0]["quantity"] == 40.0
+    assert "CS-04 UNIT MATRIX" in records[0]["reason"]
+    assert "NOT reconstructed" in records[0]["reason"]
