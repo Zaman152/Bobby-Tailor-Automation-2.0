@@ -22,6 +22,13 @@ Usage:
     python3 scripts/coverage_probe.py "uploads/Crow - Cass White Road-Plans.pdf"
     python3 scripts/coverage_probe.py --pdf a.pdf --pdf b.pdf
     python3 scripts/coverage_probe.py --json "uploads/....pdf"
+    python3 scripts/coverage_probe.py --no-veto "uploads/....pdf"
+
+``--no-veto`` disables the skip veto so the report measures CLASSIFICATION
+ALONE. That distinction is the point: the veto (plan 23-01) recovers a sheet
+that a keyword wrongly discarded, so with it switched on a broken classifier
+and a repaired one produce the same headline number. A change to the classifier
+must be graded with the backstop removed, or it is not being graded at all.
 """
 from __future__ import annotations
 
@@ -72,8 +79,14 @@ FOUR_SETS = {
 }
 
 
-def audit_page(doc, index: int) -> Dict[str, Any]:
-    """Replicate the pipeline's routing decisions for one page. Zero API."""
+def audit_page(doc, index: int, no_veto: bool = False) -> Dict[str, Any]:
+    """Replicate the pipeline's routing decisions for one page. Zero API.
+
+    Args:
+        no_veto: when True, the skip veto is not applied, so the reported
+            dispositions describe CLASSIFICATION ALONE. ``classifier_discarded``
+            is reported either way and is never affected by the veto.
+    """
     page = doc[index]
     title_block_text = get_title_block_text(doc, index)
 
@@ -97,9 +110,17 @@ def audit_page(doc, index: int) -> Dict[str, Any]:
     raw_titles = len(plan_titles(page) or [])
     raw_scales = len(extract_printed_scales(page) or [])
 
+    # What the CLASSIFIER alone decided, before the skip veto is consulted.
+    # This column is the one plan 23-06 is graded on: the veto (plan 23-01) is a
+    # backstop, and a gate that measures the backstop cannot tell a repaired
+    # classifier from a broken classifier with a good safety net.
+    classifier_discarded = not passes
+
     overruled = bool(
         not passes and (signal["plan_titles"] > 0 or signal["viewports"] > 0)
     )
+    if no_veto:
+        overruled = False
     effective_type = "floor_plan" if overruled else sheet_type
     skipped = bool(not passes and not overruled)
     deterministic = (not skipped) and effective_type in _DETERMINISTIC_SHEET_TYPES
@@ -140,17 +161,19 @@ def audit_page(doc, index: int) -> Dict[str, Any]:
         "scales": raw_scales,
         "measurable_signal": signal,
         "classifier_overruled": overruled,
+        "classifier_discarded": classifier_discarded,
         "skipped": skipped,
         "disposition": disposition,
         "note": note,
     }
 
 
-def audit_pdf(pdf_path: str) -> Dict[str, Any]:
+def audit_pdf(pdf_path: str, no_veto: bool = False) -> Dict[str, Any]:
     """Audit every page of *pdf_path* and build the ledger it implies."""
     doc = fitz.open(pdf_path)
     try:
-        pages = [audit_page(doc, i) for i in range(doc.page_count)]
+        pages = [audit_page(doc, i, no_veto=no_veto)
+                 for i in range(doc.page_count)]
         page_count = doc.page_count
     finally:
         doc.close()
@@ -176,8 +199,14 @@ def audit_pdf(pdf_path: str) -> Dict[str, Any]:
     return {
         "pdf": pdf_path,
         "page_count": page_count,
+        "no_veto": no_veto,
         "pages": pages,
         "type_histogram": histogram,
+        # Pages the CLASSIFIER discarded, independent of the veto. This is the
+        # column that grades a classification change (D-04).
+        "pages_classifier_discarded": [
+            r["page_index"] for r in pages if r["classifier_discarded"]
+        ],
         "pages_skipped": [r["page_index"] for r in pages if r["skipped"]],
         "pages_overruled": [
             r["page_index"] for r in pages if r["classifier_overruled"]
@@ -210,6 +239,14 @@ def print_report(result: Dict[str, Any]) -> None:
     print("-" * 102)
     print("type histogram (title-block only, i.e. what the pipeline uses): %s"
           % result["type_histogram"])
+    if result.get("no_veto"):
+        print("*** --no-veto: the skip veto is DISABLED, so the counts below "
+              "measure CLASSIFICATION ALONE ***")
+    # Both columns are always printed. The classifier column grades a
+    # classification change; the skipped column grades what the run does.
+    print("pages discarded by classifier: %d  %s"
+          % (len(result["pages_classifier_discarded"]),
+             result["pages_classifier_discarded"]))
     print("pages skipped entirely      : %d  %s"
           % (len(result["pages_skipped"]), result["pages_skipped"]))
     print("pages recovered by the veto : %d  %s"
@@ -236,6 +273,12 @@ def main(argv: List[str]) -> int:
                         help="Plans PDF to audit (repeatable).")
     parser.add_argument("--json", action="store_true",
                         help="Emit machine-readable JSON instead of the table.")
+    parser.add_argument(
+        "--no-veto", action="store_true",
+        help="Disable the skip veto, so the report measures CLASSIFICATION "
+             "ALONE. Use this to grade a classifier change: with the veto on, "
+             "a broken classifier and a repaired one both look fine.",
+    )
     args = parser.parse_args(argv)
 
     targets = list(args.pdf) + list(args.pdfs)
@@ -244,7 +287,7 @@ def main(argv: List[str]) -> int:
     if not targets:
         parser.error("no PDF given and none of the four plan sets are present")
 
-    results = [audit_pdf(t) for t in targets]
+    results = [audit_pdf(t, no_veto=args.no_veto) for t in targets]
 
     if args.json:
         payload = results[0] if len(results) == 1 else results

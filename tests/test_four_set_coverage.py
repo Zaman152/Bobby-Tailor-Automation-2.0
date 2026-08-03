@@ -415,3 +415,143 @@ def test_no_page_fraction_was_changed_to_achieve_any_of_this():
     assert any(x > 0.55 for x, _y in windows[:-1]), (
         "the search must evaluate at least one strictly tighter candidate"
     )
+
+
+# ---------------------------------------------------------------------------
+# Plan 23-06 Task 3 — THE CLASSIFICATION-ALONE GATE (D-04 + D-05)
+#
+# The gate above measures what a RUN does, which is the skip count after the
+# plan 23-01 skip veto has had its say. That is the right number for the run,
+# and the WRONG number for grading a classifier: the veto recovers a sheet a
+# keyword wrongly discarded, so with the veto on, a broken classifier and a
+# repaired one produce the same headline. The assertions below therefore audit
+# with `no_veto=True` — this is the backstop removed, the classifier alone.
+#
+# SOURCE OF THE PRE-CHANGE TABLE: INV-00 §1d, the four-set sweep that proved a
+# width-fraction change fixes Moxy (18 -> 2) and BREAKS Chelsea (2 -> 10,
+# floor plans 9 -> 1, roof plans 5 -> 1). §1d's Chelsea type counts were taken
+# on an older HEAD; the literals below were re-measured on the HEAD immediately
+# before plan 23-06 landed, which is the only baseline a regression test can
+# honestly compare against.
+#
+# EVERY NUMBER HERE IS A COUNT OF PAGES READ OFF THE DRAWINGS. None is fitted
+# to a quantity, a golden take-off or an accuracy score, and none may ever be
+# adjusted to make a total match — that is the documented coincidence trap.
+# ---------------------------------------------------------------------------
+
+# Classifier-discarded pages with the veto disabled.
+#   moxy    <= 2  pages 0 and 1 only: the real cover, and the LIGHTING COVER
+#                 SHEET whose index lists 11 drawing names and carries ZERO
+#                 printed scales. The other 16 are guestroom prototypes.
+#   crow    == 0  nothing to discard; every page classifies to a drawing type.
+#   bobs    == 1  page 0 is a REAL cover sheet (titles=0, scales=0).
+#   chelsea <= 2  documented baseline is 2 (INV-00 §1d); measured 0 today.
+#                 An increase beyond 2 is the 0.88 regression returning.
+MAX_CLASSIFIER_DISCARDED = {"moxy": 2, "crow": 0, "bobs": 1, "chelsea": 2}
+EXACT_CLASSIFIER_DISCARDED = {"crow": 0, "bobs": 1}
+EXPECTED_DISCARDED_PAGES = {"moxy": [0, 1], "crow": [], "bobs": [0]}
+
+# Per-set sheet-type counts measured on the pre-change HEAD. The gate asserts
+# these can only go UP, never down: collapsing plan sheets into some other type
+# is precisely the damage a fraction sweep does, and it is invisible in a skip
+# count because the sheet is still "reaching the report", just not as a plan.
+PRE_CHANGE_TYPE_FLOORS = {
+    # Chelsea is the fixture the 0.55 -> 0.88 sweep destroyed (INV-00 §1d).
+    "chelsea": {"floor_plan": 22, "roof_plan": 4},
+    # Moxy's floor plans must not fall either — the repair must not trade one
+    # misclassification for another.
+    "moxy": {"floor_plan": 13},
+    "crow": {"floor_plan": 1},
+    "bobs": {"floor_plan": 3},
+}
+
+
+@pytest.fixture(scope="module")
+def audits_no_veto():
+    """Audit every available plan set with the skip veto DISABLED."""
+    available = {k: _pdf_path(k) for k in FOUR_SETS if _pdf_path(k).exists()}
+    if not available:
+        pytest.skip("no plan-set fixtures in uploads/")
+    return {k: audit_pdf(str(v), no_veto=True) for k, v in available.items()}
+
+
+def test_classification_alone_does_not_regress_on_any_of_the_four_sets(
+    audits_no_veto,
+):
+    """ONE assertion, all four sets, veto disabled — the D-04 gate.
+
+    Deliberately a single test function: a partial improvement must FAIL, so
+    that fixing Moxy by breaking Chelsea cannot be reported as progress. Every
+    failure is collected before asserting, so one run names every cause.
+    """
+    report = {}
+    failures = []
+
+    for key in ("moxy", "crow", "bobs", "chelsea"):
+        if key not in audits_no_veto:
+            continue
+        result = audits_no_veto[key]
+        discarded = result["pages_classifier_discarded"]
+        histogram = result["type_histogram"]
+        report[key] = {
+            "pages": result["page_count"],
+            "classifier_discarded": discarded,
+            "type_histogram": histogram,
+        }
+
+        assert result["pages_overruled"] == [], (
+            "%s: the veto fired under --no-veto, so this gate is measuring the "
+            "backstop and not the classifier" % key
+        )
+
+        if len(discarded) > MAX_CLASSIFIER_DISCARDED[key]:
+            failures.append(
+                "%s: classifier discarded %d pages %s, limit %d"
+                % (key, len(discarded), discarded,
+                   MAX_CLASSIFIER_DISCARDED[key])
+            )
+        if key in EXACT_CLASSIFIER_DISCARDED and \
+                len(discarded) != EXACT_CLASSIFIER_DISCARDED[key]:
+            failures.append(
+                "%s: classifier discarded %d pages, must be exactly %d"
+                % (key, len(discarded), EXACT_CLASSIFIER_DISCARDED[key])
+            )
+        if key in EXPECTED_DISCARDED_PAGES and \
+                discarded != EXPECTED_DISCARDED_PAGES[key]:
+            failures.append(
+                "%s: the discarded pages are %s, expected %s — a different "
+                "page being dropped is a different defect"
+                % (key, discarded, EXPECTED_DISCARDED_PAGES[key])
+            )
+
+        for sheet_type, floor in PRE_CHANGE_TYPE_FLOORS.get(key, {}).items():
+            actual = histogram.get(sheet_type, 0)
+            if actual < floor:
+                failures.append(
+                    "%s: %s count fell %d -> %d. This is the damage a width "
+                    "fraction sweep does (INV-00 §1d) and it is invisible in a "
+                    "skip count" % (key, sheet_type, floor, actual)
+                )
+
+    assert not failures, (
+        "classification-alone four-plan-set gate FAILED:\n  "
+        + "\n  ".join(failures)
+        + "\n\nfull four-set report: %r" % report
+    )
+
+
+def test_the_veto_has_nothing_left_to_recover(audits):
+    """The measure of the classifier repair: the backstop is now idle.
+
+    Plan 23-01's veto recovered 16 Moxy sheets a keyword had discarded. Plan
+    23-06 removed the reasons the keyword fired, so with the classifier fixed
+    the veto correctly recovers nothing while the same sheets still reach the
+    engine. The veto stays in place for the next drafting office.
+    """
+    result = _require(audits, "moxy")
+    assert result["pages_overruled"] == [], (
+        "the veto is still rescuing pages %s — the classifier repair is "
+        "incomplete and the gate is measuring the backstop"
+        % result["pages_overruled"]
+    )
+    assert result["pages_skipped"] == [0, 1]
