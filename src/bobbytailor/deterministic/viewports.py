@@ -68,6 +68,20 @@ WORD_LINE_GAP_PT = 60.0          # column split inside a text line bucket
 # (1/4" = 1'-0" is fpi 4 — anything smaller is a blow-up detail).
 DETAIL_MAX_FPI = 4.0
 
+# Title band — the strip along a region's VISUAL BOTTOM edge where a drawing's
+# own "N / TITLE / SCALE: x" caption conventionally sits. Measured in PAGE
+# (display) space, so a /Rotate 270 sheet's captions are looked for where a
+# human reading the sheet sees them, not where the unrotated stream puts them.
+#
+# Observed on Crow's A-401 detail sheet (INV-06 §1.5): the STAIR PLAN caption
+# sits 71 pt below its region's bottom edge and the in-drawing note that
+# hijacked the region's kind sits 7 pt above it, so the band must reach both.
+# 45 pt in / 90 pt out clears the 71 pt caption gap with margin while staying
+# well inside the ~190 pt gutter between that region and the drawing below it.
+TITLE_BAND_IN_PT = 45.0
+TITLE_BAND_OUT_PT = 90.0
+TITLE_BAND_SIDE_PT = 40.0
+
 _TITLEISH_RE = re.compile(
     r"\b(PLAN|ELEVATION|SECTION|DETAIL|SCHEDULE|LEGEND|SCALE)\b", re.IGNORECASE
 )
@@ -275,6 +289,81 @@ def _titleish_text_in_bbox(lines: List[Tuple[tuple, str]], bbox) -> str:
         if hits:
             return " / ".join(hits)
     return ""
+
+
+def _page_space_bbox(page, bbox) -> tuple:
+    """*bbox* in PAGE (display) space; the input unchanged when unrotated.
+
+    Delegates to ``room_fill.to_page_space`` — the single rotation transform
+    for the whole engine (D-03). This module does not own a second copy.
+    """
+    if page is None:
+        return tuple(float(v) for v in bbox)
+    try:
+        import fitz  # noqa: PLC0415
+
+        from bobbytailor.deterministic.room_fill import to_page_space
+
+        box = to_page_space(page, fitz.Rect(*bbox))
+        return float(box.x0), float(box.y0), float(box.x1), float(box.y1)
+    except Exception:  # noqa: BLE001 — classification must never raise
+        return tuple(float(v) for v in bbox)
+
+
+def _title_band(bbox, page) -> tuple:
+    """The strip along the region's VISUAL bottom edge, in page space."""
+    x0, _y0, x1, y1 = _page_space_bbox(page, bbox)
+    return (
+        x0 - TITLE_BAND_SIDE_PT,
+        y1 - TITLE_BAND_IN_PT,
+        x1 + TITLE_BAND_SIDE_PT,
+        y1 + TITLE_BAND_OUT_PT,
+    )
+
+
+def _titleish_text_in_band(lines: List[Tuple[tuple, str]], bbox, page) -> str:
+    """Title-ish text in the region's TITLE BAND only.
+
+    A drawing's caption sits at its bottom edge; a note *inside* the drawing
+    does not. Reading the whole region is what let the in-drawing note
+    ``SEE CONC. DOOR OPENING SCHEDULE`` rename Crow's STAIR PLAN into a
+    schedule — masking its geometry out of every measurement AND barring it
+    from owning a printed scale (INV-06 §1.5).
+    """
+    band = _title_band(bbox, page)
+    hits: List[str] = []
+    for lb, text in lines:
+        cx, cy = (lb[0] + lb[2]) / 2.0, (lb[1] + lb[3]) / 2.0
+        px, py, _, _ = _page_space_bbox(page, (cx, cy, cx, cy))
+        if not _point_in_bbox((px, py), band):
+            continue
+        if _TITLEISH_RE.search(text):
+            hits.append(text.strip())
+        if len(hits) >= 3:
+            break
+    return " / ".join(hits)
+
+
+def _band_printed_fpi(anchors, bbox, page) -> Optional[float]:
+    """The single printed scale stated in the region's caption band, if one is.
+
+    A drawing's caption states its scale directly beneath the drawing. A
+    proximity halo around the whole region does NOT distinguish that from a
+    neighbour's callout, which is why this is the only scale evidence allowed
+    to release a region from the table kinds.
+    """
+    band = _title_band(bbox, page)
+    local = [
+        a
+        for a in anchors
+        if _point_in_bbox(
+            _page_space_bbox(page, (a["x"], a["y"], a["x"], a["y"]))[:2], band
+        )
+    ]
+    if not local:
+        return None
+    distinct = sorted({round(a["feet_per_inch"], 6) for a in local})
+    return distinct[0] if len(distinct) == 1 else None
 
 
 # ── Title block detection ─────────────────────────────────────────────────────
@@ -637,7 +726,7 @@ def _segment_viewports_inner(page, table_bboxes: Optional[Sequence]) -> List[Vie
         _claim_leftover_segments(protos, content_segs)
 
     regions = [
-        _make_region(tuple(bbox), method, segs, anchors, lines)
+        _make_region(tuple(bbox), method, segs, anchors, lines, page)
         for bbox, method, segs in protos
     ]
     if not regions:
@@ -717,8 +806,40 @@ def _make_region(
     segs: Sequence[Tuple[float, float, float, float]],
     anchors: Sequence[dict],
     lines: List[Tuple[tuple, str]],
+    page=None,
 ) -> Viewport:
-    """Build a drawing-region Viewport with title text and local printed scale."""
+    """Build a drawing-region Viewport with title text and local printed scale.
+
+    A drawing that merely MENTIONS a schedule must not be classified as one
+    (INV-06 §1.5). This is a shared-path judgement — ``schedule`` and
+    ``legend`` are in ``takeoff_pipeline._MASK_VIEWPORT_KINDS`` AND in
+    ``printed_scale._MASK_KINDS``, so the kind decides both whether the
+    region's geometry is measured at all and whether it may own a printed
+    scale — and a region wrongly promoted OUT of those kinds lets table
+    linework back into wall extraction (T-23-40).
+
+    The table test therefore runs exactly as it always did, over the whole
+    region's text. What is new is a strictly ONE-DIRECTIONAL promotion: a
+    region the old test called a table is released only when its TITLE BAND —
+    the caption strip at its visual bottom edge — carries a DRAWING CAPTION,
+    meaning it both names a PLAN and states a printed scale. That is the
+    signature of "N / TITLE / SCALE: x", and a ruled table does not have one.
+
+    INV-06 §2 step 6 proposed the simpler rule "do not call it a table when it
+    owns a printed drawing scale, because a real table has no drawing scale".
+    Measured on all four plan sets, that rule is FALSE: five genuine schedule
+    regions own one — Crow p1 ``GLASS SCHEDULE`` at 20 ft/in, Bob's A8.1 door
+    schedule at 2.67, Chelsea p0 ``SCHEDULE / SCHEDULE / SCHEDULE`` at 0.33 and
+    two Moxy p15 door-schedule regions at 4.0 — because a schedule shares its
+    sheet with details and the 40 pt proximity halo picks up a neighbour's
+    callout. Promoting on that evidence let 429 LF of Bob's door-schedule table
+    grid into wall extraction. Requiring the scale to sit in the CAPTION BAND,
+    beneath the region and alongside its name, is the same idea located where
+    it is actually reliable.
+
+    Nothing here can newly CREATE a ``schedule`` or ``legend`` region, so no
+    geometry that is measured today can be masked out tomorrow by this code.
+    """
     local = [
         a
         for a in anchors
@@ -737,8 +858,19 @@ def _make_region(
         kind = "legend"
     elif "SCHEDULE" in upper and "PLAN" not in upper:
         kind = "schedule"
-    elif (printed_fpi is not None and printed_fpi < DETAIL_MAX_FPI) or (
-        _DETAILISH_RE.search(title_text) and "PLAN" not in upper
+
+    if kind in ("legend", "schedule"):
+        band_upper = _titleish_text_in_band(lines, bbox, page).upper()
+        band_fpi = _band_printed_fpi(anchors, bbox, page)
+        if "PLAN" in band_upper and band_fpi is not None:
+            kind = "unknown"
+            # The caption that released it IS this region's own scale.
+            if printed_fpi is None:
+                printed_fpi = band_fpi
+
+    if kind == "unknown" and (
+        (printed_fpi is not None and printed_fpi < DETAIL_MAX_FPI)
+        or (_DETAILISH_RE.search(title_text) and "PLAN" not in upper)
     ):
         kind = "detail"
 
