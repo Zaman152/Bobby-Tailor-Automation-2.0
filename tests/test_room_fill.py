@@ -15,8 +15,10 @@ from bobbytailor.deterministic.room_fill import (
     MAX_REGION_SF,
     RoomFillResult,
     flag_implausible_unit,
+    from_page_space,
     measure_enclosed_area,
     select_fill_for_basis,
+    to_page_space,
     total_for_units,
 )
 
@@ -43,6 +45,131 @@ def _page_with_room(width_ft, height_ft, fpp=FPP_QUARTER, wall_pt=2.0, inner=Non
         ix = x0 + inner / fpp
         page.draw_line(fitz.Point(ix, y0), fitz.Point(ix, y1), width=wall_pt)
     return doc, page, fitz.Rect(x0 - 40, y0 - 40, x1 + 40, y1 + 40)
+
+
+# ── page-space transform (23-07 / SP-1 / INV-03 §4.2) ───────────────────────
+#
+# page.get_text and page.get_drawings answer in the UNROTATED mediabox; the
+# rasteriser's clip and every "above/below" judgement live in page.rect. On the
+# real fixtures those are the same space on 76 of 83 pages and 90 degrees apart
+# on the other 7, which is why the bug stayed invisible for so long.
+
+
+def _rotated_page(rot, width=600, height=800):
+    doc = fitz.open()
+    page = doc.new_page(width=width, height=height)
+    page.set_rotation(rot)
+    return doc, page
+
+
+_UNROTATED_CASES = [
+    fitz.Rect(100, 200, 300, 500),
+    fitz.Rect(0, 0, 600, 800),       # the whole page
+    fitz.Rect(0, 0, 10, 10),         # touching the top-left page edge
+    fitz.Rect(590, 790, 600, 800),   # touching the bottom-right page edge
+]
+
+
+@pytest.mark.parametrize("rect", _UNROTATED_CASES)
+def test_to_page_space_is_the_identity_on_an_unrotated_page(rect):
+    """76 of the 83 pages across the four real fixtures are unrotated.
+
+    They must take a LITERALLY unchanged path, not an equal-valued one — this
+    is the whole safety argument for a transform applied at three consumer
+    sites at once (T-23-26). The caller's own object is handed back.
+    """
+    doc, page = _rotated_page(0)
+    out = to_page_space(page, rect)
+    assert out == rect
+    assert out is rect, "the unrotated path must not even rebuild the rectangle"
+    doc.close()
+
+
+def test_to_page_space_maps_the_hand_computed_corners_at_90_degrees():
+    """rot 90 sends (x, y) -> (mediabox_height - y, x)."""
+    doc, page = _rotated_page(90)
+    assert tuple(page.rect) == (0.0, 0.0, 800.0, 600.0)
+    # corners (100,200) and (300,500) -> (800-200, 100) and (800-500, 300)
+    #      = (600, 100) and (300, 300), normalised to (300, 100, 600, 300)
+    out = to_page_space(page, fitz.Rect(100, 200, 300, 500))
+    assert tuple(out) == (300.0, 100.0, 600.0, 300.0)
+    assert out.x0 <= out.x1 and out.y0 <= out.y1, "the result is normalised"
+    doc.close()
+
+
+def test_to_page_space_maps_the_hand_computed_corners_at_270_degrees():
+    """rot 270 sends (x, y) -> (y, mediabox_width - x). Bob's rotation."""
+    doc, page = _rotated_page(270)
+    assert tuple(page.rect) == (0.0, 0.0, 800.0, 600.0)
+    # corners (100,200) and (300,500) -> (200, 600-100) and (500, 600-300)
+    #      = (200, 500) and (500, 300), normalised to (200, 300, 500, 500)
+    out = to_page_space(page, fitz.Rect(100, 200, 300, 500))
+    assert tuple(out) == (200.0, 300.0, 500.0, 500.0)
+    assert out.x0 <= out.x1 and out.y0 <= out.y1
+    doc.close()
+
+
+@pytest.mark.parametrize("rot", [90, 270])
+def test_a_rotation_preserves_area_and_lands_inside_the_displayed_page(rot):
+    """A rotation is rigid: the region measured is the region asked for.
+
+    This is T-23-25's mitigation — a crafted /Rotate cannot make the clip name
+    a bigger region than the caller did.
+    """
+    doc, page = _rotated_page(rot)
+    for rect in _UNROTATED_CASES:
+        out = to_page_space(page, rect)
+        assert (out.x1 - out.x0) * (out.y1 - out.y0) == pytest.approx(
+            (rect.x1 - rect.x0) * (rect.y1 - rect.y0)
+        )
+        assert out in page.rect or page.rect.intersect(out) == out, (
+            "the mapped clip stays on the displayed page"
+        )
+    doc.close()
+
+
+@pytest.mark.parametrize("rot", [0, 90, 180, 270])
+def test_from_page_space_is_the_exact_inverse(rot):
+    doc, page = _rotated_page(rot)
+    for rect in _UNROTATED_CASES:
+        assert tuple(from_page_space(page, to_page_space(page, rect))) == tuple(rect)
+    doc.close()
+
+
+def test_the_transform_never_raises_on_a_page_that_cannot_answer():
+    """A test stub or a defective file must degrade to today's behaviour."""
+    class _Stub:
+        pass
+
+    class _Liar:
+        rotation = 90
+        rotation_matrix = "not a matrix"
+        derotation_matrix = None
+
+    rect = fitz.Rect(1, 2, 3, 4)
+    assert to_page_space(_Stub(), rect) is rect
+    assert to_page_space(_Liar(), rect) is rect
+    assert from_page_space(_Liar(), rect) is rect
+    assert to_page_space(None, rect) is rect
+
+
+def test_the_raster_clip_renders_the_named_region_on_a_rotated_page():
+    """The engine's own bug, on a synthetic page with a known answer.
+
+    A 20' x 15' room is drawn at 1/4"=1'-0" and the page is then rotated 90
+    degrees. The clip is in drawing space, exactly as every caller's is. Before
+    this change the raw rectangle went to the rasteriser and the room was lost;
+    the measurement must now be the same 300 SF the unrotated page yields,
+    because rotating the sheet does not resize the room.
+    """
+    doc, page, clip = _page_with_room(20.0, 15.0)
+    flat = measure_enclosed_area(page, clip, FPP_QUARTER)
+    assert flat is not None and flat.area_sf == pytest.approx(300.0, rel=0.06)
+    page.set_rotation(90)
+    turned = measure_enclosed_area(page, clip, FPP_QUARTER)
+    assert turned is not None, "a rotated sheet measured NOTHING before this change"
+    assert turned.area_sf == pytest.approx(flat.area_sf, rel=0.02)
+    doc.close()
 
 
 def test_measures_a_known_room_area():

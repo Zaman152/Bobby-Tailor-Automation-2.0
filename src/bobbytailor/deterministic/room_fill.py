@@ -112,6 +112,78 @@ class RoomFillResult:
         }
 
 
+def _rect(value):
+    """``fitz.Rect(value)``, or ``None`` when fitz is missing or value is bad."""
+    try:
+        import fitz  # noqa: PLC0415 — optional at import time for test stubs
+
+        return fitz.Rect(value)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def to_page_space(page, rect):
+    """Map *rect* from DRAWING space into PAGE (display) space.
+
+    ``page.get_text(...)`` and ``page.get_drawings()`` report coordinates in the
+    page's UNROTATED space (the mediabox), but ``page.get_pixmap(clip=…)`` — and
+    every "which drawing sits above this label" judgement a human makes reading
+    the sheet — live in ``page.rect``, which is the ROTATED one. On a sheet with
+    ``/Rotate 270`` those are different spaces: Bob's page 4 has
+    ``page.rect = 3024 x 2160`` while its drawings span ``y 99..2972``, i.e. the
+    drawing's own y exceeds the display height. Handing such a rectangle to the
+    rasteriser renders the wrong region, or nothing at all.
+
+    This is the SINGLE implementation of that mapping for the whole engine.
+    ``page.rotation_matrix`` is the identity on an unrotated page, so this
+    function returns the caller's own object untouched there — 76 of the 83
+    pages across the four real fixtures are unrotated and take a literally
+    unchanged path. It never raises: a page object that cannot answer (a test
+    stub, a defective file) yields the input unchanged, which is exactly
+    today's behaviour.
+
+    :func:`from_page_space` is its exact inverse.
+    """
+    return _map_rect(page, rect, "rotation_matrix")
+
+
+def from_page_space(page, rect):
+    """Map *rect* from PAGE (display) space back into DRAWING space.
+
+    The inverse of :func:`to_page_space`, via ``page.derotation_matrix``. A
+    caller that REASONS in page space (because "above" only means anything as
+    the sheet is read) but must hand the result to an API speaking drawing
+    space needs this direction; without it the coordinate space would have to
+    be re-derived at each such site, which is the duplication D-03 forbids.
+    Identity on an unrotated page, and never raises.
+    """
+    return _map_rect(page, rect, "derotation_matrix")
+
+
+def _map_rect(page, rect, matrix_attr: str):
+    """Shared body of :func:`to_page_space` / :func:`from_page_space`."""
+    try:
+        rotation = int(getattr(page, "rotation", 0) or 0) % 360
+    except Exception:  # noqa: BLE001
+        return rect
+    if rotation == 0:
+        # The matrix is the identity here, so the mapping is a no-op by
+        # construction. Returning the caller's own object rather than a
+        # rebuilt one keeps the unrotated majority BYTE-identical instead of
+        # merely equal.
+        return rect
+    matrix = getattr(page, matrix_attr, None)
+    if matrix is None:
+        return rect
+    box = _rect(rect)
+    if box is None:
+        return rect
+    try:
+        return box * matrix
+    except Exception:  # noqa: BLE001
+        return rect
+
+
 def plan_titles(page) -> List[tuple]:
     """[(plan_name, plan_kind, bbox), ...] for every '<NAME> - <KIND> PLAN' label."""
     out: List[tuple] = []
@@ -218,7 +290,17 @@ def measure_enclosed_area(
 
     Args:
         page:            a PyMuPDF page.
-        clip:            ``fitz.Rect`` bounding ONE drawing viewport.
+        clip:            ``fitz.Rect`` bounding ONE drawing viewport, in
+            DRAWING space — the space ``page.get_text`` and
+            ``page.get_drawings`` report, which is where every caller's
+            rectangle comes from. It is mapped through :func:`to_page_space`
+            before rendering, because the rasteriser speaks ``page.rect``. On
+            an unrotated page the two spaces are identical and nothing moves;
+            on a rotated one this is the difference between rendering the
+            drawing and rendering blank paper (INV-03 §4.2). A caller holding a
+            rectangle it computed in PAGE space must map it back with
+            :func:`from_page_space` first, so this function has exactly one
+            contract and no caller can pick the wrong one.
         feet_per_point:  that viewport's OWN scale (never a project default).
         dpi:             render resolution.
         candidate_id:    id carried onto the result for fusion binding.
@@ -241,7 +323,14 @@ def measure_enclosed_area(
     try:
         import fitz  # noqa: PLC0415 — optional at import time for test stubs
 
-        pix = page.get_pixmap(clip=clip, dpi=dpi, colorspace=fitz.csGRAY)
+        # The rasteriser's clip is in page.rect space; the caller's rectangle
+        # came from get_text/get_drawings, which is the mediabox. Identical on
+        # an unrotated page, 90 degrees apart on a rotated one. get_pixmap
+        # still intersects the mapped clip with the page rectangle itself, so
+        # a rotation cannot widen the rendered region (T-23-27).
+        pix = page.get_pixmap(
+            clip=to_page_space(page, clip), dpi=dpi, colorspace=fitz.csGRAY
+        )
     except Exception as exc:  # noqa: BLE001 — a defective page must not kill a run
         logger.debug("room_fill: render failed for %s: %s", candidate_id, exc)
         return None
