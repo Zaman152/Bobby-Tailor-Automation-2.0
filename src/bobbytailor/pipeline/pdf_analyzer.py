@@ -539,4 +539,9 @@ def run_pdf_analysis(
         cross_references=cross_refs, manifest=manifest,
         learned=pipeline.learned_context,
         library=getattr(pipeline, "_project_vocabulary", None),
+        # Without these two the ledger this function built, and every drop
+        # record the pipeline wrote into it, would exist only in memory: the
+        # run would KNOW what it failed to measure and no artifact would say so.
+        coverage=ledger,
+        source_pdf=pdf_path,
     )

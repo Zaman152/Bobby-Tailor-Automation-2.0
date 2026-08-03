@@ -1,9 +1,30 @@
-"""Reporter wiring for Phase 16 outputs + 21-13 provenance/scale surfacing."""
+"""Reporter wiring for Phase 16 outputs + 21-13 provenance/scale surfacing.
+
+23-17 adds the client-facing half of the flagged-zero contract: the coverage
+ledger the pipeline fills (23-01/23-03) becomes report fields, ``coverage.json``,
+a COVERAGE section in ``summary.txt`` and a provenance column in the CSV.
+
+The load-bearing property under test throughout is negative: **a blank must
+never spell as a zero**, in any artifact a client bids from.
+"""
 import json
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
+from bobbytailor.pipeline.coverage import (
+    DrawingCoverage,
+    ERRORED,
+    EXCLUDED_OFF_SCALE,
+    ITEM_MEASURED,
+    ITEM_NOT_MEASURED,
+    ItemCoverage,
+    CoverageLedger,
+    MEASURED,
+    NOT_APPLICABLE,
+    SKIPPED_CLASSIFIER,
+    SKIPPED_NO_SCALE,
+)
 from bobbytailor.pipeline.reporter import generate_report
 
 
@@ -219,3 +240,372 @@ def test_summary_txt_includes_linkage_sections():
             assert "[RESOLVED]" in text
         finally:
             config.OUTPUT_DIR = old
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 23-17: the coverage ledger reaches the client artifacts
+# ─────────────────────────────────────────────────────────────────────────────
+
+# The report's exact shape at the commit BEFORE 23-17, captured by generating a
+# report from BASELINE_EXTRACTED on that code. It is the pin for T-23-70: a new
+# field must never break an existing consumer, and the cheapest proof is that a
+# report generated WITHOUT a ledger has not grown a single key.
+PRE_23_TOP_LEVEL_KEYS = [
+    "project_name", "folder_id", "generated_at", "sheets_processed",
+    "total_line_items", "total_calculated_items", "api_usage", "budget",
+    "fusion_rejected", "calculated_takeoff", "takeoff_summary",
+    "takeoff_summary_base", "specification_tables", "cross_references",
+    "linked_sheets_added", "linked_sheets_suggested", "linked_sheets_added_count",
+    "linked_sheets_suggested_count", "screenshots_dir", "raw_line_items",
+    "by_sheet", "by_category", "by_table", "sheet_log", "scale_calibration",
+    "sheet_assets", "_files", "_run_folder_name",
+]
+
+PRE_23_FILE_KEYS = [
+    "run_folder", "json", "raw_csv", "calculated_csv", "takeoff_summary_csv",
+    "summary_txt", "spec_tables_json", "scale_calibration_json",
+]
+
+# Pre-23 sheet_log entry keys. 23-17 adds exactly ONE — `error` — because the
+# same task repairs INV-08 §2 row S11 (an errored sheet rendered as `type=None`
+# with zero items, indistinguishable from a sheet that held nothing).
+PRE_23_SHEET_LOG_KEYS = [
+    "sheet", "page_id", "type", "title", "scale", "scale_parsed", "geometry",
+    "measurements", "components", "rooms", "materials", "schedules",
+    "confidence", "notes", "tokens_in", "tokens_out", "cost_usd", "model_used",
+    "measurement_mode", "scale_confidence", "main_plan_region",
+]
+
+# summary.txt rendered from BASELINE_EXTRACTED on the commit before 23-17, with
+# only the timestamp line masked. Byte-identical means byte-identical.
+PRE_23_SUMMARY_TXT = """\
+══════════════════════════════════════════════════════════════════════
+QUANTITY TAKEOFF SUMMARY
+══════════════════════════════════════════════════════════════════════
+Project:          Baseline Proj
+Generated:        <ts>
+Sheets analyzed:  1
+Raw items:        1
+Calculated items: 0
+
+──────────────────────────────────────────────────────────────────────
+API USAGE & COST
+──────────────────────────────────────────────────────────────────────
+Total cost:       $0.0200 USD
+Input tokens:     10
+Output tokens:    5
+Cost per sheet:   $0.0200 USD
+
+──────────────────────────────────────────────────────────────────────
+SCALE CONFIDENCE
+──────────────────────────────────────────────────────────────────────
+  (no per-viewport scale data recorded)
+
+──────────────────────────────────────────────────────────────────────
+PROVENANCE BREAKDOWN
+──────────────────────────────────────────────────────────────────────
+  geometry               1 items
+  Geometry/text-derived quantities: 1/1 (100.0% of provenance-tagged items)
+
+──────────────────────────────────────────────────────────────────────
+SHEET-BY-SHEET LOG (source traceability)
+──────────────────────────────────────────────────────────────────────
+  [A-101.png                          ] type=floor_plan     meas=  0 comp=  1 rooms=  0 mat=  0 conf=?
+
+──────────────────────────────────────────────────────────────────────
+RAW ITEMS BY CATEGORY
+──────────────────────────────────────────────────────────────────────
+  COMPONENT           1 items
+
+──────────────────────────────────────────────────────────────────────
+CALCULATED TAKEOFF BY ESTIMATION TABLE
+──────────────────────────────────────────────────────────────────────
+
+──────────────────────────────────────────────────────────────────────
+DETAILED CALCULATED TAKEOFF (with sources)
+──────────────────────────────────────────────────────────────────────
+
+──────────────────────────────────────────────────────────────────────
+RAW DIMENSIONAL MEASUREMENTS (by sheet)
+──────────────────────────────────────────────────────────────────────"""
+
+
+def _baseline_extracted() -> list:
+    """The fixed input the pre-23 baseline above was captured from."""
+    return [{
+        "_source_sheet": "A-101.png",
+        "_sheet_name": "A-101",
+        "sheet_type": "floor_plan",
+        "_tokens_in": 10, "_tokens_out": 5, "_cost_usd": 0.02,
+        "components": [{"name": "CMU Wall", "quantity": 100.0, "unit": "SF",
+                        "provenance": "geometry", "confidence": "high"}],
+    }]
+
+
+def _cmu_estimate() -> list:
+    """One calculated item, so the run publishes a real MEASURED take-off row."""
+    return [{
+        "item_type": "masonry",
+        "description": "CMU Wall",
+        "quantity": 100.0,
+        "unit": "SF",
+        "source_sheet": "A-101",
+        "table_used": "masonry",
+    }]
+
+
+def _mask_timestamp(text: str) -> str:
+    return "\n".join(
+        "Generated:        <ts>" if line.startswith("Generated:") else line
+        for line in text.split("\n")
+    )
+
+
+def _three_page_ledger() -> CoverageLedger:
+    """A ledger shaped like a real run: one measured page, one silently lost
+    page, one genuine cover sheet.
+
+    Page 1 is the whole point of INV-08: classified as carrying no take-off
+    content while holding six scaled plan drawings. It must NOT be reported as
+    a page with nothing on it.
+    """
+    led = CoverageLedger(pages_in_source=3)
+    led.register_page(
+        0,
+        sheet_name="A-101",
+        sheet_type="floor_plan",
+        disposition=MEASURED,
+        measurable_signal={"plan_titles": 2, "printed_scales": 2},
+        drawings=[
+            DrawingCoverage(region_id="R1", title="KING A - RCP PLAN",
+                            plan_kind="RCP", disposition=MEASURED, area_sf=229.4),
+            DrawingCoverage(region_id="R2", title="KING A - FC PLAN",
+                            plan_kind="FC", disposition=SKIPPED_NO_SCALE,
+                            reason="no printed scale beneath the title"),
+            DrawingCoverage(region_id="R3", title="TYPICAL S.C.C.P. DETAIL",
+                            disposition=EXCLUDED_OFF_SCALE,
+                            reason="printed scale differs from the page scale "
+                                   "— measuring it here would be 60x wrong"),
+        ],
+    )
+    led.register_page(
+        1,
+        sheet_name="A-102",
+        sheet_type="title_sheet",
+        classifier_keyword="COVER",
+        classifier_context='LABEL ON THE LIGHT SWITCH COVER PLATE INDICATING',
+        disposition=SKIPPED_CLASSIFIER,
+        reason="classified title_sheet",
+        measurable_signal={"plan_titles": 6, "printed_scales": 10},
+    )
+    led.register_page(
+        2,
+        sheet_name="CS-00",
+        sheet_type="title_sheet",
+        disposition=NOT_APPLICABLE,
+        reason="cover sheet — no take-off content",
+        measurable_signal={"plan_titles": 0, "printed_scales": 0},
+    )
+    return led
+
+
+def test_a_report_with_no_ledger_is_shaped_exactly_as_before(tmp_path):
+    """T-23-70: every coverage field is additive AND absent without a ledger.
+
+    A pre-23 caller (the scraper path) must be able to keep calling
+    generate_report with no idea this feature exists.
+    """
+    with _isolated_output_dir():
+        report = generate_report("Baseline Proj", _baseline_extracted(), [])
+
+        assert list(report.keys()) == PRE_23_TOP_LEVEL_KEYS
+        assert list(report["_files"].keys()) == PRE_23_FILE_KEYS
+        for key in ("coverage", "coverage_ledger", "item_coverage",
+                    "coverage_warnings", "pages_in_source", "source_pdf"):
+            assert key not in report
+
+        run_dir = Path(report["_files"]["run_folder"])
+        assert not (run_dir / "coverage.json").exists()
+
+        with open(run_dir / "takeoff.json") as f:
+            on_disk = json.load(f)
+        assert "coverage" not in on_disk
+        assert "coverage_ledger" not in on_disk
+
+
+def test_a_report_with_no_ledger_renders_the_pre_change_summary_byte_for_byte():
+    with _isolated_output_dir():
+        report = generate_report("Baseline Proj", _baseline_extracted(), [])
+        text = Path(report["_files"]["summary_txt"]).read_text()
+        assert _mask_timestamp(text) == PRE_23_SUMMARY_TXT
+        assert "COVERAGE" not in text
+
+
+def test_the_ledger_becomes_five_additive_report_fields():
+    with _isolated_output_dir():
+        report = generate_report(
+            "Ledger Proj", _baseline_extracted(), [],
+            coverage=_three_page_ledger(),
+            source_pdf="uploads/Ledger Proj-Plans.pdf",
+        )
+
+        cov = report["coverage"]
+        assert cov["pages_in_source"] == 3
+        assert cov["sheets_measured"] == 1
+        assert cov["sheets_skipped"] == 1
+        assert cov["sheets_not_applicable"] == 1
+        assert cov["drawings_dropped_no_scale"] == 1
+        assert cov["drawings_excluded_off_scale"] == 1
+        # The alarm: a page discarded although it carries measurable drawings.
+        assert cov["silent_loss_pages"] == [1]
+
+        # THE invariant (INV-08 §3.1): one ledger row per page of the SOURCE
+        # PDF — not per processed sheet. The run above processed ONE sheet.
+        assert len(report["coverage_ledger"]) == cov["pages_in_source"] == 3
+        assert report["pages_in_source"] == 3
+        assert report["sheets_processed"] == 1, (
+            "sheets_processed must keep exactly the meaning it has always had; "
+            "pages_in_source is what makes the difference legible"
+        )
+        assert {r["page_index"] for r in report["coverage_ledger"]} == {0, 1, 2}
+        assert all(r["disposition"] for r in report["coverage_ledger"])
+
+        assert any("were NOT measured" in w for w in report["coverage_warnings"])
+        assert report["source_pdf"] == "uploads/Ledger Proj-Plans.pdf"
+
+
+def test_item_coverage_carries_a_row_for_an_item_that_was_never_measured():
+    """The unfound items are the point — absence cannot be classified later."""
+    extracted = _baseline_extracted()
+    extracted[0]["_item_coverage"] = [ItemCoverage(
+        name="Gyp Ceiling",
+        unit="SF",
+        status=ITEM_NOT_MEASURED,
+        quantity=None,
+        basis="ceiling_area",
+        reason="no RCP plan drawing was measured on this sheet",
+        expected_from="vocabulary",
+    )]
+    with _isolated_output_dir():
+        report = generate_report(
+            "Ledger Proj", extracted, _cmu_estimate(),
+            coverage=_three_page_ledger(),
+        )
+        rows = {r["name"]: r for r in report["item_coverage"]}
+
+        assert rows["Gyp Ceiling"]["status"] == ITEM_NOT_MEASURED
+        assert rows["Gyp Ceiling"]["quantity"] is None, "never 0.0 as a stand-in"
+
+        assert rows["CMU Wall"]["status"] == ITEM_MEASURED
+        assert rows["CMU Wall"]["quantity"] == 100.0
+
+        # The counts a client reads must agree with the rows underneath them.
+        assert report["coverage"]["items_not_measured"] == 1
+        assert report["coverage"]["items_measured"] == 1
+
+
+def test_a_published_row_is_never_contradicted_by_a_sheet_record():
+    """23-03 deviation 1's precedent: telling a client an item was not measured
+    two rows below its measurement is worse than the silence being fixed."""
+    extracted = _baseline_extracted()
+    extracted[0]["_item_coverage"] = [ItemCoverage(
+        name="cmu  WALL", unit="SF", status=ITEM_NOT_MEASURED, quantity=None,
+    )]
+    with _isolated_output_dir():
+        report = generate_report(
+            "Ledger Proj", extracted, _cmu_estimate(),
+            coverage=_three_page_ledger(),
+        )
+        names = [
+            " ".join(str(r["name"]).split()).lower()
+            for r in report["item_coverage"]
+        ]
+        assert names.count("cmu wall") == 1
+        published = next(r for r in report["item_coverage"] if r["name"] == "CMU Wall")
+        assert published["status"] == ITEM_MEASURED
+        assert published["quantity"] == 100.0
+
+
+def test_generate_report_never_mutates_the_ledger_it_was_handed():
+    ledger = _three_page_ledger()
+    with _isolated_output_dir():
+        generate_report("Ledger Proj", _baseline_extracted(), [], coverage=ledger)
+        generate_report("Ledger Proj", _baseline_extracted(), [], coverage=ledger)
+    assert ledger.items == [], "the pipeline's record is read, never written to"
+
+
+def test_an_errored_sheet_carries_its_message_and_its_type():
+    """INV-08 §2 row S11: the error dict sets `_sheet_type`, and the sheet log
+    read `sheet_type`, so a failed sheet rendered as a typeless empty row."""
+    errored = [{
+        "error": "PDF page 4 raised RuntimeError: bad xref",
+        "measurement_mode": "vector",
+        "_source_sheet": "A-104.png",
+        "_sheet_name": "A-104",
+        "_sheet_type": "floor_plan",
+        "_tokens_in": 0, "_tokens_out": 0, "_cost_usd": 0.0,
+    }]
+    with _isolated_output_dir():
+        report = generate_report("Errored Proj", errored, [])
+        entry = report["sheet_log"][0]
+        assert entry["type"] == "floor_plan"
+        assert entry["error"] == "PDF page 4 raised RuntimeError: bad xref"
+
+        text = Path(report["_files"]["summary_txt"]).read_text()
+        assert "type=floor_plan" in text
+        assert "type=?" not in text
+
+        # Exactly one additive key, and no existing key renamed or dropped.
+        assert list(entry.keys()) == (
+            PRE_23_SHEET_LOG_KEYS[:3] + ["error"] + PRE_23_SHEET_LOG_KEYS[3:]
+        )
+
+
+def test_coverage_json_is_written_registered_and_round_trips_the_summary():
+    with _isolated_output_dir():
+        report = generate_report(
+            "Ledger Proj", _baseline_extracted(), [],
+            coverage=_three_page_ledger(),
+            source_pdf="uploads/Ledger Proj-Plans.pdf",
+        )
+        path = Path(report["_files"]["coverage_json"])
+        assert path.name == "coverage.json"
+        assert path.parent == Path(report["_files"]["run_folder"])
+
+        doc = json.loads(path.read_text())
+        assert doc["summary"] == report["coverage"]
+        assert doc["warnings"] == report["coverage_warnings"]
+        assert doc["sheets"] == report["coverage_ledger"]
+        assert doc["items"] == report["item_coverage"]
+        assert doc["source_pdf"] == "uploads/Ledger Proj-Plans.pdf"
+        # The one-line acceptance, readable from the artifact alone.
+        assert len(doc["sheets"]) == doc["summary"]["pages_in_source"]
+
+
+def test_a_discarded_measurement_is_escalated_not_logged():
+    """A room fill that was MEASURED and then thrown away is the worst case:
+    the run knew the number and no artifact said so."""
+    extracted = _baseline_extracted()
+    extracted[0]["_coverage_notes"] = [
+        "5 room fills measured (1,200.0 SF) but no vocabulary item has an area "
+        "basis — the measurements were discarded",
+    ]
+    with _isolated_output_dir():
+        report = generate_report(
+            "Ledger Proj", extracted, [], coverage=_three_page_ledger(),
+        )
+        assert any(
+            "the measurements were discarded" in w and "[A-101]" in w
+            for w in report["coverage_warnings"]
+        )
+
+
+def test_an_errored_page_is_reported_as_errored_not_as_zero():
+    led = CoverageLedger(pages_in_source=1)
+    led.register_page(0, sheet_name="A-104", disposition=ERRORED,
+                      reason="RuntimeError: bad xref")
+    with _isolated_output_dir():
+        report = generate_report("Errored Proj", [], [], coverage=led)
+        assert report["coverage"]["sheets_errored"] == 1
+        assert any("errored" in w and "not zero" in w
+                   for w in report["coverage_warnings"])

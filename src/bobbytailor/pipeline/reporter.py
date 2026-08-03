@@ -14,6 +14,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from bobbytailor.config import OUTPUT_DIR
+from bobbytailor.pipeline.coverage import CoverageLedger, ItemCoverage
+from bobbytailor.pipeline.provenance import provenance_of_row
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +29,10 @@ def generate_report(project_name: str,
                     manifest=None,
                     screenshots_dir: Optional[str] = None,
                     learned=None,
-                    library=None) -> dict:
+                    library=None,
+                    *,
+                    coverage: Optional[CoverageLedger] = None,
+                    source_pdf: Optional[str] = None) -> dict:
     """
     Build the final takeoff report.
 
@@ -44,6 +49,25 @@ def generate_report(project_name: str,
         learned: Optional bobbytailor.learning.retrieval.LearnedContext — the
                  run's retrieved learning bundle (21-16, V3-LEARN-02/03).
                  Threads learned vocabulary into aggregation naming.
+        coverage: KEYWORD-ONLY, default None. The run's CoverageLedger
+                  (INV-08 / 23-01): one row per PAGE OF THE SOURCE PDF, plus the
+                  per-drawing drop records the pipeline wrote. Supplying it adds
+                  the five additive coverage fields, writes ``coverage.json``
+                  into the run folder and renders the COVERAGE section of
+                  ``summary.txt``. Passing None renders EXACTLY as a pre-23
+                  report: no new key appears anywhere, so a pre-23 caller (the
+                  scraper path) is untouched.
+        source_pdf: KEYWORD-ONLY, default None. Path of the PDF this report was
+                    built from. generate_report has no record of its own input
+                    today, which is itself a provenance gap — it is what makes
+                    the ledger-completeness assertion (ledger length == source
+                    page count == the PDF's own page count) checkable from the
+                    artifact alone. Omitted from the report when not supplied.
+
+    A blank is NOT a zero. Everything the coverage argument adds exists so the
+    report can state what the run did NOT measure; the report has always been a
+    complete account of what WAS found and a total silence about the rest
+    (INV-08 §2 closing note).
     """
     all_estimates = all_estimates or []
 
@@ -145,7 +169,15 @@ def generate_report(project_name: str,
             {
                 "sheet": d.get("_source_sheet"),
                 "page_id": d.get("_page_id"),
-                "type": d.get("sheet_type"),
+                # The per-sheet error dict sets `_sheet_type`, not `sheet_type`
+                # (takeoff_pipeline._error_result), so an errored sheet used to
+                # render as `type=None` with zero items — indistinguishable from
+                # a sheet that genuinely held nothing (INV-08 §2 row S11).
+                "type": d.get("sheet_type") or d.get("_sheet_type"),
+                # None on every healthy sheet; the exception text on a degraded
+                # one. A sheet that FAILED and a sheet that found nothing are
+                # different facts and must not render alike.
+                "error": d.get("error"),
                 "title": d.get("sheet_title"),
                 "scale": d.get("scale"),
                 "scale_parsed": _parsed_scale(d.get("scale")),
@@ -169,6 +201,21 @@ def generate_report(project_name: str,
             for d in all_extracted
         ],
     }
+
+    # ── Coverage ledger surfacing (23-17, INV-08 §3.3) ───────────────────────
+    # Five ADDITIVE fields, and not one of them appears when the run carried no
+    # ledger: a pre-23 report must still be a valid, unchanged report.
+    report_ledger = _coverage_for_report(coverage, all_extracted, takeoff_summary)
+    if report_ledger is not None:
+        report["coverage"] = report_ledger.summary()
+        # One row per PAGE OF THE SOURCE PDF — not per processed sheet. That is
+        # the whole invariant: len(coverage_ledger) == pages_in_source.
+        report["coverage_ledger"] = [s.to_dict() for s in report_ledger.sheets]
+        report["item_coverage"] = [i.to_dict() for i in report_ledger.items]
+        report["coverage_warnings"] = _coverage_warnings(report_ledger, all_extracted)
+        report["pages_in_source"] = report_ledger.pages_in_source
+    if source_pdf:
+        report["source_pdf"] = str(source_pdf)
 
     # Scale calibration — per-sheet drawing scale + scale-independent raw geometry
     # so the Results "Scale & Verify" module can recompute measured quantities
@@ -196,6 +243,27 @@ def generate_report(project_name: str,
             json.dump(scale_calibration, f, indent=2)
     except Exception as e:
         logger.error(f"Failed to write scale_calibration.json: {e}")
+
+    # coverage.json — the record of what the run did NOT measure, as its own
+    # artifact so it can be read (and diffed run to run) without parsing the
+    # whole take-off. Written only when a ledger was supplied.
+    coverage_json = run_dir / "coverage.json"
+    coverage_written = False
+    if report_ledger is not None:
+        try:
+            with open(coverage_json, "w") as f:
+                json.dump({
+                    "project_name": project_name,
+                    "generated_at": report["generated_at"],
+                    "source_pdf": str(source_pdf) if source_pdf else "",
+                    "summary": report["coverage"],
+                    "warnings": report["coverage_warnings"],
+                    "sheets": report["coverage_ledger"],
+                    "items": report["item_coverage"],
+                }, f, indent=2)
+            coverage_written = True
+        except Exception as e:
+            logger.error(f"Failed to write coverage.json: {e}")
 
     # Save each output file independently so one failure doesn't kill the others
     try:
@@ -249,8 +317,135 @@ def generate_report(project_name: str,
         "spec_tables_json": str(spec_json) if specification_tables else None,
         "scale_calibration_json": str(calib_json),
     }
+    if coverage_written:
+        # Registered only when it exists: a pre-23 report's files map keeps its
+        # exact pre-change shape, and a consumer that finds the key can trust it.
+        report["_files"]["coverage_json"] = str(coverage_json)
     report["_run_folder_name"] = run_dir.name
     return report
+
+
+# ─── Coverage ledger → report (23-17, INV-08 §3.3) ───────────────────────────
+
+def _item_coverage_records(all_extracted: list) -> List[ItemCoverage]:
+    """Every ItemCoverage the pipeline recorded on a sheet, in sheet order.
+
+    Fusion writes an explicit NOT MEASURED record when no drawing of the right
+    discipline was measured for an item's basis (23-03). Those records are the
+    only account of an item that produced no published row at all, which is
+    precisely the defect — absence cannot be classified after the fact.
+    """
+    out: List[ItemCoverage] = []
+    for d in all_extracted or []:
+        if not isinstance(d, dict):
+            continue
+        for rec in d.get("_item_coverage") or []:
+            if isinstance(rec, ItemCoverage):
+                out.append(rec)
+            elif isinstance(rec, dict) and rec.get("name"):
+                out.append(ItemCoverage(**{
+                    k: v for k, v in rec.items()
+                    if k in ItemCoverage.__dataclass_fields__
+                }))
+    return out
+
+
+def _norm_item_key(name: Any) -> str:
+    return " ".join(str(name or "").split()).lower()
+
+
+def _coverage_for_report(coverage: Optional[CoverageLedger],
+                         all_extracted: list,
+                         takeoff_summary: list) -> Optional[CoverageLedger]:
+    """A REPORTING COPY of the run's ledger, with one item row per expected item.
+
+    Returns None when the run carried no ledger, which is what keeps a pre-23
+    report byte-identical.
+
+    Why a copy: ``generate_report`` must never mutate the ledger the pipeline
+    still holds — calling it twice with the same ledger would otherwise double
+    every item row. ``sheets`` is shared by reference (those rows are the
+    pipeline's record and are only ever read here); ``items`` is a new list.
+
+    Item rows come from two places, in this order:
+
+    1. **The published take-off rows.** They are the artifact a client actually
+       reads, and 23-03 already made them complete — an expected item that was
+       never measured has a row with ``quantity=None`` and provenance
+       ``NOT MEASURED``.
+    2. **Records the run made that never became a published row.** Deduplicated
+       against (1) by name, so the report can never say NOT MEASURED two rows
+       below the measurement of the same thing — 23-03 deviation 1 is the
+       precedent: contradicting yourself is worse than the silence being fixed.
+    """
+    if coverage is None:
+        return None
+
+    led = CoverageLedger(
+        pages_in_source=coverage.pages_in_source,
+        sheets=coverage.sheets,
+        items=[],
+    )
+
+    seen = set()
+    for row in takeoff_summary or []:
+        if not isinstance(row, dict):
+            continue
+        name = row.get("item")
+        key = _norm_item_key(name)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        quantity = row.get("quantity")
+        led.add_item(ItemCoverage(
+            name=str(name),
+            unit=str(row.get("unit") or ""),
+            # Read from the record. provenance_of_row is the ONE place that
+            # decides this vocabulary, and it is only consulted here for a row
+            # the aggregator has not already classified (a pre-23 row).
+            status=str(row.get("provenance") or provenance_of_row(row)),
+            quantity=quantity if isinstance(quantity, (int, float)) else None,
+            basis=str(row.get("item_type") or ""),
+            source_sheets=[str(s) for s in (row.get("source_sheets") or [])],
+            reason="; ".join(str(x) for x in (row.get("review_reasons") or [])),
+            expected_from=str(row.get("source") or "detected"),
+        ))
+
+    for rec in list(coverage.items) + _item_coverage_records(all_extracted):
+        key = _norm_item_key(getattr(rec, "name", ""))
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        led.add_item(rec)
+
+    return led
+
+
+def _coverage_notes(all_extracted: list) -> List[str]:
+    """Per-sheet coverage notes, deduplicated and named by their sheet.
+
+    A note such as "N room fills measured (… SF) but no vocabulary item has an
+    area basis — the measurements were discarded" is an escalation, not a log
+    line: it says a real measurement was computed and then thrown away.
+    """
+    out: List[str] = []
+    for d in all_extracted or []:
+        if not isinstance(d, dict):
+            continue
+        sheet = str(d.get("_sheet_name") or d.get("_source_sheet") or "").strip()
+        for note in d.get("_coverage_notes") or []:
+            text = str(note).strip()
+            if not text:
+                continue
+            line = f"[{sheet}] {text}" if sheet else text
+            if line not in out:
+                out.append(line)
+    return out
+
+
+def _coverage_warnings(ledger: CoverageLedger, all_extracted: list) -> List[str]:
+    """``report["coverage_warnings"]`` — the ledger's escalations plus the notes."""
+    return list(ledger.warnings()) + _coverage_notes(all_extracted)
 
 
 def _collect_specification_tables(all_extracted: list) -> List[Dict[str, Any]]:
