@@ -993,7 +993,7 @@ Plans are listed in EXECUTION order; the wave in each plan's frontmatter is auth
 - [x] 23-08-PLAN.md — Room-mix census wiring + finish-tag flagged rows + finish-schedule unit fix (wave 4, SP-10)
 - [x] 23-09-PLAN.md — Region geometry primitive: shared labeller, contour trace, perimeter, shape ratio (wave 4, SP-3)
 - [x] 23-10-PLAN.md — Open-run chainer core + styled harvest + viewport title-band fix (wave 4, SP-5)
-- [ ] 23-11-PLAN.md — Geometric clip cell + printed-extent cross-check replacing the plausibility cap (wave 5, SP-4) — **PARTIAL**: the printed-extent cross-check shipped (`15c48bc`, V4-MEAS-02 advanced); the geometric clip cell is STOPPED with its partition rule falsified on all sixteen prototype sheets. See 23-11-SUMMARY.md deviation 2.
+- [x] 23-11-PLAN.md — Printed-extent cross-check replacing the plausibility cap (wave 5) — closed on Task 3 of 4 by orchestrator decision; `_MAX_UNIT_SF` and `flag_implausible_unit` deleted, V4-MEAS-02 advanced not complete. (**SP-4, the geometric clip cell, is CARRIED FORWARD** — its partition rule is falsified on all sixteen prototype sheets and it is blocked behind DEF-23-SP4.)
 - [ ] 23-12-PLAN.md — Open-run selectors: annotated linetype + rail, position-validated (wave 6, SP-5)
 - [ ] 23-13-PLAN.md — Wall-area binder + basis registry + one-area-one-item arbitration + multiplier honesty (wave 6, SP-9)
 - [ ] 23-14-PLAN.md — Elevation facade measurement: silhouette, datums, routing, keynote attribution (wave 7, gap 3)

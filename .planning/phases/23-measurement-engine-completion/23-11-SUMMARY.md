@@ -3,7 +3,8 @@ phase: 23-measurement-engine-completion
 plan: 11
 subsystem: deterministic/room_fill
 tags: [SP-4, V4-MEAS-02, extent-cross-check, clip, INV-02, D-01, D-07]
-status: blocked
+status: complete
+closed_early: "Task 3 of 4, by orchestrator decision. Tasks 1, 2 and 4 (the geometric clip cell, SP-4) are NOT done and carry forward under DEF-23-SP4."
 
 requires:
   - phase: 23-07
@@ -39,6 +40,8 @@ key-decisions:
   - "EXTENT_TOLERANCE = 1.25 is read off the distribution in INV-02 §4 (thirteen sheets 0.976-1.073, a two-plan leak ~2.0), not fitted to any total. It is dimensionless, so the same number governs a 250 SF guest room and a 12,000 SF ballroom — pinned by a test that scales both sides by fifty."
   - "flag_implausible_unit is DELETED rather than repurposed. Its docstring asserted a story three probes falsified; the correction lives in cross_check_extent, where it is read by whoever next asks why the check exists."
   - "Tasks 1, 2 and 4 (the geometric clip cell) are STOPPED, not shipped partially. The plan's stated partition rule is falsified by the fixtures and no variant reaches either the plan's own 2% no-regression bar or the executor's byte-identical bar. Shipping the helpers without the rewire would be untested dead code with invented semantics."
+  - "The plan is CLOSED on Task 3 by orchestrator decision rather than re-scoped or retried. SP-4 is blocked behind a DOMAIN question — what a dimension-string corridor should contribute to a room's area — whose answer lives in the take-off documents, not in the plans and not in our judgement. Logged as DEF-23-SP4."
+  - "The sixteen pinned RCP areas are LEFT EXACTLY AS THEY ARE. They remain a valid regression guard for the CURRENT clip; they are not a specification a new clip can be measured against, because 14% of one of them is annotation."
 
 requirements-completed: []
 requirements-advanced: [V4-MEAS-02]
@@ -88,14 +91,14 @@ coverage:
     requirement: V4-MEAS-02
     verification:
       - kind: integration
-        ref: "STOPPED — four prototype variants measured against all sixteen real sheets; best reproduces 4 of 16. See Deviations 2."
-        status: blocked
+        ref: "NOT DONE — four prototype variants measured against all sixteen real sheets; best reproduces 4 of 16. Carried forward as DEF-23-SP4. See Deviations 2."
+        status: deferred
     human_judgment: true
 
 metrics:
   duration: ~4h
   completed: 2026-08-04
-  tasks: 1 of 4
+  tasks: 1 of 4 (closed early by orchestrator decision)
   commits: 1
   tests_added: 9
   suite: "1692 passed, 2 deselected (baseline 1683)"
@@ -107,13 +110,19 @@ metrics:
 against the drawing's OWN printed overall dimensions — reproducing INV-02 §4 sheet for sheet on all
 sixteen real prototypes, with thirteen ratios inside 0.976-1.073 and the two sheets that print no
 dimension pair flagged while still reporting their area. All sixteen pinned RCP areas are
-byte-identical. The geometric clip cell is STOPPED: the plan's own partition rule is falsified by
+byte-identical. The geometric clip cell is NOT DONE: the plan's own partition rule is falsified by
 the fixtures, and the reason is a measurement, not an opinion.**
+
+**The plan is closed on Task 3 alone, by orchestrator decision.** That is deliberate and it is the
+right call: Task 3 delivers the contract 23-CONTEXT actually mandated — no guestroom-sized threshold
+— while the clip was always labelled a ROBUSTNESS fix rather than a bug fix, because INV-02's three
+probes had already exonerated it. SP-4 is blocked behind a question that is not ours to answer, and
+it is logged as **DEF-23-SP4**.
 
 ## Performance
 
 - **Duration:** ~4h (roughly half of it in read-only probes against the real PDFs, zero API)
-- **Tasks:** 1 of 4 (Task 3). Tasks 1, 2 and 4 stopped — see Deviations 2.
+- **Tasks:** 1 of 4 (Task 3). Tasks 1, 2 and 4 not done — see Deviations 2 and DEF-23-SP4.
 - **Files:** 0 created, 3 modified
 
 ## What shipped
@@ -236,11 +245,11 @@ same object it measured before.
   are one rule rather than a union. Re-measured: exactly INV-02 §4, including `None` on both sheets.
 - **Commit:** `15c48bc`
 
-### 2. [Rule 4 — STOPPED, user decision required] The clip-cell partition rule is falsified
+### 2. [Rule 4 — escalated, and CLOSED by orchestrator decision] The clip-cell partition rule is falsified
 
-Tasks 1, 2 and 4 are **not shipped**. Four prototypes were built and measured against all sixteen
-real prototype sheets; none reaches either the plan's own no-regression bar (2%) or the executor's
-byte-identical bar. Full detail is in the checkpoint; the measured core of it:
+Tasks 1, 2 and 4 are **not shipped**, and the plan is closed without them. Four prototypes were built
+and measured against all sixteen real prototype sheets; none reaches either the plan's own
+no-regression bar (2%) or the executor's byte-identical bar:
 
 | variant | sheets reproducing the pinned RCP area | worst error |
 |---|---|---|
@@ -267,10 +276,26 @@ Three measured facts, any one of which blocks the plan as written:
    that constant. **A clip that no longer depends on a width constant cannot reproduce a number that
    does.**
 
-The honest choices are named in the checkpoint. What was **not** done: no threshold was widened, no
-baseline literal was rewritten to match a new output, and no partially-wired helper was committed.
-Tuning the partition until sixteen numbers agreed would have been the coincidence trap this phase
-exists to abolish, in a new costume.
+**The resolution: fact 3 is not an engineering obstacle, it is an unanswered domain question.** A
+baseline that is 14% composed of dimension-string corridors is not a specification, and pinning any
+new clip against it would be fitting geometry to an artefact of the old constant. The question —
+*what should a dimension-string corridor contribute to a room's measured area?* — is logged verbatim
+as **DEF-23-SP4**, and its answer comes from DATA rather than from a choice: the estimator's own
+take-off states what was counted. The first evidence points one way — `ID-411 KING SUITE B`'s golden
+**353.4 SF** against printed overall dimensions of `17'-0" x 20'-7 1/8"` = **350.1 SF**, a 0.9%
+match, which is what you would see if the estimator measured the room and not its dimension
+corridors. (The 350.1 is measured by this plan's own `printed_extent_bound`; the golden figure is
+quoted from the orchestrator's reading of the take-off.) One sheet is a coincidence; the pattern
+needs confirming across several before anything is pinned, and that means reading the **take-off
+documents**, not the plans.
+
+The **sixteen pinned RCP areas are left exactly as they are**. They remain a valid regression guard
+for the current clip — which is unchanged by this plan — and 23-09's equality test still passes
+untouched.
+
+What was **not** done: no threshold was widened, no baseline literal was rewritten to match a new
+output, and no partially-wired helper was committed. Tuning the partition until sixteen numbers
+agreed would have been the coincidence trap this phase exists to abolish, in a new costume.
 
 ### 3. [Correction to the record] INV-02 §5's strip collapse was already fixed by 23-07
 
@@ -353,7 +378,12 @@ rooftop bar.
   perimeter, which is the check INV-01 §4 asked for.
 - **23-16** inherits the corrected story in code; `docs/PIPELINE-GROUND-TRUTH.md` §14.2 is still owed
   the same correction.
-- **SP-4 is still open.** Nothing in this plan changed a clip. The four measured variants and the
-  three falsifying facts above are the starting point for whoever takes it next, and the first
-  question they must answer is not geometric at all: what should a dimension-string corridor
-  contribute to a room's measured area?
+- **SP-4 is still open, and now has a named blocker.** Nothing in this plan changed a clip. The four
+  measured variants, the three falsifying facts and both corrections to the plan's premises are the
+  starting point for whoever takes it next — but the first question is not geometric at all, and it
+  is recorded as **DEF-23-SP4**: *what should a dimension-string corridor contribute to a room's
+  measured area?* Answering it requires the take-off documents. The re-plan is scheduled separately
+  once that is settled.
+- **DEF-23-10** (the coverage ledger calling a KEPT oversize region "rejected") nominated 23-11 as
+  its owner because 23-11 was to open `_measure_room_fills`. That rewire did not happen, so the
+  rename carries forward with SP-4; the deferred item has been annotated.

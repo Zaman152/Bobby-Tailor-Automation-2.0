@@ -278,6 +278,10 @@ an untested edit to a module this plan does not exercise.
 out-parameter to `oversize_regions` and reword the ledger reason to *"N region(s) of X SF exceed the
 single-unit maximum and are included, flagged"*. Purely cosmetic; no measurement moves.
 
+**Still open after 23-11.** That plan closed on its cross-check task alone (see DEF-23-SP4), so the
+clip-cell work its nominated owner was attached to never happened and this rename went with it. It
+carries forward to whichever plan next opens `_measure_room_fills`.
+
 ---
 
 ## DEF-23-11 — three Crow page-2 captions still bind to no viewport
@@ -306,3 +310,69 @@ INV-06 measured them at.
 **To fix:** make the containment margin asymmetric (slop below and sideways, none above the top
 edge), and let a region own more than one caption when the labels are vertically separated — then
 re-run the four-set scale diff.
+
+---
+
+## DEF-23-SP4 — what should a dimension-string corridor contribute to a room's measured area?
+
+**Found during:** 23-11, prototyping the geometric clip cell (SP-4). It is the reason that plan
+closed on its cross-check task alone.
+**Where:** `room_fill.measure_enclosed_area` — the region filter at the `touches_edge` /
+`MIN_REGION_SF` test — and every clip that feeds it.
+
+**This is a DOMAIN question, not an engineering one, and it blocks SP-4 entirely.** No geometric clip
+can be pinned against the current sixteen-sheet baseline until it is answered, because that baseline
+is partly composed of the very thing in question.
+
+### The evidence
+
+`ID-407 KING A - RCP PLAN` measures **229.4 SF**, and that number is a sum of **eight** enclosed
+regions. Three of them are not rooms — they are dimension-string corridors, the narrow channels
+between a dimension line and the drawing it annotates (page-space bboxes, measured offline against
+the real PDF):
+
+```
+   13.4 SF  bbox=(1049.5, 1397.8, 1060.7, 1767.7)   11 pt wide, 370 pt tall
+    8.5 SF  bbox=(1245.2, 1399.1, 1254.2, 1690.7)    9 pt wide, 292 pt tall
+   10.8 SF  bbox=(1617.4, 1399.1, 1626.4, 1768.6)    9 pt wide, 370 pt tall
+  ---------
+   32.7 SF  = 14% of the published 229.4 SF
+```
+
+They are the `11.6-13.4` shape-ratio band INV-01 §4 identified as "annotation and dimension cells",
+and they clear `MIN_REGION_SF = 8.0` by a hair, which is why they survive the filter.
+
+**Whether each one is counted depends entirely on where the fixed `±260 pt` clip's edge falls.** The
+10.8 SF corridor sits at x 1617.4, and the nearest anchor-derived boundary lands at 1607.8 — so a
+geometric clip cuts it, it touches the edge, and it is discarded. That single corridor is the whole
+of the 229.4 → 218.6 SF movement observed in the 23-11 prototypes. INV-02 §3's own clip-width sweep
+says the same from the other side: three sheets move 17-20% across a ±80 pt change of that constant.
+
+**Consequence: a clip that no longer depends on a width constant cannot reproduce a number that
+does.** The sixteen pinned RCP areas are a valid regression guard *for the current clip* and must be
+left exactly as they are. They are NOT a specification a new clip can be measured against.
+
+### The evidence that points to an answer
+
+The estimator's own take-off appears to measure the ROOM and not the room plus its corridors.
+`ID-411 KING SUITE B` golden reads **353.4 SF** against printed overall dimensions of
+`17'-0" x 20'-7 1/8" = 350.1 SF` — a **0.9%** match. (The printed-dimension figure is measured;
+the golden figure is quoted from the coordinator's reading of the take-off.)
+
+**Answering this requires reading the TAKE-OFF DOCUMENTS, not the plans.** The plans state what is
+drawn; only the take-off states what the estimator counted. One sheet is a coincidence — the pattern
+needs confirming across several before anything is pinned.
+
+### What comes after the answer
+
+Once it is settled, SP-4 can be re-planned. 23-11 measured four clip-partition variants against all
+sixteen prototype sheets and none reproduces the baseline; the three facts that falsify the
+anchor-midpoint rule, and the two corrections to the plan's premises (INV-02 §5's strip collapse was
+already fixed by 23-07; the ">900 SF largest region" criterion is likely unmeetable because an RCP is
+subdivided by its own ceiling grid), are recorded in `23-11-SUMMARY.md` deviations 2 and 3. The
+architecture that looked viable is per-drawing ink attribution in PAPER space — a wall is 2-8 pt of
+paper and a layout gutter is tens of points, and that distinction is scale-free and
+building-type-free — but it is a new plan, not a task.
+
+**NOT fixed in 23-11** because the answer is not ours to choose. Fitting a clip until sixteen numbers
+agreed would be the coincidence trap this phase exists to abolish, wearing a new costume.
