@@ -262,7 +262,11 @@ def classify_sheet_type_verbose(
     """
 
     for is_title_block, src_raw in ((True, title_block_text), (False, full_page_text)):
-        if not src_raw:
+        if not src_raw or not isinstance(src_raw, str):
+            # A non-string text source is not usable evidence. Skipping it keeps
+            # this function TOTAL: the page text comes from an untrusted PDF via
+            # a parser that is entitled to hand back something unexpected, and a
+            # classifier that raises turns one odd page into a dead run.
             continue
         src = src_raw.upper()
         source = "title_block" if is_title_block else "full_page_text"

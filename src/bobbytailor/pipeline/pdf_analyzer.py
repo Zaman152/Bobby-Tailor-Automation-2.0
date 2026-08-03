@@ -13,9 +13,14 @@ from typing import Optional, Union
 from PIL import Image
 
 from bobbytailor.pipeline.calculator import resolve_spec_lookups
+from bobbytailor.pipeline.coverage import ERRORED, NOT_APPLICABLE, CoverageLedger
 from bobbytailor.pipeline.cross_references import resolve_cross_references
 from bobbytailor.pipeline.reporter import generate_report
-from bobbytailor.pipeline.takeoff_pipeline import RunSettings, TakeoffPipeline
+from bobbytailor.pipeline.takeoff_pipeline import (
+    RunSettings,
+    TakeoffPipeline,
+    page_measurable_signal,
+)
 from bobbytailor.pipeline.page_text_enrichment import enrich_components_from_page_text
 from bobbytailor.config import RENDER_TARGET_PX, SCREENSHOTS_DIR
 
@@ -299,6 +304,29 @@ def run_pdf_analysis(
     logger.info(f"Processing PDF ({total} of {total_pages} pages): {pdf_path}")
 
     # ----------------------------------------------------------------
+    # Coverage ledger (INV-08 / SP-8) — one row per PAGE OF THE SOURCE
+    # PDF, created BEFORE any routing or page-selection filtering.
+    #
+    # This ordering is the whole point. Today a page the classifier
+    # discards never becomes a processed sheet, so it leaves no row, no
+    # flag and no count in any artifact: a 40-page Moxy run renders
+    # "Sheets analyzed: 22" and is silent about the other 18. Registering
+    # first makes the ledger's completeness an invariant of construction
+    # rather than something each code path has to remember.
+    # ----------------------------------------------------------------
+    ledger = CoverageLedger(pages_in_source=total_pages)
+    selected = set(pages_to_process)
+    for i in range(total_pages):
+        if i in selected:
+            ledger.register_page(i)
+        else:
+            ledger.register_page(
+                i,
+                disposition=NOT_APPLICABLE,
+                reason="not selected for analysis",
+            )
+
+    # ----------------------------------------------------------------
     # Pass 1 — Convert PDF pages to images
     # ----------------------------------------------------------------
     doc = fitz.open(pdf_path)
@@ -315,10 +343,53 @@ def run_pdf_analysis(
             img_path = _page_to_image(pdf_path, i, str(img_dir))
             sheet_type_hint = None
             try:
-                from bobbytailor.pipeline.sheet_pass_matrix import classify_sheet_type_from_text
-                sheet_type_hint = classify_sheet_type_from_text(title_block_text)
+                from bobbytailor.pipeline.sheet_pass_matrix import (
+                    classify_sheet_type_verbose,
+                )
+                # Routing input is UNCHANGED (title-block text only). The
+                # verbose form adds the reason, never a different verdict.
+                sheet_type_hint, type_source, kw, ctx = classify_sheet_type_verbose(
+                    title_block_text
+                )
+                ledger.register_page(
+                    i,
+                    sheet_name=sheet,
+                    sheet_type=sheet_type_hint,
+                    type_source=type_source,
+                    classifier_keyword=kw,
+                    classifier_context=ctx,
+                    # Recorded for plan 23-06, NOT acted on here — see the
+                    # field's comment in pipeline/coverage.py.
+                    sheet_type_full_text=classify_sheet_type_verbose(
+                        title_block_text, doc[i].get_text()
+                    )[0],
+                )
             except ImportError:
                 pass
+            except Exception as exc:  # noqa: BLE001 — per-page degradation
+                logger.warning(
+                    "coverage: classification failed on page %d (%s)", i, exc,
+                )
+
+            # Measurable signal, once per page, zero API (~0.2 s/page). A
+            # malformed page records ERRORED with its message instead of
+            # aborting the run — an untrusted PDF must not be able to stop
+            # the analysis by carrying one broken page (threat T-23-01).
+            try:
+                ledger.register_page(
+                    i, measurable_signal=page_measurable_signal(doc[i]),
+                )
+            except Exception as exc:  # noqa: BLE001 — per-page degradation
+                logger.warning(
+                    "coverage: measurable-signal probe failed on page %d (%s)",
+                    i, exc,
+                )
+                ledger.register_page(
+                    i,
+                    disposition=ERRORED,
+                    reason="measurable-signal probe failed: %s" % exc,
+                )
+
             pipeline_pages.append({
                 "image_path": img_path,
                 "sheet_name": sheet,
@@ -375,7 +446,21 @@ def run_pdf_analysis(
         manifest=manifest,
         scale_feet_per_inch=scale_feet_per_inch,
         project_key=project_name,
+        coverage=ledger,
     )
+
+    # The invariant (INV-08 §3.1): every page of the source PDF has exactly one
+    # ledger row. If this ever fires the run's own accounting is incomplete, so
+    # it is logged loudly rather than swallowed — but it never aborts a run that
+    # otherwise produced numbers.
+    unaccounted = ledger.assert_accounted()
+    if unaccounted:
+        logger.error(
+            "coverage: %d source page(s) have no ledger row: %s — every total "
+            "below is a lower bound", len(unaccounted), unaccounted,
+        )
+    for line in ledger.warnings():
+        logger.warning("coverage: %s", line)
 
     # Emit "complete" progress for each successfully analyzed sheet
     if progress_callback:

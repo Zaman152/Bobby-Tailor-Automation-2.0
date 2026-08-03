@@ -552,3 +552,362 @@ class TestRunProject:
                if "Fiber Cement Panel" in e.get("description", "")]
         assert fcp and abs(fcp[0]["quantity"] - 123231.03) < 0.01
         assert fcp[0]["unit"] == "SF"
+
+
+# ---------------------------------------------------------------------------
+# The skip veto — measurable geometry outranks a classifier keyword
+# (23-01 / INV-08 §3.4). Synthetic pages only: no fixture PDF, no API key.
+# ---------------------------------------------------------------------------
+
+import os
+import tempfile
+
+import fitz
+
+from bobbytailor.pipeline.coverage import (
+    MEASURED_PARTIAL,
+    NOT_APPLICABLE,
+    SKIPPED_CLASSIFIER,
+    CoverageLedger,
+    SheetCoverage,
+)
+
+page_measurable_signal = _tp.page_measurable_signal
+
+# 1/4" = 1'-0" — Moxy's guestroom prototype scale, the sheets this veto recovers.
+_SYNTHETIC_SCALE_LABEL = 'SCALE: 1/4" = 1\'-0"'
+
+
+def _synthetic_sheet(with_title=True, with_scale=True, vector=True) -> str:
+    """A one-page PDF shaped like a guestroom prototype sheet. Returns its path.
+
+    *vector* controls whether the page clears is_vector_sheet's path-count
+    threshold — a raster page has no deterministic geometry to recover, and the
+    veto must refuse to spend vision money on it.
+    """
+    doc = fitz.open()
+    page = doc.new_page(width=800, height=800)
+    page.draw_rect(fitz.Rect(150, 150, 500, 400), width=2)   # the "room"
+    if vector:
+        for i in range(260):                                  # vector density
+            y = 152 + (i % 240)
+            page.draw_line(fitz.Point(152, y), fitz.Point(160, y), width=0.3)
+    if with_title:
+        page.insert_text(fitz.Point(200, 470), "KING A - RCP PLAN", fontsize=12)
+    if with_scale:
+        page.insert_text(fitz.Point(200, 492), _SYNTHETIC_SCALE_LABEL, fontsize=9)
+    path = tempfile.mktemp(suffix=".pdf")
+    doc.save(path)
+    doc.close()
+    return path
+
+
+def _exploding_analyzer(*args, **kwargs):
+    """Any vision pass reaching this is unbudgeted API spend — fail loudly."""
+    raise AssertionError(
+        "a vision pass was invoked on a vetoed sheet — this costs real money"
+    )
+
+
+class TestMeasurableSignal:
+    """plan_titles counts titles that ANCHOR A SCALE, not title-shaped strings.
+
+    Moxy page 1 is the lighting cover sheet: its index lists 11 strings matching
+    the plan-title pattern and it carries zero printed scales. Counting those as
+    measurable signal would report a silent loss of 11 drawings on an index
+    page — a false alarm on every drawing set that has an index.
+    """
+
+    def test_title_with_a_scale_beneath_it_is_measurable(self):
+        path = _synthetic_sheet()
+        try:
+            doc = fitz.open(path)
+            signal = page_measurable_signal(doc[0])
+            doc.close()
+        finally:
+            os.unlink(path)
+        assert signal["plan_titles"] == 1
+        assert signal["printed_scales"] == 1
+
+    def test_title_without_a_scale_is_not_measurable(self):
+        """Measuring it at a borrowed scale would be a squared error."""
+        path = _synthetic_sheet(with_scale=False)
+        try:
+            doc = fitz.open(path)
+            signal = page_measurable_signal(doc[0])
+            doc.close()
+        finally:
+            os.unlink(path)
+        assert signal["plan_titles"] == 0
+
+    def test_blank_page_has_no_signal(self):
+        path = _synthetic_sheet(with_title=False, with_scale=False)
+        try:
+            doc = fitz.open(path)
+            signal = page_measurable_signal(doc[0])
+            doc.close()
+        finally:
+            os.unlink(path)
+        assert sum(signal.values()) == 0
+
+    def test_signal_keys_are_stable(self):
+        path = _synthetic_sheet()
+        try:
+            doc = fitz.open(path)
+            signal = page_measurable_signal(doc[0])
+            doc.close()
+        finally:
+            os.unlink(path)
+        assert set(signal) == {"plan_titles", "printed_scales", "viewports",
+                               "schedules"}
+
+
+class TestSkipVeto:
+    def test_scaled_plan_title_overrules_the_classifier(self):
+        """THE Gap 8 fix: 16 Moxy guestroom sheets stop being discarded."""
+        path = _synthetic_sheet()
+        coverage = SheetCoverage(page_index=23)
+        try:
+            pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+            result = pipeline.run_sheet(
+                image_path="ID-407.png",
+                sheet_name="ID-407",
+                sheet_type="title_sheet",
+                pdf_path=path,
+                page_index=0,
+                coverage=coverage,
+            )
+        finally:
+            os.unlink(path)
+
+        assert not result.get("_skipped"), "a page holding a scaled plan must be measured"
+        assert coverage.classifier_overruled is True
+        assert coverage.disposition == MEASURED_PARTIAL
+        assert coverage.disposition == "measured_partial"
+        assert coverage.sheet_type == "floor_plan"
+        assert "overruled" in coverage.reason
+
+    def test_the_veto_spends_nothing(self):
+        """INV-08 risk 1: recovering sheets must not become an API bill.
+
+        The analyzer raises on any call, so the test passing IS the assertion
+        that no vision pass ran.
+        """
+        path = _synthetic_sheet()
+        try:
+            pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+            result = pipeline.run_sheet(
+                image_path="ID-407.png", sheet_name="ID-407",
+                sheet_type="title_sheet", pdf_path=path, page_index=0,
+                coverage=SheetCoverage(page_index=23),
+            )
+        finally:
+            os.unlink(path)
+        assert result is not None
+
+    def test_a_raster_page_is_never_recovered_onto_the_vision_ensemble(self):
+        """A raster page has no deterministic geometry to recover.
+
+        Routing it to _run_sheet_raster would buy an ensemble vision estimate
+        for a sheet a keyword had already called worthless — the honest outcome
+        is the recorded skip.
+        """
+        path = _synthetic_sheet(vector=False)
+        coverage = SheetCoverage(page_index=23)
+        try:
+            pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+            result = pipeline.run_sheet(
+                image_path="ID-407.png", sheet_name="ID-407",
+                sheet_type="title_sheet", pdf_path=path, page_index=0,
+                coverage=coverage,
+            )
+        finally:
+            os.unlink(path)
+        assert result["_skipped"] is True
+        assert result["_classifier_overruled"] is True
+        assert coverage.disposition == SKIPPED_CLASSIFIER
+        assert "deterministic engine produced nothing" in coverage.reason
+
+    def test_overruled_branch_routes_deterministically(self):
+        """The recovered sheet goes through _route_deterministic, not the passes."""
+        path = _synthetic_sheet()
+        seen = {}
+        try:
+            pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+            original = pipeline._route_deterministic
+
+            def _spy(**kwargs):
+                seen.update(kwargs)
+                return original(**kwargs)
+
+            pipeline._route_deterministic = _spy
+            pipeline.run_sheet(
+                image_path="ID-407.png", sheet_name="ID-407",
+                sheet_type="title_sheet", pdf_path=path, page_index=0,
+                coverage=SheetCoverage(page_index=23),
+            )
+        finally:
+            os.unlink(path)
+        assert seen, "_route_deterministic was never called"
+        assert seen["resolved_type"] == "floor_plan"
+        assert seen["deterministic_only"] is True, "the raster/vision branch must be refused"
+
+
+class TestSkipIsRecorded:
+    def test_a_genuine_cover_sheet_is_not_applicable(self):
+        """Bob's page 0 / Moxy page 0: titles=0 scales=0, a real cover sheet.
+
+        All-zero signal means there was nothing to lose, so the honest label is
+        NOT_APPLICABLE — not the alarm-raising SKIPPED_CLASSIFIER.
+        """
+        path = _synthetic_sheet(with_title=False, with_scale=False)
+        coverage = SheetCoverage(page_index=0)
+        try:
+            pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+            result = pipeline.run_sheet(
+                image_path="CS-00.png", sheet_name="CS-00",
+                title_block_text="CS-00 COVER SHEET 25-13.01",
+                pdf_path=path, page_index=0, coverage=coverage,
+            )
+        finally:
+            os.unlink(path)
+
+        assert result["_skipped"] is True
+        assert coverage.disposition == NOT_APPLICABLE
+        assert coverage.classifier_keyword == "COVER SHEET"
+        assert coverage.is_silent_loss is False
+
+    def test_a_skipped_page_with_signal_is_skipped_classifier(self, monkeypatch):
+        """Chelsea page 0's shape: scale callouts, but nothing measurable bound
+        to them. Skipped — and flagged, because the page was not empty."""
+        path = _synthetic_sheet(with_title=False, with_scale=False)
+        coverage = SheetCoverage(page_index=0)
+        signal = {"plan_titles": 0, "printed_scales": 2, "viewports": 0,
+                  "schedules": 0}
+        try:
+            pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+            monkeypatch.setattr(
+                pipeline, "_skip_veto_signal",
+                lambda *a, **k: (signal, False),
+            )
+            result = pipeline.run_sheet(
+                image_path="C0.png", sheet_name="C0",
+                title_block_text="C0 COVER SHEET",
+                pdf_path=path, page_index=0, coverage=coverage,
+            )
+        finally:
+            os.unlink(path)
+
+        assert result["_skipped"] is True
+        assert coverage.disposition == SKIPPED_CLASSIFIER
+        assert coverage.disposition == "skipped_classifier"
+        assert coverage.classifier_keyword != ""
+        assert coverage.is_silent_loss is True
+
+    def test_the_sentinel_carries_the_reason(self):
+        """A skipped page states which keyword skipped it and what it matched."""
+        path = _synthetic_sheet(with_title=False, with_scale=False)
+        try:
+            pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+            result = pipeline.run_sheet(
+                image_path="x.png", sheet_name="ID-411",
+                title_block_text=(
+                    "PROVIDE LABEL ON THE LIGHT SWITCH COVER PLATE INDICATING"
+                ),
+                pdf_path=path, page_index=0,
+            )
+        finally:
+            os.unlink(path)
+
+        assert result["_skipped"] is True
+        assert result["_skip_keyword"] == "COVER"
+        assert "PLATE" in result["_skip_context"]
+        assert result["_skip_reason"]
+        assert set(result["_measurable_signal"]) == {
+            "plan_titles", "printed_scales", "viewports", "schedules",
+        }
+
+    def test_skipping_without_a_ledger_row_still_works(self):
+        """coverage=None is the scraper's path — it must stay byte-compatible."""
+        pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+        result = pipeline.run_sheet(
+            image_path="/path/G0.1.png", sheet_name="G0.1",
+            sheet_type="title_sheet",
+        )
+        assert result["_skipped"] is True
+        assert result["sheet_type"] == "title_sheet"
+        assert result["sheet_name"] == "G0.1"
+        assert result["sheet_source"] == "/path/G0.1.png"
+
+    def test_no_pdf_path_means_no_veto(self):
+        """An image-only caller has no page to ask; the verdict stands."""
+        pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+        coverage = SheetCoverage(page_index=0)
+        result = pipeline.run_sheet(
+            image_path="x.png", sheet_name="G0.1", sheet_type="title_sheet",
+            coverage=coverage,
+        )
+        assert result["_skipped"] is True
+        assert coverage.classifier_overruled is False
+
+    def test_an_unreadable_pdf_does_not_abort_the_sheet(self):
+        """Threat T-23-01: a malformed page must not stop the run."""
+        pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+        signal, fires = pipeline._skip_veto_signal("/no/such/file.pdf", 0, "X")
+        assert fires is False
+        assert sum(signal.values()) == 0
+
+
+class TestRunSheetSignature:
+    def test_coverage_is_keyword_only_with_a_none_default(self):
+        """run_sheet has four call sites, three of them in scrape/scraper.py."""
+        import inspect
+        param = inspect.signature(TakeoffPipeline.run_sheet).parameters["coverage"]
+        assert param.default is None
+        assert param.kind == inspect.Parameter.KEYWORD_ONLY
+
+    def test_run_project_coverage_is_keyword_only_with_a_none_default(self):
+        import inspect
+        param = inspect.signature(TakeoffPipeline.run_project).parameters["coverage"]
+        assert param.default is None
+        assert param.kind == inspect.Parameter.KEYWORD_ONLY
+
+    def test_positional_call_shape_is_unchanged(self):
+        """The scraper calls run_sheet positionally — the order must not move."""
+        import inspect
+        params = list(inspect.signature(TakeoffPipeline.run_sheet).parameters)
+        assert params[:9] == [
+            "self", "image_path", "sheet_name", "sheet_type", "title_block_text",
+            "full_page_text", "pdf_path", "page_index", "budget",
+        ]
+
+
+class TestRunProjectThreadsTheLedger:
+    def test_every_page_keeps_its_row_even_when_skipped(self):
+        """The sentinel stays out of all_extracted; the page stays in the ledger."""
+        ledger = CoverageLedger(pages_in_source=2)
+        ledger.register_page(0)
+        ledger.register_page(1)
+        pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+        pages = [
+            {"image_path": "a.png", "sheet_name": "CS-00",
+             "sheet_type_hint": "title_sheet", "page_index": 0, "page_num": 1},
+            {"image_path": "b.png", "sheet_name": "CS-01",
+             "sheet_type_hint": "title_sheet", "page_index": 1, "page_num": 2},
+        ]
+        all_extracted, _est, _ptype = pipeline.run_project(pages, coverage=ledger)
+
+        assert all_extracted == []                  # both skipped, as today
+        assert ledger.assert_accounted() == []      # but neither page vanished
+        assert len(ledger.sheets) == 2
+        assert ledger.sheet(0).sheet_name == "CS-00"
+        assert ledger.sheet(0).disposition == NOT_APPLICABLE
+        assert pipeline.coverage_ledger is ledger
+
+    def test_run_project_without_a_ledger_is_unchanged(self):
+        pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
+        pages = [{"image_path": "a.png", "sheet_name": "CS-00",
+                  "sheet_type_hint": "title_sheet", "page_index": 0}]
+        all_extracted, _est, _ptype = pipeline.run_project(pages)
+        assert all_extracted == []
+        assert pipeline.coverage_ledger is None

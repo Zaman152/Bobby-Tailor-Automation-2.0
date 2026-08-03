@@ -693,3 +693,23 @@ class TestVerboseEquivalenceSweep:
             assert (keyword, context) == ("", "")
         else:
             assert keyword != ""
+
+
+class TestClassifierIsTotal:
+    """The page text comes from an untrusted PDF; the classifier must not raise.
+
+    A classifier that throws on an unexpected text type turns one odd page into
+    a dead run — the opposite of the honest-failure contract.
+    """
+
+    @pytest.mark.parametrize("bad", [None, 123, object(), b"FLOOR PLAN", ["FLOOR PLAN"]])
+    def test_a_non_string_page_text_is_ignored_not_raised(self, bad):
+        assert classify_sheet_type_verbose("A2.1 FLOOR PLAN", bad)[0] == "floor_plan"
+        assert classify_sheet_type_from_text("", bad) == "floor_plan"
+
+    @pytest.mark.parametrize("bad", [None, 123, object()])
+    def test_a_non_string_title_block_falls_through_to_page_text(self, bad):
+        sheet_type, source, _kw, _ctx = classify_sheet_type_verbose(
+            bad, "EXTERIOR ELEVATION"
+        )
+        assert (sheet_type, source) == ("elevation", "full_page_text")

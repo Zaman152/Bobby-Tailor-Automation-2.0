@@ -44,8 +44,16 @@ import fitz
 
 from bobbytailor.pipeline.sheet_pass_matrix import (
     classify_sheet_type_from_text,
+    classify_sheet_type_verbose,
     plan_passes,
     pick_model_for_pass,
+)
+from bobbytailor.pipeline.coverage import (
+    MEASURED_PARTIAL,
+    NOT_APPLICABLE,
+    SKIPPED_CLASSIFIER,
+    CoverageLedger,
+    SheetCoverage,
 )
 from bobbytailor.pipeline.accuracy_config import count_tiling_enabled, count_tiling_grid
 
@@ -234,6 +242,80 @@ _PLAN_SHEET_TYPES = ("floor_plan", "civil_site", "roof_plan")
 # sheets join because find_tables() reads their rows verbatim (text-layer
 # ground truth); other types keep the legacy vision passes.
 _DETERMINISTIC_SHEET_TYPES = _PLAN_SHEET_TYPES + ("schedule",)
+
+# Half-width, in points, of the band searched either side of a plan title's
+# centre for the printed scale callout that belongs to it. This is NOT a new
+# constant: it is the same 260 pt the room-fill clip already uses
+# (TakeoffPipeline._FILL_CLIP_SIDE_PT), pulled to module scope so the skip veto,
+# the coverage ledger and scripts/coverage_probe.py all bind a title to a scale
+# by exactly the same rule. One definition, so the oracle cannot drift from the
+# thing it is the oracle for.
+_TITLE_SCALE_SIDE_PT = 260.0
+# A callout printed slightly ABOVE a title's baseline still belongs to it —
+# 6 pt of tolerance for baseline/bbox rounding, matching _measure_room_fills.
+_TITLE_SCALE_ABOVE_TOL_PT = -6.0
+
+
+def page_measurable_signal(page) -> dict:
+    """Count what can actually be MEASURED on *page*. Zero API.
+
+    ``{"plan_titles": n, "printed_scales": n, "viewports": n, "schedules": n}``
+
+    ``plan_titles`` counts only titles that have a printed scale beneath them,
+    and ``viewports`` only non-title-block viewports with a solved scale —
+    because a drawing with no scale of its own is NOT measurable, and measuring
+    it at a borrowed scale is a squared error (flag-don't-guess).
+
+    That distinction is load-bearing, not pedantry. Moxy page 1 is the LIGHTING
+    COVER SHEET: its sheet index lists 11 strings that match the plan-title
+    pattern ("QQ A - AR PLAN", ...) and it carries zero printed scales. Counting
+    those 11 as measurable signal would make the ledger report a silent loss of
+    11 drawings on an index page — a false alarm on every drawing set that has
+    an index. A loud ledger is not accuracy (INV-08 risk 4).
+    """
+    from bobbytailor.deterministic.printed_scale import (  # noqa: PLC0415
+        extract_printed_scales,
+        match_scales_to_viewports,
+    )
+    from bobbytailor.deterministic.room_fill import plan_titles  # noqa: PLC0415
+    from bobbytailor.deterministic.viewports import segment_viewports  # noqa: PLC0415
+
+    scales = extract_printed_scales(page) or []
+    scaled_titles = 0
+    for _name, _kind, tbox in plan_titles(page) or []:
+        tx0, _ty0, tx1, ty1 = tbox
+        mid = (tx0 + tx1) / 2.0
+        for s in scales:
+            cx, cy = s.center_pt
+            if abs(cx - mid) > _TITLE_SCALE_SIDE_PT:
+                continue
+            if cy - ty1 < _TITLE_SCALE_ABOVE_TOL_PT:
+                continue
+            if float(getattr(s, "feet_per_point", 0.0) or 0.0) <= 0:
+                continue
+            scaled_titles += 1
+            break
+
+    scaled_viewports = 0
+    try:
+        vps = segment_viewports(page) or []
+        by_region = match_scales_to_viewports(scales, vps) or {}
+        for vp in vps:
+            if vp.kind in _MASK_VIEWPORT_KINDS:
+                continue
+            own = by_region.get(vp.region_id)
+            if float(getattr(own, "feet_per_point", 0.0) or 0.0) > 0:
+                scaled_viewports += 1
+    except Exception:  # noqa: BLE001 — the title signal alone still stands
+        scaled_viewports = 0
+
+    return {
+        "plan_titles": scaled_titles,
+        "printed_scales": len(scales),
+        "viewports": scaled_viewports,
+        "schedules": 0,
+    }
+
 
 # Viewport kinds masked out of measurement (matches scale_solver._MASK_KINDS).
 _MASK_VIEWPORT_KINDS = ("title_block", "legend", "schedule")
@@ -1168,6 +1250,50 @@ class TakeoffPipeline:
     # Public API
     # ------------------------------------------------------------------
 
+    def _skip_veto_signal(
+        self,
+        pdf_path: Optional[str],
+        page_index: Optional[int],
+        sheet_name: str = "",
+    ) -> "tuple":
+        """Measurable signal for a page the classifier wants to discard.
+
+        Returns ``(signal, veto_fires)``. The veto fires when the page carries
+        at least one plan title with a printed scale beneath it, or at least one
+        non-title-block viewport with a solved scale — i.e. when there is
+        genuinely something on the page that can be measured correctly.
+
+        Zero API and bounded per page. A malformed page degrades to "no signal,
+        no veto" rather than aborting the run (threat T-23-01): an untrusted PDF
+        must not be able to stop the analysis by carrying one broken page.
+        """
+        signal = {"plan_titles": 0, "printed_scales": 0, "viewports": 0,
+                  "schedules": 0}
+        if not pdf_path or page_index is None:
+            # Image-only caller (the scraper's blob-less path): no page to ask.
+            return signal, False
+        try:
+            doc = fitz.open(pdf_path)
+        except Exception as exc:  # noqa: BLE001 — unreadable PDF → no veto
+            logger.warning(
+                "run_sheet: %r — cannot open %s to check for measurable "
+                "geometry (%s); the classifier verdict stands",
+                sheet_name, pdf_path, exc,
+            )
+            return signal, False
+        try:
+            signal = page_measurable_signal(doc[page_index])
+        except Exception as exc:  # noqa: BLE001 — per-page degradation
+            logger.warning(
+                "run_sheet: %r — measurable-signal probe failed on page %s "
+                "(%s); the classifier verdict stands",
+                sheet_name, page_index, exc,
+            )
+            return signal, False
+        finally:
+            doc.close()
+        return signal, (signal["plan_titles"] > 0 or signal["viewports"] > 0)
+
     def run_sheet(
         self,
         image_path: str,
@@ -1178,6 +1304,8 @@ class TakeoffPipeline:
         pdf_path: Optional[str] = None,
         page_index: Optional[int] = None,
         budget: Optional[BudgetGuard] = None,
+        *,
+        coverage: Optional[SheetCoverage] = None,
     ) -> dict:
         """Run the applicable extraction flow for a single sheet.
 
@@ -1204,30 +1332,149 @@ class TakeoffPipeline:
             budget:           Per-run BudgetGuard (threaded by run_project);
                               None → the run-level guard, else a fresh
                               per-sheet guard so no call site is unguarded.
+            coverage:         KEYWORD-ONLY, default None. This sheet's ledger
+                              row, enriched in place with the classifier's
+                              reason, the measurable signal and the final
+                              disposition. None keeps every existing call site
+                              (three in scrape/scraper.py) byte-identical.
 
         Returns:
             Merged extraction dict, or a skip sentinel for title_sheet:
-            {"_skipped": True, "sheet_type": "title_sheet", "sheet_name": ...}
+            {"_skipped": True, "sheet_type": "title_sheet", "sheet_name": ...,
+             "_skip_reason": ..., "_skip_keyword": ..., "_skip_context": ...,
+             "_measurable_signal": {...}}
         """
         # Step 1 — classify if not provided
-        resolved_type = sheet_type or classify_sheet_type_from_text(
-            title_block_text, full_page_text
-        )
+        classifier_keyword = getattr(coverage, "classifier_keyword", "") or ""
+        classifier_context = getattr(coverage, "classifier_context", "") or ""
+        if sheet_type:
+            # Pre-classified by the caller (the PDF path): its ledger row
+            # already carries the deciding keyword and context.
+            resolved_type = sheet_type
+        else:
+            resolved_type, type_source, classifier_keyword, classifier_context = (
+                classify_sheet_type_verbose(title_block_text, full_page_text)
+            )
+            if coverage is not None:
+                coverage.sheet_type = resolved_type
+                coverage.type_source = type_source
+                coverage.classifier_keyword = classifier_keyword
+                coverage.classifier_context = classifier_context
 
         # Step 2 — determine passes
         passes = plan_passes(resolved_type, title_block_text=title_block_text)
 
+        guard = budget or self._run_budget or BudgetGuard(self._settings.budget_usd)
+
         if not passes:
-            # title_sheet — skip entirely; zero API calls
-            logger.info("run_sheet: skipping title_sheet %r (zero API cost)", sheet_name)
+            # The classifier wants to discard this sheet entirely. Before
+            # honouring that, ask the drawing (INV-08 §3.4): measurable
+            # geometry OUTRANKS a keyword.
+            signal, veto_fires = self._skip_veto_signal(
+                pdf_path, page_index, sheet_name
+            )
+
+            if veto_fires:
+                # A keyword must not be able to veto measurable geometry.
+                # 16 of Moxy's 40 pages are guestroom prototypes carrying 5-6
+                # scaled "<NAME> - <KIND> PLAN" drawings each, discarded because
+                # an electrical keynote saying "COVER PLATE" bled into the
+                # title-block crop. The trigger here is the PRESENCE of scaled
+                # plan geometry — a position/shape signal, never a tuned count.
+                logger.info(
+                    "run_sheet: %r classified %r but carries %d scaled plan "
+                    "drawing(s) and %d scaled viewport(s) — classifier "
+                    "OVERRULED; deterministic path only (zero API)",
+                    sheet_name, resolved_type,
+                    signal["plan_titles"], signal["viewports"],
+                )
+                resolved_type = "floor_plan"
+                if coverage is not None:
+                    coverage.sheet_type = resolved_type
+                    coverage.classifier_overruled = True
+                    coverage.disposition = MEASURED_PARTIAL
+                    coverage.reason = (
+                        "classifier overruled; deterministic geometry only"
+                    )
+                    coverage.measurable_signal = dict(signal)
+
+                # DETERMINISTIC ONLY. Recovering these sheets onto the legacy
+                # vision path would be real API spend on a sheet a keyword
+                # already called worthless (INV-08 risk 1), so the veto never
+                # falls through to the vision passes below: it either returns
+                # deterministic geometry or returns an honest sentinel.
+                routed = None
+                if (
+                    self._settings.deterministic_enabled
+                    and pdf_path is not None
+                    and page_index is not None
+                ):
+                    routed = self._route_deterministic(
+                        image_path=image_path,
+                        sheet_name=sheet_name,
+                        resolved_type=resolved_type,
+                        pdf_path=pdf_path,
+                        page_index=page_index,
+                        guard=guard,
+                        full_page_text=full_page_text,
+                        deterministic_only=True,
+                    )
+                if routed is not None:
+                    self._apply_learned_flags_safe(routed)
+                    return routed
+
+                reason = (
+                    "classifier overruled on measurable geometry, but the "
+                    "deterministic engine produced nothing on this page"
+                )
+                logger.warning("run_sheet: %r — %s", sheet_name, reason)
+                if coverage is not None:
+                    coverage.disposition = SKIPPED_CLASSIFIER
+                    coverage.reason = reason
+                return {
+                    "_skipped": True,
+                    "sheet_type": resolved_type,
+                    "sheet_name": sheet_name,
+                    "sheet_source": image_path,
+                    "_skip_reason": reason,
+                    "_skip_keyword": classifier_keyword,
+                    "_skip_context": classifier_context,
+                    "_measurable_signal": dict(signal),
+                    "_classifier_overruled": True,
+                }
+
+            # The veto did not fire: nothing scaled and measurable on the page.
+            # This is a legitimate skip — and it is now RECORDED, with the
+            # keyword that decided it and the phrase that keyword landed in.
+            measurable = sum(signal.values()) > 0
+            disposition = SKIPPED_CLASSIFIER if measurable else NOT_APPLICABLE
+            reason = (
+                "classified %s by keyword %r%s"
+                % (
+                    resolved_type,
+                    classifier_keyword,
+                    "" if measurable else "; no measurable geometry on the page",
+                )
+            )
+            logger.info(
+                "run_sheet: skipping %r (%s, zero API cost) — %s",
+                sheet_name, resolved_type, reason,
+            )
+            if coverage is not None:
+                coverage.sheet_type = resolved_type
+                coverage.disposition = disposition
+                coverage.reason = reason
+                coverage.measurable_signal = dict(signal)
             return {
                 "_skipped": True,
                 "sheet_type": resolved_type,
                 "sheet_name": sheet_name,
                 "sheet_source": image_path,
+                "_skip_reason": reason,
+                "_skip_keyword": classifier_keyword,
+                "_skip_context": classifier_context,
+                "_measurable_signal": dict(signal),
             }
-
-        guard = budget or self._run_budget or BudgetGuard(self._settings.budget_usd)
 
         # Step 2.5 — deterministic-first routing (21-13). Vector plan sheets
         # never reach the vision extraction passes; raster plan sheets go to
@@ -1471,6 +1718,7 @@ class TakeoffPipeline:
         page_index: int,
         guard: BudgetGuard,
         full_page_text: str = "",
+        deterministic_only: bool = False,
     ) -> Optional[dict]:
         """Dispatch a deterministic-eligible sheet to the vector or raster flow.
 
@@ -1478,6 +1726,16 @@ class TakeoffPipeline:
         or a vector schedule sheet with no deterministic tables). Exceptions
         inside a branch degrade per-sheet to the error-dict convention —
         never crash the run (threat model: untrusted PDF flow).
+
+        Args:
+            deterministic_only: When True, the raster branch is refused and
+                None is returned instead. The raster branch is the ENSEMBLE
+                VISION path — it costs real money. The skip veto sets this,
+                because recovering sheets a keyword had already discarded must
+                never turn into unbudgeted spend on a scanned drawing set
+                (INV-08 risk 1). On a raster page there is no deterministic
+                geometry to recover, so the honest outcome is the recorded
+                skip, not a vision call.
         """
         try:
             doc = fitz.open(pdf_path)
@@ -1498,6 +1756,13 @@ class TakeoffPipeline:
                 return None
 
             raster = self._settings.raster_force or not is_vector_sheet(page)
+            if raster and deterministic_only:
+                logger.info(
+                    "run_sheet: %r — raster page, and the caller requires a "
+                    "deterministic-only route; refusing the vision ensemble "
+                    "(zero API)", sheet_name,
+                )
+                return None
             if raster:
                 if resolved_type not in _PLAN_SHEET_TYPES:
                     # Raster schedule sheets: vision reads the table image —
@@ -1768,7 +2033,11 @@ class TakeoffPipeline:
     # several regions (Moxy ID-411 -> 167 + 65 + 41 SF instead of one 342 SF
     # unit), so the callout is the reliable anchor for "one drawing".
     _FILL_CLIP_UP_PT = 620.0
-    _FILL_CLIP_SIDE_PT = 260.0
+    # Same value, one definition: the skip veto, the coverage ledger and
+    # scripts/coverage_probe.py bind a title to its scale callout with exactly
+    # the rule _measure_room_fills uses, so the oracle cannot drift from the
+    # thing it is the oracle for.
+    _FILL_CLIP_SIDE_PT = _TITLE_SCALE_SIDE_PT
 
     def _measure_room_fills(
         self,
@@ -2657,6 +2926,8 @@ class TakeoffPipeline:
         manifest=None,
         scale_feet_per_inch: Optional[float] = None,
         project_key: Optional[str] = None,
+        *,
+        coverage: Optional[CoverageLedger] = None,
     ) -> "tuple[list[dict], list[dict], str]":
         """Run the full pipeline for every page in a project.
 
@@ -2672,6 +2943,12 @@ class TakeoffPipeline:
 
             progress_callback: Optional ``callable(current, total, sheet_name)``
                 called once per page before extraction begins.
+            coverage: KEYWORD-ONLY, default None. The run's CoverageLedger,
+                already carrying one row per page of the source PDF. Each
+                page's row is threaded into ``run_sheet`` and enriched in
+                place, so a page that never becomes an entry in
+                ``all_extracted`` still leaves a record of itself. Exposed
+                afterwards as ``self.coverage_ledger``.
 
         Returns:
             A ``(all_extracted, all_estimates, project_type)`` tuple:
@@ -2690,6 +2967,10 @@ class TakeoffPipeline:
         # Lazy import — calculator does not import takeoff_pipeline.
         from bobbytailor.pipeline.calculator import apply_estimation_tables, _detect_project_type  # noqa: PLC0415
 
+        # The run's coverage ledger (INV-08 / SP-8). pdf_analyzer builds it and
+        # registers every source page BEFORE routing; run_sheet enriches each
+        # row. Exposed so plan 23-03 can hand it to generate_report.
+        self.coverage_ledger = coverage
         # Optional object manifest — used by targeted counting/measurement passes.
         self._manifest = manifest
         # Reliable scale (feet per inch): explicit arg wins, else a manifest
@@ -2824,6 +3105,15 @@ class TakeoffPipeline:
             if progress_callback:
                 progress_callback(i, total, sheet_name)
 
+            page_index = page.get("page_index")
+            sheet_coverage = (
+                coverage.sheet(page_index)
+                if coverage is not None and page_index is not None
+                else None
+            )
+            if sheet_coverage is not None:
+                sheet_coverage.sheet_name = sheet_name
+
             extracted = self.run_sheet(
                 image_path=image_path,
                 sheet_name=sheet_name,
@@ -2831,17 +3121,23 @@ class TakeoffPipeline:
                 title_block_text=title_block_text,
                 full_page_text=page.get("full_page_text", ""),
                 pdf_path=page.get("pdf_path"),
-                page_index=page.get("page_index"),
+                page_index=page_index,
                 budget=self._run_budget,
+                coverage=sheet_coverage,
             )
 
             # Tag original page number for downstream reporters.
             extracted["_page_num"] = page.get("page_num", i)
 
             if extracted.get("_skipped"):
+                # The sentinel stays OUT of all_extracted (every downstream
+                # contract is preserved) — but the page is no longer invisible:
+                # run_sheet has already written the reason, the deciding keyword
+                # and the measurable signal onto its ledger row.
                 logger.info(
-                    "run_project: skipping %r (sheet_type=%s)",
+                    "run_project: skipping %r (sheet_type=%s) — %s",
                     sheet_name, extracted.get("sheet_type"),
+                    extracted.get("_skip_reason", "no reason recorded"),
                 )
                 continue
 

@@ -138,8 +138,16 @@ class SheetCoverage:
 
     page_index: int
     sheet_name: str = ""
-    sheet_type: str = ""
+    sheet_type: str = ""               # the verdict the run actually routed on
     type_source: str = ""              # "title_block" | "full_page_text" | "default"
+    # The verdict the classifier's two-source fallback WOULD give if full-page
+    # text were consulted. Recorded, not acted on: measured over all four plan
+    # sets, consulting page text costs Chelsea 26 -> 17 and Bob's 5 -> 4
+    # deterministic-eligible pages while changing no skip count, so acting on it
+    # here would trade one fixture for another. Classification repair is plan
+    # 23-06's job, gated on the four-set check; this field is the evidence it
+    # needs.
+    sheet_type_full_text: str = ""
     classifier_keyword: str = ""       # the keyword that decided it (e.g. "COVER")
     classifier_context: str = ""       # ~+/-25 chars around the hit — auditable
     classifier_overruled: bool = False  # the skip veto fired (INV-08 §3.4)
@@ -165,6 +173,7 @@ class SheetCoverage:
             "sheet_name": self.sheet_name,
             "sheet_type": self.sheet_type,
             "type_source": self.type_source,
+            "sheet_type_full_text": self.sheet_type_full_text,
             "classifier_keyword": self.classifier_keyword,
             "classifier_context": self.classifier_context,
             "classifier_overruled": self.classifier_overruled,
