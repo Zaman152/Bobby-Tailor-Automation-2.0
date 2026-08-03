@@ -256,3 +256,24 @@ doing. Choosing it needs its own four-set sweep.
 
 **To fix:** cap the fallback distance at a justified multiple of the label height, or require the
 label's x-span to overlap the viewport's rather than merely its centre, and re-run the four-set diff.
+
+---
+
+## DEF-23-10 — the coverage ledger still calls a KEPT oversize region "rejected"
+
+**Found during:** 23-09 Task 3 (oversize regions kept and flagged).
+**Where:** `TakeoffPipeline._measure_room_fills`, the `MEASURED_PARTIAL` branch — the reason string
+reads *"N region(s) of X SF were rejected as larger than one unit"*.
+
+As of this plan an oversize region is **not** rejected: it is kept, counted into `area_sf`, and the
+result comes back flagged with a reason naming it. The out-list `dropped_regions` is still populated,
+so the ledger still learns the fact and the disposition (`MEASURED_PARTIAL`) is still right — but the
+verb is now wrong. The parameter name `dropped_regions` has the same problem at the API boundary.
+
+**NOT fixed here** because 23-09's constraints scope it to `room_fill.py` and its tests; the string
+and the call site both live in `takeoff_pipeline.py`, which is 23-11's file. Fixing it here would be
+an untested edit to a module this plan does not exercise.
+
+**To fix:** 23-11 (which already owns the clip cell in `_measure_room_fills`) should rename the
+out-parameter to `oversize_regions` and reword the ledger reason to *"N region(s) of X SF exceed the
+single-unit maximum and are included, flagged"*. Purely cosmetic; no measurement moves.

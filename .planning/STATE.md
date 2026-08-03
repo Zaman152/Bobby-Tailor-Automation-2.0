@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 23
 current_phase_name: measurement-engine-completion
 status: in-progress
-stopped_at: Completed 23-17-PLAN.md — report + export emission of the coverage record (SP-8), wave 2
-last_updated: "2026-08-03T15:35:17.353Z"
+stopped_at: Completed 23-09-PLAN.md
+last_updated: "2026-08-03T16:36:39.607Z"
 last_activity: 2026-08-03
 last_activity_desc: 23-17 surfaced the coverage ledger in every client artifact; a never-measured quantity is now a BLANK in takeoff.json, coverage.json, summary.txt, the CSV and the workbook; suite 1511 -> 1531
 progress:
   total_phases: 28
   completed_phases: 19
   total_plans: 121
-  completed_plans: 106
+  completed_plans: 107
   percent: 68
 ---
 
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 23 (measurement-engine-completion) — IN PROGRESS
-Plan: 9 of 17 complete (wave 2)
+Plan: 10 of 17 complete (wave 2)
 Status: wave 1 (23-01 ledger, 23-02 scale parser) done; wave 2 has 23-03 (flagged-zero contract), 23-04 (door-schedule unification), 23-05 (tag-pairing primitives), 23-06 (structural title-block identification) and 23-17 (report + export emission of the coverage record) landed
 Last activity: 2026-08-03 — 23-17 surfaced the coverage ledger in every client artifact; a never-measured quantity is now a BLANK in takeoff.json, coverage.json, summary.txt, the CSV and the workbook; suite 1511 -> 1531
 
@@ -75,6 +75,7 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 | Phase 23 P05 | 140 | 3 tasks | 6 files |
 | Phase 23 P07 | 4h | 3 tasks | 10 files |
 | Phase 23 P08 | ~2h05m | 3 tasks | 7 files |
+| Phase 23 P09 | ~2h20m | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,9 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 - [Phase ?]: 23-08: a unit key plan is identified by its own printed DRAWING TITLE (a title bound to a scale callout), not by a page-text search — Moxy p3 prints KEY PLAN in its title block and is correctly not selected
 - [Phase ?]: 23-08: the in-plan census supersedes the manifest per D-10; every count carries unit_count_source and disagreement is flagged on the row that uses the number — human_inputs/ is never edited
 - [Phase ?]: 23-08: no area is ever synthesized for a finish code; a called-out code becomes a named zero-quantity row seeded with its tag positions, and the finish-schedule path emits the same contract (D-03)
+- [Phase ?]: 23-09: the contour trace terminates on repetition of the FIRST TRANSITION, not on 'back at the seed facing west' — Moxy ACC KING TUB RCP re-enters its seed heading south and reported no perimeter at all
+- [Phase ?]: 23-09: MAX_HONEST_SHAPE_RATIO=8.0 is read off observed geometry (honest rooms 4.24-5.08, leaking AR fills 8.54-9.04, annotation cells 11.6-13.4) and is deliberately never applied to area
+- [Phase ?]: 23-09: an oversize region is KEPT AND FLAGGED — the hard drop returned None for the whole drawing, making a lobby indistinguishable from a genuine zero
 
 ### 22-04 Decisions
 
@@ -381,8 +385,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-03T15:34:53.453Z
-Stopped at: Completed 23-05-PLAN.md — tag-pairing primitives (SP-6), wave 2
+Last session: 2026-08-03T16:36:39.601Z
+Stopped at: Completed 23-09-PLAN.md
 Resume file: None
 
 ### Phase 23 decisions so far

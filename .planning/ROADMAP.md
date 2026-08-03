@@ -978,7 +978,7 @@ Plans:
 6. Door schedules parse across at least the Crow, Bob's, and Moxy formats
 7. Any sheet that produces zero measurable geometry emits an explicit coverage flag — a blank is never reported as a zero
 
-**Plans:** 9/17 plans executed
+**Plans:** 10/17 plans executed
 
 Plans are listed in EXECUTION order; the wave in each plan's frontmatter is authoritative.
 
@@ -991,7 +991,7 @@ Plans are listed in EXECUTION order; the wave in each plan's frontmatter is auth
 - [x] 23-06-PLAN.md — Structural title-block identification + keyword-context guard, four-set gated (wave 2)
 - [x] 23-07-PLAN.md — Page-space rotation correctness across clip, adjacency and callout binding (wave 3, SP-1)
 - [x] 23-08-PLAN.md — Room-mix census wiring + finish-tag flagged rows + finish-schedule unit fix (wave 4, SP-10)
-- [ ] 23-09-PLAN.md — Region geometry primitive: shared labeller, contour trace, perimeter, shape ratio (wave 4, SP-3)
+- [x] 23-09-PLAN.md — Region geometry primitive: shared labeller, contour trace, perimeter, shape ratio (wave 4, SP-3)
 - [ ] 23-10-PLAN.md — Open-run chainer core + styled harvest + viewport title-band fix (wave 4, SP-5)
 - [ ] 23-11-PLAN.md — Geometric clip cell + printed-extent cross-check replacing the plausibility cap (wave 5, SP-4)
 - [ ] 23-12-PLAN.md — Open-run selectors: annotated linetype + rail, position-validated (wave 6, SP-5)
