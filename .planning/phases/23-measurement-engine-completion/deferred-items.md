@@ -277,3 +277,32 @@ an untested edit to a module this plan does not exercise.
 **To fix:** 23-11 (which already owns the clip cell in `_measure_room_fills`) should rename the
 out-parameter to `oversize_regions` and reword the ledger reason to *"N region(s) of X SF exceed the
 single-unit maximum and are included, flagged"*. Purely cosmetic; no measurement moves.
+
+---
+
+## DEF-23-11 — three Crow page-2 captions still bind to no viewport
+
+**Found during:** 23-10 Task 3 (the schedule/drawing kind fix).
+**Where:** `printed_scale.match_scales_to_viewports`.
+
+Freeing the STAIR PLAN region took Crow page 2 from **4** unbound printed-scale labels to **3**.
+Zero — which INV-06 §3.5 predicted — is not reachable from `viewports.py`, and two of the three have
+nothing to do with viewport kinds:
+
+1. **Pigeonhole.** `match_scales_to_viewports` keeps at most ONE label per region. Crow page 2 draws
+   **13** captioned details into **11** non-title-block regions, so two labels cannot bind however
+   the kinds are assigned. The segmenter merges some adjacent details into one region.
+2. **The containment margin is symmetric.** A caption sits at its drawing's BOTTOM edge, but
+   `_contains(..., margin=6.0)` also accepts a label just ABOVE a region's TOP edge. R4's top is
+   `623` and `RAMP RAIL SECTION`'s caption is at `y=620`; R12's top is `1450` and `Z-GUARD DETAIL`'s
+   is at `y=1445`. Both captions are therefore claimed by the drawing BELOW them, which already owns
+   a nearer label, so they are dropped.
+
+**NOT fixed here** because both live in `printed_scale.py`, which 23-10 does not touch, and because
+either change is a shared-path edit that needs its own four-fixture before/after sweep. Neither
+blocks 23-12: all five estimator rail marks already sit in an unmasked viewport bound to the scale
+INV-06 measured them at.
+
+**To fix:** make the containment margin asymmetric (slop below and sideways, none above the top
+edge), and let a region own more than one caption when the labels are vertically separated — then
+re-run the four-set scale diff.

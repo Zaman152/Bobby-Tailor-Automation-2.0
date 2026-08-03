@@ -992,7 +992,7 @@ Plans are listed in EXECUTION order; the wave in each plan's frontmatter is auth
 - [x] 23-07-PLAN.md — Page-space rotation correctness across clip, adjacency and callout binding (wave 3, SP-1)
 - [x] 23-08-PLAN.md — Room-mix census wiring + finish-tag flagged rows + finish-schedule unit fix (wave 4, SP-10)
 - [x] 23-09-PLAN.md — Region geometry primitive: shared labeller, contour trace, perimeter, shape ratio (wave 4, SP-3)
-- [ ] 23-10-PLAN.md — Open-run chainer core + styled harvest + viewport title-band fix (wave 4, SP-5)
+- [x] 23-10-PLAN.md — Open-run chainer core + styled harvest + viewport title-band fix (wave 4, SP-5)
 - [ ] 23-11-PLAN.md — Geometric clip cell + printed-extent cross-check replacing the plausibility cap (wave 5, SP-4)
 - [ ] 23-12-PLAN.md — Open-run selectors: annotated linetype + rail, position-validated (wave 6, SP-5)
 - [ ] 23-13-PLAN.md — Wall-area binder + basis registry + one-area-one-item arbitration + multiplier honesty (wave 6, SP-9)
