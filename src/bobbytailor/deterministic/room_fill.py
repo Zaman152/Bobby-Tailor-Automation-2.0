@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import logging
 import re
+from array import array
 from collections import deque
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
@@ -230,50 +231,143 @@ def select_fill_for_basis(fills: Sequence[RoomFillResult], basis: str) -> Option
     return min(pool, key=lambda f: f.area_sf)
 
 
-def _label_regions(samples, width: int, height: int, px_area_sf: float) -> List[FilledRegion]:
-    """Connected-component label every free (non-ink) region in a gray bitmap."""
+@dataclass
+class LabelledMask:
+    """The output of :func:`label_mask` — a labelled bitmap that KEEPS its labels.
+
+    ``labels[i]`` is the 1-based component id of pixel ``i``, or 0 for a pixel
+    that is not set in the input mask. The three per-component lists are
+    parallel and 0-indexed, so component ``k`` (1-based) is described by
+    ``counts[k - 1]``, ``starts[k - 1]`` and ``touches_edge[k - 1]``.
+    """
+
+    labels: "array"
+    counts: List[int]
+    starts: List[int]
+    touches_edge: List[bool]
+    width: int
+    height: int
+
+    @property
+    def count(self) -> int:
+        return len(self.counts)
+
+
+# 1 where the sample is free space, 0 where it is ink. Built once at import so
+# the per-pixel classification is a single C-level ``bytes.translate`` rather
+# than a 1.2-million-iteration Python loop per clip — the labeller is already
+# the dominant cost of a fill (T-23-33) and the render resolution constant is
+# deliberately NOT raised to compensate (R11).
+_FREE_TABLE = bytes(1 if v > INK_THRESHOLD else 0 for v in range(256))
+
+
+def free_mask(samples, n_px: int):
+    """The free-space (non-ink) mask of a grayscale sample buffer."""
+    try:
+        return samples.translate(_FREE_TABLE)
+    except (AttributeError, TypeError, ValueError):  # a list, a test stub
+        out = bytearray(n_px)
+        for i in range(n_px):
+            if samples[i] > INK_THRESHOLD:
+                out[i] = 1
+        return out
+
+
+def label_mask(mask, width: int, height: int) -> LabelledMask:
+    """Connected-component label a boolean/byte mask, KEEPING the labels.
+
+    THE one labeller (D-03). Three consumers share this single implementation
+    so a clip is labelled ONCE, not once per question asked of it:
+
+    1. the enclosed-void consumer — :func:`measure_enclosed_area`, which labels
+       free space and measures each void that does not touch the clip edge;
+    2. the contour consumer — :func:`_trace_outer_contour`, which needs the
+       label array and each component's seed pixel, both of which the previous
+       implementation built and then threw away;
+    3. the silhouette-complement consumer that plan 23-14 adds, which labels
+       INK rather than free space. Nothing here knows which of the two it was
+       handed, which is exactly why one function can serve both.
+
+    Connectivity is 4-way, unchanged: a room that leaks into the outside
+    through a diagonal pixel gap is not enclosed, and 8-way labelling of free
+    space would silently merge them.
+
+    Args:
+        mask:   a ``bytes``/``bytearray``/sequence where a truthy entry is a
+                member pixel, indexed row-major.
+        width:  pixels per row.
+        height: rows.
+
+    Returns:
+        A :class:`LabelledMask`. ``starts[k]`` is component ``k+1``'s
+        TOPMOST-then-LEFTMOST pixel by construction: the outer scan runs in
+        raster order, so the first pixel of a component ever visited is its
+        lowest linear index, which is its smallest ``y`` and, within that row,
+        its smallest ``x``. That is precisely the seed a Moore-neighbour trace
+        requires, so no second pass is needed to find it.
+    """
     n_px = width * height
-    free = bytearray(n_px)
-    for i in range(n_px):
-        if samples[i] > INK_THRESHOLD:
-            free[i] = 1
-    seen = bytearray(n_px)
-    out: List[FilledRegion] = []
+    labels = array("i")
+    labels.frombytes(b"\x00" * (labels.itemsize * n_px))
+    counts: List[int] = []
+    starts: List[int] = []
+    edges: List[bool] = []
+    last_row = n_px - width
     for start in range(n_px):
-        if not free[start] or seen[start]:
+        if not mask[start] or labels[start]:
             continue
+        cid = len(counts) + 1
         queue = deque([start])
-        seen[start] = 1
+        labels[start] = cid
         count = 0
         edge = False
         while queue:
             idx = queue.popleft()
             count += 1
-            x, y = idx % width, idx // width
-            if x == 0 or y == 0 or x == width - 1 or y == height - 1:
+            x = idx % width
+            if x == 0 or x == width - 1 or idx < width or idx >= last_row:
                 edge = True
             if x + 1 < width:
                 j = idx + 1
-                if free[j] and not seen[j]:
-                    seen[j] = 1
+                if mask[j] and not labels[j]:
+                    labels[j] = cid
                     queue.append(j)
             if x > 0:
                 j = idx - 1
-                if free[j] and not seen[j]:
-                    seen[j] = 1
+                if mask[j] and not labels[j]:
+                    labels[j] = cid
                     queue.append(j)
-            if y + 1 < height:
+            if idx < last_row:
                 j = idx + width
-                if free[j] and not seen[j]:
-                    seen[j] = 1
+                if mask[j] and not labels[j]:
+                    labels[j] = cid
                     queue.append(j)
-            if y > 0:
+            if idx >= width:
                 j = idx - width
-                if free[j] and not seen[j]:
-                    seen[j] = 1
+                if mask[j] and not labels[j]:
+                    labels[j] = cid
                     queue.append(j)
-        out.append(FilledRegion(area_sf=count * px_area_sf, px=count, touches_edge=edge))
-    return out
+        counts.append(count)
+        starts.append(start)
+        edges.append(edge)
+    return LabelledMask(
+        labels=labels, counts=counts, starts=starts, touches_edge=edges,
+        width=width, height=height,
+    )
+
+
+def _label_regions(samples, width: int, height: int, px_area_sf: float) -> List[FilledRegion]:
+    """Connected-component label every free (non-ink) region in a gray bitmap.
+
+    A thin projection over :func:`label_mask` — the counting view of the one
+    labeller, for callers that want areas and nothing else. The return shape is
+    exactly what it always was, so no caller moves.
+    """
+    labelled = label_mask(free_mask(samples, width * height), width, height)
+    return [
+        FilledRegion(area_sf=count * px_area_sf, px=count, touches_edge=edge)
+        for count, edge in zip(labelled.counts, labelled.touches_edge)
+    ]
 
 
 def measure_enclosed_area(

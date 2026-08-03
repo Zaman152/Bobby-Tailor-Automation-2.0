@@ -16,6 +16,7 @@ from bobbytailor.deterministic.room_fill import (
     RoomFillResult,
     flag_implausible_unit,
     from_page_space,
+    label_mask,
     measure_enclosed_area,
     select_fill_for_basis,
     to_page_space,
@@ -24,6 +25,8 @@ from bobbytailor.deterministic.room_fill import (
 
 # 1/4" = 1'-0"  ->  4 ft per inch  ->  4/72 ft per point (Moxy's guestroom scale)
 FPP_QUARTER = 4.0 / 72.0
+
+MOXY_PDF = "uploads/Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf"
 
 
 def _page_with_room(width_ft, height_ft, fpp=FPP_QUARTER, wall_pt=2.0, inner=None):
@@ -534,3 +537,188 @@ def test_the_discipline_mapping_is_unchanged():
 def test_an_unknown_basis_still_selects_nothing():
     assert select_fill_for_basis([_fill("RCP", 300.0)], "linear") is None
     assert select_fill_for_basis([_fill("RCP", 300.0)], "") is None
+
+
+# ── SP-3: ONE shared mask labeller (23-09 Task 1) ────────────────────────────
+#
+# The previous implementation built a labelled bitmap and threw it away,
+# returning only counts — which is why no perimeter primitive existed anywhere
+# in the package (INV-01 §3). `label_mask` keeps the labels, so the contour
+# consumer here, the enclosed-void consumer that already existed, and the
+# silhouette consumer plan 23-14 adds all label a clip ONCE (D-03).
+
+
+def _mask(rows):
+    """A byte mask from an ASCII picture: '#' is set, anything else is clear."""
+    width = len(rows[0])
+    assert all(len(r) == width for r in rows), "the picture must be rectangular"
+    flat = bytearray()
+    for r in rows:
+        flat.extend(1 if ch == "#" else 0 for ch in r)
+    return flat, width, len(rows)
+
+
+def test_label_mask_finds_every_component_with_its_pixel_count():
+    """Three known components, hand-counted."""
+    mask, w, h = _mask([
+        ".....",
+        ".##..",
+        ".##..",
+        "....#",
+        "###..",
+    ])
+    out = label_mask(mask, w, h)
+    assert out.count == 3
+    assert sorted(out.counts) == [1, 3, 4]
+    assert sum(out.counts) == sum(mask), "every set pixel belongs to exactly one component"
+
+
+def test_label_mask_reports_which_components_touch_the_edge():
+    """The edge flag is the whole basis of 'this region is the OUTSIDE'."""
+    mask, w, h = _mask([
+        ".....",
+        ".##..",
+        ".##..",
+        "....#",
+        "###..",
+    ])
+    out = label_mask(mask, w, h)
+    by_start = dict(zip(out.starts, out.touches_edge))
+    assert by_start[1 * 5 + 1] is False, "the interior 2x2 block touches no edge"
+    assert by_start[3 * 5 + 4] is True, "the single pixel sits on the right edge"
+    assert by_start[4 * 5 + 0] is True, "the bottom strip sits on the bottom edge"
+
+
+def test_the_first_pixel_of_a_component_is_its_topmost_then_leftmost():
+    """The Moore trace is seeded here, so the seed must be exactly this pixel.
+
+    A raster-order scan visits a component's lowest linear index first, which
+    is its smallest y and — within that row — its smallest x. The property is
+    asserted rather than assumed because a wrong seed sends the trace around an
+    interior hole instead of the outer ring.
+    """
+    mask, w, h = _mask([
+        "..###",
+        ".####",
+        "####.",
+        "..##.",
+    ])
+    out = label_mask(mask, w, h)
+    assert out.count == 1
+    start = out.starts[0]
+    assert (start % w, start // w) == (2, 0)
+    # independently recomputed from the mask itself
+    members = [(i % w, i // w) for i in range(w * h) if mask[i]]
+    assert min(members, key=lambda p: (p[1], p[0])) == (start % w, start // w)
+
+
+def test_the_labels_array_is_the_thing_that_used_to_be_discarded():
+    """Every set pixel carries its component id; every clear pixel carries 0."""
+    mask, w, h = _mask([
+        "##..",
+        "##..",
+        "..##",
+    ])
+    out = label_mask(mask, w, h)
+    assert out.count == 2
+    assert len(out.labels) == w * h
+    for i in range(w * h):
+        assert (out.labels[i] != 0) is bool(mask[i])
+    assert out.labels[0] != out.labels[2 * w + 2], "the two blocks are distinct"
+
+
+def test_label_mask_is_four_connected_so_a_diagonal_gap_is_not_a_leak():
+    """8-way labelling of free space would merge a room with the outside
+    through a single diagonal pixel gap and the room would be lost."""
+    mask, w, h = _mask([
+        "#..",
+        ".#.",
+        "..#",
+    ])
+    assert label_mask(mask, w, h).count == 3
+
+
+def test_label_regions_is_a_projection_over_the_one_labeller():
+    """D-03: the counting view must not be a second implementation."""
+    import inspect
+
+    from bobbytailor.deterministic import room_fill as r
+
+    src = inspect.getsource(r._label_regions)
+    assert "label_mask" in src
+    assert "deque" not in src, "the breadth-first search lives in ONE place"
+
+
+# ── the real-PDF measurement baseline (23-09, T-23-35) ───────────────────────
+
+
+@pytest.fixture(scope="module")
+def moxy_prototype_fills():
+    """Every drawing on Moxy's 16 prototype-unit sheets, measured ONCE.
+
+    ~70 s of pure-Python flood fill over ~1.2 M pixels per clip. Module-scoped
+    deliberately: the area baseline, the perimeter assertions and the blind
+    shape-ratio bands all read the SAME measurement, so the evidence is one run
+    of the engine rather than three, and the suite pays for it once.
+    """
+    import os
+
+    if not os.path.exists(MOXY_PDF):
+        pytest.skip("the real Moxy plan set is not present")
+    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+    pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    doc = fitz.open(MOXY_PDF)
+    try:
+        out = {
+            pno: pipe._measure_room_fills(doc[pno], [], {}, "p%d" % pno)[0]
+            for pno in range(23, 39)
+        }
+    finally:
+        doc.close()
+    return out
+
+
+def _dominant(fills, page, kind):
+    """The largest-area region of the *kind* drawing on *page*."""
+    picks = [f for f in fills[page] if f.plan_kind == kind]
+    assert len(picks) == 1, "expected exactly one %s drawing on page %d" % (kind, page)
+    return picks[0]
+
+
+# (page, plan name, area_sf) as measured BEFORE any of 23-09's changes, taken
+# from a probe run of the shipped engine. These are the sixteen reflected-
+# ceiling prototypes; §14 of PIPELINE-GROUND-TRUTH records four of them
+# (229.4 / 341.7 / 272.6 / 274.6) and INV-01 §1 records ACC QQ RIS at 451.1.
+#
+# Their job is T-23-35: adding perimeter must not perturb a shipped area by a
+# single decimal. If a refactor here moves one of these, the refactor is wrong
+# — the number is NOT to be updated to match.
+MOXY_RCP_AREA_BASELINE = [
+    (23, "KING A", 229.4),
+    (24, "KING B", 235.5),
+    (25, "KING C", 217.6),
+    (26, "KING SUITE A", 362.5),
+    (27, "KING SUITE B", 341.7),
+    (28, "KING SUITE C", 458.3),
+    (29, "QQ A", 272.6),
+    (30, "QQ B", 309.5),
+    (31, "QQ C", 284.3),
+    (32, "BUNK A", 454.7),
+    (33, "BUNK B", 274.6),
+    (34, "ADA KING RIS", 347.2),
+    (35, "ACC KING TUB", 347.7),
+    (36, "ACC QQ RIS", 451.1),
+    (37, "ACC QQ TUB", 463.0),
+    (38, "ACC BUNK", 458.5),
+]
+
+
+def test_the_sixteen_sheet_moxy_area_baseline_is_byte_identical(moxy_prototype_fills):
+    """Not `approx` — EQUAL. Area is the shipped number and must not move."""
+    measured = [
+        (page, _dominant(moxy_prototype_fills, page, "RCP").plan_name,
+         _dominant(moxy_prototype_fills, page, "RCP").area_sf)
+        for page, _, _ in MOXY_RCP_AREA_BASELINE
+    ]
+    assert measured == MOXY_RCP_AREA_BASELINE
