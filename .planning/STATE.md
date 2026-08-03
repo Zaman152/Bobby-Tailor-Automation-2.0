@@ -5,15 +5,15 @@ milestone_name: milestone
 current_phase: 23
 current_phase_name: measurement-engine-completion
 status: in-progress
-stopped_at: Completed 23-02-PLAN.md — printed-scale parser hardening (SP-2), wave 1
+stopped_at: Completed 23-03-PLAN.md — the flagged-zero contract (SP-8), wave 2
 last_updated: "2026-08-03T00:00:00.000Z"
 last_activity: 2026-08-03
-last_activity_desc: 23-02 anchored the paper-inch parse — 7 Bob's scales corrected, 383 unmoved
+last_activity_desc: 23-03 made quantity Optional[float] — a blank can no longer render as a zero
 progress:
   total_phases: 28
   completed_phases: 19
   total_plans: 121
-  completed_plans: 99
+  completed_plans: 100
   percent: 68
 ---
 
@@ -30,11 +30,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 23 (measurement-engine-completion) — IN PROGRESS
-Plan: 2 of 17 complete (wave 1)
-Status: 23-01 (coverage ledger + skip veto) and 23-02 (printed-scale parser, SP-2) landed
-Last activity: 2026-08-03 — 23-02 corrected 7 Bob's printed scales, 0 movement on Crow/Moxy/Chelsea
+Plan: 3 of 17 complete (wave 2)
+Status: wave 1 (23-01 ledger, 23-02 scale parser) and 23-03 (flagged-zero contract) landed
+Last activity: 2026-08-03 — 23-03 landed quantity Optional[float] + drop records; suite 1310 -> 1353
 
-Progress: [█░░░░░░░░░] 12%
+Progress: [██░░░░░░░░] 18%
 
 Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 success criteria met.
 
@@ -71,6 +71,7 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 | Phase 22 P01 | 17min | 3 tasks | 6 files |
 | Phase 22 P04 | 38min | 3 tasks | 13 files |
 | Phase 23 P02 | ~2h | 3 tasks | 5 files |
+| Phase 23 P03 | ~3h | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -368,7 +369,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-08-03T00:00:00.000Z
-Stopped at: Completed 23-02-PLAN.md — printed-scale parser hardening (SP-2), wave 1
+Stopped at: Completed 23-03-PLAN.md — the flagged-zero contract (SP-8), wave 2
 Resume file: None
 
 ### Phase 23 decisions so far
@@ -382,3 +383,21 @@ Resume file: None
 - 23-02: `scale_probe.py`'s human report is byte-frozen; new detail goes in `--json`.
 - 23-02: DEF-23-01/02/03 logged to `deferred-items.md` rather than fixed — DEF-23-01 would break
   the very pin this plan establishes, DEF-23-03 (BUG-C) belongs to plan 23-07.
+- 23-03: `quantity` is `Optional[float]`. `None` means "not measured"; `0.0` means "measured as
+  zero". The only correct test is `is None` — a comparison against zero is the bug itself.
+- 23-03: provenance is COMPUTED FROM THE RECORD. The aggregator builds the four-value status from
+  what the run did and passes it to `provenance_of_row`, so nothing infers provenance from a value
+  and a manifest-NAMED measurement is never relabelled as a human input.
+- 23-03: in plans-only mode, expected items come from `learned.expected_items` plus library entries
+  carrying a measure BASIS — a basis is the app's own statement that it knows what measuring the
+  item would mean. Bounded: 10 rows for Bob's (incl. `Lintels`), 25 for Crow.
+- 23-03: an expected item is suppressed when any contributing description RESOLVED to it, whatever
+  name finally won — otherwise a human's rename makes the same object both measured and missing.
+- 23-03: `excluded_viewports` stays separate from `coverage_drops`: a deliberate off-scale exclusion
+  is correct behaviour, and conflating it with a failure would make a well-measured sheet read partial.
+- 23-03: `select_fill_for_basis` prefers-then-falls-back instead of filtering. A flagged fill is
+  returned WITH its flag so the caller flags; it never vanishes.
+- 23-03: a probe that skips a page must say so — silence in the tooling is the same defect one
+  layer out (Crow printed nothing at all and reported `TOTAL rooms=0`).
+- 23-03: DEF-23-04 logged — the pre-existing `max_region_sf` test passes for the wrong reason (its
+  fixture overflows the page, so the region is discarded as the outside before the guard is reached).
