@@ -1820,6 +1820,9 @@ def _fuse_rooms(
 _ROW_NAME_KEYS = ("ITEM", "DESCRIPTION", "TYPE", "NAME")
 _ROW_QTY_KEYS = ("QTY", "QUANTITY", "COUNT")
 _ROW_UNIT_KEYS = ("UNIT", "UNITS", "UOM")
+# The row's own tag/room identifier, so a flagged finish row says WHERE it
+# applies — a reviewer who cannot find the room cannot close the flag.
+_SCHEDULE_TAG_KEYS = ("TAG", "ROOM", "ROOM NO.", "ROOM NO", "MARK", "NO.")
 
 
 def _row_lookup(row: dict, keys) -> Optional[str]:
@@ -1832,16 +1835,32 @@ def _row_lookup(row: dict, keys) -> Optional[str]:
     return None
 
 
+#: Schedule kinds whose rows are TYPE DECLARATIONS, not installed quantities.
+#:
+#: A door-schedule row is one opening: counting it as one each is correct. A
+#: FINISH-schedule row is "room 204's walls are WC-1" — it declares WHICH finish
+#: applies, and the quantity is an area nobody has measured. Emitting ``1 EA``
+#: for it is not a small error: it is a fabricated unit on a fabricated number,
+#: and it renders as a completed line item. So a finish row takes the SAME shape
+#: as the material-tag row above — zero SF, flagged, with the room tag in the
+#: reason — and the two finish paths converge on one contract rather than
+#: producing two different flag shapes for the same idea (D-03).
+_TYPE_DECLARATION_SCHEDULE_KINDS = frozenset({"finish"})
+
+
 def _fuse_schedules(bundle: dict, components: List[dict]) -> None:
     """Schedule rows (tables.py) → components with schedule_table provenance.
 
     Rows are grouped by their name column; an explicit QTY cell is parsed
     verbatim (text-layer ground truth), otherwise each row counts as one
-    installed instance (e.g. one door per door-schedule row).
+    installed instance (e.g. one door per door-schedule row) — EXCEPT for the
+    kinds in :data:`_TYPE_DECLARATION_SCHEDULE_KINDS`, which declare a type
+    rather than an installed quantity and are emitted flagged at zero.
     """
     for sched in bundle.get("schedules") or []:
         kind = str(_field(sched, "kind", "schedule") or "schedule")
         table_conf = _field(sched, "confidence", "medium")
+        declares_type = _norm_name(kind) in _TYPE_DECLARATION_SCHEDULE_KINDS
         grouped: Dict[str, dict] = {}
         order: List[str] = []
         for row in _field(sched, "rows", []) or []:
@@ -1857,12 +1876,42 @@ def _fuse_schedules(bundle: dict, components: List[dict]) -> None:
             key = _norm_name(name)
             slot = grouped.get(key)
             if slot is None:
-                grouped[key] = {"name": name, "quantity": qty, "unit": unit}
+                grouped[key] = {"name": name, "quantity": qty, "unit": unit,
+                                "tags": []}
                 order.append(key)
             else:
                 slot["quantity"] += qty
+            if declares_type:
+                tag = _row_lookup(row, _SCHEDULE_TAG_KEYS)
+                if tag and tag not in grouped[key]["tags"]:
+                    grouped[key]["tags"].append(tag)
         for key in order:
             slot = grouped[key]
+            if declares_type:
+                tags = slot["tags"]
+                components.append(
+                    {
+                        "name": slot["name"],
+                        "quantity": 0,
+                        "unit": "SF",
+                        "provenance": "schedule_table",
+                        "confidence": "low",
+                        "schedule_kind": kind,
+                        "candidate_id": "FINISH-%s" % slot["name"],
+                        "name_source": "schedule_table",
+                        "tag_positions_pt": [],
+                        "needs_review": True,
+                        "review_reason": (
+                            "%s is a %s-schedule row: it DECLARES which finish "
+                            "applies%s, it does not state how much was "
+                            "installed. The area was NOT measured and was NOT "
+                            "estimated; measure it in the workspace."
+                            % (slot["name"], kind,
+                               " to %s" % ", ".join(tags) if tags else "")
+                        ),
+                    }
+                )
+                continue
             quantity = slot["quantity"]
             if quantity == int(quantity):
                 quantity = int(quantity)

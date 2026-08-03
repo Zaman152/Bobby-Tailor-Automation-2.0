@@ -19,6 +19,22 @@ the honesty policy already documented in ``schedule_extraction.py``.
 Every extracted ``ScheduleTable`` records its ``bbox_pt`` so the fusion layer
 can mask schedule regions out of measurement and the symbols module can
 exclude them from clustering.
+
+UNTESTED AGAINST A REAL SHEET — ``kind="finish"``
+-------------------------------------------------
+As of the INV-05 investigation, ``kind="finish"`` has **never fired on any real
+input**.  Re-run across all four plan sets it returns zero tables every time
+(Moxy: door; Crow: door; Bob's: door + keynote; Chelsea: nothing).  Moxy's own
+drawing index lists ``CS-03 NOTES, REQUIREMENTS, FINISH SCHEDULES`` on page 1
+and **that sheet is not in the PDF**, so there is nothing to parse; its
+wall-covering quantities are interior-elevation callouts read by
+``deterministic/finish_tags.py`` instead.
+
+The vocabulary is deliberately KEPT — a ruled finish schedule is real on other
+drawing sets — but it is exercised only by the synthetic fixture in
+``tests/test_tables.py``, so treat its behaviour on a real sheet as unproven.
+A regression guard asserts the zero across all four sets, so the day it does
+fire will be visible rather than silent.
 """
 from __future__ import annotations
 

@@ -1117,3 +1117,114 @@ def test_a_tag_inside_a_schedule_or_legend_mask_never_becomes_a_row():
     result = fuse_sheet(bundle, {"matches": []})
     assert not [c for c in result["components"]
                 if c.get("name_source") == "material_tag"]
+
+
+# ---------------------------------------------------------------------------
+# 23-08 — a finish-schedule row is a TYPE DECLARATION, not one each.
+#
+# INV-05 §4 row 5: every schedule row emitted `quantity = 1.0, unit = "EA"`, so
+# even if a finish schedule parsed, WC-1 would land as "1 EA" — a fabricated
+# unit on a fabricated number, rendered as a completed line item. The finish
+# kind now takes the same shape the material-tag path emits (D-03).
+# ---------------------------------------------------------------------------
+
+
+def _schedule(kind, rows, confidence="high"):
+    return {"kind": kind, "confidence": confidence, "rows": rows,
+            "bbox_pt": (0, 0, 100, 100)}
+
+
+def test_a_finish_schedule_row_never_reports_one_each():
+    bundle = {"sheet_name": "CS-03", "schedules": [
+        _schedule("finish", [{"TAG": "204", "ITEM": "WC-1", "FINISH": "WALLCOVERING"}])
+    ]}
+    result = fuse_sheet(bundle, {"matches": []})
+    rows = [c for c in result["components"] if c.get("schedule_kind") == "finish"]
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["quantity"] == 0, "a type declaration is not an installed quantity"
+    assert row["unit"] == "SF", "and it is certainly not one EACH"
+    assert row["needs_review"] is True
+    assert "204" in row["review_reason"], "the room tag must be in the reason"
+    assert "NOT measured" in row["review_reason"]
+
+
+def test_the_two_finish_paths_emit_one_contract():
+    """D-03: the same idea must not produce two different flag shapes."""
+    sched_bundle = {"sheet_name": "CS-03", "schedules": [
+        _schedule("finish", [{"TAG": "204", "ITEM": "WC-1"}])
+    ]}
+    tag_bundle = _elevation_bundle([("WC-1", (10, 20, 40, 32))])
+
+    from_schedule = [c for c in fuse_sheet(sched_bundle, {"matches": []})["components"]
+                     if c.get("schedule_kind") == "finish"][0]
+    from_tag = [c for c in fuse_sheet(tag_bundle, {"matches": []})["components"]
+                if c.get("name_source") == "material_tag"][0]
+
+    for field in ("quantity", "unit", "needs_review", "confidence"):
+        assert from_schedule[field] == from_tag[field], field
+    assert from_schedule["candidate_id"].startswith("FINISH-")
+    assert from_tag["candidate_id"].startswith("FINISH-")
+    assert "tag_positions_pt" in from_schedule and "tag_positions_pt" in from_tag
+
+
+def test_a_door_kind_and_a_keynote_kind_are_untouched():
+    """The change is scoped to the finish kind — a door row IS one opening."""
+    bundle = {"sheet_name": "A7-01", "schedules": [
+        _schedule("door", [{"TYPE": "WD-1", "QTY": "3"}, {"TYPE": "HM-2"}]),
+        _schedule("keynote", [{"ITEM": "Note 1"}]),
+    ]}
+    rows = {c["name"]: c for c in fuse_sheet(bundle, {"matches": []})["components"]}
+
+    assert rows["WD-1"]["quantity"] == 3 and rows["WD-1"]["unit"] == "EA"
+    assert rows["HM-2"]["quantity"] == 1 and rows["HM-2"]["unit"] == "EA"
+    assert rows["WD-1"]["needs_review"] is False
+    assert rows["Note 1"]["quantity"] == 1 and rows["Note 1"]["unit"] == "EA"
+    assert rows["Note 1"]["confidence"] == "high", "table confidence is preserved"
+
+
+def test_a_finish_row_with_no_room_tag_still_flags_without_inventing_one():
+    bundle = {"sheet_name": "CS-03", "schedules": [
+        _schedule("finish", [{"ITEM": "WC-1"}])
+    ]}
+    row = [c for c in fuse_sheet(bundle, {"matches": []})["components"]
+           if c.get("schedule_kind") == "finish"][0]
+    assert row["quantity"] == 0 and row["needs_review"] is True
+    assert " to " not in row["review_reason"]
+
+
+def test_no_real_plan_set_produces_a_finish_schedule():
+    """INV-05 §6 item 1, the regression guard for this change, on all four sets.
+
+    `kind="finish"` has never fired on a real input: Moxy's CS-03 is indexed on
+    page 1 and is not in the PDF. Keeping the vocabulary is right; pretending it
+    is exercised would not be. The day it fires, this test says so.
+    """
+    import os
+
+    import fitz
+
+    from bobbytailor.deterministic.tables import extract_schedules
+
+    uploads = os.path.join(os.path.dirname(__file__), os.pardir, "uploads")
+    names = [
+        "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+        "Crow - Cass White Road-Plans.pdf",
+        "Bob's Discount Furniture - Kennesaw, GA-plans.pdf",
+        "Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf",
+    ]
+    paths = [os.path.join(uploads, n) for n in names]
+    missing = [n for n, p in zip(names, paths) if not os.path.exists(p)]
+    if missing:
+        pytest.skip("plan set(s) not present: %s" % ", ".join(missing))
+
+    for name, path in zip(names, paths):
+        doc = fitz.open(path)
+        try:
+            kinds = [t.kind for t in extract_schedules(doc)]
+        finally:
+            doc.close()
+        assert "finish" not in kinds, "%s now yields a finish schedule: %s" % (
+            name, kinds,
+        )
