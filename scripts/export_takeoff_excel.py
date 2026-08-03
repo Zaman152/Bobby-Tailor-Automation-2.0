@@ -27,6 +27,17 @@ for p in (ROOT, ROOT / "src"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
+# The classification is a RECORD, not a presentation choice, so it lives in the
+# package (INV-08 §5). The local copy this import replaces inferred provenance
+# from the value — `float(qty or 0) <= 0 -> NOT MEASURED` — which made a
+# genuinely measured zero indistinguishable from a measurement never attempted,
+# could not label an item that produced no row at all (and absence is precisely
+# the defect), and was visible only to spreadsheet users while the JSON, the CSV,
+# the web view and the API all shipped the bare number. This script keeps
+# ownership of layout, colours and the About sheet; that is genuinely
+# presentation.
+from bobbytailor.pipeline.provenance import provenance_of_row  # noqa: E402
+
 
 def _load(run_dir: Path) -> dict:
     f = run_dir / "takeoff.json"
@@ -35,16 +46,10 @@ def _load(run_dir: Path) -> dict:
     return json.loads(f.read_text())
 
 
-def _provenance(row: dict) -> str:
-    qty = row.get("quantity")
-    if qty in (None, "") or float(qty or 0) <= 0:
-        return "NOT MEASURED"
-    if row.get("needs_review"):
-        return "NEEDS REVIEW"
-    src = str(row.get("source") or "").lower()
-    if src in ("manifest", "human", "learned"):
-        return "HUMAN INPUT"
-    return "MEASURED"
+def _row_provenance(row: dict) -> str:
+    """The provenance the RUN recorded, falling back to the one place that
+    decides the vocabulary for a pre-23 row that carries none."""
+    return str(row.get("provenance") or provenance_of_row(row))
 
 
 def build(run_dir: Path, out: Path, golden_pdf: Path = None) -> Path:
@@ -84,9 +89,14 @@ def build(run_dir: Path, out: Path, golden_pdf: Path = None) -> Path:
         "NOT MEASURED": "F2F2F2",
     }
     for row in sorted(summary, key=lambda r: -(float(r.get("quantity") or 0))):
-        prov = _provenance(row)
+        prov = _row_provenance(row)
         name = str(row.get("item", ""))
+        # A never-measured quantity keeps a BLANK cell. openpyxl writes None as
+        # an empty cell, and an empty cell is the only honest rendering: a zero
+        # here would be a number the run never measured.
         qty = row.get("quantity")
+        if qty == "":
+            qty = None
         detail = row.get("detail") or []
         formula = ""
         for d in detail:
@@ -118,6 +128,65 @@ def build(run_dir: Path, out: Path, golden_pdf: Path = None) -> Path:
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
     ws.freeze_panes = "A2"
 
+    # ── coverage: one row per PAGE OF THE SOURCE PDF ─────────────────────────
+    # The take-off sheet above shows the pages that produced numbers. This one
+    # shows the whole source PDF, so a page that produced nothing is visible as
+    # a page that produced nothing rather than as no row at all.
+    ledger = data.get("coverage_ledger") or []
+    coverage = data.get("coverage") or {}
+    if ledger:
+        ws3 = wb.create_sheet("Coverage")
+        ws3.append([
+            "Every page of the source PDF is listed. A blank quantity on the "
+            "Take-Off sheet is NOT a zero — see the About sheet for what each "
+            "provenance means."
+        ])
+        ws3["A1"].font = Font(bold=True, color="9C0006")
+        # "Excluded (off-scale)" is kept SEPARATE from "dropped": excluding a
+        # viewport whose own printed scale disagrees with the page is CORRECT
+        # behaviour — measuring it there would be ~60x wrong — and folding it in
+        # would make a well-measured sheet read as a partial one.
+        cov_headers = ["Page", "Sheet", "Type", "Disposition", "Reason",
+                       "Plan titles", "Printed scales", "Drawings measured",
+                       "Drawings dropped", "Excluded (off-scale)", "Items"]
+        ws3.append(cov_headers)
+        for c in ws3[2]:
+            c.font = Font(bold=True, color="FFFFFF")
+            c.fill = head_fill
+            c.alignment = Alignment(horizontal="center", vertical="center")
+        for page in ledger:
+            signal = page.get("measurable_signal") or {}
+            drawings = page.get("drawings") or []
+            measured_n = sum(
+                1 for d in drawings if d.get("disposition") == "measured"
+            )
+            excluded_n = sum(
+                1 for d in drawings
+                if d.get("disposition") == "excluded_off_scale"
+            )
+            ws3.append([
+                (page.get("page_index") or 0) + 1,
+                page.get("sheet_name") or "",
+                page.get("sheet_type") or "",
+                str(page.get("disposition") or "").replace("_", " "),
+                str(page.get("reason") or "")[:300],
+                signal.get("plan_titles", ""),
+                signal.get("printed_scales", ""),
+                measured_n,
+                len(drawings) - measured_n - excluded_n,
+                excluded_n,
+                page.get("items_emitted", 0),
+            ])
+            if page.get("is_silent_loss"):
+                # Discarded although it carries measurable drawings — the one
+                # row on this sheet a client must not skim past.
+                flag = PatternFill("solid", fgColor="FFEB9C")
+                for col in range(1, len(cov_headers) + 1):
+                    ws3.cell(row=ws3.max_row, column=col).fill = flag
+        for i, w in enumerate([7, 22, 16, 20, 60, 12, 14, 18, 17, 20, 8], start=1):
+            ws3.column_dimensions[ws3.cell(row=2, column=i).column_letter].width = w
+        ws3.freeze_panes = "A3"
+
     # ── provenance legend / run facts ────────────────────────────────────────
     ws2 = wb.create_sheet("About")
     api = data.get("api_usage") or {}
@@ -127,6 +196,17 @@ def build(run_dir: Path, out: Path, golden_pdf: Path = None) -> Path:
         ("Sheets processed", data.get("sheets_processed", "")),
         ("Line items", len(summary)),
         ("API cost (USD)", api.get("total_cost_usd", "")),
+    ]
+    if coverage:
+        # sheets_processed counts sheets the run ANALYZED; these three say what
+        # the source PDF actually held, which is the difference a client needs.
+        facts += [
+            ("Pages in source PDF", coverage.get("pages_in_source", "")),
+            ("Pages measured", coverage.get("sheets_measured", "")),
+            ("Pages skipped", (coverage.get("sheets_skipped") or 0)
+                              + (coverage.get("sheets_not_applicable") or 0)),
+        ]
+    facts += [
         ("", ""),
         ("PROVENANCE", "MEANING"),
         ("MEASURED", "Geometry measured this off the drawing at the drawing's own printed scale."),

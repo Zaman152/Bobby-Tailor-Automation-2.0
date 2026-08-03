@@ -759,6 +759,112 @@ def test_a_human_entered_quantity_never_publishes_a_stale_provenance():
     assert row["measured"] is False
 
 
+# ── the workbook: one place decides provenance, and the whole PDF is shown ───
+
+def _export(report_data: dict, tmp_path):
+    """Write a takeoff.json and build the client workbook from it."""
+    import sys
+    root = str(Path(__file__).resolve().parents[1])
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from scripts.export_takeoff_excel import build
+
+    run_dir = Path(tmp_path) / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "takeoff.json").write_text(json.dumps(report_data))
+    from openpyxl import load_workbook
+    return load_workbook(build(run_dir, run_dir / "takeoff.xlsx"))
+
+
+def test_the_exporter_no_longer_owns_the_provenance_classification():
+    """INV-08 §5: the classification is a record, not a presentation choice."""
+    source = (Path(__file__).resolve().parents[1]
+              / "scripts" / "export_takeoff_excel.py").read_text()
+    assert "from bobbytailor.pipeline.provenance import" in source
+    assert "def _provenance" not in source, "the local copy must be deleted"
+    code = "\n".join(
+        line for line in source.split("\n") if not line.lstrip().startswith("#")
+    )
+    assert "float(qty or 0) <= 0" not in code, (
+        "provenance must never again be inferred from the value"
+    )
+
+
+def test_the_workbook_renders_the_recorded_provenance_not_a_guess(tmp_path):
+    """A measured zero renders MEASURED. The deleted helper said
+    `float(qty or 0) <= 0 -> NOT MEASURED`, so it called this row an absence —
+    T-23-73, the repudiation threat, in one cell."""
+    wb = _export({
+        "project_name": "P",
+        "takeoff_summary": [
+            {"item": "CMU Wall", "quantity": 0.0, "unit": "SF",
+             "provenance": ITEM_MEASURED, "source": "vision"},
+            {"item": "Lintels", "quantity": None, "unit": "EA",
+             "provenance": ITEM_NOT_MEASURED, "source": "manifest_missing"},
+        ],
+    }, tmp_path)
+    ws = wb["Take-Off"]
+    rows = {ws.cell(row=r, column=1).value: r for r in range(2, ws.max_row + 1)}
+
+    cmu = rows["CMU Wall"]
+    assert ws.cell(row=cmu, column=2).value == 0.0
+    assert ws.cell(row=cmu, column=4).value == ITEM_MEASURED
+
+    lintels = rows["Lintels"]
+    assert ws.cell(row=lintels, column=2).value is None, "blank, not zero"
+    assert ws.cell(row=lintels, column=4).value == ITEM_NOT_MEASURED
+
+
+def test_the_workbook_shows_the_whole_source_pdf_not_only_the_measured_pages(tmp_path):
+    ledger = _three_page_ledger()
+    report_data = {
+        "project_name": "P",
+        "sheets_processed": 1,
+        "takeoff_summary": [],
+        "coverage": ledger.summary(),
+        "coverage_ledger": [s.to_dict() for s in ledger.sheets],
+    }
+    wb = _export(report_data, tmp_path)
+
+    assert "Coverage" in wb.sheetnames
+    ws = wb["Coverage"]
+    # Row 1 is the caption that keeps the About sheet's thesis reachable from
+    # here; row 2 is the header. Everything below is one page of the source PDF.
+    assert ws.max_row - 2 == report_data["coverage"]["pages_in_source"] == 3
+    assert "NOT a zero" in str(ws["A1"].value)
+    assert "About sheet" in str(ws["A1"].value)
+
+    pages = [ws.cell(row=r, column=1).value for r in range(3, ws.max_row + 1)]
+    assert pages == [1, 2, 3], "pages are numbered as a human counts them"
+
+    by_sheet = {
+        ws.cell(row=r, column=2).value: [
+            ws.cell(row=r, column=c).value for c in range(1, 12)
+        ]
+        for r in range(3, ws.max_row + 1)
+    }
+    assert by_sheet["A-102"][3] == "skipped classifier"
+    # A correct off-scale exclusion is counted apart from a drop: measuring
+    # that viewport at the page scale would have been ~60x wrong.
+    assert by_sheet["A-101"][7:10] == [1, 1, 1]
+
+    about = {r[0].value: r[1].value for r in wb["About"].iter_rows(min_row=1)}
+    assert about["Pages in source PDF"] == 3
+    assert about["Pages measured"] == 1
+    assert about["Pages skipped"] == 2
+    assert "Do NOT read a blank as zero" in about["NOT MEASURED"]
+
+
+def test_a_pre_23_run_still_exports_the_same_two_worksheets(tmp_path):
+    wb = _export({
+        "project_name": "P",
+        "takeoff_summary": [{"item": "Doors", "quantity": 4, "unit": "EA"}],
+    }, tmp_path)
+    assert wb.sheetnames == ["Take-Off", "About"]
+    # No recorded provenance on a pre-23 row: the package classifies it once.
+    assert wb["Take-Off"].cell(row=2, column=4).value == ITEM_MEASURED
+
+
 def test_an_errored_page_is_reported_as_errored_not_as_zero():
     led = CoverageLedger(pages_in_source=1)
     led.register_page(0, sheet_name="A-104", disposition=ERRORED,
