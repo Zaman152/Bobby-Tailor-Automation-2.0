@@ -31,7 +31,7 @@ import logging
 import math
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, NamedTuple, Optional, Sequence, Tuple
 
 from bobbytailor.deterministic.dimensions import (
     _mid_in_exclude_rects,
@@ -201,21 +201,95 @@ def _is_stroked(path) -> bool:
     return "s" in str(ptype)
 
 
-def _harvest(page, doc, exclude_rects: Optional[Sequence]):
-    """Return ``(segments, curve_polylines, straight_len_pt, curve_len_pt)``.
+def _path_style(path) -> Tuple[float, Optional[tuple]]:
+    """Stroke width and stroke colour of one drawing path.
 
-    Straight segments come from "l"/"re"/"qu" items; consecutive "c" items in
-    one path are chained into flattened curve polylines (Recipe E). Length
-    totals are pre-filter, for the Pitfall-6 curve-share flag.
+    ``width`` is normalised to a float (PyMuPDF reports ``None`` for the
+    PDF default and ``0`` for the thinnest renderable line). ``color`` is the
+    STROKE colour — ``path["fill"]`` is deliberately not consulted, because a
+    stroked path's identity here is the pen it was drawn with.
+
+    Both are rounded to four decimals so they can be used as GROUPING keys: a
+    PDF stroke width is authored in hundredths of a point, and the single-float
+    round-trip through the content stream turns one authored ``0.48`` pen into
+    ``0.47999998927116394``. Four decimals is three orders of magnitude finer
+    than anything a drawing distinguishes, and it makes "the same pen" an
+    equality test rather than a tolerance.
     """
-    segments: List[Segment] = []
-    curves: List[List[Point]] = []
+    width = path.get("width")
+    try:
+        width = round(float(width), 4) if width is not None else 0.0
+    except (TypeError, ValueError):
+        width = 0.0
+    color = path.get("color")
+    if color is None:
+        return width, None
+    try:
+        return width, tuple(round(float(c), 4) for c in color)
+    except (TypeError, ValueError):
+        return width, None
+
+
+class StyledSegment(NamedTuple):
+    """One straight stroke segment with the pen it was drawn with.
+
+    The first four fields are the endpoints in that order, so every
+    ``Segment``-shaped helper in this module (``_seg_len``, ``_seg_mid``,
+    ``_angle_bin``) accepts a ``StyledSegment`` unchanged.
+    """
+
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    length: float
+    width: float
+    color: Optional[tuple]
+
+
+class StyledCurve(NamedTuple):
+    """One flattened Bézier polyline with the pen it was drawn with."""
+
+    points: Tuple[Point, ...]
+    length: float
+    width: float
+    color: Optional[tuple]
+
+
+def _harvest_styled(
+    page,
+    doc,
+    exclude_rects: Optional[Sequence] = None,
+    max_segments: Optional[int] = None,
+):
+    """Return ``(styled_segments, styled_curves, straight_len_pt, curve_len_pt)``.
+
+    A WIDENING of :func:`_harvest`: the identical stroked-path selection,
+    hidden-optional-content-layer filtering, Bézier flattening and
+    exclude-rect masking, with each segment additionally carrying its own
+    length, stroke width and stroke colour. ``_harvest`` is a projection of
+    this function (width and colour dropped), so wall extraction cannot drift
+    when this one changes.
+
+    ``max_segments`` is the resource-exhaustion guard (threat model T-23-37):
+    once more straight segments than that have been harvested the walk stops
+    and ``([], [], 0.0, 0.0)`` is returned, so an attacker-controlled path
+    count cannot buy unbounded downstream work. It defaults to ``None`` — no
+    cap — because :func:`extract_walls_detailed` enforces ``MAX_SEGMENTS``
+    itself AFTER its own minimum-length filter and needs the over-cap page to
+    reach that check so the page is flagged "segment cap exceeded" rather than
+    silently emptied. Open-run chaining, which has no such downstream check,
+    passes ``MAX_SEGMENTS`` here.
+    """
+    segments: List[StyledSegment] = []
+    curves: List[StyledCurve] = []
     straight_len = 0.0
     curve_len = 0.0
 
     for path in _visible_drawings(page, doc):
         if not _is_stroked(path):
             continue
+        width, color = _path_style(path)
         chain: List[Point] = []
 
         def _flush_chain() -> None:
@@ -223,10 +297,12 @@ def _harvest(page, doc, exclude_rects: Optional[Sequence]):
             if len(chain) >= 2:
                 length = _polyline_len(chain)
                 curve_len += length
-                curves.append(list(chain))
+                curves.append(StyledCurve(tuple(chain), length, width, color))
             del chain[:]
 
         for it in path.get("items", []):
+            if max_segments is not None and len(segments) > max_segments:
+                break
             op = it[0]
             if op == "c":
                 p0 = (it[1].x, it[1].y)
@@ -245,21 +321,31 @@ def _harvest(page, doc, exclude_rects: Optional[Sequence]):
             if op == "l":
                 a, b = it[1], it[2]
                 seg = (a.x, a.y, b.x, b.y)
-                segments.append(seg)
-                straight_len += _seg_len(seg)
+                length = _seg_len(seg)
+                segments.append(StyledSegment(*seg, length, width, color))
+                straight_len += length
             elif op == "re":
                 for seg in _rect_edges(it[1]):
-                    segments.append(seg)
-                    straight_len += _seg_len(seg)
+                    length = _seg_len(seg)
+                    segments.append(StyledSegment(*seg, length, width, color))
+                    straight_len += length
             elif op == "qu":
                 try:
                     edges = _quad_edges(it[1])
                 except AttributeError:
                     continue
                 for seg in edges:
-                    segments.append(seg)
-                    straight_len += _seg_len(seg)
+                    length = _seg_len(seg)
+                    segments.append(StyledSegment(*seg, length, width, color))
+                    straight_len += length
         _flush_chain()
+        if max_segments is not None and len(segments) > max_segments:
+            logger.warning(
+                "Styled harvest: %d segments exceed cap %d; page abandoned",
+                len(segments),
+                max_segments,
+            )
+            return [], [], 0.0, 0.0
 
     if exclude_rects:
         segments = [
@@ -268,8 +354,32 @@ def _harvest(page, doc, exclude_rects: Optional[Sequence]):
         ]
         curves = [
             c for c in curves
-            if not _mid_in_exclude_rects(c[len(c) // 2], exclude_rects)
+            if not _mid_in_exclude_rects(
+                c.points[len(c.points) // 2], exclude_rects
+            )
         ]
+    return segments, curves, straight_len, curve_len
+
+
+def _harvest(page, doc, exclude_rects: Optional[Sequence]):
+    """Return ``(segments, curve_polylines, straight_len_pt, curve_len_pt)``.
+
+    Straight segments come from "l"/"re"/"qu" items; consecutive "c" items in
+    one path are chained into flattened curve polylines (Recipe E). Length
+    totals are pre-filter, for the Pitfall-6 curve-share flag.
+
+    This is a PROJECTION of :func:`_harvest_styled` that drops the stroke width
+    and colour. Wall behaviour is therefore byte-identical to the styled
+    harvest by construction, not by inspection — the mitigation the styled
+    widening owes to everything downstream of ``extract_walls``.
+    """
+    styled_segments, styled_curves, straight_len, curve_len = _harvest_styled(
+        page, doc, exclude_rects
+    )
+    segments: List[Segment] = [
+        (s.x0, s.y0, s.x1, s.y1) for s in styled_segments
+    ]
+    curves: List[List[Point]] = [list(c.points) for c in styled_curves]
     return segments, curves, straight_len, curve_len
 
 

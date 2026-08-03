@@ -12,7 +12,12 @@ import fitz
 import pytest
 
 from bobbytailor.deterministic.walls import (
+    MAX_SEGMENTS,
+    StyledCurve,
+    StyledSegment,
     WallSegment,
+    _harvest,
+    _harvest_styled,
     extract_walls,
     extract_walls_detailed,
     opening_gap_widths,
@@ -22,6 +27,7 @@ from bobbytailor.deterministic.walls import (
 FIXTURES = Path(__file__).parent / "fixtures"
 SYNTHETIC_DIR = FIXTURES / "synthetic"
 CROW_PDF = FIXTURES / "crow_cass" / "crow_cass_plans.pdf"
+BOBS_PDF = FIXTURES / "bobs_discount" / "bobs_discount_plans.pdf"
 
 
 def _ensure_floorplan_fixture() -> Path:
@@ -215,6 +221,155 @@ def test_missing_scale_returns_no_walls():
     doc.close()
     assert wall_lf_by_class([], 0) == {}
     assert opening_gap_widths([], 0) == []
+
+
+# ── The styled harvester and its projection (23-10 Task 1) ───────────────────
+
+
+def _two_pen_page(doc):
+    """A page carrying strokes in two widths and two colours, plus a curve."""
+    page = doc.new_page(width=400, height=400)
+    page.draw_line(fitz.Point(20, 20), fitz.Point(200, 20), width=0.48)
+    page.draw_line(fitz.Point(20, 40), fitz.Point(200, 40), width=0.48)
+    page.draw_line(
+        fitz.Point(20, 80), fitz.Point(200, 80), width=1.44, color=(1, 0, 0)
+    )
+    page.draw_rect(
+        fitz.Rect(240, 240, 340, 300), width=0.96, color=(0, 0, 1)
+    )
+    page.draw_bezier(
+        fitz.Point(40, 300),
+        fitz.Point(80, 260),
+        fitz.Point(140, 340),
+        fitz.Point(180, 300),
+        width=0.24,
+        color=(0, 0.5, 0),
+    )
+    return page
+
+
+def test_harvest_is_a_projection_of_the_styled_harvest():
+    """D-03 / T-23-39: wall input is byte-identical by construction."""
+    doc = fitz.open()
+    page = _two_pen_page(doc)
+
+    plain_segs, plain_curves, plain_straight, plain_curve_len = _harvest(
+        page, doc, None
+    )
+    styled_segs, styled_curves, straight, curve_len = _harvest_styled(page, doc)
+
+    assert len(plain_segs) == len(styled_segs)
+    for plain, styled in zip(plain_segs, styled_segs):
+        assert plain == (styled.x0, styled.y0, styled.x1, styled.y1)
+    assert len(plain_curves) == len(styled_curves)
+    for plain, styled in zip(plain_curves, styled_curves):
+        assert plain == list(styled.points)
+    assert plain_straight == straight
+    assert plain_curve_len == curve_len
+    doc.close()
+
+
+def test_styled_harvest_carries_two_widths_and_two_colours():
+    doc = fitz.open()
+    page = _two_pen_page(doc)
+    segs, curves, _, _ = _harvest_styled(page, doc)
+    doc.close()
+
+    pens = {(s.width, s.color) for s in segs}
+    assert (0.48, (0.0, 0.0, 0.0)) in pens
+    assert (1.44, (1.0, 0.0, 0.0)) in pens
+    assert (0.96, (0.0, 0.0, 1.0)) in pens
+    assert len({w for w, _ in pens}) >= 2
+    assert len({c for _, c in pens}) >= 2
+    # Every segment reports its own length, and the curve keeps its pen too.
+    for s in segs:
+        assert s.length == pytest.approx(
+            ((s.x1 - s.x0) ** 2 + (s.y1 - s.y0) ** 2) ** 0.5
+        )
+    assert curves and curves[0].width == 0.24
+    assert curves[0].color == (0.0, 0.5, 0.0)
+    assert isinstance(segs[0], StyledSegment)
+    assert isinstance(curves[0], StyledCurve)
+
+
+def test_styled_segment_is_accepted_by_the_segment_helpers():
+    """The first four fields ARE the endpoints, so Segment helpers still work."""
+    from bobbytailor.deterministic.walls import _angle_bin, _seg_len, _seg_mid
+
+    s = StyledSegment(0.0, 0.0, 3.0, 4.0, 5.0, 0.48, (0.0, 0.0, 0.0))
+    assert _seg_len(s) == pytest.approx(5.0)
+    assert _seg_mid(s) == (1.5, 2.0)
+    assert _angle_bin(s) == _angle_bin((0.0, 0.0, 3.0, 4.0))
+
+
+class _FakePoint:
+    __slots__ = ("x", "y")
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+
+class _FakePage:
+    """A page whose drawing stream is one path of ``n`` line items."""
+
+    def __init__(self, n):
+        a, b = _FakePoint(0.0, 0.0), _FakePoint(10.0, 0.0)
+        self._paths = [{
+            "type": "s",
+            "width": 0.5,
+            "color": (0.0, 0.0, 0.0),
+            "items": [("l", a, b)] * n,
+        }]
+
+    def get_drawings(self):
+        return self._paths
+
+
+class _FakeDoc:
+    def get_ocgs(self):
+        return {}
+
+    def layer_ui_configs(self):
+        return {}
+
+
+def test_over_cap_page_returns_empty_without_raising_and_bounded():
+    """T-23-37: the DoS guard lives in the styled harvester."""
+    import time
+
+    page = _FakePage(MAX_SEGMENTS + 10)
+    doc = _FakeDoc()
+    t0 = time.monotonic()
+    segs, curves, straight, curve_len = _harvest_styled(
+        page, doc, None, max_segments=MAX_SEGMENTS
+    )
+    elapsed = time.monotonic() - t0
+    assert segs == [] and curves == []
+    assert straight == 0.0 and curve_len == 0.0
+    assert elapsed < 2.0, "over-cap harvest must be bounded work"
+
+
+def test_the_cap_defaults_off_so_walls_keeps_its_own_cap_check():
+    """Walls flags 'segment cap exceeded'; the harvester must not pre-empt it."""
+    page = _FakePage(1000)
+    doc = _FakeDoc()
+    segs, _, _, _ = _harvest_styled(page, doc, None)
+    assert len(segs) == 1000
+
+
+@pytest.mark.skipif(not BOBS_PDF.is_file(), reason="Bob's PDF fixture missing")
+def test_bobs_roof_plan_carries_the_gas_run_stroke_width():
+    """INV-04 §2: the A3.0 gas run is black at width 0.48 — width is real."""
+    doc = fitz.open(BOBS_PDF)
+    segs, _, _, _ = _harvest_styled(doc[3], doc)
+    doc.close()
+
+    group = [s for s in segs if s.width == 0.48 and s.color == (0.0, 0.0, 0.0)]
+    assert len(group) > 1000, (
+        "the 0.48 pt black pen INV-04 recorded for the gas run must be a "
+        "populated group, not a stray segment"
+    )
 
 
 # ── Crow Cass fixture smoke ───────────────────────────────────────────────────
