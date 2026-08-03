@@ -402,3 +402,57 @@ class TestLegendShadowLeavesATrace:
         assert row["needs_review"] is False
         assert row["provenance"] == "HUMAN INPUT"
         assert any("suppressed" in r for r in row["review_reasons"])
+
+
+class TestCompletenessDoesNotContradictItself:
+    """A blank row must never appear for something the run DID measure.
+
+    Caught by an existing naming-precedence test: a human had renamed the
+    plan's site-cast-panel text, so the LEARNED name won and the library's own
+    term for the same physical object never produced a bucket. Enumerating it
+    would have told the client "your tilt-up walls were not measured" while the
+    very same walls were published at 106,997 SF two rows above.
+    """
+
+    class _Learned:
+        expected_items = []
+
+        def __init__(self, mapping):
+            self._m = mapping
+
+        def lookup_name(self, desc):
+            return self._m.get(str(desc).strip().lower())
+
+    def test_a_renamed_library_object_is_not_also_reported_as_missing(self):
+        library = [{"name": "Tilt Up Wall",
+                    "aliases": ["site cast concrete panel"],
+                    "basis": "wall_area", "unit": "SF"}]
+        desc = "exterior site cast concrete panel"
+        learned = self._Learned({desc: ("Internal Tilt up walls", "SF")})
+        items = [{"description": desc, "item_type": "wall",
+                  "calculated_quantity": 106997.0, "calculated_unit": "SF"}]
+        out = aggregate_takeoff(items, learned=learned, library=library)
+
+        assert _row(out, "Internal Tilt up walls")["quantity"] == 106997.0
+        assert [r for r in out if r["item"] == "Tilt Up Wall"] == [], (
+            "the same object must not be both measured and reported missing"
+        )
+
+    def test_a_library_object_nothing_resolved_to_is_still_enumerated(self):
+        """The guard must not swallow the guarantee it protects."""
+        library = [
+            {"name": "Tilt Up Wall", "aliases": ["site cast concrete panel"],
+             "basis": "wall_area", "unit": "SF"},
+            {"name": "Lintels", "aliases": ["LINTEL"], "basis": "linear",
+             "unit": "LF"},
+        ]
+        items = [{"description": "exterior site cast concrete panel",
+                  "item_type": "wall", "calculated_quantity": 106997.0,
+                  "calculated_unit": "SF"}]
+        out = aggregate_takeoff(items, library=library)
+        # Resolved and measured under its own library name.
+        assert _row(out, "Tilt Up Wall")["quantity"] == 106997.0
+        assert _row(out, "Tilt Up Wall")["provenance"] == "MEASURED"
+        # Nothing resolved to Lintels, so the gap is stated rather than omitted.
+        assert _row(out, "Lintels")["quantity"] is None
+        assert _row(out, "Lintels")["provenance"] == "NOT MEASURED"

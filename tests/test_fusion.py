@@ -809,3 +809,105 @@ def test_noise_and_real_clusters_coexist():
     assert by_name["Columns"]["quantity"] == 132
     assert by_name["Bollards"]["quantity"] == 28
     assert "1 / 2 / 3" not in by_name       # gridline-bubble noise dropped
+
+
+# ---------------------------------------------------------------------------
+# 23-03 — _fuse_room_fills stops discarding measured areas in silence.
+#
+# INV-08 §2 row S8: three early exits could each throw away a SUCCESSFULLY
+# MEASURED enclosed area with no trace. The one at `if not wanted` is the
+# plans-only failure mode: with no manifest the vocabulary frequently carries
+# no `basis`, so every area the engine just computed is dropped.
+# ---------------------------------------------------------------------------
+
+
+def _room_fill(kind, area, name="KING A", needs_review=False):
+    from bobbytailor.deterministic.room_fill import RoomFillResult
+    return RoomFillResult(
+        area_sf=area, candidate_id="FILL-1", scale_fpi=4.0,
+        plan_kind=kind, plan_name=name, viewport_title="%s - %s PLAN" % (name, kind),
+        needs_review=needs_review,
+        review_reason="exceeds the plausible single-unit maximum" if needs_review else "",
+    )
+
+
+def _ceiling_vocab(name="Gyp Ceiling"):
+    return [{"name": name, "basis": "ceiling_area", "unit": "SF"}]
+
+
+def test_measured_fills_with_no_area_basis_leave_a_coverage_note():
+    """THE plans-only failure mode. 1,452 SF measured, zero line items, and
+    until now zero indication that anything had been measured at all."""
+    bundle = {
+        "room_fills": [_room_fill("RCP", 341.7), _room_fill("AR", 369.9)],
+        "sheet_name": "page27",
+    }
+    result = fuse_sheet(bundle, {"matches": []})       # no vocabulary at all
+    assert not [c for c in result["components"] if c.get("name_source") == "room_fill"]
+
+    notes = bundle.get("coverage_notes") or []
+    assert len(notes) == 1
+    note = notes[0]
+    assert "711.6 SF" in note, "the note must state the total that was discarded"
+    assert "no vocabulary or manifest item carries an area basis" in note
+    assert "DISCARDED" in note
+    assert "KING A - RCP PLAN" in note, "and name the drawings it came from"
+
+
+def test_a_sheet_with_no_measurable_drawing_says_so():
+    bundle = {"room_fills": [], "sheet_name": "page0"}
+    fuse_sheet(bundle, {"matches": []}, vocabulary=_ceiling_vocab())
+    notes = bundle.get("coverage_notes") or []
+    assert len(notes) == 1
+    assert "no measurable plan drawing on this sheet" in notes[0]
+    assert "NOT the same as measuring zero" in notes[0]
+
+
+def test_no_drawing_of_the_right_discipline_emits_a_not_measured_item():
+    """S9: the selector finds nothing, and the caller used to `continue`.
+
+    Substituting the architectural plan's area for a ceiling would be a guess,
+    so the honest outcome is an explicit blank — never no row at all.
+    """
+    bundle = {"room_fills": [_room_fill("AR", 369.9)], "sheet_name": "page27"}
+    result = fuse_sheet(bundle, {"matches": []}, vocabulary=_ceiling_vocab())
+
+    assert not [c for c in result["components"] if c["name"] == "Gyp Ceiling"]
+    items = bundle.get("item_coverage") or []
+    assert len(items) == 1
+    item = items[0]
+    assert item.name == "Gyp Ceiling"
+    assert item.quantity is None, "a blank is None, never 0.0"
+    assert item.status == "NOT MEASURED"
+    assert item.basis == "ceiling_area"
+    assert item.source_sheets == ["page27"]
+    assert "RCP" in item.reason and "would be a guess" in item.reason
+
+
+def test_a_flagged_fill_now_produces_a_flagged_row_instead_of_nothing():
+    """The end-to-end shape of the S8/S9 repair: the ONLY RCP drawing on the
+    sheet is flagged (Moxy's ACC BUNK ~2x clip defect). The row must exist,
+    carry the measured number, and be flagged — not vanish."""
+    bundle = {
+        "room_fills": [_room_fill("RCP", 458.5, name="ACC BUNK", needs_review=True)],
+        "sheet_name": "page38",
+    }
+    result = fuse_sheet(bundle, {"matches": []}, vocabulary=_ceiling_vocab())
+    rows = [c for c in result["components"] if c["name"] == "Gyp Ceiling"]
+    assert len(rows) == 1
+    assert rows[0]["quantity"] == pytest.approx(458.5)
+    assert rows[0]["needs_review"] is True
+    assert "plausible single-unit maximum" in rows[0]["review_reason"]
+    assert not (bundle.get("item_coverage") or []), (
+        "a measured-but-flagged item is NOT a not-measured item"
+    )
+
+
+def test_a_clean_binding_writes_no_notes_and_no_item_coverage():
+    """Silence is correct when nothing was lost — the record must not cry wolf."""
+    bundle = {"room_fills": [_room_fill("RCP", 341.7)], "sheet_name": "page27"}
+    result = fuse_sheet(bundle, {"matches": []}, vocabulary=_ceiling_vocab())
+    rows = [c for c in result["components"] if c["name"] == "Gyp Ceiling"]
+    assert len(rows) == 1 and rows[0]["quantity"] == pytest.approx(341.7)
+    assert not (bundle.get("coverage_notes") or [])
+    assert not (bundle.get("item_coverage") or [])

@@ -16,6 +16,7 @@ from bobbytailor.deterministic.room_fill import (
     RoomFillResult,
     flag_implausible_unit,
     measure_enclosed_area,
+    select_fill_for_basis,
     total_for_units,
 )
 
@@ -211,3 +212,70 @@ def test_a_region_below_the_minimum_is_not_reported_as_oversize():
 def test_the_size_constant_is_untouched():
     """INV-08 risk 6 / §14.2: fix the clip, not the threshold."""
     assert MAX_REGION_SF == 900.0
+
+
+# ── flag-don't-drop in the selector (23-03 / INV-08 §2 rows S8-S9) ───────────
+
+
+def _fill(kind, area, needs_review=False, name="KING A"):
+    return RoomFillResult(
+        area_sf=area, candidate_id="FILL-%s-%.0f" % (kind, area),
+        plan_kind=kind, plan_name=name, needs_review=needs_review,
+        review_reason="flagged" if needs_review else "",
+    )
+
+
+def test_a_flagged_fill_is_returned_with_its_flag_not_dropped():
+    """`and not f.needs_review` made a flagged fill VANISH.
+
+    A discipline whose every drawing was flagged returned None, the caller
+    `continue`d, and the row disappeared — flag-don't-guess degrading into
+    drop-and-be-silent, which is exactly what this function's own docstring
+    says must never happen.
+    """
+    fills = [_fill("RCP", 458.5, needs_review=True)]
+    pick = select_fill_for_basis(fills, "ceiling_area")
+    assert pick is not None, "a flagged measurement is still a measurement"
+    assert pick.needs_review is True, "the flag must survive the selection"
+    assert pick.area_sf == 458.5, "the number is never rewritten"
+
+
+def test_an_unflagged_candidate_still_wins_over_a_flagged_one():
+    """Existing behaviour preserved: the clean measurement is preferred."""
+    fills = [_fill("RCP", 229.4), _fill("RCP", 200.0, needs_review=True)]
+    pick = select_fill_for_basis(fills, "ceiling_area")
+    assert pick.needs_review is False
+    assert pick.area_sf == 229.4, (
+        "the smallest-of-the-unflagged rule must not reach across the flag"
+    )
+
+
+def test_the_smallest_of_several_flagged_candidates_is_taken():
+    """Same opposite-hand rule as before: the larger spans both units."""
+    fills = [_fill("RCP", 458.5, needs_review=True),
+             _fill("RCP", 231.0, needs_review=True)]
+    assert select_fill_for_basis(fills, "ceiling_area").area_sf == 231.0
+
+
+def test_the_wrong_discipline_is_still_never_substituted():
+    """A ceiling comes off the RCP. Returning the AR plan's area would be a
+    guess, and no amount of flagging makes a guess acceptable."""
+    assert select_fill_for_basis([_fill("AR", 300.0)], "ceiling_area") is None
+    assert select_fill_for_basis([_fill("RCP", 300.0)], "floor_area") is None
+
+
+def test_the_discipline_mapping_is_unchanged():
+    """23-13 owns any change here; this plan must not move it."""
+    from bobbytailor.deterministic.room_fill import BASIS_PLAN_KIND
+    assert BASIS_PLAN_KIND == {
+        "ceiling_area": "RCP",
+        "roof_area": "RCP",
+        "floor_area": "AR",
+        "wall_area": "AR",
+        "area": "AR",
+    }
+
+
+def test_an_unknown_basis_still_selects_nothing():
+    assert select_fill_for_basis([_fill("RCP", 300.0)], "linear") is None
+    assert select_fill_for_basis([_fill("RCP", 300.0)], "") is None

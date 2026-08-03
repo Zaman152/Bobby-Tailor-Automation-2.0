@@ -403,6 +403,11 @@ def aggregate_takeoff(
     # the suppression is correct and completely silent: a measured row is
     # deleted and the report shows no sign it ever existed.
     legend_bucket_by_name: Dict[str, str] = {}
+    # Library objects some contributing description resolved to, regardless of
+    # which naming path finally won. Guards the plans-only completeness
+    # guarantee against telling a client "your tilt-up walls were not measured"
+    # when they WERE, under the name a human previously corrected them to.
+    library_bound: set = set()
     for item in calculated_items:
         if item.get("qty_source") == "plan_schedule_legend":
             desc = item.get("description", "")
@@ -447,6 +452,14 @@ def aggregate_takeoff(
             # Manifest takes priority over the hardcoded map: when the user told us
             # what objects exist and what to call them, use that name + unit VERBATIM.
             entry = manifest.resolve(desc, unit) if manifest else None
+            # Resolve the library ONCE, before naming precedence is applied.
+            # This raw text IS that library object whatever name the run ends up
+            # publishing it under, and the completeness guarantee below must not
+            # claim the object was never measured merely because a human's
+            # rename outranked the library's term for it.
+            lib_hit = _resolve_library_name(desc, library)
+            if lib_hit is not None:
+                library_bound.add(lib_hit[0])
             if entry is not None:
                 canonical_name = entry.name
                 canonical_unit = (entry.unit or unit or "").strip().upper()
@@ -468,7 +481,6 @@ def aggregate_takeoff(
                     )
                     bucket_source = "learned"
                 else:
-                    lib_hit = _resolve_library_name(desc, library)
                     if lib_hit is not None:
                         canonical_name = lib_hit[0]
                         canonical_unit = (lib_hit[1] or unit or "").strip().upper()
@@ -564,6 +576,7 @@ def aggregate_takeoff(
     if expected:
         present = {_norm_item_key(k) for k in buckets}
         present |= {_norm_item_key(n) for n in legend_names}
+        present |= {_norm_item_key(n) for n in library_bound}
         for name, info in expected.items():
             if _norm_item_key(name) in present:
                 continue

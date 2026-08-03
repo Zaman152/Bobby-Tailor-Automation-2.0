@@ -1535,9 +1535,20 @@ def _fuse_room_fills(
         select_fill_for_basis,
         total_for_units,
     )
+    from bobbytailor.pipeline.coverage import (  # noqa: PLC0415
+        ITEM_NOT_MEASURED,
+        ItemCoverage,
+    )
+
+    def _note(text: str) -> None:
+        bundle.setdefault("coverage_notes", []).append(text)
 
     fills = bundle.get("room_fills") or []
     if not fills:
+        _note(
+            "no measurable plan drawing on this sheet — no enclosed-region area "
+            "was produced, which is NOT the same as measuring zero area"
+        )
         return
     vocab_map = vocab_map or {}
     room_mix = room_mix or {}
@@ -1552,11 +1563,58 @@ def _fuse_room_fills(
         wanted.setdefault(str(name).strip().lower(), {"name": name, "basis": basis,
                                                       "unit": info.get("unit") or "SF"})
     if not wanted:
+        # THE plans-only failure mode (INV-08 §2 row S8): with no manifest the
+        # vocabulary frequently carries no `basis`, so every successfully
+        # measured area on the sheet is discarded here — silently, and after
+        # the work of measuring it was already done.
+        _note(
+            "%d room fill(s) measured totalling %.1f SF (%s) but no vocabulary "
+            "or manifest item carries an area basis, so the measurements were "
+            "DISCARDED — nothing was measured as zero; the areas exist and have "
+            "no line item to bind to"
+            % (
+                len(fills),
+                sum(float(getattr(f, "area_sf", 0.0) or 0.0) for f in fills),
+                ", ".join(
+                    sorted(
+                        {
+                            str(getattr(f, "viewport_title", "") or
+                                getattr(f, "plan_kind", "") or "?")
+                            for f in fills
+                        }
+                    )
+                ),
+            )
+        )
         return
 
     for info in wanted.values():
         pick = select_fill_for_basis(fills, info["basis"])
         if pick is None:
+            # No drawing of the right DISCIPLINE was measured. Substituting
+            # another discipline's area would be a guess (a ceiling is taken
+            # off the RCP, not off the architectural plan), so the honest
+            # outcome is an explicit NOT MEASURED row — never a bare continue,
+            # which leaves the item with no row at all and its quantity read as
+            # a zero (INV-08 §2 row S9).
+            from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
+                BASIS_PLAN_KIND,
+            )
+            want_kind = BASIS_PLAN_KIND.get(info["basis"], "?")
+            bundle.setdefault("item_coverage", []).append(
+                ItemCoverage(
+                    name=str(info["name"]),
+                    unit=str(info["unit"] or "SF"),
+                    status=ITEM_NOT_MEASURED,
+                    quantity=None,
+                    basis=info["basis"],
+                    source_sheets=[str(bundle.get("sheet_name") or "")],
+                    reason="no %s plan drawing was measured on this sheet for "
+                           "basis %r — measuring it off a different discipline's "
+                           "drawing would be a guess" % (want_kind, info["basis"]),
+                    expected_from="vocabulary",
+                )
+            )
             continue
         plan_key = _norm_name(pick.plan_name)
         count = room_mix.get(plan_key)

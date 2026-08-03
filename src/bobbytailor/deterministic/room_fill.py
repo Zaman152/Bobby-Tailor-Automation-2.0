@@ -131,18 +131,31 @@ def plan_titles(page) -> List[tuple]:
 def select_fill_for_basis(fills: Sequence[RoomFillResult], basis: str) -> Optional[RoomFillResult]:
     """The fill whose drawing discipline measures *basis* (ceiling -> RCP …).
 
-    Returns ``None`` when no drawing of the right discipline was measured — the
-    caller must flag, never substitute a different drawing's area.
+    Returns ``None`` **only** when no drawing of the right discipline was
+    measured at all — the caller must then flag, never substitute a different
+    drawing's area.
+
+    Flagged candidates are NOT filtered away. The old ``and not f.needs_review``
+    made a flagged fill vanish, so a discipline whose every drawing was flagged
+    returned ``None`` and the caller's ``continue`` deleted the row: flag-don't-
+    guess degraded into drop-and-be-silent, breaking the contract this very
+    docstring states (INV-08 §2 rows S8-S9). A flagged fill now comes back
+    **with its flag intact**, so the caller emits a NEEDS REVIEW row carrying a
+    real measured number instead of nothing at all.
     """
     want = BASIS_PLAN_KIND.get((basis or "").strip().lower())
     if not want:
         return None
-    matches = [f for f in fills if f.plan_kind == want and not f.needs_review]
+    matches = [f for f in fills if f.plan_kind == want]
     if not matches:
         return None
+    # Prefer a clean measurement; fall back to a flagged one rather than to
+    # silence. Existing behaviour is preserved exactly whenever any unflagged
+    # candidate of the right discipline exists.
+    pool = [f for f in matches if not f.needs_review] or matches
     # One drawing per discipline per prototype sheet; if a sheet repeats it
     # (opposite hand), the smaller is the single unit — the larger spans both.
-    return min(matches, key=lambda f: f.area_sf)
+    return min(pool, key=lambda f: f.area_sf)
 
 
 def _label_regions(samples, width: int, height: int, px_area_sf: float) -> List[FilledRegion]:
