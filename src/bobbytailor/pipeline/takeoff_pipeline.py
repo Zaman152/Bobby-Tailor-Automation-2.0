@@ -86,6 +86,11 @@ from bobbytailor.deterministic.printed_scale import (
     identify_main_plan_scale,
     match_scales_to_viewports,
 )
+from bobbytailor.deterministic.room_fill import (
+    MAX_REGION_SF,
+    from_page_space,
+    to_page_space,
+)
 from bobbytailor.deterministic.scale_solver import (
     resolve_scale_v2,
     select_main_plan,
@@ -261,6 +266,38 @@ _TITLE_SCALE_SIDE_PT = 260.0
 _TITLE_SCALE_ABOVE_TOL_PT = -6.0
 
 
+def _page_space_point(page, x: float, y: float) -> tuple:
+    """One point, mapped by the ONE rect transform (``room_fill.to_page_space``).
+
+    "Below" is a statement about the sheet as it is READ, and text coordinates
+    are reported in the unrotated mediabox — so an adjacency test written in
+    raw y is asking a question about a space nobody looks at. A degenerate
+    rectangle is used deliberately rather than a second point-shaped copy of
+    the rotation matrix: D-03 allows exactly one implementation of this
+    mapping, and a rigid rotation sends the corners of a zero-area rectangle
+    to the mapped point.
+
+    On an unrotated page ``to_page_space`` hands back the caller's own object,
+    so this returns ``(x, y)`` bit for bit.
+    """
+    try:
+        import fitz  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        return float(x), float(y)
+    box = to_page_space(page, fitz.Rect(x, y, x, y))
+    return float(box.x0), float(box.y0)
+
+
+def _page_space_box(page, bbox) -> tuple:
+    """``(x0, y0, x1, y1)`` of *bbox* in page space. Identity when unrotated."""
+    try:
+        import fitz  # noqa: PLC0415
+    except Exception:  # noqa: BLE001
+        return tuple(float(v) for v in bbox)
+    box = to_page_space(page, fitz.Rect(*bbox))
+    return float(box.x0), float(box.y0), float(box.x1), float(box.y1)
+
+
 def page_measurable_signal(page) -> dict:
     """Count what can actually be MEASURED on *page*. Zero API.
 
@@ -288,10 +325,17 @@ def page_measurable_signal(page) -> dict:
     scales = extract_printed_scales(page) or []
     scaled_titles = 0
     for _name, _kind, tbox in plan_titles(page) or []:
-        tx0, _ty0, tx1, ty1 = tbox
+        # PAGE space, for exactly the reason _measure_room_fills uses it: a
+        # callout is "beneath" a title as the SHEET IS READ. This oracle and
+        # the engine it is the oracle for must agree page by page, and on
+        # Moxy's /Rotate 90 lobby sheets an unrotated-y test answers zero
+        # while the engine measures two 350+ SF drawings — a ledger reporting
+        # no measurable signal on a page that measures 743 SF is the silent
+        # zero this whole phase exists to abolish.
+        tx0, _ty0, tx1, ty1 = _page_space_box(page, tbox)
         mid = (tx0 + tx1) / 2.0
         for s in scales:
-            cx, cy = s.center_pt
+            cx, cy = _page_space_point(page, *s.center_pt)
             if abs(cx - mid) > _TITLE_SCALE_SIDE_PT:
                 continue
             if cy - ty1 < _TITLE_SCALE_ABOVE_TOL_PT:
@@ -2110,6 +2154,7 @@ class TakeoffPipeline:
         viewports: Sequence,
         printed_scales_by_region: dict,
         sheet_name: str,
+        max_region_sf: float = MAX_REGION_SF,
     ) -> tuple:
         """Measure each scaled DRAWING as an enclosed region, at its own scale.
 
@@ -2119,6 +2164,25 @@ class TakeoffPipeline:
         details, and area scales by the SQUARE, so one page-level scale corrupts
         every region it touches. A drawing with no printed scale of its own is
         skipped rather than measured with a borrowed one (flag-don't-guess).
+
+        "Above" is decided in PAGE space (23-07/SP-1). The title box, the
+        callout centre, the adjacency gap and the clip are all mapped through
+        ``room_fill.to_page_space`` first, because ``page.get_text`` answers in
+        the unrotated mediabox while a reader — and the rasteriser — see
+        ``page.rect``. On Moxy's ``/Rotate 90`` sheets the raw gap for
+        ``LEVEL 1 LOBBY - AR PLAN`` is **-80 pt**, the guard rejects it, no
+        scale binds and the drawing is skipped: pages 9 and 13 measured
+        NOTHING. The tolerance is deliberately untouched — the defect is the
+        coordinate space, and widening the guard would paper over it while
+        moving unrotated sheets.
+
+        Args:
+            max_region_sf: the largest region still credible as ONE unit.
+                Threaded rather than read from the module constant so a caller
+                measuring something that is not a guest room (23-11, 23-14) can
+                pass its own bound without editing a constant every other
+                caller shares. Defaults to exactly today's
+                ``room_fill.MAX_REGION_SF``, so this plan moves no measurement.
 
         Returns:
             ``(fills, drops)`` — the measurements, and one
@@ -2164,13 +2228,16 @@ class TakeoffPipeline:
         titles = plan_titles(page)
         out: list = []
         for i, (plan_name, plan_kind, tb) in enumerate(titles):
-            tx0, ty0, tx1, ty1 = tb
+            # Everything below is PAGE space: the space the sheet is read in,
+            # and the space the rasteriser's clip lives in. Identity on the 61
+            # unrotated pages of the four fixtures.
+            tx0, ty0, tx1, ty1 = _page_space_box(page, tb)
             mid = (tx0 + tx1) / 2.0
             # This drawing's OWN scale = the ratio printed directly beneath its
             # title. Borrowing another drawing's scale is a squared error.
             ps, best_gap = None, float("inf")
             for s in scales:
-                cx, cy = s.center_pt
+                cx, cy = _page_space_point(page, *s.center_pt)
                 if abs(cx - mid) > self._FILL_CLIP_SIDE_PT:
                     continue
                 gap = cy - ty1
@@ -2209,7 +2276,16 @@ class TakeoffPipeline:
                 continue
             oversize: List[float] = []
             result = measure_enclosed_area(
-                page, clip, fpp, candidate_id="FILL-%d" % (i + 1),
+                # measure_enclosed_area has ONE contract — its clip is in
+                # drawing space and it maps forward itself — so the page-space
+                # rectangle reasoned about here is handed back through the
+                # inverse rather than a second "which space is this?" flag that
+                # a future caller could get wrong. Both maps are the identity
+                # on an unrotated page, so this is the same object today's code
+                # passed.
+                page, from_page_space(page, clip), fpp,
+                candidate_id="FILL-%d" % (i + 1),
+                max_region_sf=max_region_sf,
                 dropped_regions=oversize,
             )
             if result is None:

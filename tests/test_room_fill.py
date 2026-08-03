@@ -172,6 +172,134 @@ def test_the_raster_clip_renders_the_named_region_on_a_rotated_page():
     doc.close()
 
 
+# ── the title-to-scale adjacency is a PAGE-space question (23-07 Task 2) ─────
+
+
+def _sheet_reading_upright(rot, page_pt=800.0):
+    """One titled, scaled drawing whose PAGE-space layout is fixed at *rot*.
+
+    A sheet that displays upright at ``/Rotate 90`` is AUTHORED sideways in the
+    mediabox — that is Moxy pages 7-17, and it is why ``page.get_text`` reports
+    a title as a tall narrow box while a reader sees a wide one. Both fixtures
+    here put the room, the title and the callout at IDENTICAL page-space
+    coordinates, so any difference in what they measure is a coordinate-space
+    defect and nothing else.
+    """
+    doc = fitz.open()
+    page = doc.new_page(width=page_pt, height=page_pt)
+
+    def draw(px, py):
+        """A page-space point, expressed in the mediabox this page authors in."""
+        return (py, page_pt - px) if rot == 90 else (px, py)
+
+    # A 20' x 15' room at 1/4" = 1'-0"  ->  360 x 270 pt, as four strokes.
+    corners = [(100, 100), (460, 100), (460, 370), (100, 370)]
+    pts = [fitz.Point(*draw(*c)) for c in corners]
+    for a, b in zip(pts, pts[1:] + pts[:1]):
+        page.draw_line(a, b, width=2.0)
+    page.insert_text(fitz.Point(*draw(150, 400)), "LOBBY - AR PLAN",
+                     fontsize=12, rotate=rot)
+    page.insert_text(fitz.Point(*draw(150, 420)), '1/4" = 1\'-0"',
+                     fontsize=10, rotate=rot)
+    page.set_rotation(rot)
+    return doc, page
+
+
+def _fills(page):
+    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+    pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    return pipe._measure_room_fills(page, [], {}, "SYNTH")
+
+
+def test_the_same_sheet_measures_the_same_whether_it_is_rotated():
+    """Rotating a sheet does not resize the room it draws.
+
+    Before this change the adjacency gap was computed as callout-centre minus
+    title-bottom in UNROTATED y. On a page rotated 90 degrees that is a large
+    negative number, the guard rejects it, no scale binds and the drawing is
+    skipped entirely — real consequence: Moxy pages 9 and 13 returned ZERO room
+    fills.
+    """
+    flat_doc, flat = _sheet_reading_upright(0)
+    turned_doc, turned = _sheet_reading_upright(90)
+    flat_fills, flat_drops = _fills(flat)
+    turned_fills, turned_drops = _fills(turned)
+
+    assert len(flat_fills) == 1, "the control fixture must measure"
+    assert len(turned_fills) == 1, (
+        "the rotated sheet measured NOTHING before this change: %r"
+        % ([d.reason for d in turned_drops],)
+    )
+    assert turned_fills[0].viewport_title == flat_fills[0].viewport_title
+    assert turned_fills[0].scale_fpi == flat_fills[0].scale_fpi == pytest.approx(4.0)
+    assert turned_fills[0].area_sf == pytest.approx(flat_fills[0].area_sf, rel=0.02)
+    assert turned_fills[0].area_sf == pytest.approx(300.0, rel=0.06)
+    assert not turned_drops and not flat_drops
+    flat_doc.close()
+    turned_doc.close()
+
+
+def test_the_adjacency_tolerance_is_not_what_was_changed():
+    """The defect was the coordinate space, not the guard's tolerance.
+
+    Widening the tolerance would have "fixed" Moxy by letting a callout that
+    sits ABOVE a title bind to it — which would move unrotated sheets and bind
+    the wrong scale. Both constants are pinned.
+    """
+    from bobbytailor.pipeline import takeoff_pipeline as tp
+
+    assert tp._TITLE_SCALE_ABOVE_TOL_PT == -6.0
+    assert tp._TITLE_SCALE_SIDE_PT == 260.0
+    assert tp.TakeoffPipeline._FILL_CLIP_UP_PT == 620.0
+
+
+@pytest.mark.parametrize("rot", [0, 90])
+def test_the_skip_veto_oracle_cannot_drift_from_the_engine_it_measures(rot):
+    """`page_measurable_signal` binds a title to a callout by the SAME rule.
+
+    Its own comment says so — *"one definition, so the oracle cannot drift
+    from the thing it is the oracle for"* — and moving only the engine into
+    page space would have broken exactly that: the ledger would report ZERO
+    measurable drawings on a Moxy lobby sheet the engine now measures at 743
+    SF, and the skip veto would let the classifier discard it. A silent zero
+    wearing a coverage number.
+    """
+    from bobbytailor.pipeline.takeoff_pipeline import page_measurable_signal
+
+    doc, page = _sheet_reading_upright(rot)
+    assert page_measurable_signal(page)["plan_titles"] == len(_fills(page)[0]) == 1
+    doc.close()
+
+
+def test_the_region_bound_is_threaded_and_defaults_to_the_module_constant():
+    """23-11 and 23-14 measure things that are not guest rooms.
+
+    They must be able to pass their own bound instead of editing a constant
+    every other caller shares — and the default must stay exactly today's, so
+    this plan moves no measurement.
+    """
+    import inspect
+
+    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+    param = inspect.signature(
+        TakeoffPipeline._measure_room_fills
+    ).parameters["max_region_sf"]
+    assert param.default == MAX_REGION_SF
+
+    doc, page = _sheet_reading_upright(0)
+    assert len(_fills(page)[0]) == 1
+    # A bound below the room's own area rejects it — proof the argument
+    # reaches measure_enclosed_area rather than being decorative.
+    tight_fills, tight_drops = TakeoffPipeline(
+        analyzer=lambda *a, **k: {}
+    )._measure_room_fills(page, [], {}, "SYNTH", max_region_sf=50.0)
+    assert tight_fills == []
+    assert tight_drops and "larger than one unit" in tight_drops[0].reason
+    doc.close()
+
+
 def test_measures_a_known_room_area():
     """20' x 15' = 300 SF, drawn at 1/4" = 1'-0"."""
     doc, page, clip = _page_with_room(20.0, 15.0)
