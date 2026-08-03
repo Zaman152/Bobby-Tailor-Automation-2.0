@@ -6,14 +6,14 @@ current_phase: 23
 current_phase_name: measurement-engine-completion
 status: in-progress
 stopped_at: Completed 23-10-PLAN.md
-last_updated: "2026-08-04T04:20:00.000Z"
+last_updated: "2026-08-03T20:55:08.407Z"
 last_activity: 2026-08-04
 last_activity_desc: 23-10 built the ONE open-run chainer core (SP-5) that INV-04 and INV-06 both proposed separately; walls._harvest is now a projection of a styled harvester (83-page byte-identical diff) and Crow's STAIR PLAN viewport is a drawing again, so all five estimator rail marks are unmasked and correctly scaled; suite 1637 -> 1683
 progress:
   total_phases: 28
   completed_phases: 19
   total_plans: 121
-  completed_plans: 108
+  completed_plans: 109
   percent: 68
 ---
 
@@ -389,6 +389,7 @@ None yet.
 - Claude schedule counting accuracy — document confidence limits; v2 review UI (EST-02)
 - Pricing table may go stale — verify quarterly against Anthropic docs
 - GitNexus index stale after 21-01 package move (symbols indexed at old root paths) — run `npx gitnexus analyze` before impact analysis in later plans
+- 23-11 SP-4 clip cell STOPPED: the plan's midpoint anchor partition is falsified on all 16 Moxy prototype sheets (best variant reproduces 4/16). Needs a decision on what the pinned RCP areas mean. See 23-11-SUMMARY.md deviation 2.
 
 ## Session Continuity
 
