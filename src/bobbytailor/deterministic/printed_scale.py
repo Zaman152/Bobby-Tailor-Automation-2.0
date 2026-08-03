@@ -119,6 +119,19 @@ def _normalize(text: str) -> str:
 # of 8.0 — a 144x scale error that would corrupt every quantity on the sheet.
 # (Crow's PDF writes literal slashes and never hits this; Bob's does.)
 #
+# The flattening may leave a SPACE where the slash was, not only a bare
+# concatenation. ``page.get_text('rawdict')`` on Bob's A3.0 roof-plan callout
+# returns the ratio as THREE spans — the label, the stacked digits, then the
+# closing quote and the feet side (INV-04 §4 BUG-A):
+#
+#     SPAN ArialMT 12.6  'SCALE: '
+#     SPAN ArialMT  8.8  '3 32'          <- stacked 3/32; slash gone, SPACE left
+#     SPAN ArialMT 12.6  '" = 1\'-0"'
+#
+# so both ``"332"`` and ``"3 32"`` must map to 3/32. A key lookup on the
+# concatenation alone reads only the first digit run ("3") -> 0.333 ft/in
+# instead of 10.667, a 32x error on every Bob's plan sheet.
+#
 # The repair is unambiguous because the literal readings are architecturally
 # absurd: no drawing is labelled "18 inches = 1 foot" (1.5x life size). Each key
 # below is the digit-concatenation of a STANDARD architectural scale fraction,
@@ -138,15 +151,30 @@ _DROPPED_SLASH_FRACTIONS = {
 }
 
 
-def _paper_inches(text_before_eq: str) -> Optional[float]:
-    """Parse the drawing-inch side left of '=' -> paper inches.
+# The paper-inch measure is the token immediately LEFT of the inch mark, so
+# every anchored pattern below ends at the anchor ("$" on the truncated head).
+# Quantifiers are bounded at 4 digits — the widest real measure is 3 digits
+# ("132", "316", the stacked 1/32 and 3/16 keys) and no printed scale uses a
+# 4-digit paper-inch value, so {1,4} gives one digit of headroom over the
+# longest observed form while keeping the scan strictly linear-time on
+# adversarial callout text (T-23-06: no unbounded repetition on a hot path).
+_ANCH_MIXED_RE = re.compile(r"(\d{1,4})\s+(\d{1,4})\s*/\s*(\d{1,4})\s*$")
+_ANCH_FRACTION_RE = re.compile(r"(\d{1,4})\s*/\s*(\d{1,4})\s*$")
+_ANCH_SPLIT_STACK_RE = re.compile(r"(\d{1,4})\s+(\d{1,4})\s*$")
+_ANCH_LITERAL_RE = re.compile(r"(\d{1,4}(?:\.\d{1,4})?)\s*$")
 
-    Handles mixed numbers ("1 1/2"), plain fractions ("3/32", "1/4"), whole or
-    decimal inches ("1", "1.5"), and stacked-fraction glyphs whose slash the PDF
-    text layer dropped ("18" -> 1/8; see :data:`_DROPPED_SLASH_FRACTIONS`).
-    Non-digit tokens (e.g. "SCALE:") are ignored.
+# The word that marks a callout whose paper-inch measure is anchored. Moxy
+# prints BARE ratios with no such keyword ("1/4\" = 1'-0\"" on its own line);
+# those take the legacy unanchored scan so 40 Moxy sheets keep today's parse.
+_SCALE_KEYWORD_RE = re.compile(r"(?i)scale")
+
+
+def _paper_inches_unanchored(s: str) -> Optional[float]:
+    """Legacy left-to-right scan — the parse for a callout with no SCALE word.
+
+    Preserved verbatim so a bare ratio (Moxy prints 40 sheets of them) takes a
+    literally unchanged code path; see :func:`_paper_inches`.
     """
-    s = text_before_eq
     # Mixed number: "1 1/2" -> 1.5
     m = re.search(r"(\d+)\s+(\d+)\s*/\s*(\d+)", s)
     if m:
@@ -164,6 +192,75 @@ def _paper_inches(text_before_eq: str) -> Optional[float]:
     # Whole or decimal inches: "1", "1.5" — but first repair a stacked fraction
     # whose slash the text layer dropped ("18" is 1/8, never 18 paper inches).
     m = re.search(r"(\d+(?:\.\d+)?)", s)
+    if m:
+        token = m.group(1)
+        if token in _DROPPED_SLASH_FRACTIONS:
+            return _DROPPED_SLASH_FRACTIONS[token]
+        try:
+            return float(token)
+        except ValueError:
+            return None
+    return None
+
+
+def _paper_inches(text_before_eq: str) -> Optional[float]:
+    """Parse the drawing-inch side left of '=' -> paper inches.
+
+    ANCHORED at the last inch mark before the '=' and parsed LEFTWARD from it,
+    because the paper-inch measure is by construction the token the inch mark
+    belongs to. An unanchored left-to-right scan takes the FIRST digit run
+    anywhere in the left-hand text, so a drawing number printed before the ratio
+    wins instead — Bob's ``'2 SCALE: 18" = 1'-0" FRONT ELEVATION NEW'`` read
+    2 paper inches and resolved 0.5 ft/in instead of 8.0, a 16x linear and 256x
+    area error on every quantity of the sheet (INV-04 §4 BUG-B, INV-03 §4.1).
+
+    Handles, in order at the anchor: mixed numbers ("1 1/2"), plain fractions
+    ("3/32", "1/4"), stacked fractions the text layer split with a SPACE
+    ("3 32" -> 3/32, "1 12" -> 1 1/2), stacked fractions it concatenated
+    ("18" -> 1/8; :data:`_DROPPED_SLASH_FRACTIONS`), then whole or decimal
+    inches ("1", "1.5").
+
+    A callout with no ``SCALE`` keyword — Moxy's bare ratios — keeps the legacy
+    unanchored scan unchanged, as does a callout with no inch mark to anchor on.
+    """
+    s = text_before_eq
+    anchor = s.rfind('"')
+    if anchor < 0 or not _SCALE_KEYWORD_RE.search(s):
+        return _paper_inches_unanchored(s)
+
+    head = s[:anchor]
+
+    # Mixed number: "1 1/2" -> 1.5
+    m = _ANCH_MIXED_RE.search(head)
+    if m:
+        den = int(m.group(3))
+        if den:
+            return int(m.group(1)) + int(m.group(2)) / den
+        return None
+    # Plain fraction: "3/32" -> 0.09375
+    m = _ANCH_FRACTION_RE.search(head)
+    if m:
+        den = int(m.group(2))
+        if den:
+            return int(m.group(1)) / den
+        return None
+    # Stacked fraction the text layer split with a SPACE (INV-04 §4 BUG-A).
+    # "3 32" -> 3/32 when the CONCATENATION is a standard-fraction key;
+    # "1 12" -> 1 + 1/2 when only the SECOND token is one (a mixed number whose
+    # fractional part was the stacked glyph). Concatenation is tried first
+    # because "1 16" is 1/16 on Bob's, not 1 + 1/6.
+    m = _ANCH_SPLIT_STACK_RE.search(head)
+    if m:
+        first, second = m.group(1), m.group(2)
+        joined = first + second
+        if joined in _DROPPED_SLASH_FRACTIONS:
+            den = int(second)
+            if den:
+                return int(first) / den
+        elif second in _DROPPED_SLASH_FRACTIONS:
+            return int(first) + _DROPPED_SLASH_FRACTIONS[second]
+    # Stacked fraction the text layer concatenated, then a literal measure.
+    m = _ANCH_LITERAL_RE.search(head)
     if m:
         token = m.group(1)
         if token in _DROPPED_SLASH_FRACTIONS:

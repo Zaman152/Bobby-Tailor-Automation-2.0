@@ -99,6 +99,124 @@ def test_parse_garbage_returns_none():
     assert parse_scale_ratio(None) is None
 
 
+# ── SP-2: anchored right-to-left paper-inch parse ─────────────────────────────
+#
+# INV-04 §4's verified fix table, pinned row for row. Two independent defects
+# made every Bob's page 16-32x wrong linearly and 256-1024x wrong by area:
+#
+#   BUG-A  the stacked fraction glyph flattens to a SPACE, not only to a
+#          concatenation, so 'SCALE: 3 32" = 1\'-0"' read the first digit run
+#          "3" -> 0.333 ft/in instead of 10.667.
+#   BUG-B  the paper-inch scan was unanchored, so a drawing number printed
+#          BEFORE the ratio won: '2 SCALE: 18" = 1\'-0" ...' -> 0.5 not 8.0.
+#
+# The fix anchors on the last inch mark before '=' and parses LEFTWARD from it,
+# because the paper-inch measure is by construction the token the inch mark
+# belongs to. Each row records expected / pre-change / why.
+
+_FIX_TABLE = [
+    # (text, expected_fpi, pre_change_fpi, note)
+    # ── the three forms that were WRONG before the fix ────────────────────
+    ('SCALE: 3 32" = 1\'-0"', 32.0 / 3.0, 1.0 / 3.0,
+     "BUG-A split stacked 3/32 — Bob's A1.1/A2.0/A3.0 plan sheets"),
+    ('2 SCALE: 18" = 1\'-0" FRONT ELEVATION NEW', 8.0, 0.5,
+     "BUG-B leading drawing number 2 was read as 2 paper inches"),
+    ('3 REAR ELEVATION NEW SCALE: 18" = 1\'-0"', 8.0, 1.0 / 3.0,
+     "BUG-B leading drawing number 3 was read as 3 paper inches"),
+    ('5 ENLARGED GLAZING AND ENTRY DOORS SCALE: 14" = 1\'-0"'
+     ' 4 TRUCK DOCK ELEVATION NEW', 4.0, 0.2,
+     "BUG-B leading drawing number 5 was read as 5 paper inches"),
+    ('1 SCALE: 2" = 1\'-0"', 0.5, 1.0,
+     "BUG-B leading drawing number 1 was read as 1 paper inch"),
+    ('SCALE: 1 12" = 1\'-0"', 2.0 / 3.0, 1.0,
+     "split stacked mixed number 1 1/2 — only the SECOND token is a key"),
+    ('SCALE: 1 16" = 1\'-0"', 16.0, 1.0,
+     "split stacked 1/16 — the CONCATENATION is a key, so it wins over 1+1/6"),
+    # ── forms that already parsed correctly and must NOT move ─────────────
+    ('SCALE: 14" = 1\'-0"', 4.0, 4.0, "concatenated stacked 1/4, unchanged"),
+    ('SCALE: 12" = 1\'-0"', 2.0, 2.0, "concatenated stacked 1/2, unchanged"),
+    ('SCALE: 1" = 1\'-0"', 1.0, 1.0, "whole-inch detail scale, unchanged"),
+    ('1" = 40\'-0"', 40.0, 40.0, "engineering scale, no SCALE keyword"),
+    ('1" = 20\'', 20.0, 20.0, "engineering scale, feet only, no SCALE keyword"),
+    ('1/4" = 1\'-0"', 4.0, 4.0, "literal slash, unchanged"),
+    ('3/32" = 1\'-0"', 32.0 / 3.0, 32.0 / 3.0, "literal slash, unchanged"),
+    ('1 1/2" = 1\'-0"', 2.0 / 3.0, 2.0 / 3.0, "literal mixed number, unchanged"),
+]
+
+
+@pytest.mark.parametrize(
+    "text,expected,note",
+    [(t, e, n) for t, e, _pre, n in _FIX_TABLE],
+    ids=[n[:40] for _t, _e, _p, n in _FIX_TABLE],
+)
+def test_inv04_verified_fix_table(text, expected, note):
+    got = parse_scale_ratio(text)
+    assert got is not None, f"{note}: {text!r} failed to parse"
+    assert abs(got - expected) < 1e-3, f"{note}: {text!r} -> {got}, want {expected}"
+
+
+@pytest.mark.parametrize(
+    "text,pre_change",
+    [(t, p) for t, e, p, _n in _FIX_TABLE if abs(e - p) < 1e-9],
+)
+def test_previously_correct_forms_did_not_move(text, pre_change):
+    """The eight rows that already parsed correctly return their old value.
+
+    A scale parser change is high-blast-radius — every quantity on a sheet is
+    scaled by it, and an area error is the square. These rows are the guard
+    that the fix corrected only what was broken.
+    """
+    assert abs(parse_scale_ratio(text) - pre_change) < 1e-3
+
+
+def test_triple_token_stacked_fraction_is_a_known_limitation():
+    """'1 1 2' (a hypothetical fully-split mixed number) is NOT solved here.
+
+    INV-04 §4 scores the recipe 14/15 and names this the one failure. The form
+    appears in NONE of the four plan sets, so inventing a rule for it would be
+    a constant justified by nothing observed (D-07). It returns the safe value
+    2.0 (reading the trailing '1 2' as the stacked 1/2) and the caller flags.
+    """
+    assert abs(parse_scale_ratio('SCALE: 1 1 2" = 1\'-0"') - 2.0) < 1e-3
+
+
+def test_hyphenated_mixed_number_keeps_its_pre_change_value():
+    """Bob's A8.3 prints 'SCALE: 1-1/2" = 1'-0"', parsed as 1/2 -> 2.0.
+
+    Architecturally that is 1.5 paper inches (0.667 ft/in), so 2.0 is wrong —
+    but it is wrong BEFORE this change too, it is a different defect from
+    BUG-A/BUG-B, and correcting it here would break the pinned four-fixture
+    sweep this plan exists to establish. Pinned as-is; see the deferred item.
+    """
+    assert abs(parse_scale_ratio('SCALE: 1-1/2" = 1\'-0"') - 2.0) < 1e-3
+
+
+def test_bare_ratio_without_scale_keyword_takes_the_legacy_path():
+    """Moxy prints 40 sheets of bare ratios with no SCALE keyword.
+
+    Those must take a literally unchanged code path — the anchor exists to
+    disambiguate a callout that also carries a drawing number and a title.
+    """
+    assert parse_scale_ratio('1/4" = 1\'-0"') == 4.0
+    assert parse_scale_ratio('1/8" = 1\'-0"') == 8.0
+    assert abs(parse_scale_ratio('1 1/2" = 1\'-0"') - 2.0 / 3.0) < 1e-3
+
+
+def test_anchored_parse_is_linear_on_adversarial_text():
+    """T-23-06: a long adversarial callout must not blow up the regex engine.
+
+    Callout text is attacker-controlled (it comes out of the PDF text layer).
+    Every anchored pattern uses bounded {1,4} quantifiers with no nested
+    repetition, so a pathological string returns promptly rather than hanging.
+    """
+    import time
+
+    nasty = "SCALE: " + "1 " * 5000 + '9" = 1\'-0"'
+    t0 = time.time()
+    parse_scale_ratio(nasty)
+    assert time.time() - t0 < 1.0
+
+
 # ── Synthetic fitz page ───────────────────────────────────────────────────────
 
 
