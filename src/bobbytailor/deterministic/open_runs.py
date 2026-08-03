@@ -707,6 +707,42 @@ def _replace_polyline(
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
+def _chain_group(segments, feet_per_point: float, min_run_ft: float) -> List[OpenRun]:
+    """The core pipeline for one segment population: merge collinear pieces
+    across bridged gaps, collapse parallel pairs, chain with the continuity
+    window, absorb stubs with one hop, build the surviving runs."""
+    spans = _merge_collinear(segments)
+    if not spans:
+        return []
+    spans = _collapse_pairs(spans, feet_per_point)
+    chains = _absorb_stubs(_chain(spans))
+
+    runs: List[OpenRun] = []
+    min_len_pt = min_run_ft / feet_per_point
+    for chain in chains:
+        pts = tuple(chain["pts"])
+        length = _polyline_len(pts)
+        if length < min_len_pt:
+            continue
+        run = OpenRun(
+            polyline_pt=pts,
+            length_pt=length,
+            ink_pt=min(chain["ink"], length),
+            paired=chain["paired"],
+            segment_count=chain["count"],
+        )
+        if run.ink_fraction < MIN_INK_FRACTION:
+            run.needs_review = True
+            run.review_reason = (
+                "run is %.0f%% bridged gap — its ink covers only %.2f of "
+                "its span" % (
+                    100.0 * (1.0 - run.ink_fraction), run.ink_fraction
+                )
+            )
+        runs.append(run)
+    return runs
+
+
 def extract_open_runs(
     page,
     doc,
@@ -715,6 +751,7 @@ def extract_open_runs(
     min_run_ft: float = MIN_RUN_FT,
     exclude_rects: Optional[Sequence] = None,
     candidate_prefix: str = "RUN",
+    per_pen: bool = False,
 ) -> List[OpenRun]:
     """Chain the open runs drawn inside ``clip_pt``. Never raises.
 
@@ -727,6 +764,16 @@ def extract_open_runs(
     ``feet_per_point`` parameterises the two real-length constants — the
     minimum reported run length and the parallel-pair offset band. It does NOT
     convert the result: every ``OpenRun.length_pt`` comes back in points.
+
+    ``per_pen=True`` runs the identical pipeline once per (stroke width,
+    stroke colour) pen instead of once over everything. CAD draws one object
+    with one pen, so merging, pairing and chaining across pens conflates
+    DIFFERENT objects: on Crow's stair details, the rail face (a 0.96 pt pen)
+    was being merged with the lighter stringer line that continues past the
+    rail's end (a 0.36 pt pen), over-chaining the run 72 pt beyond where the
+    estimator's own mark stops. The pen partition terminates the chain where
+    the drawn object ends — a position-truth fix, not a count fit. This is
+    exactly what the styled harvest carries width and colour FOR (23-10).
     """
     if not feet_per_point or feet_per_point <= 0:
         logger.warning("Open-run chaining requires a solved scale; skipping")
@@ -753,35 +800,17 @@ def extract_open_runs(
         if not inside:
             return []
 
-        spans = _merge_collinear(inside)
-        if not spans:
-            return []
-        spans = _collapse_pairs(spans, feet_per_point)
-        chains = _absorb_stubs(_chain(spans))
-
-        runs: List[OpenRun] = []
-        min_len_pt = min_run_ft / feet_per_point
-        for chain in chains:
-            pts = tuple(chain["pts"])
-            length = _polyline_len(pts)
-            if length < min_len_pt:
-                continue
-            run = OpenRun(
-                polyline_pt=pts,
-                length_pt=length,
-                ink_pt=min(chain["ink"], length),
-                paired=chain["paired"],
-                segment_count=chain["count"],
-            )
-            if run.ink_fraction < MIN_INK_FRACTION:
-                run.needs_review = True
-                run.review_reason = (
-                    "run is %.0f%% bridged gap — its ink covers only %.2f of "
-                    "its span" % (
-                        100.0 * (1.0 - run.ink_fraction), run.ink_fraction
-                    )
+        if per_pen:
+            pens: Dict[tuple, list] = {}
+            for s in inside:
+                pens.setdefault((s[5], s[6]), []).append(s)
+            runs: List[OpenRun] = []
+            for _pen in sorted(pens, key=lambda k: (k[0], str(k[1]))):
+                runs.extend(
+                    _chain_group(pens[_pen], feet_per_point, min_run_ft)
                 )
-            runs.append(run)
+        else:
+            runs = _chain_group(inside, feet_per_point, min_run_ft)
 
         runs.sort(key=lambda r: (-r.length_pt, r.polyline_pt))
         for rank, run in enumerate(runs, start=1):
@@ -1275,3 +1304,80 @@ def extract_linetype_runs(
     except Exception as exc:  # noqa: BLE001 — untrusted PDF must not crash
         logger.warning("Linetype run detection failed: %s", exc)
         return []
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SELECTOR 2 — rails (INV-06, gap 6)
+#
+# A rail is drawn as one or two thin parallel faces inside a DETAIL drawing at
+# the detail's own printed scale. The selector is the chainer core run per pen
+# inside a callout-anchored clip; what it adds is the stamping — the owning
+# viewport's title, the callout's scale, and the typical-detail flag that is
+# the entire defence against summing the same rail drawn on a typical detail
+# with the same rail drawn on a main plan (INV-06 risk 3).
+#
+# THE STANDING CAUTION: measuring a run is not counting the runs. Crow's
+# golden rail totals are ~6x and ~21x the drawn per-instance lengths, because
+# the instance multiplier is not printed anywhere on the sheets. A rail run is
+# emitted PER INSTANCE; the binder (23-13) must ship it flagged with the count
+# unknown. Tuning anything here until a total reads 420.35 would be the
+# coincidence trap this phase exists to abolish (D-07).
+# ═════════════════════════════════════════════════════════════════════════════
+
+# A run is TYPICAL when its callout's scale differs from the resolved page
+# scale by more than this relative tolerance. The value matches
+# ``takeoff_pipeline._SCALE_MATCH_TOL`` — the same test the pipeline already
+# uses to decide whether a viewport is off the page scale — and a test pins
+# the two equal so they cannot drift. (Binding by reference is impossible
+# here: the deterministic layer must not import the pipeline layer.)
+SCALE_MATCH_TOL = 0.05
+
+
+def extract_rail_runs(
+    page,
+    doc,
+    clip_pt: Sequence[float],
+    feet_per_point: float,
+    min_run_ft: float = MIN_RUN_FT,
+    exclude_rects: Optional[Sequence] = None,
+    viewport_title: str = "",
+    page_feet_per_point: Optional[float] = None,
+) -> List[OpenRun]:
+    """Chain the rail runs drawn inside one callout-anchored clip.
+
+    Sits directly on :func:`extract_open_runs` — the ONE chainer — with the
+    pen partition on, because a rail's two faces are drawn with one pen and
+    the linework that continues past the rail's end is drawn with another.
+    Never offered unclipped: the clip requirement is inherited from the core
+    (a ``None`` clip returns ``[]``), and running unclipped on Crow's overall
+    floor plan chained a hatch field into a 369-foot phantom (INV-06 risk 4).
+
+    ``feet_per_point`` is the CALLOUT's scale — the scale printed beneath the
+    detail the clip covers — never the page's. ``page_feet_per_point`` is the
+    resolved page scale, used only to stamp ``is_typical``: a run measured at
+    an off-page-scale callout is a typical detail, drawn once and installed
+    many times, and must never be summed with a main-plan run of the same
+    object.
+    """
+    runs = extract_open_runs(
+        page,
+        doc,
+        clip_pt,
+        feet_per_point,
+        min_run_ft=min_run_ft,
+        exclude_rects=exclude_rects,
+        candidate_prefix="RAIL",
+        per_pen=True,
+    )
+    scale_fpi = feet_per_point * 72.0
+    typical = False
+    if page_feet_per_point and page_feet_per_point > 0:
+        typical = (
+            abs(feet_per_point - page_feet_per_point)
+            > SCALE_MATCH_TOL * page_feet_per_point
+        )
+    for run in runs:
+        run.viewport_title = viewport_title
+        run.scale_fpi = scale_fpi
+        run.is_typical = typical
+    return runs

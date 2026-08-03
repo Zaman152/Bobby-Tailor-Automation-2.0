@@ -19,6 +19,7 @@ from bobbytailor.deterministic.open_runs import (
     MAX_PITCH_OVER_SPAN,
     MIN_INK_FRACTION,
     PAIR_OFFSET_MAX_FT,
+    SCALE_MATCH_TOL,
     STUB_HOPS,
     STUB_MAX_PT,
     OpenRun,
@@ -26,6 +27,7 @@ from bobbytailor.deterministic.open_runs import (
     clamp_run,
     extract_linetype_runs,
     extract_open_runs,
+    extract_rail_runs,
     run_lf,
 )
 from bobbytailor.deterministic.walls import MAX_SEGMENTS, MIN_THICKNESS_FT
@@ -797,3 +799,237 @@ def test_zero_false_positives_across_all_76_pages_of_the_other_three_sets():
         doc.close()
     assert page_total == 76, "the sweep no longer covers the 76 pages"
     assert fired == {}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SELECTOR 2 — rails (INV-06)
+#
+# Validation is by POSITION against the ESTIMATOR's five measurement marks —
+# the coloured polylines the human drew on the take-off PDF, pinned below as
+# literals. The stamped golden totals (Guard Rail 420.35 LF / Hand Rail
+# 438.80 LF) are a per-instance length times an instance multiplier the
+# drawings do not print; NOTHING in this section asserts against them, and
+# nothing ever may (INV-06 §4 risk 1).
+# ═════════════════════════════════════════════════════════════════════════════
+
+# The same clip rule the pipeline's cell primitive uses (23-11's
+# _fill_clip_for_title): the drawing sits in the box above its callout.
+CLIP_UP_PT, CLIP_SIDE_PT = 620.0, 260.0
+
+# The estimator's five rail marks (INV-06 §1.3): bbox, the LF the estimator's
+# own trace measures at the detail's printed scale, and that scale.
+ESTIMATOR_RAIL_MARKS = (
+    ((273, 167, 1229, 167), 53.10, QUARTER_FPP),   # ENLARGED RAMP PLAN guard
+    ((1771, 869, 1771, 1168), 8.32, HALF_FPP),     # STAIR PLAN guard
+    ((1607, 870, 1607, 1169), 8.31, HALF_FPP),     # STAIR PLAN guard
+    ((1783, 937, 1783, 1315), 10.50, HALF_FPP),    # STAIR PLAN hand
+    ((1591, 936, 1591, 1315), 10.52, HALF_FPP),    # STAIR PLAN hand
+)
+
+
+def _callout_clips(page):
+    """(clip, feet_per_point, title) per printed-scale callout on the page."""
+    from bobbytailor.deterministic.printed_scale import extract_printed_scales
+
+    out = []
+    for ps in extract_printed_scales(page):
+        b = ps.bbox_pt
+        clip = (
+            b[0] - CLIP_SIDE_PT,
+            max(0.0, b[1] - CLIP_UP_PT),
+            b[2] + CLIP_SIDE_PT,
+            max(0.0, b[1] - 8.0),
+        )
+        out.append((clip, ps.feet_per_point, ps.title))
+    return out
+
+
+@pytest.mark.skipif(not CROW_PDF.is_file(), reason="Crow Cass PDF fixture missing")
+def test_the_rail_selector_reproduces_all_five_estimator_marks_by_position():
+    """Each of the estimator's five marks is reproduced by a run within 3 pt
+    on its ALONG-run edges and 3.5 pt on its cross-run edges, with its length
+    within 5% of the estimator's own figure.
+
+    The cross-run margin is 3.5 rather than 3 for a measured reason: the
+    estimator traces a rail's OUTER face, while the selector reports the
+    collapsed pair's MIDLINE, which sits half the drawn pipe offset inboard —
+    2.25 pt at the stair details' 1/2" scale. The worst observed cross-run
+    delta is 3.04 pt (the hand rail at x=1783); every along-run delta is
+    under 0.9 pt. The nearest OTHER parallel linework is over 10 pt away, so
+    the widened margin cannot capture a neighbouring element.
+    """
+    doc = fitz.open(CROW_PDF)
+    page = doc[2]
+    clips = _callout_clips(page)
+    runs_by_fpp = {}
+    for clip, fpp, title in clips:
+        key = round(fpp, 6)
+        runs_by_fpp.setdefault(key, []).extend(
+            extract_rail_runs(page, doc, clip, fpp, viewport_title=title)
+        )
+    doc.close()
+
+    for (x0, y0, x1, y1), expect_lf, fpp in ESTIMATOR_RAIL_MARKS:
+        vertical = abs(x1 - x0) < abs(y1 - y0)
+        cross_tol = 3.5
+        along_tol = 3.0
+        if vertical:
+            tols = (cross_tol, along_tol, cross_tol, along_tol)
+        else:
+            tols = (along_tol, cross_tol, along_tol, cross_tol)
+        target = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+        matched = []
+        for run in runs_by_fpp.get(round(fpp, 6), ()):
+            b = run.bbox_pt
+            if all(abs(b[i] - target[i]) <= tols[i] for i in range(4)):
+                matched.append(run)
+        assert matched, (
+            "no run reproduces the estimator's mark %r" % ((x0, y0, x1, y1),)
+        )
+        best = min(
+            matched, key=lambda r: abs(r.length_lf(fpp) - expect_lf)
+        )
+        assert best.length_lf(fpp) == pytest.approx(expect_lf, rel=0.05)
+
+
+@pytest.mark.skipif(not CROW_PDF.is_file(), reason="Crow Cass PDF fixture missing")
+def test_the_stair_rail_marks_are_reproduced_as_collapsed_pairs():
+    """The four stair marks are double-line rails: measured ONCE, paired."""
+    doc = fitz.open(CROW_PDF)
+    page = doc[2]
+    runs = []
+    for clip, fpp, title in _callout_clips(page):
+        if abs(fpp - HALF_FPP) > 1e-9:
+            continue
+        runs.extend(extract_rail_runs(page, doc, clip, fpp))
+    doc.close()
+    for (x0, y0, x1, y1), expect_lf, fpp in ESTIMATOR_RAIL_MARKS[1:]:
+        hits = [
+            r for r in runs
+            if abs(r.bbox_pt[0] - min(x0, x1)) <= 3.5
+            and abs(r.bbox_pt[1] - min(y0, y1)) <= 3.0
+            and abs(r.bbox_pt[3] - max(y0, y1)) <= 3.0
+        ]
+        assert hits
+        assert any(r.paired for r in hits), (
+            "the rail at %r is not a collapsed pair" % ((x0, y0, x1, y1),)
+        )
+
+
+def test_a_double_line_rail_yields_one_paired_run_not_two():
+    """INV-06 §2 step 4: without the collapse every rail reports at 2x."""
+    # 1 1/2" O.D. pipe = 0.125 ft = 2.25 pt at 1/4" scale.
+    def draw(page):
+        page.draw_line(fitz.Point(100, 300), fitz.Point(400, 300), width=0.3)
+        page.draw_line(fitz.Point(100, 302.25), fitz.Point(400, 302.25), width=0.3)
+
+    doc, page = _page(draw)
+    try:
+        runs = extract_rail_runs(page, doc, PAGE, QUARTER_FPP, min_run_ft=1.0)
+    finally:
+        doc.close()
+    assert len(runs) == 1
+    assert runs[0].paired is True
+    assert runs[0].candidate_id == "RAIL-1"
+    assert runs[0].length_pt == pytest.approx(300.0, abs=0.1)
+
+
+def test_two_faces_drawn_with_different_pens_are_different_objects():
+    """The pen partition IS the chain termination: on the real stair detail a
+    0.36 pt stringer line continued past the 0.96 pt rail face's end and the
+    pen-blind merge over-chained the run 72 pt beyond the estimator's mark."""
+    def draw(page):
+        # A heavy rail face and, collinear beyond its end, a light line.
+        page.draw_line(fitz.Point(100, 300), fitz.Point(300, 300), width=0.96)
+        page.draw_line(fitz.Point(301, 300), fitz.Point(420, 300), width=0.36)
+
+    doc, page = _page(draw)
+    try:
+        runs = extract_rail_runs(page, doc, PAGE, QUARTER_FPP, min_run_ft=1.0)
+    finally:
+        doc.close()
+    lengths = sorted(round(r.length_pt, 1) for r in runs)
+    # Two runs, terminated at the pen change — not one 320 pt chain.
+    assert lengths == [119.0, 200.0]
+
+
+def test_the_typical_detail_flag_follows_the_page_scale():
+    """A run at an off-page-scale callout is a typical detail; one at the
+    page scale is not. The flag is the whole defence against summing the same
+    rail drawn on a typical detail with the same rail drawn on a main plan."""
+    def draw(page):
+        page.draw_line(fitz.Point(100, 300), fitz.Point(400, 300), width=0.3)
+
+    doc, page = _page(draw)
+    try:
+        typical = extract_rail_runs(
+            page, doc, PAGE, HALF_FPP, min_run_ft=1.0,
+            viewport_title="STAIR RAIL", page_feet_per_point=QUARTER_FPP,
+        )
+        at_page_scale = extract_rail_runs(
+            page, doc, PAGE, QUARTER_FPP, min_run_ft=1.0,
+            page_feet_per_point=QUARTER_FPP,
+        )
+        unresolved = extract_rail_runs(
+            page, doc, PAGE, HALF_FPP, min_run_ft=1.0,
+        )
+    finally:
+        doc.close()
+    assert typical[0].is_typical is True
+    assert typical[0].viewport_title == "STAIR RAIL"
+    assert typical[0].scale_fpi == pytest.approx(2.0)
+    assert at_page_scale[0].is_typical is False
+    # No resolved page scale -> nothing to compare against -> not typical.
+    assert unresolved[0].is_typical is False
+
+
+def test_the_typical_tolerance_is_the_pipelines_own():
+    """SCALE_MATCH_TOL cannot be bound by reference (the deterministic layer
+    must not import the pipeline layer), so this test pins the equality."""
+    from bobbytailor.pipeline import takeoff_pipeline
+
+    assert SCALE_MATCH_TOL == takeoff_pipeline._SCALE_MATCH_TOL
+
+
+def test_the_rail_selector_is_not_offered_unclipped():
+    """T-23-38, inherited from the core: no clip, no runs."""
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=600)
+    page.draw_line(fitz.Point(100, 300), fitz.Point(400, 300), width=0.3)
+    assert extract_rail_runs(page, doc, None, QUARTER_FPP) == []
+    assert extract_rail_runs(page, doc, PAGE, 0) == []
+    doc.close()
+
+
+@pytest.mark.skipif(not CROW_PDF.is_file(), reason="Crow Cass PDF fixture missing")
+def test_the_left_ramp_hatch_field_cannot_become_a_run():
+    """INV-06 risk 4: unconstrained chaining inside the overall floor plan's
+    left ramp box produced a single 369.8 LF zigzag "run" — 665 pt of chained
+    hatch inside a box whose diagonal is ~138 pt, length 4.8x the clip
+    diagonal and ~6.6x its own bbox diagonal. With the continuity window and
+    the pen partition, a run is at most an L (one absorbed stub): its length
+    can never exceed sqrt(2) of its own bbox diagonal. Both invariants are
+    asserted, with margin."""
+    import math
+
+    doc = fitz.open(CROW_PDF)
+    page = doc[0]
+    fpp = 40.0 / 72.0  # the overall plan's printed 1" = 40'-0"
+    # The left ramp, centred on the vertical RAMP label at (461-470, 1138-1166).
+    clip = (431.0, 1092.0, 500.0, 1212.0)
+    clip_diag = math.hypot(clip[2] - clip[0], clip[3] - clip[1])
+    runs = extract_rail_runs(page, doc, clip, fpp, min_run_ft=4.0)
+    doc.close()
+
+    assert runs, "the ramp box must produce runs — an empty guard proves nothing"
+    for run in runs:
+        b = run.bbox_pt
+        own_diag = math.hypot(b[2] - b[0], b[3] - b[1])
+        assert run.length_pt <= 1.5 * own_diag, (
+            "zigzag: run of %.1f pt inside a %.1f pt bbox" % (
+                run.length_pt, own_diag
+            )
+        )
+        # A pass-through straight segment may exceed the clip diagonal, but
+        # nothing may approach the 4.8x of the recorded hatch phantom.
+        assert run.length_pt <= 2.0 * clip_diag
