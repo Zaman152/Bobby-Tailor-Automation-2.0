@@ -540,19 +540,23 @@ class TestClassifySheetTypeVerbose:
 
     # -- the live COVER PLATE defect, recorded as a fact ---------------------
 
-    def test_cover_plate_collision_is_recorded_not_repaired(self):
-        """Moxy pages 23-38: an electrical keynote kills 16 guestroom sheets.
+    def test_cover_plate_collision_is_repaired(self):
+        """Moxy pages 23-38: an electrical keynote killed 16 guestroom sheets.
 
-        This test PINS the live defect (INV-08 §1.2) as a recorded fact. The
-        structural repair belongs to plan 23-06, gated on the four-set check —
-        when it lands, this expectation changes deliberately, in that plan.
+        Plan 23-01 PINNED this defect as a recorded fact and handed the repair
+        to plan 23-06, gated on the four-set check: "when it lands, this
+        expectation changes deliberately, in that plan." It has landed, so the
+        expectation is inverted here rather than deleted — the phrase that cost
+        16 sheets stays in the suite forever as the regression it is.
         """
         text = "PROVIDE LABEL ON THE LIGHT SWITCH COVER PLATE INDICATING MASTER"
         sheet_type, source, keyword, context = classify_sheet_type_verbose(text)
-        assert sheet_type == "title_sheet"
-        assert source == "title_block"
-        assert keyword == "COVER"
-        assert "PLATE" in context
+        assert sheet_type != "title_sheet", (
+            "the COVER PLATE keynote is discarding drawing sheets again"
+        )
+        assert (sheet_type, source, keyword, context) == (
+            "floor_plan", "default", "", ""
+        )
 
     def test_bare_cover_is_not_trusted_in_full_page_text(self):
         """The same phrase in page text must NOT reach the title_sheet branch."""
@@ -872,3 +876,144 @@ class TestIsTitleShapedMatch:
         )
         start = text.index("COVER")
         assert is_title_shaped_match(text, start, start + len("COVER")) is False
+
+
+# ---------------------------------------------------------------------------
+# Plan 23-06 Task 2 — the keyword-context guard
+#
+# A bare title word ("COVER", "INDEX") is trusted only inside the title block,
+# because a title_sheet verdict SKIPS THE SHEET ENTIRELY. Whole-word matching
+# was not enough: "LIGHT SWITCH COVER PLATE" contains COVER as a whole word,
+# and that one phrase discarded 16 Moxy guestroom prototypes (INV-08 §1.2).
+# The guard tests the POSITION of the match, never the keyword.
+# ---------------------------------------------------------------------------
+
+_find_title_position_hit = _spm._find_title_position_hit
+_KW_TITLE_BLOCK_ONLY = _spm._KW_TITLE_BLOCK_ONLY
+
+
+class TestBareTitleKeywordContextGuard:
+
+    # Verbatim from plan 23-01's classify_sheet_type_verbose output on Moxy
+    # page 23: ('title_sheet', 'title_block', 'COVER',
+    #           'ABEL ON THE LIGHT SWITCH COVER PLATE INDICATING "MASTER')
+    MOXY_KEYNOTE = (
+        'MASTER SWITCH, IF REQUIRED. PROVIDE LABEL ON THE LIGHT SWITCH '
+        'COVER PLATE INDICATING "MASTER SWITCH". SHEET NO. JOB NO. DATE '
+        'SHEET TITLE PHASE A KING TYPE A GUESTROOM ID-407'
+    )
+    # Real title-block text from the two genuine Moxy title sheets.
+    MOXY_COVER_SHEET = (
+        "ELEVATE PROJECT NUMBER: SHEET TITLE: SHEET NUMBER: & by CGS. "
+        "CS-00 COVER SHEET 25-13.01 ELEVATE"
+    )
+    MOXY_INDEX_SHEET = (
+        "ELEVATE PROJECT NUMBER: SHEET TITLE: SHEET NUMBER: "
+        "CS-01 SHEET INDEX 25-13.01"
+    )
+    BOBS_COVER_SHEET = (
+        "ARCHITECTURAL CS-1 COVER SHEET GN-1 BUILDING CODE / OCCUPANCY & "
+        "LIFE SAFETY PLAN GN-2 ACCESSIBILITY DETAILS"
+    )
+
+    def test_the_electrical_keynote_is_no_longer_a_title_sheet(self):
+        assert classify_sheet_type_from_text(self.MOXY_KEYNOTE) != "title_sheet"
+
+    def test_the_keynote_sheet_is_therefore_not_skipped(self):
+        """The consequence that matters: an empty pass list means the sheet is
+        never measured, never rendered, never counted."""
+        sheet_type = classify_sheet_type_from_text(self.MOXY_KEYNOTE)
+        assert plan_passes(sheet_type, title_block_text=self.MOXY_KEYNOTE) != []
+
+    def test_the_genuine_cover_sheet_still_classifies_as_a_title_sheet(self):
+        assert classify_sheet_type_from_text(self.MOXY_COVER_SHEET) == "title_sheet"
+
+    def test_the_genuine_index_sheet_still_classifies_as_a_title_sheet(self):
+        assert classify_sheet_type_from_text(self.MOXY_INDEX_SHEET) == "title_sheet"
+
+    def test_a_second_offices_genuine_cover_sheet_also_survives(self):
+        assert classify_sheet_type_from_text(self.BOBS_COVER_SHEET) == "title_sheet"
+
+    def test_a_wall_covering_note_is_not_a_title_sheet(self):
+        note = (
+            "FINISH NOTE: ALL GUESTROOM WALLS TO RECEIVE VINYL WALL COVER "
+            "AS SCHEDULED BY THE INTERIOR DESIGNER"
+        )
+        assert classify_sheet_type_from_text(note) != "title_sheet"
+
+    def test_a_bare_cover_in_a_title_field_still_fires(self):
+        """The guard rejects a POSITION, not the word. A title block whose sheet
+        title is literally "COVER" must still be recognised — otherwise the
+        guard would just be a disguised deletion of the keyword."""
+        text = "SHEET NO. A-000 SHEET TITLE COVER JOB NO. 25-13"
+        sheet_type, source, keyword, _ctx = classify_sheet_type_verbose(text)
+        assert (sheet_type, source, keyword) == ("title_sheet", "title_block", "COVER")
+
+    def test_a_bare_index_in_a_title_field_still_fires(self):
+        text = "SHEET NO. A-001 SHEET TITLE INDEX JOB NO. 25-13"
+        assert classify_sheet_type_from_text(text) == "title_sheet"
+
+    def test_a_title_block_hit_wins_over_an_earlier_note_hit(self):
+        """Deterministic order is preserved: the earliest TITLE-POSITION match
+        decides, so a note mentioning COVER before the title block does not
+        suppress the real title."""
+        text = (
+            "PROVIDE LABEL ON THE LIGHT SWITCH COVER PLATE INDICATING MASTER. "
+            "SHEET TITLE COVER JOB NO. 25-13"
+        )
+        assert classify_sheet_type_from_text(text) == "title_sheet"
+
+    def test_bare_keywords_are_still_ignored_in_full_page_text(self):
+        """The title-block-only restriction is unchanged by the guard."""
+        assert classify_sheet_type_from_text("", "COVER") != "title_sheet"
+
+    def test_the_keyword_set_is_untouched(self):
+        """The repair is a context predicate. Adding, removing or reordering a
+        keyword to make a fixture pass is forbidden by the plan."""
+        assert _KW_TITLE_BLOCK_ONLY == frozenset(["INDEX", "COVER"])
+
+    def test_the_guard_is_not_a_deny_list_of_product_phrases(self):
+        """A novel compound never seen before must be rejected on shape alone."""
+        novel = (
+            "PROVIDE A STAINLESS ACCESS PANEL AND A HINGED INSPECTION COVER "
+            "PANEL AT EACH SHAFT PER THE MANUFACTURER"
+        )
+        assert classify_sheet_type_from_text(novel) != "title_sheet"
+
+    def test_the_guard_returns_the_matched_keyword_and_span(self):
+        text = "SHEET TITLE COVER 25-13"
+        kw, start, end = _find_title_position_hit(text, _KW_TITLE_BLOCK_ONLY)
+        assert (kw, text[start:end]) == ("COVER", "COVER")
+
+    def test_the_guard_returns_none_when_every_match_is_prose(self):
+        assert _find_title_position_hit(
+            self.MOXY_KEYNOTE.upper(), _KW_TITLE_BLOCK_ONLY
+        ) is None
+
+
+class TestVerboseEquivalenceSweepAfterTheGuard:
+    """Plan 23-01's sweep, re-asserted: every input that is NOT one of the two
+    collision shapes keeps its verdict, and the collision shapes change on
+    purpose. Listing them explicitly is what stops a future refactor from
+    quietly widening the guard."""
+
+    COLLISION_SHAPES = {
+        "PROVIDE LABEL ON THE LIGHT SWITCH COVER PLATE",
+    }
+
+    def test_only_the_collision_shapes_moved(self):
+        for title_block, full_page in TestVerboseEquivalenceSweep.SWEEP:
+            verdict = classify_sheet_type_from_text(title_block, full_page)
+            if title_block in self.COLLISION_SHAPES:
+                assert verdict != "title_sheet", (
+                    "%r is a keynote sentence and must no longer discard the "
+                    "sheet" % title_block
+                )
+            elif full_page in self.COLLISION_SHAPES:
+                # Bare keywords were never trusted in full-page text, so this
+                # row's verdict was already floor_plan and must not move.
+                assert verdict == "floor_plan"
+
+    def test_every_non_collision_row_keeps_a_title_verdict_where_it_had_one(self):
+        for title_block in ("CS-00 COVER SHEET 25-13.01", "A0.1 SHEET INDEX"):
+            assert classify_sheet_type_from_text(title_block) == "title_sheet"

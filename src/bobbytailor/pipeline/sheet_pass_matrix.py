@@ -28,6 +28,7 @@ from bobbytailor.config import (
     CLAUDE_MODEL_SCHEDULES,
     CLAUDE_MODEL_SEMANTIC,
 )
+from bobbytailor.pipeline.text_shape import is_title_shaped_match
 
 # Optional: fall back gracefully if _pick_model is not yet importable
 try:
@@ -210,6 +211,44 @@ def _find_hit(text: str, keywords: "frozenset[str]") -> Optional[tuple]:
     return kw, start, end
 
 
+def _find_title_position_hit(text: str, keywords: "frozenset[str]") -> Optional[tuple]:
+    """(keyword, start, end) for the earliest match sitting in a TITLE POSITION.
+
+    The guard for the bare title words. "COVER" and "INDEX" are catastrophic
+    when they are wrong — a title_sheet verdict discards the sheet entirely,
+    zero API and zero geometry — and a real drawing says them constantly in its
+    notes. Whole-word matching (which this codebase already does) fixed
+    "COVERING" but NOT the live collision, because "LIGHT SWITCH COVER PLATE"
+    contains "COVER" as a whole word. It discarded 16 Moxy guestroom prototypes
+    (INV-08 §1.2), and the same shape reappears in every wall-covering note.
+
+    So the deciding evidence is the match's POSITION, not the keyword. A
+    title-block field value is a short token run bounded by sheet IDs, numbers
+    and colons — "CS-00 COVER SHEET 25-13.01", "SHEET TITLE: COVER". A keynote
+    is a long run of words containing English function words — "PROVIDE LABEL
+    ON THE LIGHT SWITCH COVER PLATE INDICATING". text_shape.is_title_shaped_match
+    tests exactly that, and both conditions must hold.
+
+    This is deliberately NOT a deny list of product phrases: "COVER PLATE" and
+    "WALL COVERING" are the two collisions we happen to have seen, and a list of
+    them would miss the third. It is also NOT a change to the keyword sets —
+    those are frozen, and a test pins them.
+
+    Matches are considered in the same deterministic order as _find_hit
+    (earliest, then longest keyword, then alphabetical) and the first one in a
+    title position wins, so a page whose notes mention "COVER" before its title
+    block says "COVER" is still classified by its title block.
+    """
+    candidates = []
+    for kw in sorted(keywords):
+        for m in _kw_regex(kw).finditer(text):
+            candidates.append((m.start(), -len(kw), kw, m.end()))
+    for start, _neg_len, kw, end in sorted(candidates):
+        if is_title_shaped_match(text, start, end):
+            return kw, start, end
+    return None
+
+
 def _hit(text: str, keywords: "frozenset[str]") -> bool:
     """True when any keyword appears in *text* as a WHOLE WORD (text is upper).
 
@@ -277,7 +316,9 @@ def classify_sheet_type_verbose(
         # sheet entirely and a real drawing's notes say "WALL COVERING".
         hit = _find_hit(src, _KW_TITLE)
         if hit is None and is_title_block:
-            hit = _find_hit(src, _KW_TITLE_BLOCK_ONLY)
+            # Bare "COVER"/"INDEX" must additionally sit in a title POSITION —
+            # a title word inside a sentence is a keynote, not a sheet title.
+            hit = _find_title_position_hit(src, _KW_TITLE_BLOCK_ONLY)
         if hit is not None:
             return _verdict("title_sheet", source, src, hit)
 

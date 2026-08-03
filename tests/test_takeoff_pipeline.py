@@ -810,23 +810,29 @@ class TestSkipIsRecorded:
         assert coverage.is_silent_loss is True
 
     def test_the_sentinel_carries_the_reason(self):
-        """A skipped page states which keyword skipped it and what it matched."""
+        """A skipped page states which keyword skipped it and what it matched.
+
+        The input is a GENUINE cover sheet. It used to be the "LIGHT SWITCH
+        COVER PLATE" keynote, borrowed purely because it produced a skip — but
+        plan 23-06's keyword-context guard means a title word inside a sentence
+        no longer discards a sheet, which is the whole point of that plan. The
+        assertion here is about the sentinel carrying its reason, so the input
+        is now a page that SHOULD be skipped.
+        """
         path = _synthetic_sheet(with_title=False, with_scale=False)
         try:
             pipeline = TakeoffPipeline(analyzer=_exploding_analyzer)
             result = pipeline.run_sheet(
-                image_path="x.png", sheet_name="ID-411",
-                title_block_text=(
-                    "PROVIDE LABEL ON THE LIGHT SWITCH COVER PLATE INDICATING"
-                ),
+                image_path="x.png", sheet_name="CS-00",
+                title_block_text="CS-00 COVER SHEET 25-13.01",
                 pdf_path=path, page_index=0,
             )
         finally:
             os.unlink(path)
 
         assert result["_skipped"] is True
-        assert result["_skip_keyword"] == "COVER"
-        assert "PLATE" in result["_skip_context"]
+        assert result["_skip_keyword"] == "COVER SHEET"
+        assert "CS-00" in result["_skip_context"]
         assert result["_skip_reason"]
         assert set(result["_measurable_signal"]) == {
             "plan_titles", "printed_scales", "viewports", "schedules",
