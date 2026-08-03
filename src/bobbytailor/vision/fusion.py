@@ -33,6 +33,15 @@ import math
 import re
 from typing import Dict, List, Optional, Tuple
 
+# Unit-count provenance, imported rather than restated so the report row and the
+# resolver that produced the number cannot drift apart (threat T-23-32).
+# ``room_tags`` is a pure extractor — it imports no pipeline and no PDF library
+# at module scope — so this adds no import weight and no cycle.
+from bobbytailor.deterministic.room_tags import (
+    UNIT_COUNT_SOURCE_ASSUMED as _UNIT_COUNT_SOURCE_ASSUMED,
+    UNIT_COUNT_SOURCE_MANIFEST as _UNIT_COUNT_SOURCE_MANIFEST,
+)
+
 logger = logging.getLogger(__name__)
 
 # ── Provenance enum (RESEARCH §3 "Keeping vision away from numbers") ─────────
@@ -1518,13 +1527,24 @@ def _fuse_room_fills(
     components: List[dict],
     vocab_map: Optional[Dict[str, dict]] = None,
     room_mix: Optional[Dict[str, int]] = None,
+    room_mix_meta: Optional[Dict[str, dict]] = None,
 ) -> None:
     """Measured enclosed-region areas → area line items (prototype × room mix).
 
     The number is geometry: an area flood-filled from the drawing at that
-    drawing's own printed scale. The only human input is ``room_mix`` — how many
-    of each unit type the building has (an estimator's room mix, routinely absent
-    from the drawing set itself). It is a COUNT; it never supplies a quantity.
+    drawing's own printed scale. ``room_mix`` supplies only the COUNT — how many
+    of each unit type the building has; it never supplies a quantity.
+
+    That count is no longer necessarily a human input. ``room_mix_meta`` carries
+    ``{name: {"source": ..., "note": ...}}`` from
+    ``TakeoffPipeline._resolve_room_mix``, where the source is
+    ``unit_tag_census`` (counted off the drawing set's own unit key plans),
+    ``manifest`` (the estimator declared it and the drawings did not confirm it)
+    or ``assumed`` (no count exists, so the prototype stands for one unit). The
+    source is written into the formula string and onto the row, because a count
+    that silently switches provenance between runs is unauditable
+    (threat T-23-32), and any note — a disagreement with the manifest, an
+    abbreviation match — flags the row that USES the number.
 
     Binding is by DISCIPLINE, not size: a ceiling area comes off the Reflected
     Ceiling Plan, a floor area off the Architectural plan. A prototype sheet
@@ -1552,6 +1572,7 @@ def _fuse_room_fills(
         return
     vocab_map = vocab_map or {}
     room_mix = room_mix or {}
+    room_mix_meta = room_mix_meta or {}
 
     # Area objects the vocabulary/manifest asks for, deduped by canonical name.
     wanted: Dict[str, dict] = {}
@@ -1621,6 +1642,17 @@ def _fuse_room_fills(
         known_count = count is not None and int(count) > 0
         qty = total_for_units(pick.area_sf, count if known_count else None)
 
+        meta = room_mix_meta.get(plan_key) or {}
+        # A known count with no stated source predates the census wiring (a
+        # caller passing a bare room_mix, i.e. the estimator's declaration), so
+        # it reports `manifest`. An unknown count is `assumed`: the prototype
+        # stands for one unit and the row says so.
+        count_source = str(meta.get("source") or "").strip() or (
+            _UNIT_COUNT_SOURCE_MANIFEST if known_count else _UNIT_COUNT_SOURCE_ASSUMED
+        )
+        if not known_count:
+            count_source = _UNIT_COUNT_SOURCE_ASSUMED
+
         reasons = []
         if pick.needs_review:
             reasons.append(pick.review_reason)
@@ -1630,6 +1662,8 @@ def _fuse_room_fills(
                 "the drawing set — supply the room mix to scale it"
                 % (pick.plan_name, pick.area_sf)
             )
+        if known_count and meta.get("note"):
+            reasons.append(str(meta["note"]))
         components.append(
             {
                 "name": info["name"],
@@ -1640,15 +1674,17 @@ def _fuse_room_fills(
                 "candidate_id": pick.candidate_id,
                 "name_source": "room_fill",
                 "formula": (
-                    "%.1f SF (%s, enclosed regions @ %.2f ft/in) × %d units"
+                    "%.1f SF (%s, enclosed regions @ %.2f ft/in) × %d units "
+                    "(unit count source: %s)"
                     % (pick.area_sf, pick.viewport_title or pick.plan_kind,
-                       pick.scale_fpi or 0.0, int(count))
+                       pick.scale_fpi or 0.0, int(count), count_source)
                     if known_count else
                     "%.1f SF (%s, enclosed regions @ %.2f ft/in)"
                     % (pick.area_sf, pick.viewport_title or pick.plan_kind,
                        pick.scale_fpi or 0.0)
                 ),
                 "unit_count": int(count) if known_count else None,
+                "unit_count_source": count_source,
                 "needs_review": bool(reasons),
                 "review_reason": "; ".join(r for r in reasons if r),
             }
@@ -1888,6 +1924,7 @@ def fuse_sheet(
     wall_height_ft: Optional[float] = None,
     wall_height_source: Optional[str] = None,
     room_mix: Optional[Dict[str, int]] = None,
+    room_mix_meta: Optional[Dict[str, dict]] = None,
 ) -> dict:
     """Apply vision ID→label answers to deterministic candidates for a sheet.
 
@@ -1923,6 +1960,16 @@ def fuse_sheet(
             binding. When None or ≤ 0, wall classes stay LF.
         wall_height_source: Provenance of the height ("plan" | "learned" |
             "default"); a "default" height flags derived wall-area items.
+        room_mix: ``{unit type -> how many exist}``, the multiplier applied to a
+            measured prototype. Resolved by
+            ``TakeoffPipeline._resolve_room_mix`` from the drawing set's own
+            unit key plans first and the estimator's manifest second.
+        room_mix_meta: ``{unit type -> {"source": ..., "note": ...}}`` — where
+            each count came from (``unit_tag_census`` | ``manifest`` |
+            ``assumed``) and any disagreement between the two sources. The
+            source lands in the formula string and on the row; the note flags
+            the row that uses the disputed number. Omitting it leaves the
+            binding behaviour unchanged.
 
     Returns:
         Extraction dict mirroring the analyze_drawing result shape:
@@ -1979,7 +2026,9 @@ def fuse_sheet(
         library_wall_map=library_wall_map,
     )
     _fuse_project_area_items(deterministic_bundle, vocabulary, components)
-    _fuse_room_fills(deterministic_bundle, components, vocab_map, room_mix)
+    _fuse_room_fills(
+        deterministic_bundle, components, vocab_map, room_mix, room_mix_meta
+    )
     _fuse_rooms(deterministic_bundle, room_labels, components, rejected)
     _fuse_schedules(deterministic_bundle, components)
     _fuse_footprint(deterministic_bundle, components)

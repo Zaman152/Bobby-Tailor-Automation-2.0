@@ -10,9 +10,9 @@ Moxy's pages 7 and 8 (ID-001 / ID-002) are stacked unit key plans carrying 214
 room tags with 214 distinct room numbers and no duplicates.  Counting them blind
 — before any comparison was made — yields ``QQ A 90``, ``KING A 26``,
 ``K SUITE B 2``, ``BUNK B 1``, a 4/4 exact match against the golden multipliers
-(INV-05 §2 Key B).  The multiplier is in the input.  Correcting the pipeline
-docstring is plan 23-08 and correcting the ground-truth document is plan 23-16
-(decision D-01); this module supplies the evidence, and changes neither.
+(INV-05 §2 Key B).  The multiplier is in the input.  The pipeline docstring was
+corrected in plan 23-08, which also wired :func:`resolve_room_mix` into the
+pipeline; correcting the ground-truth document is plan 23-16 (decision D-01).
 
 The convention is the drawing's, not ours
 -----------------------------------------
@@ -34,8 +34,25 @@ quietly counted it once — or twice — would be a guess.  :func:`derive_room_m
 therefore REFUSES on any duplicated number: it returns an empty mapping plus a
 flag naming the duplicates, never a partial count (INV-05 risk 4).
 
-This is a PURE EXTRACTOR: no pipeline import, no fusion import, no bundle key.
-Wiring is plan 23-08.
+Precedence, and why the manifest is kept (D-10)
+-----------------------------------------------
+:func:`resolve_room_mix` merges the census with the estimator's manifest under
+the precedence 23-CONTEXT resolution 3 locks: **the in-plan census WINS wherever
+it has a count for a name**, the manifest fills only the names the census does
+not cover, and where both carry a count and they DISAGREE the census value is
+used *and the disagreement is flagged naming both numbers and both sources*.
+Nothing is silently overwritten in either direction, and
+``human_inputs/*.json`` is never edited — a wrong human number is surfaced, not
+corrected behind the estimator's back.
+
+Every published count therefore carries a SOURCE
+(:data:`UNIT_COUNT_SOURCE_CENSUS` / :data:`UNIT_COUNT_SOURCE_MANIFEST` /
+:data:`UNIT_COUNT_SOURCE_ASSUMED`), which is threat T-23-32: a count that
+silently switches provenance between runs is unauditable.
+
+This module stays a PURE EXTRACTOR: no pipeline import, no fusion import, no
+bundle key.  Choosing WHICH sheets are unit key plans, and calling the resolver,
+is the pipeline's job (plan 23-08).
 """
 from __future__ import annotations
 
@@ -266,6 +283,250 @@ def derive_room_mix(
             rects = mask_rects_by_page.get(page_index, ())
         tags.extend(extract_room_tags(page, rects, page_index))
     return census_room_tags(tags, page_indices)
+
+
+# ── Provenance of a published unit count (threat T-23-32) ────────────────────
+#
+# A count that cannot say where it came from is unauditable, and the whole point
+# of the census is that a number the drawing contains must never require a
+# human.  Exactly three answers are possible, and every published count carries
+# one of them.
+
+#: Counted from the room tags the drawing itself prints on its unit key plans.
+UNIT_COUNT_SOURCE_CENSUS = "unit_tag_census"
+
+#: Supplied by the estimator's manifest — a human input the drawings did not
+#: confirm.  Retained as a cross-check, never as an override (D-10).
+UNIT_COUNT_SOURCE_MANIFEST = "manifest"
+
+#: No count exists at all, so the measured prototype stands for one unit.  This
+#: is the value a CONSUMER reports when it finds no entry in the resolved mix;
+#: :func:`resolve_room_mix` never publishes it, because publishing an assumed
+#: count would be inventing a multiplier.
+UNIT_COUNT_SOURCE_ASSUMED = "assumed"
+
+
+@dataclass(frozen=True)
+class RoomMixResolution:
+    """The unit mix actually published, with the source of every count.
+
+    ``counts`` is a LOOKUP TABLE, not a list of units: one count may appear
+    under more than one key when the drawing abbreviates a name on its key plan
+    (``K SUITE B``) and spells it out on the prototype sheet
+    (``KING SUITE B``).  Consumers look a count up by whichever name their sheet
+    prints, so both keys must resolve; summing ``counts.values()`` is therefore
+    meaningless and no consumer does it.
+
+    ``sources`` is keyed identically to ``counts`` and is never partial —
+    a count with no source would defeat T-23-32.
+
+    ``flags`` are the run-level disagreements (a refusal, a manifest that
+    disagrees with the drawings); ``name_flags`` are the same statements keyed
+    by the name they concern, so the row that USES a number can carry the
+    reason it is doubted.
+    """
+
+    counts: Dict[str, int] = field(default_factory=dict)
+    sources: Dict[str, str] = field(default_factory=dict)
+    name_flags: Dict[str, str] = field(default_factory=dict)
+    flags: Tuple[str, ...] = ()
+    census_refused: bool = False
+    census_total_tags: int = 0
+    pages_censused: Tuple[int, ...] = ()
+
+    def source_of(self, name: str) -> str:
+        """Provenance of *name*'s count — ``assumed`` when there is none."""
+        return self.sources.get(normalise_room_name(name), UNIT_COUNT_SOURCE_ASSUMED)
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
+def abbreviation_target(name: str, targets: Sequence[str]) -> Tuple[Optional[str], bool]:
+    """The one full name *name* is a printed abbreviation of, and ambiguity.
+
+    A drawing set abbreviates by TRUNCATION: Moxy's key plans tag a suite
+    ``K SUITE B`` and its prototype sheet titles the same unit ``KING SUITE B``.
+    The rule is therefore purely structural — same number of words, and every
+    word of the short name is a prefix of the corresponding word of the long
+    one.  It is not an expansion dictionary: nothing here knows that ``K``
+    stands for ``KING``, and nothing may be added that does, because a
+    substitution table is our vocabulary rather than the drawing's.
+
+    It FAILS CLOSED.  ``('king a', 'king b')`` cannot merge (``b`` is not a
+    prefix of ``a``), ``ada (ris)`` cannot reach ``ada king ris`` (two words
+    against three), and when two full names both admit the abbreviation nothing
+    is matched at all — the second element of the return is that ambiguity, so
+    the caller can flag it rather than pick one.
+
+    Returns ``(target, ambiguous)``; ``target`` is None when there is no unique
+    match.  An exact match is not an abbreviation and returns None.
+    """
+    short = normalise_room_name(name).split()
+    if not short:
+        return None, False
+    hits = set()
+    for candidate in targets or ():
+        full = normalise_room_name(candidate).split()
+        if len(full) != len(short) or full == short:
+            continue
+        if all(a and b.startswith(a) for a, b in zip(short, full)):
+            hits.add(" ".join(full))
+    if len(hits) == 1:
+        return hits.pop(), False
+    return None, len(hits) > 1
+
+
+def resolve_room_mix(
+    manifest_counts: Optional[Dict[str, int]],
+    census: Optional[RoomMix],
+    alias_targets: Sequence[str] = (),
+) -> RoomMixResolution:
+    """Merge the in-plan census with the manifest under the D-10 precedence.
+
+    The drawings outrank the manifest.  Where the census has a count for a name
+    that count is published with :data:`UNIT_COUNT_SOURCE_CENSUS`; where the
+    manifest disagrees, the census value still wins and a flag names BOTH
+    numbers and BOTH sources.  Names the census does not cover fall back to the
+    manifest, flagged as not derived from the drawings.  Where the census
+    REFUSED — duplicate room numbers, so the sheets overlap — the manifest is
+    used wholesale with the refusal named: a partial census is never published
+    (threat T-23-18).
+
+    ``alias_targets`` are the full names the drawing spells out elsewhere (its
+    prototype plan titles, plus the manifest's own names).  A census key that is
+    a printed abbreviation of exactly one of them publishes its count under that
+    name too, flagged, so the prototype sheet can find it — see
+    :func:`abbreviation_target`.
+
+    Pure: it reads no PDF, edits no human input, and invents no count.
+    """
+    manifest_mix: Dict[str, int] = {}
+    for raw_name, raw_count in (manifest_counts or {}).items():
+        key = normalise_room_name(raw_name)
+        try:
+            value = int(raw_count)
+        except (TypeError, ValueError):
+            continue
+        if key and value > 0:
+            manifest_mix[key] = value
+
+    counts: Dict[str, int] = {}
+    sources: Dict[str, str] = {}
+    name_flags: Dict[str, str] = {}
+    flags: List[str] = []
+
+    def _from_manifest(key: str, note: str) -> None:
+        counts[key] = manifest_mix[key]
+        sources[key] = UNIT_COUNT_SOURCE_MANIFEST
+        name_flags[key] = note
+        flags.append(note)
+
+    # ── The census could not be taken, or refused ────────────────────────────
+    if census is None or census.refused:
+        if manifest_mix:
+            if census is not None and census.refused:
+                reason = (
+                    "the in-plan unit-tag census REFUSED and no partial count was "
+                    "used: %s Every unit count below therefore comes from the "
+                    "human manifest (source %s) and none was derived from the "
+                    "drawings." % (census.reason, UNIT_COUNT_SOURCE_MANIFEST)
+                )
+            else:
+                reason = (
+                    "no unit key plan was identified in this drawing set, so no "
+                    "in-plan unit-tag census was taken. Every unit count below "
+                    "comes from the human manifest (source %s) and none was "
+                    "derived from the drawings." % UNIT_COUNT_SOURCE_MANIFEST
+                )
+            flags.append(reason)
+            for key in sorted(manifest_mix):
+                counts[key] = manifest_mix[key]
+                sources[key] = UNIT_COUNT_SOURCE_MANIFEST
+                name_flags[key] = reason
+        return RoomMixResolution(
+            counts=counts,
+            sources=sources,
+            name_flags=name_flags,
+            flags=tuple(flags),
+            census_refused=bool(census is not None and census.refused),
+            census_total_tags=int(getattr(census, "total_tags", 0) or 0),
+            pages_censused=tuple(getattr(census, "pages_censused", ()) or ()),
+        )
+
+    # ── The census has counts: it wins, and disagreement is flagged ──────────
+    for key in sorted(census.counts):
+        value = int(census.counts[key])
+        counts[key] = value
+        sources[key] = UNIT_COUNT_SOURCE_CENSUS
+        declared = manifest_mix.get(key)
+        if declared is not None and declared != value:
+            note = (
+                "unit count for %r DISAGREES between the drawings and the human "
+                "input: the in-plan unit-tag census reads %d (source %s) and the "
+                "manifest declares %d (source %s). The census value %d is "
+                "published because a number the drawings contain outranks a "
+                "human input; the manifest entry is retained as a cross-check "
+                "and was NOT edited."
+                % (key, value, UNIT_COUNT_SOURCE_CENSUS, declared,
+                   UNIT_COUNT_SOURCE_MANIFEST, value)
+            )
+            name_flags[key] = note
+            flags.append(note)
+
+    # ── The same count under the name the prototype sheet spells out ─────────
+    for key in sorted(census.counts):
+        target, ambiguous = abbreviation_target(key, alias_targets)
+        if ambiguous:
+            note = (
+                "the census name %r is a printed abbreviation of more than one "
+                "full name in this set, so it was NOT matched to any of them and "
+                "its count was published under %r alone." % (key, key)
+            )
+            flags.append(note)
+            continue
+        if not target or target in counts:
+            continue
+        value = int(census.counts[key])
+        counts[target] = value
+        sources[target] = UNIT_COUNT_SOURCE_CENSUS
+        note = (
+            "unit count %d for %r was read from the key plan's abbreviated tag "
+            "%r (source %s); the two names were matched because every word of "
+            "%r is a prefix of the corresponding word of %r, uniquely in this "
+            "set." % (value, target, key, UNIT_COUNT_SOURCE_CENSUS, key, target)
+        )
+        declared = manifest_mix.get(target)
+        if declared is not None and declared != value:
+            note += (
+                " It DISAGREES with the manifest, which declares %d (source %s); "
+                "the census value is published and the manifest was NOT edited."
+                % (declared, UNIT_COUNT_SOURCE_MANIFEST)
+            )
+        name_flags[target] = note
+        flags.append(note)
+
+    # ── The manifest fills only what the drawings never stated ───────────────
+    for key in sorted(manifest_mix):
+        if key in counts:
+            continue
+        _from_manifest(
+            key,
+            "unit count %d for %r is NOT derived from the drawings: the in-plan "
+            "census carries no tag for that name, so the human manifest supplies "
+            "it (source %s) and nothing in the drawing set confirms it."
+            % (manifest_mix[key], key, UNIT_COUNT_SOURCE_MANIFEST),
+        )
+
+    return RoomMixResolution(
+        counts=counts,
+        sources=sources,
+        name_flags=name_flags,
+        flags=tuple(flags),
+        census_refused=False,
+        census_total_tags=int(census.total_tags),
+        pages_censused=tuple(census.pages_censused or ()),
+    )
 
 
 if __name__ == "__main__":  # quick measurement harness (free, no API)

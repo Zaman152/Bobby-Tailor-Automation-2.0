@@ -752,14 +752,30 @@ def _build_measure_hint(manifest) -> Optional[str]:
     )
 
 
-def _manifest_room_mix(manifest) -> dict:
-    """``{unit type -> how many exist}`` from the manifest (the estimator's room mix).
+def _manifest_unit_counts(manifest) -> dict:
+    """``{unit type -> how many the ESTIMATOR declared}`` from the manifest.
 
     A hotel/multifamily set draws ONE prototype of each unit type and the
-    take-off multiplies by the mix. That multiplier is an ESTIMATOR input — it is
-    routinely not in the drawing set at all (Moxy's plans index CS-04 "Guestroom
-    Matrix" but do not include the sheet, and the guestroom floors are absent),
-    so no reading of the plan can recover it.
+    take-off multiplies by the mix.
+
+    **This function's predecessor documented that multiplier as unrecoverable,
+    and that was false.** ``_manifest_room_mix`` asserted the mix "is routinely
+    not in the drawing set at all … so no reading of the plan can recover it",
+    and ``docs/PIPELINE-GROUND-TRUTH.md`` recorded the same claim as BLOCKER A.
+    A blind census of Moxy's own unit key plans (pages 7 and 8, ID-001 / ID-002,
+    the two sheets whose printed drawing titles read ``LEVEL nn KEY PLAN``)
+    reads **214 room tags with 214 distinct room numbers and no duplicates**,
+    and counting them — before any comparison was made — yields ``QQ A 90``,
+    ``KING A 26``, ``K SUITE B 2``, ``BUNK B 1``: **4 of 4 exact** against the
+    golden multipliers. The multiplier is in the input, and
+    :func:`bobbytailor.deterministic.room_tags.derive_room_mix` reads it
+    (INV-05 §2 Key B; the matching correction to the ground-truth document is
+    plan 23-16, decision D-01).
+
+    So this is no longer THE room mix — it is the estimator's DECLARATION of it,
+    one of two sources that :meth:`TakeoffPipeline._resolve_room_mix` merges
+    under the D-10 precedence, where the drawings win and disagreement is
+    flagged rather than silently resolved.
 
     Declared as manifest entries carrying ``unit_count``::
 
@@ -1243,6 +1259,10 @@ class TakeoffPipeline:
         self._run_budget: Optional[BudgetGuard] = None
         # extract_schedules() scans the whole document — cache per pdf_path.
         self._schedules_cache: dict = {}
+        # The unit-mix resolution (in-plan census + manifest, D-10 precedence)
+        # is a DOCUMENT-level answer, not a per-sheet one: selecting the unit
+        # key plans reads every sheet's drawing titles. Cached per pdf_path.
+        self._room_mix_cache: dict = {}
         # Run-level LearnedContext (21-16, V3-LEARN-03): retrieved ONCE at
         # run start (never per-sheet DB churn) and injected forward into
         # prompt hints, the scale-prior feed, and the guardrail flags.
@@ -1897,6 +1917,123 @@ class TakeoffPipeline:
             for s in self._schedules_cache[key]
             if _sched_field(s, "page_index", 0) == page_index
         ]
+
+    # A unit key plan identifies itself by its own printed DRAWING TITLE — the
+    # title bound to a scale callout, not stray page text. Moxy pages 7 and 8
+    # title four and three drawings "LEVEL nn KEY PLAN" at 3/32" = 1'-0", and
+    # no other sheet in any of the four real sets titles a drawing that way.
+    # Page index 3 prints the words KEY PLAN in its title block and is NOT
+    # selected, because its drawing titles are building elevations — which is
+    # exactly why the test is the drawing title and not a text search.
+    _KEY_PLAN_TITLE_RE = re.compile(r"\bKEY\s+PLANS?\b", re.IGNORECASE)
+
+    def _unit_key_plan_pages(self, doc) -> List[int]:
+        """Page indices whose own drawing titles name a key plan.
+
+        Deciding which sheet keys the units is sheet CLASSIFICATION, which is
+        why ``room_tags.derive_room_mix`` refuses to guess it and takes the
+        scope from here (23-05 deviation 2). Returning ``[]`` is a valid answer
+        — Crow, Bob's and Chelsea have no key plan at all — and the resolver
+        then falls back to the manifest with that stated.
+        """
+        pages: List[int] = []
+        for index in range(int(getattr(doc, "page_count", 0) or 0)):
+            try:
+                scales = extract_printed_scales(doc[index]) or []
+            except Exception as exc:  # noqa: BLE001 — selection is additive
+                logger.debug("key-plan title read failed on page %s: %s", index, exc)
+                continue
+            for scale in scales:
+                title = str(getattr(scale, "title", "") or "")
+                if self._KEY_PLAN_TITLE_RE.search(title):
+                    pages.append(index)
+                    break
+        return pages
+
+    def _document_plan_titles(self, doc) -> List[str]:
+        """Every prototype drawing title in the set (the full, spelled-out names).
+
+        These are the names a key plan's tag may be an abbreviation OF — the
+        drawing's own vocabulary on both sides, so a plans-only run reaches the
+        same answer with no manifest present.
+        """
+        from bobbytailor.deterministic.room_fill import plan_titles  # noqa: PLC0415
+
+        names: List[str] = []
+        seen = set()
+        for index in range(int(getattr(doc, "page_count", 0) or 0)):
+            try:
+                titles = plan_titles(doc[index]) or []
+            except Exception as exc:  # noqa: BLE001 — additive
+                logger.debug("plan-title read failed on page %s: %s", index, exc)
+                continue
+            for entry in titles:
+                name = str((entry[0] if entry else "") or "").strip()
+                key = name.lower()
+                if name and key not in seen:
+                    seen.add(key)
+                    names.append(name)
+        return names
+
+    def _resolve_room_mix(self, manifest, doc, pdf_path: Optional[str] = None):
+        """The unit mix actually used, with the SOURCE of every count (D-10).
+
+        Two sources, one precedence: the in-plan unit-tag census read off the
+        drawing set's own key plans WINS wherever it has a count, the manifest
+        fills only the names the drawings never state, and a disagreement
+        between them is FLAGGED naming both numbers and both sources rather than
+        resolved in silence. ``human_inputs/*.json`` is never edited — the four
+        Moxy ``unit_count``s a suite's "2 doors" inflated stay exactly as the
+        estimator wrote them, and are surfaced instead.
+
+        A census that refuses (duplicate room numbers ⇒ the censused sheets
+        overlap) falls back to the manifest WHOLESALE with the refusal named. A
+        partial census is never published: a wrong multiplier is not one wrong
+        line item, it multiplies Gyp Ceiling, Gyp Wall, Guestroom-Wall Covering
+        and Doors at once (threat T-23-18).
+
+        Computed ONCE per document and cached: the census reads two sheets, but
+        selecting them reads every sheet's drawing titles.
+        """
+        from bobbytailor.deterministic.room_tags import (  # noqa: PLC0415
+            derive_room_mix,
+            resolve_room_mix,
+        )
+        from bobbytailor.deterministic.tag_pairing import (  # noqa: PLC0415
+            sheet_mask_rects,
+        )
+
+        cache_key = pdf_path or (id(doc) if doc is not None else "")
+        cached = self._room_mix_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        manifest_counts = _manifest_unit_counts(manifest)
+        alias_targets: List[str] = list(manifest_counts)
+        census = None
+        if doc is not None:
+            try:
+                pages = self._unit_key_plan_pages(doc)
+                if pages:
+                    masks = {p: sheet_mask_rects(doc[p]) for p in pages}
+                    census = derive_room_mix(
+                        doc, pages=pages, mask_rects_by_page=masks
+                    )
+                    alias_targets.extend(self._document_plan_titles(doc))
+            except Exception as exc:  # noqa: BLE001 — census is additive
+                # A swallowed census is not a census that found nothing. The
+                # resolver flags the absence either way, so the run says so.
+                logger.warning("in-plan unit-tag census failed: %s", exc)
+                census = None
+
+        resolution = resolve_room_mix(manifest_counts, census, alias_targets)
+        if resolution.flags:
+            logger.info(
+                "room mix resolved: %d count(s), %d flag(s) — %s",
+                len(resolution.counts), len(resolution.flags), resolution.flags[0],
+            )
+        self._room_mix_cache[cache_key] = resolution
+        return resolution
 
     def _deterministic_bundle(
         self,
@@ -2646,6 +2783,17 @@ class TakeoffPipeline:
         # Thread the autonomous project vocabulary (measure basis) + resolved
         # wall height so wall_area labels bind as SF (LF × height) and
         # floor/roof-plane vocabulary items bind to the measured footprint.
+        # The unit multiplier comes from the DRAWINGS where the drawings state
+        # it (D-10). Every count carries its source into the formula string, and
+        # a disagreement with the human manifest rides on the row that uses the
+        # number instead of being resolved in silence.
+        room_mix_resolution = self._resolve_room_mix(
+            getattr(self, "_manifest", None), doc, pdf_path
+        )
+        if room_mix_resolution.flags and bundle.get("room_fills"):
+            # Recorded only where a unit count could actually be applied — a
+            # sheet with no measured drawing has nothing to multiply.
+            bundle.setdefault("coverage_notes", []).extend(room_mix_resolution.flags)
         fused = fuse_sheet(
             bundle,
             vision_labels,
@@ -2653,7 +2801,14 @@ class TakeoffPipeline:
             vocabulary=getattr(self, "_project_vocabulary", None),
             wall_height_ft=getattr(self, "_project_wall_height", None),
             wall_height_source=getattr(self, "_project_wall_height_source", None),
-            room_mix=_manifest_room_mix(getattr(self, "_manifest", None)),
+            room_mix=dict(room_mix_resolution.counts),
+            room_mix_meta={
+                name: {
+                    "source": room_mix_resolution.sources.get(name, ""),
+                    "note": room_mix_resolution.name_flags.get(name, ""),
+                }
+                for name in room_mix_resolution.counts
+            },
         )
         merged = merge_with_provenance([fused])
 

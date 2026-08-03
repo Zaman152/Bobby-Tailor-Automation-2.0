@@ -21,14 +21,19 @@ import pytest
 from bobbytailor.deterministic.room_tags import (
     MAX_ROOM_NAME_CHARS,
     ROOM_TAG_MAX_GAP_PT,
+    UNIT_COUNT_SOURCE_ASSUMED,
+    UNIT_COUNT_SOURCE_CENSUS,
+    UNIT_COUNT_SOURCE_MANIFEST,
     RoomMix,
     RoomTag,
+    abbreviation_target,
     census_room_tags,
     derive_room_mix,
     extract_room_tags,
     is_room_name,
     is_room_number,
     normalise_room_name,
+    resolve_room_mix,
 )
 
 UPLOADS = os.path.join(os.path.dirname(__file__), os.pardir, "uploads")
@@ -297,6 +302,212 @@ def test_the_door_schedule_sheet_holds_no_rooms_once_its_table_is_masked():
     assert invented.issubset({(t.name, t.number) for t in unmasked})
     assert invented.isdisjoint({(t.name, t.number) for t in masked})
     assert len(masked) < len(unmasked)
+
+
+# ── Precedence: the drawings outrank the manifest, and disagreement flags ────
+#
+# 23-CONTEXT resolution 3 (D-10). Every assertion here is about PROVENANCE and
+# VISIBILITY, never about a corrected total: the phase's rule is that a number
+# may legitimately get worse as long as its source is stated and a disagreement
+# is surfaced rather than resolved in silence.
+
+
+#: The estimator's declaration for Moxy, transcribed from
+#: ``human_inputs/moxy_knoxville.json``. That file is READ-ONLY in this phase:
+#: the four inflated counts are FLAGGED, never edited.
+MOXY_MANIFEST_COUNTS = {
+    "KING A": 26, "KING B": 15, "KING C": 5,
+    "KING SUITE A": 5, "KING SUITE B": 2, "KING SUITE C": 2,
+    "QQ A": 90, "QQ B": 6, "QQ C": 15,
+    "BUNK A": 2, "BUNK B": 1,
+    "ADA KING RIS": 1, "ACC KING TUB": 3, "ACC QQ RIS": 2, "ACC BUNK": 2,
+}
+
+#: The full names Moxy's prototype sheets title their drawings with — the
+#: alias targets an abbreviated key-plan tag may resolve to.
+MOXY_PLAN_TITLES = list(MOXY_MANIFEST_COUNTS)
+
+
+def _census(counts, **kwargs):
+    return RoomMix(counts=dict(counts), total_tags=sum(counts.values()),
+                   distinct_numbers=sum(counts.values()), **kwargs)
+
+
+def test_the_census_wins_where_it_has_a_count():
+    res = resolve_room_mix({"QQ A": 90}, _census({"qq a": 90}))
+    assert res.counts["qq a"] == 90
+    assert res.sources["qq a"] == UNIT_COUNT_SOURCE_CENSUS
+    assert res.flags == (), "agreement is not news"
+
+
+def test_a_disagreement_is_flagged_naming_both_numbers_and_both_sources():
+    """Never silently overwrite, and never silently prefer the human input."""
+    res = resolve_room_mix({"BUNK A": 2}, _census({"bunk a": 1}))
+    assert res.counts["bunk a"] == 1, "the drawings outrank the manifest"
+    assert res.sources["bunk a"] == UNIT_COUNT_SOURCE_CENSUS
+    flag = res.name_flags["bunk a"]
+    assert flag in res.flags
+    assert "1" in flag and "2" in flag
+    assert UNIT_COUNT_SOURCE_CENSUS in flag and UNIT_COUNT_SOURCE_MANIFEST in flag
+    assert "NOT edited" in flag
+
+
+def test_names_the_census_does_not_cover_fall_back_to_the_manifest_flagged():
+    res = resolve_room_mix({"ACC BUNK": 2}, _census({"qq a": 90}))
+    assert res.counts["acc bunk"] == 2
+    assert res.sources["acc bunk"] == UNIT_COUNT_SOURCE_MANIFEST
+    assert "NOT derived from the drawings" in res.name_flags["acc bunk"]
+
+
+def test_a_refusal_falls_back_wholesale_and_never_to_a_partial_census():
+    """Threat T-23-18: half a census is a wrong multiplier, not a partial one."""
+    refused = RoomMix(counts={}, total_tags=2, distinct_numbers=1,
+                      duplicate_numbers=("204",), refused=True,
+                      reason="room numbers are not unique (204).")
+    res = resolve_room_mix({"QQ A": 90, "KING A": 26}, refused)
+    assert res.census_refused is True
+    assert res.counts == {"qq a": 90, "king a": 26}
+    assert set(res.sources.values()) == {UNIT_COUNT_SOURCE_MANIFEST}
+    assert any("REFUSED" in f and "204" in f for f in res.flags)
+
+
+def test_no_census_at_all_is_stated_rather_than_looking_like_agreement():
+    res = resolve_room_mix({"QQ A": 90}, None)
+    assert res.sources["qq a"] == UNIT_COUNT_SOURCE_MANIFEST
+    assert res.census_refused is False
+    assert any("no unit key plan was identified" in f for f in res.flags)
+
+
+def test_a_set_with_neither_source_says_nothing():
+    res = resolve_room_mix({}, None)
+    assert res.counts == {} and res.flags == ()
+
+
+def test_an_unknown_name_reports_assumed_rather_than_a_missing_source():
+    res = resolve_room_mix({"QQ A": 90}, _census({"qq a": 90}))
+    assert res.source_of("KING SUITE Z") == UNIT_COUNT_SOURCE_ASSUMED
+
+
+def test_the_resolution_is_serialisable():
+    res = resolve_room_mix({"QQ A": 90}, _census({"qq a": 90}))
+    assert res.to_dict()["sources"]["qq a"] == UNIT_COUNT_SOURCE_CENSUS
+
+
+# ── The abbreviation match: structural, and fails closed ────────────────────
+
+
+def test_a_key_plan_abbreviation_resolves_to_the_prototype_sheet_s_full_name():
+    target, ambiguous = abbreviation_target("k suite b", MOXY_PLAN_TITLES)
+    assert target == "king suite b" and ambiguous is False
+
+
+def test_the_abbreviation_rule_cannot_merge_two_different_units():
+    """Every word must be a prefix — 'b' is not a prefix of 'a'."""
+    assert abbreviation_target("king a", ["KING B", "KING C"]) == (None, False)
+    assert abbreviation_target("k suite a", ["KING SUITE B"]) == (None, False)
+
+
+def test_a_different_word_count_is_not_an_abbreviation():
+    """'ADA (RIS)' is two words and 'ADA KING RIS' is three: no match."""
+    assert abbreviation_target("ada (ris)", ["ADA KING RIS"]) == (None, False)
+
+
+def test_an_exact_name_is_not_an_abbreviation_of_itself():
+    assert abbreviation_target("king a", ["KING A"]) == (None, False)
+
+
+def test_an_ambiguous_abbreviation_matches_nothing_and_says_so():
+    target, ambiguous = abbreviation_target("k a", ["KING A", "KILN A"])
+    assert target is None and ambiguous is True
+
+
+def test_the_abbreviated_count_is_published_under_the_full_name_and_flagged():
+    res = resolve_room_mix(MOXY_MANIFEST_COUNTS, _census({"k suite b": 2}),
+                           MOXY_PLAN_TITLES)
+    assert res.counts["king suite b"] == 2
+    assert res.sources["king suite b"] == UNIT_COUNT_SOURCE_CENSUS
+    assert res.counts["k suite b"] == 2, "the printed name still resolves too"
+    assert "abbreviated tag" in res.name_flags["king suite b"]
+
+
+def test_an_abbreviated_count_that_disagrees_with_the_manifest_flags_too():
+    """Moxy's real case: the key plan tags ONE K SUITE C, the manifest says 2."""
+    res = resolve_room_mix(MOXY_MANIFEST_COUNTS, _census({"k suite c": 1}),
+                           MOXY_PLAN_TITLES)
+    assert res.counts["king suite c"] == 1
+    flag = res.name_flags["king suite c"]
+    assert "DISAGREES with the manifest" in flag and "2" in flag
+
+
+def test_an_ambiguous_abbreviation_is_flagged_rather_than_guessed():
+    res = resolve_room_mix({}, _census({"k a": 4}), ["KING A", "KILN A"])
+    assert "king a" not in res.counts and "kiln a" not in res.counts
+    assert res.counts["k a"] == 4
+    assert any("more than one full name" in f for f in res.flags)
+
+
+# ── The real drawing set, resolved ──────────────────────────────────────────
+
+
+@_needs_moxy
+def test_moxy_resolves_four_of_four_multipliers_from_the_drawings():
+    """The single largest human input on the Moxy path, removed.
+
+    Derived independently of any golden file: the census reads the room tags
+    the key plans print, and the comparison below is made after the fact.
+    """
+    doc = fitz.open(MOXY)
+    try:
+        census = derive_room_mix(doc, pages=MOXY_KEY_PLAN_PAGES)
+    finally:
+        doc.close()
+    res = resolve_room_mix(MOXY_MANIFEST_COUNTS, census, MOXY_PLAN_TITLES)
+    for name, expected in MOXY_GOLDEN_MULTIPLIERS.items():
+        assert res.counts[name] == expected, name
+        assert res.sources[name] == UNIT_COUNT_SOURCE_CENSUS, name
+    # And the suite the key plan abbreviates resolves under the prototype
+    # sheet's own title, still sourced from the drawings.
+    assert res.counts["king suite b"] == 2
+    assert res.sources["king suite b"] == UNIT_COUNT_SOURCE_CENSUS
+
+
+@_needs_moxy
+def test_moxy_has_a_real_disagreement_and_it_is_visible():
+    """At least one name where the drawings and the human input differ.
+
+    The flag must name both numbers and both sources. No corrected TOTAL is
+    asserted — the manifest is not edited and the phase does not tune to one.
+    """
+    doc = fitz.open(MOXY)
+    try:
+        census = derive_room_mix(doc, pages=MOXY_KEY_PLAN_PAGES)
+    finally:
+        doc.close()
+    res = resolve_room_mix(MOXY_MANIFEST_COUNTS, census, MOXY_PLAN_TITLES)
+
+    disagreements = [f for f in res.flags if "DISAGREES" in f]
+    assert disagreements, "the four suspect unit_counts must be visible"
+    for flag in disagreements:
+        assert UNIT_COUNT_SOURCE_CENSUS in flag
+        assert UNIT_COUNT_SOURCE_MANIFEST in flag
+        assert any(ch.isdigit() for ch in flag)
+
+
+@_needs_moxy
+def test_moxy_names_the_census_cannot_reach_are_flagged_as_human_supplied():
+    doc = fitz.open(MOXY)
+    try:
+        census = derive_room_mix(doc, pages=MOXY_KEY_PLAN_PAGES)
+    finally:
+        doc.close()
+    res = resolve_room_mix(MOXY_MANIFEST_COUNTS, census, MOXY_PLAN_TITLES)
+
+    # The accessible-unit prototypes carry no matching key-plan tag.
+    assert res.sources["acc king tub"] == UNIT_COUNT_SOURCE_MANIFEST
+    assert "NOT derived from the drawings" in res.name_flags["acc king tub"]
+    assert res.counts["acc king tub"] == MOXY_MANIFEST_COUNTS["ACC KING TUB"], (
+        "the manifest value is used verbatim — the file is never edited"
+    )
 
 
 # ── One projection helper, not two ──────────────────────────────────────────

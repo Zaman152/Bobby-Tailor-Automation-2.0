@@ -1146,3 +1146,244 @@ class TestRecordSheetCoverage:
         assert row.disposition == MEASURED
         assert row.drawings == []
         assert row.items_emitted == 0
+
+
+# ---------------------------------------------------------------------------
+# 23-08 — the unit multiplier comes from the DRAWINGS (D-10).
+#
+# `_manifest_room_mix` documented the multiplier as unrecoverable from the plan
+# set. It is recoverable: Moxy's two unit key plans carry 214 room tags with 214
+# distinct numbers and reproduce 4 of 4 golden multipliers. These tests are
+# about PRECEDENCE and PROVENANCE — that the census wins, that a disagreement is
+# visible, and that a refusal never degrades into a partial count.
+# ---------------------------------------------------------------------------
+
+class _ScaleStub:
+    def __init__(self, title):
+        self.title = title
+
+
+class _PageStub:
+    def __init__(self, number=0):
+        self.number = number
+
+
+class _DocStub:
+    def __init__(self, n):
+        self.page_count = n
+        self._pages = [_PageStub(i) for i in range(n)]
+
+    def __getitem__(self, index):
+        return self._pages[index]
+
+
+class TestResolveRoomMix:
+    def test_the_unrecoverable_multiplier_function_is_gone(self):
+        """The docstring that asserted 'no reading of the plan can recover it'
+        went with it. The claim was false and it was load-bearing."""
+        assert not hasattr(TakeoffPipeline, "_manifest_room_mix")
+        assert hasattr(TakeoffPipeline, "_resolve_room_mix")
+        assert not hasattr(_tp, "_manifest_room_mix")
+
+    def test_a_key_plan_is_identified_by_its_own_printed_drawing_title(self):
+        """Structure, not a page number and not a text search.
+
+        Moxy page index 3 prints the words KEY PLAN in its title block while its
+        DRAWINGS are building elevations — so the test is the drawing title.
+        """
+        titles = {
+            3: [_ScaleStub("BUILDING ELEVATION SOUTH SUMMIT HILL DR")],
+            7: [_ScaleStub("ID-001 LEVEL 01 KEY PLAN"),
+                _ScaleStub("ID-001 LEVEL 02 KEY PLAN")],
+            8: [_ScaleStub("ID-002 LEVEL 05 KEY PLAN")],
+            9: [_ScaleStub("ID-100 LEVEL 1 LOBBY AR PLAN")],
+        }
+        pipe = TakeoffPipeline(analyzer=MagicMock())
+        with patch.object(_tp, "extract_printed_scales",
+                          side_effect=lambda page: titles.get(page.number, [])):
+            assert pipe._unit_key_plan_pages(_DocStub(10)) == [7, 8]
+
+    def test_a_set_with_no_key_plan_selects_no_pages(self):
+        pipe = TakeoffPipeline(analyzer=MagicMock())
+        with patch.object(_tp, "extract_printed_scales", return_value=[]):
+            assert pipe._unit_key_plan_pages(_DocStub(4)) == []
+
+    def test_an_unreadable_page_does_not_abort_the_selection(self):
+        def _scales(page):
+            if page.number == 1:
+                raise RuntimeError("corrupt content stream")
+            return [_ScaleStub("LEVEL 02 KEY PLAN")] if page.number == 2 else []
+
+        pipe = TakeoffPipeline(analyzer=MagicMock())
+        with patch.object(_tp, "extract_printed_scales", side_effect=_scales):
+            assert pipe._unit_key_plan_pages(_DocStub(4)) == [2]
+
+    # ── The resolution itself ────────────────────────────────────────────────
+
+    @staticmethod
+    def _resolve(manifest_entries, census, titles=(), key_pages=(7, 8)):
+        from bobbytailor.deterministic import room_fill, room_tags, tag_pairing
+
+        manifest = MagicMock()
+        manifest.entries = [
+            MagicMock(name=None, assumptions={"unit_count": count})
+            for _n, count in manifest_entries
+        ]
+        for entry, (label, _c) in zip(manifest.entries, manifest_entries):
+            entry.name = label
+
+        pipe = TakeoffPipeline(analyzer=MagicMock())
+        with patch.object(_tp, "extract_printed_scales",
+                          side_effect=lambda page: (
+                              [_ScaleStub("LEVEL 01 KEY PLAN")]
+                              if page.number in key_pages else []
+                          )), \
+             patch.object(tag_pairing, "sheet_mask_rects", return_value=[]), \
+             patch.object(room_tags, "derive_room_mix", return_value=census), \
+             patch.object(room_fill, "plan_titles",
+                          side_effect=lambda page: [(t, "AR", (0, 0, 1, 1))
+                                                    for t in titles]):
+            return pipe._resolve_room_mix(manifest, _DocStub(10), "moxy.pdf")
+
+    def test_the_census_supersedes_the_manifest_and_says_so(self):
+        from bobbytailor.deterministic.room_tags import (
+            UNIT_COUNT_SOURCE_CENSUS, RoomMix,
+        )
+        res = self._resolve(
+            [("QQ A", 90), ("BUNK A", 2)],
+            RoomMix(counts={"qq a": 90, "bunk a": 1}, total_tags=91,
+                    distinct_numbers=91),
+        )
+        assert res.counts["qq a"] == 90
+        assert res.counts["bunk a"] == 1, "the drawings outrank the manifest"
+        assert res.sources["bunk a"] == UNIT_COUNT_SOURCE_CENSUS
+        assert any("DISAGREES" in f for f in res.flags)
+
+    def test_a_refused_census_falls_back_to_the_manifest_never_to_a_partial(self):
+        """The stubbed duplicate-number refusal (threat T-23-18).
+
+        A partial census is the one outcome that must be impossible: a wrong
+        multiplier is not one wrong row, it scales every per-unit quantity.
+        """
+        from bobbytailor.deterministic.room_tags import (
+            UNIT_COUNT_SOURCE_MANIFEST, RoomMix,
+        )
+        refused = RoomMix(
+            counts={}, total_tags=275, distinct_numbers=237,
+            duplicate_numbers=("101", "103"), refused=True,
+            reason="room numbers are not unique across the censused sheets: "
+                   "2 number(s) appear more than once (101, 103).",
+        )
+        res = self._resolve([("QQ A", 90), ("KING A", 26)], refused)
+        assert res.census_refused is True
+        assert res.counts == {"qq a": 90, "king a": 26}
+        assert set(res.sources.values()) == {UNIT_COUNT_SOURCE_MANIFEST}
+        assert any("REFUSED" in f and "101" in f for f in res.flags)
+
+    def test_with_no_key_plan_every_count_is_marked_human_supplied(self):
+        from bobbytailor.deterministic.room_tags import UNIT_COUNT_SOURCE_MANIFEST
+        res = self._resolve([("QQ A", 90)], None, key_pages=())
+        assert res.sources["qq a"] == UNIT_COUNT_SOURCE_MANIFEST
+        assert any("no unit key plan was identified" in f for f in res.flags)
+
+    def test_the_prototype_sheet_title_resolves_an_abbreviated_key_plan_tag(self):
+        from bobbytailor.deterministic.room_tags import (
+            UNIT_COUNT_SOURCE_CENSUS, RoomMix,
+        )
+        res = self._resolve(
+            [("KING SUITE B", 2)],
+            RoomMix(counts={"k suite b": 2}, total_tags=2, distinct_numbers=2),
+            titles=("KING SUITE B",),
+        )
+        assert res.counts["king suite b"] == 2
+        assert res.sources["king suite b"] == UNIT_COUNT_SOURCE_CENSUS
+
+    def test_the_resolution_is_computed_once_per_document(self):
+        """Selecting the key plans reads every sheet's drawing titles; doing it
+        per sheet would pay that cost forty times on Moxy."""
+        from bobbytailor.deterministic import room_tags, tag_pairing
+
+        pipe = TakeoffPipeline(analyzer=MagicMock())
+        doc = _DocStub(6)
+        with patch.object(_tp, "extract_printed_scales",
+                          return_value=[]) as scales, \
+             patch.object(tag_pairing, "sheet_mask_rects", return_value=[]), \
+             patch.object(room_tags, "derive_room_mix", return_value=None):
+            first = pipe._resolve_room_mix(None, doc, "moxy.pdf")
+            second = pipe._resolve_room_mix(None, doc, "moxy.pdf")
+        assert first is second
+        assert scales.call_count == 6, "one pass over the document, not two"
+
+    def test_a_census_that_raises_leaves_the_run_saying_so(self):
+        from bobbytailor.deterministic import room_tags, tag_pairing
+
+        pipe = TakeoffPipeline(analyzer=MagicMock())
+        manifest = MagicMock()
+        entry = MagicMock(assumptions={"unit_count": 90})
+        entry.name = "QQ A"
+        manifest.entries = [entry]
+        with patch.object(_tp, "extract_printed_scales",
+                          return_value=[_ScaleStub("LEVEL 01 KEY PLAN")]), \
+             patch.object(tag_pairing, "sheet_mask_rects", return_value=[]), \
+             patch.object(room_tags, "derive_room_mix",
+                          side_effect=RuntimeError("boom")):
+            res = pipe._resolve_room_mix(manifest, _DocStub(2), "x.pdf")
+        assert res.counts == {"qq a": 90}
+        assert res.flags, "a swallowed census is not a census that found nothing"
+
+    # ── The real drawing set ────────────────────────────────────────────────
+
+    def test_moxy_key_plans_are_found_and_resolve_the_multiplier(self):
+        """The whole point, end to end on the real PDF and with no API call.
+
+        Selection is structural (a drawing titled ``… KEY PLAN``), the count is
+        a blind census of that sheet's room tags, and the comparison below is
+        made after the extraction. `human_inputs/moxy_knoxville.json` is read
+        only to prove the DISAGREEMENT is visible — it is never edited.
+        """
+        import os
+        import fitz
+        from bobbytailor.deterministic.room_tags import (
+            UNIT_COUNT_SOURCE_CENSUS, UNIT_COUNT_SOURCE_MANIFEST,
+        )
+
+        moxy = os.path.join(
+            os.path.dirname(__file__), os.pardir, "uploads",
+            "Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf",
+        )
+        if not os.path.exists(moxy):
+            pytest.skip("Moxy plans PDF not present")
+
+        declared = {"KING A": 26, "KING SUITE B": 2, "QQ A": 90,
+                    "BUNK A": 2, "BUNK B": 1, "ACC KING TUB": 3}
+        manifest = MagicMock()
+        manifest.entries = []
+        for label, count in declared.items():
+            entry = MagicMock(assumptions={"unit_count": count})
+            entry.name = label
+            manifest.entries.append(entry)
+
+        pipe = TakeoffPipeline(analyzer=MagicMock())
+        doc = fitz.open(moxy)
+        try:
+            assert pipe._unit_key_plan_pages(doc) == [7, 8], (
+                "ID-001 / ID-002 title their drawings 'LEVEL nn KEY PLAN'"
+            )
+            res = pipe._resolve_room_mix(manifest, doc, moxy)
+        finally:
+            doc.close()
+
+        # 4 of 4 golden multipliers, every one sourced from the drawings.
+        for name, expected in (("qq a", 90), ("king a", 26),
+                               ("k suite b", 2), ("bunk b", 1)):
+            assert res.counts[name] == expected, name
+            assert res.sources[name] == UNIT_COUNT_SOURCE_CENSUS, name
+
+        # A real disagreement with the human input, named and not resolved.
+        assert res.counts["bunk a"] == 1
+        assert res.sources["bunk a"] == UNIT_COUNT_SOURCE_CENSUS
+        assert any("DISAGREES" in f and "bunk a" in f for f in res.flags)
+
+        # And a name the drawings never state stays visibly human-supplied.
+        assert res.sources["acc king tub"] == UNIT_COUNT_SOURCE_MANIFEST
+        assert "NOT derived from the drawings" in res.name_flags["acc king tub"]
