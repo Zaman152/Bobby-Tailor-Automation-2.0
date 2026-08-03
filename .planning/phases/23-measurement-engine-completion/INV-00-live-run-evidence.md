@@ -46,6 +46,52 @@ survives into `takeoff_summary`. The measurement capability exists and is accura
 not. INV-01 must treat this as the primary defect — fixing it is likely the largest single accuracy
 jump available in the whole program.
 
+### 1b. Proven by direct invocation — the measurement engine WORKS
+
+I called `TakeoffPipeline._measure_room_fills` directly on the real Moxy prototype pages (zero API).
+**Beware the page index:** searching page text for `ID-411` finds the drawing INDEX first (page 8);
+the real prototype sheets are pages 23–38 (ID-407…ID-422), and ID-411 is **page 27** — matching
+§13.5's "Moxy p27 → 13 scales @ 4.0". An investigation that probes page 8 will wrongly conclude the
+engine returns nothing.
+
+| Sheet | golden SF/unit | AR fill | RCP fill | FC fill | verdict |
+|---|---|---|---|---|---|
+| ID-411 KING SUITE B (p27) | 353.4 | 369.9 | **341.7 (3.3%)** | 190.9 | works — identical to §14's table |
+| ID-415 QQ C (p31) | 284.3 | 260.4 | **284.3 (0.0%)** | 150.5 | exact |
+| ID-412 KING SUITE C (p28) | 231.0 | 517.9 | **458.3 (98% over)** | 211.0 | 2× defect |
+| ID-416 BUNK A (p32) | 231.0 | 515.5 | **454.7 (97% over)** | 154.1 | 2× defect |
+
+Every fill carries `plan_name`, `plan_kind` (AR/FF/RCP/FC/EM), `scale_fpi=4.0`, `candidate_id`,
+`needs_review`. So the engine produces correctly-scaled, correctly-titled, discipline-tagged regions.
+
+**Two consequences for the plan:**
+
+1. **INV-01's target is the DOWNSTREAM path only.** Do not re-engineer measurement. The suspect is
+   `_fuse_room_fills(deterministic_bundle, components, vocab_map, room_mix)` (`vision/fusion.py:1924`)
+   and specifically `room_mix`: the manifest's `unit_type` entries are landing as empty `0.0` line
+   items, which is exactly what you would see if they were consumed by the ordinary
+   manifest→line-item path instead of being assembled into the room-mix multiplier. Verify whether
+   `room_mix` is non-empty at the call site before changing anything else.
+2. **The 2× clip defect has a sharp new clue.** On both defective sheets the over-reach hits **AR and
+   RCP but not FC/EM** (ID-412 FC = 211.0 vs golden 231; ID-416 FC = 154.1). The clip constants
+   `_FILL_CLIP_UP_PT = 620.0` / `_FILL_CLIP_SIDE_PT = 260.0` (`takeoff_pipeline.py:1770-1771`) are a
+   fixed-size window around the scale callout; on these two sheets the AR/RCP drawings sit adjacent
+   to their opposite-hand twin and the window swallows it. The fix is to bound the clip by the
+   drawing's own extent (its border linework or the midpoint to the neighbouring callout), not to
+   shrink the constants — shrinking them is the overfit §14.2 explicitly forbids.
+
+Reproduce with:
+
+```python
+sys.path.insert(0,'src')
+from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+from bobbytailor.deterministic.viewports import segment_viewports
+from bobbytailor.deterministic.printed_scale import extract_printed_scales
+page = fitz.open(MOXY)[27]
+TakeoffPipeline()._measure_room_fills(page, segment_viewports(page), extract_printed_scales(page), 'ID-411')
+# -> 5 RoomFillResult dataclasses (NOT dicts — use dataclasses.asdict)
+```
+
 ---
 
 ## 2. Scored Moxy run (with manifest) — 8% overall
