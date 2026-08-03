@@ -42,39 +42,27 @@ def build_deterministic_legends(
     """
     legends: List[dict] = []
 
-    # Door schedule → authoritative legend. A *type + count* schedule (Crow-style:
-    # Type / Count / Material columns) is read by the component-library harvester,
-    # which counts every door and frame by material via the abbreviation key —
-    # this recovers ALL rows, not just the handful a per-opening tag scan finds.
-    # A per-opening schedule (Moxy-style: one row per opening tag) has no Count
-    # column, so it keeps the proven per-opening extractor. Component path wins
-    # when present; otherwise fall back.
+    # Door schedule → authoritative legend. ONE call: the extractor reads the
+    # type+count (Crow), per-opening (Moxy) and split-cell (Bob's) formats alike
+    # and names every result in the canonical estimator form (23-04).
+    #
+    # There used to be two paths here, tried in order, because two parsers each
+    # handled one format and disagreed about the resulting names. A fallback
+    # between two partial readers is not robustness — it is a coin toss over
+    # which vocabulary the report ends up speaking.
     door_legend = None
     try:
-        door_legend = build_door_component_legend(pdf_path)
+        from bobbytailor.deterministic.schedule_extraction import extract_door_legend_from_pdf
+        door_legend = extract_door_legend_from_pdf(pdf_path)
         if door_legend:
             logger.info(
-                "Door schedule (type+count): %d component row(s) from plans (pages %s)",
+                "Door schedule: %d row(s) from plans (pages %s)",
                 len(door_legend.get("rows") or []),
                 door_legend.get("_source_pages"),
             )
     except Exception as exc:  # noqa: BLE001
-        logger.warning("Door-component extraction failed: %s", exc)
+        logger.warning("Door-schedule extraction failed: %s", exc)
         door_legend = None
-
-    if not door_legend:
-        try:
-            from bobbytailor.deterministic.schedule_extraction import extract_door_legend_from_pdf
-            door_legend = extract_door_legend_from_pdf(pdf_path)
-            if door_legend:
-                logger.info(
-                    "Door schedule (per-opening): %d row(s) from plans (pages %s)",
-                    len(door_legend.get("rows") or []),
-                    door_legend.get("_source_pages"),
-                )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Door-schedule extraction failed: %s", exc)
-            door_legend = None
 
     if door_legend:
         legends.append(door_legend)
@@ -97,16 +85,14 @@ def build_deterministic_legends(
 
 
 def build_door_component_legend(pdf_path: str) -> Optional[dict]:
-    """Build an authoritative door/frame legend from a *type + count* schedule.
+    """Build a door/frame legend via the component-library harvester.
 
-    Delegates to the component-library harvester, which reads the Type / Count /
-    Material columns of a type+count door schedule and counts doors AND frames by
-    material via the abbreviation key (with the printed-note HM reclassification).
-    Each material group becomes an EXACT, auto-verifiable ``takeoff_legend`` row
-    whose quantity passes through verbatim (never re-waste a counted door).
+    NOT on the production path since 23-04 — ``build_deterministic_legends``
+    makes one call to the unified extractor. Retained because the harvester
+    produces the same counts through the component-library shape
+    (``{name, quantity, unit}``), which the library merge consumes.
 
-    Returns ``None`` when the set has no type+count door schedule (e.g. a
-    per-opening schedule, which keeps its ``schedule_extraction`` path).
+    Returns ``None`` when the set has no parsable door schedule.
     """
     try:
         import fitz

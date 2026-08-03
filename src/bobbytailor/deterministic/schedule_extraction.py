@@ -169,6 +169,28 @@ _MAT_PHRASE_RE = [
 # Every canonical code the resolver can emit.
 MATERIAL_CODES = tuple(sorted({code for _, code in _MAT_PHRASES}))
 
+# Canonical ESTIMATOR code for a read material code — the ONE definition, shared
+# by door_schedule_to_legend and component_library.count_doors_by_material so the
+# formats can never disagree about a name again (INV-07 risk 4).
+#
+# SCW maps to the WOOD code, NOT to "SC": aggregator.py's door patterns include
+# ``door.*\bwd\b`` and no ``\bsc\b``, so ``Doors-SC`` matches none of them and
+# falls into the generic "Doors" bucket. That single letter is why Moxy's
+# correctly-parsed solid-core-wood doors scored MISSING (INV-07 §3).
+MATERIAL_CODE_ALIAS = {
+    "SCW": "WD",
+    "ALUM": "AL",
+    "GLASS": "GL",
+    "HMG": "HM",
+    "GALV": "STL",
+}
+
+
+def canonical_material_code(code: str) -> str:
+    """Map a read material code onto the canonical estimator code."""
+    key = (code or "").strip().upper()
+    return MATERIAL_CODE_ALIAS.get(key, key)
+
 
 def _material_code(cell) -> str:
     """The door/frame material a schedule cell names, or ``""``.
@@ -205,6 +227,33 @@ _FRAME_LABEL = {
     "SCW": "Solid Core Wood", "GLASS": "Glass / Aluminum", "GL": "Glass / Aluminum",
     "IM": "Intermediate Metal", "HC": "Hollow Core Wood", "FRP": "FRP",
 }
+
+# A note body that classifies its doors as hollow metal, and the reference to it
+# printed in a schedule row's comment cell. These live HERE, not in
+# component_library, so BOTH schedule formats receive the reclassification: the
+# type+count format got it and the per-opening format did not, which is half the
+# reason two parsers disagreed (INV-07 §5 step 9).
+_NOTE_REF_RE = re.compile(r"NOTE\s*(\d{1,2})", re.IGNORECASE)
+_HM_DOOR_NOTE_RE = re.compile(r"HOLLOW\s+METAL\s+DOOR", re.IGNORECASE)
+
+
+def _hm_door_notes(text: str) -> set:
+    """Note numbers whose printed body says "HOLLOW METAL DOOR(S)".
+
+    Reads the plan's own note text (e.g. ``NOTE 1 - ... HOLLOW METAL DOORS
+    ...``) so P-series personnel doors carried in HM frames are named as HM
+    doors — the estimator's reading, taken verbatim from the plan, not guessed.
+    """
+    hm: set = set()
+    if not text:
+        return hm
+    for m in re.finditer(r"NOTE\s*(\d{1,2})\s*-\s*(.+)", text, re.IGNORECASE):
+        num, body = m.group(1), m.group(2)
+        # Only look at the remainder of the same line for the classifier.
+        body = body.splitlines()[0] if body else ""
+        if _HM_DOOR_NOTE_RE.search(body):
+            hm.add(num)
+    return hm
 
 
 # ── The two-part legend guard, part 1: standalone door-schedule title bands ───
@@ -667,19 +716,68 @@ class DoorRecord:
     panel_material: str = ""
     frame_material: str = ""
     page: int = 0
+    count: int = 1
+    comment: str = ""
 
 
 @dataclass
 class DoorSchedule:
-    openings: int = 0                      # distinct scheduled openings
+    # Scheduled openings: the SUM of the printed counts, not the number of
+    # distinct tags. A type row reading "P1 / 24" is twenty-four doors.
+    openings: int = 0
     panel_counts: Counter = field(default_factory=Counter)
     frame_counts: Counter = field(default_factory=Counter)
     pages: List[int] = field(default_factory=list)
     records: List[DoorRecord] = field(default_factory=list)
+    # Every parsed DATA ROW, in the shape count_doors_by_material consumes. This
+    # is what lets ONE extractor serve both the legend and the component library.
+    rows: List[dict] = field(default_factory=list)
+    # How many band-qualified tables were examined across the document.
+    tables_seen: int = 0
+    # 1-based pages printing a standalone door-schedule TITLE, whether or not a
+    # table was parsed there. A non-empty list with openings == 0 is Chelsea: the
+    # plan set references a schedule it does not contain. Without this field that
+    # state cannot be told from "we never looked".
+    titled_pages: List[int] = field(default_factory=list)
+    # Text of the pages that carried a schedule — the source for the printed
+    # HOLLOW METAL DOOR note reclassification.
+    notes_text: str = ""
 
     @property
     def found(self) -> bool:
         return self.openings > 0
+
+
+def reclassified_panel_counts(ds: "DoorSchedule") -> "Counter[str]":
+    """Panel counts with the plan's OWN printed NOTE reclassification applied.
+
+    A door row whose comment references a NOTE the plan classifies as
+    "HOLLOW METAL DOOR" is counted as hollow metal whatever code the row printed:
+    Crow prints ``IM`` on the twenty-nine rows its ``NOTE 1`` / ``NOTE 2`` bodies
+    describe as *16 GA. HOLLOW METAL DOORS IN ... WELDED HOLLOW METAL FRAMES*.
+
+    Codes stay RAW here — canonicalisation to the estimator form happens in
+    :func:`door_schedule_to_legend`, so a caller can still see what was printed.
+    """
+    counts: "Counter[str]" = Counter()
+    if ds is None:
+        return counts
+    hm_notes = _hm_door_notes(ds.notes_text or "")
+    for row in ds.rows or []:
+        code = (row.get("door_material") or "").strip().upper()
+        if not code:
+            continue
+        try:
+            n = int(row.get("count") or 0)
+        except (TypeError, ValueError):
+            n = 0
+        if n <= 0:
+            continue
+        note = _NOTE_REF_RE.search(row.get("comment") or "")
+        if note and note.group(1) in hm_notes:
+            code = "HM"
+        counts[code] += n
+    return counts
 
 
 def _page_tables(page):
@@ -719,6 +817,11 @@ def accepted_door_tables(page) -> List[dict]:
     bands = _door_title_bands(page, table_bboxes)
     if not bands:
         return []
+    return _accept_under_bands(table_rows, table_bboxes, bands)
+
+
+def _accept_under_bands(table_rows, table_bboxes, bands) -> List[dict]:
+    """The guard's part 2, applied to every table the bands already qualified."""
     qualified = [
         idx for idx, bb in enumerate(table_bboxes)
         if _table_in_door_band(bb, bands)
@@ -764,21 +867,57 @@ def accepted_door_tables(page) -> List[dict]:
     return accepted
 
 
+def _row_count(row: List[str], count_col: Optional[int]) -> int:
+    """The quantity a data row carries: its printed count, else ONE.
+
+    "Else one" is the whole point. A schedule with no count column prints one row
+    per opening, so its row IS its quantity — the concept whose absence made the
+    old type+count parser return ``None`` on both per-opening formats.
+    """
+    if count_col is None or count_col >= len(row):
+        return 1
+    raw = (row[count_col] or "").strip()
+    if not _INT_CELL_RE.match(raw):
+        return 1
+    try:
+        return int(raw)
+    except ValueError:
+        return 1
+
+
 def extract_door_schedule(doc) -> DoorSchedule:
     """Extract a deterministic door schedule from an open fitz.Document.
 
-    Per page: compute the standalone door-schedule title bands, keep only the
-    tables those bands qualify, resolve the tag / count / panel / frame columns
-    by header role with a content fallback, then read one row at a time.
+    ONE parser for all three real formats. Per page: compute the standalone
+    door-schedule title bands, keep only the tables those bands qualify, resolve
+    the tag / count / panel / frame columns by header role with a content
+    fallback, then read one row at a time. A row's quantity is its printed count
+    when the schedule prints one, otherwise ONE.
+
+    Tag de-duplication stays for the RECORDS — a tag repeated across continuation
+    fragments is one opening — but the QUANTITY is the summed count, because a
+    type row reading "P1 / 24" is twenty-four doors under one tag.
     """
     out = DoorSchedule()
     seen_tags = set()
+    notes: List[str] = []
     for i in range(doc.page_count):
         page = doc[i]
+        table_rows, table_bboxes = _page_tables(page)
+        bands = _door_title_bands(page, table_bboxes)
+        if not bands:
+            continue
+        # The page NAMES a door schedule. Recorded before any table is judged, so
+        # "referenced but absent" is representable (Chelsea).
+        out.titled_pages.append(i + 1)
+        accepted = _accept_under_bands(table_rows, table_bboxes, bands)
+        out.tables_seen += len(accepted)
+
         page_used = False
-        for table in accepted_door_tables(page):
+        for table in accepted:
             rows = table["rows"]
             tag_col = table["tag_col"]
+            count_col = table["count_col"]
             panel_col = table["panel_col"]
             frame_col = table["frame_col"]
             for r in _data_rows(rows, tag_col):
@@ -786,22 +925,38 @@ def extract_door_schedule(doc) -> DoorSchedule:
                 room = r[tag_col + 1] if tag_col + 1 < len(r) else ""
                 panel = _cell_material(r, panel_col) if panel_col is not None else ""
                 frame = _cell_material(r, frame_col) if frame_col is not None else ""
+                comment = r[-1] if r else ""
+                n = _row_count(r, count_col)
+                if n <= 0:
+                    continue
+                out.rows.append({
+                    "type": toks[0],
+                    "count": n,
+                    "door_material": panel,
+                    "frame_material": frame,
+                    "comment": comment,
+                })
+                if panel:
+                    out.panel_counts[panel] += n
+                if frame:
+                    out.frame_counts[frame] += n
+                out.openings += n
+                page_used = True
                 for tg in toks:
                     if tg in seen_tags:
                         continue
                     seen_tags.add(tg)
                     out.records.append(DoorRecord(
                         tag=tg, room=room, panel_material=panel,
-                        frame_material=frame, page=i + 1,
+                        frame_material=frame, page=i + 1, count=n, comment=comment,
                     ))
-                    if panel:
-                        out.panel_counts[panel] += 1
-                    if frame:
-                        out.frame_counts[frame] += 1
-                    page_used = True
         if page_used:
             out.pages.append(i + 1)
-    out.openings = len(seen_tags)
+            try:
+                notes.append(page.get_text() or "")
+            except Exception:  # noqa: BLE001
+                pass
+    out.notes_text = "\n".join(notes)
     return out
 
 
@@ -812,21 +967,36 @@ def door_schedule_to_legend(ds: "DoorSchedule") -> Optional[dict]:
     *scheduled* openings. Quantities pass through verbatim (``takeoff_legend``)
     so the pipeline never re-applies waste/formulas to a counted door.
 
+    The ITEM field carries the CANONICAL estimator form — ``Doors-<CODE>`` and
+    ``Door Frames-<CODE>`` — because that is what ``aggregator.ITEM_NAME_MAP``
+    and the scorer match on. Emitting the prose name there is the entire reason
+    Moxy's correctly-parsed doors scored MISSING: it published
+    ``Doors - Solid Core Wood (door schedule)`` against a golden asking for
+    ``Doors-WD``, and no token-overlap matcher can bridge that (INV-07 §3). The
+    prose survives in DESCRIPTION for the human report.
+
+    The plan's own printed HOLLOW METAL DOOR note reclassification is applied
+    HERE, so BOTH schedule formats receive it.
+
     Returns ``None`` when nothing reliable was extracted.
     """
-    if not ds or not ds.found or (not ds.panel_counts and not ds.frame_counts):
+    if not ds or not ds.found:
+        return None
+    panel_counts = reclassified_panel_counts(ds)
+    frame_counts = ds.frame_counts
+    if not panel_counts and not frame_counts:
         return None
 
     rows: List[dict] = []
-    for code, n in ds.panel_counts.most_common():
+    for code, n in panel_counts.most_common():
         rows.append({
-            "ITEM": f"Doors - {_PANEL_LABEL.get(code, code)} (door schedule)",
+            "ITEM": "Doors-{}".format(canonical_material_code(code)),
             "DESCRIPTION": f"Doors - {_PANEL_LABEL.get(code, code)} (door schedule)",
             "QTY": str(n), "QUANTITY": str(n), "UNIT": "EA",
         })
-    for code, n in ds.frame_counts.most_common():
+    for code, n in frame_counts.most_common():
         rows.append({
-            "ITEM": f"Door Frames - {_FRAME_LABEL.get(code, code)} (door schedule)",
+            "ITEM": "Door Frames-{}".format(canonical_material_code(code)),
             "DESCRIPTION": f"Door Frames - {_FRAME_LABEL.get(code, code)} (door schedule)",
             "QTY": str(n), "QUANTITY": str(n), "UNIT": "EA",
         })
@@ -880,5 +1050,9 @@ if __name__ == "__main__":  # quick measurement harness
         d.close()
         print(f"\n=== {p.split('/')[-1]} ===")
         print(f"  scheduled openings : {ds.openings}  (pages {ds.pages})")
+        print(f"  titled pages       : {ds.titled_pages}  tables_seen={ds.tables_seen}")
         print(f"  panel materials    : {dict(ds.panel_counts)}")
+        print(f"  panel (notes app.) : {dict(reclassified_panel_counts(ds))}")
         print(f"  frame materials    : {dict(ds.frame_counts)}")
+        legend = door_schedule_to_legend(ds)
+        print(f"  legend items       : {[r['ITEM'] for r in (legend or {}).get('rows', [])]}")

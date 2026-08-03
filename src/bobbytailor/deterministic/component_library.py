@@ -13,11 +13,12 @@ What it harvests
    pair yields alias mappings (``HM`` <-> ``Hollow Metal``) and, for the door /
    frame construction codes, composes estimator names (``Doors-HM``,
    ``Door Frames-HM``) so a detected door binds to the plan's own naming.
-2. **Door schedule** — a *type + count* door schedule (Type / Count / Material /
-   Frame Material columns) is read row-by-row; doors and frames are counted by
-   material using the abbreviation key. When a door row references a printed NOTE
-   whose body says "HOLLOW METAL DOORS", the door material is reclassified to HM
-   (reading the plan's own note text — never a guess).
+2. **Door schedule** — read row-by-row by the ONE unified extractor in
+   ``schedule_extraction`` (type+count, per-opening and split-cell formats
+   alike); doors and frames are counted by material here. When a door row
+   references a printed NOTE whose body says "HOLLOW METAL DOORS", the door
+   material is reclassified to HM (reading the plan's own note text — never a
+   guess).
 3. **Keynotes + general notes** — conservative object-noun mentions (ladder,
    guardrail, handrail, bollard, column, stair, concrete pad, downspout, ...)
    become candidate library names.
@@ -37,6 +38,12 @@ import logging
 import re
 from collections import Counter, OrderedDict
 from typing import Dict, List, Optional
+
+from bobbytailor.deterministic.schedule_extraction import (
+    MATERIAL_CODE_ALIAS as _MAT_CODE_ALIAS,
+    _hm_door_notes,
+    canonical_material_code as _canon_mat,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -190,123 +197,21 @@ def abbreviations_to_library(abbr: Dict[str, str]) -> List[dict]:
     return out
 
 
-# ── Door schedule: type + count parsing (counted by material) ─────────────────
+# ── Door schedule: material grouping over the UNIFIED extractor's rows ────────
 
-# Door / frame material tokens found in a schedule material cell.
-_SCHED_MAT = {
-    "AL", "STL", "IM", "HM", "SC", "HC", "WD", "GLASS", "GL", "ALUM", "FRP",
-    "SCW", "HMG", "GALV", "KD",
-}
-# A door TYPE code: 1-3 leading letters then optional digits (DSF, OD1, P1, SF).
-# Deliberately requires >=1 leading letter so numeric per-opening tags (003, 101B
-# on per-opening schedules like Moxy) do NOT match — those keep their own path.
-_TYPE_CODE_RE = re.compile(r"^[A-Z]{1,3}\d{0,2}[A-Z]?$")
-_INT_CELL_RE = re.compile(r"^\d{1,3}$")
+# The row parser, the material vocabulary and the printed-note reclassification
+# all live in ``schedule_extraction`` now — ONE parser reads the type+count, the
+# per-opening and the split-cell formats (INV-07 §5 steps 8-10). This module
+# keeps only the note-aware GROUPING step on top of its rows.
+#
+# ``_parse_count_door_rows`` used to live here. It required column 0 to be a
+# TYPE code, required a Count column (returning ``None`` when absent — with no
+# row-counting fallback), and matched materials as bare tokens. Each of those
+# three is a format assumption, and together they meant it read Crow and gave up
+# on Bob's and Moxy entirely.
+
 # "NOTE 1", "NOTE 3" note reference inside a comment cell.
 _NOTE_REF_RE = re.compile(r"NOTE\s*(\d{1,2})", re.IGNORECASE)
-# A note body that classifies its doors as hollow metal.
-_HM_DOOR_NOTE_RE = re.compile(r"HOLLOW\s+METAL\s+DOOR", re.IGNORECASE)
-
-
-def _hm_door_notes(text: str) -> set:
-    """Note numbers whose printed body says "HOLLOW METAL DOOR(S)".
-
-    Reads the plan's own note text (e.g. ``NOTE 1 - ... HOLLOW METAL DOORS
-    ...``) so P-series personnel doors carried in HM frames are named as HM
-    doors — the estimator's reading, taken verbatim from the plan, not guessed.
-    """
-    hm: set = set()
-    if not text:
-        return hm
-    for m in re.finditer(r"NOTE\s*(\d{1,2})\s*-\s*(.+)", text, re.IGNORECASE):
-        num, body = m.group(1), m.group(2)
-        # Only look at the remainder of the same line for the classifier.
-        body = body.splitlines()[0] if body else ""
-        if _HM_DOOR_NOTE_RE.search(body):
-            hm.add(num)
-    return hm
-
-
-def _parse_count_door_rows(rows: List[List[str]]) -> Optional[List[dict]]:
-    """Parse a *type + count* door schedule table into structured rows.
-
-    Content-based (no header dependency — PyMuPDF often splits the header into a
-    separate table): column 0 must read as door TYPE codes, a nearby column must
-    be an integer COUNT, and there must be a material column. Returns
-    ``[{type, count, door_material, frame_material, comment}]`` or ``None`` when
-    the table is not a type+count door schedule (e.g. a per-opening schedule).
-    """
-    data = [
-        r for r in rows
-        if r and _TYPE_CODE_RE.match((r[0] or "").strip())
-    ]
-    if len(data) < 3:
-        return None
-    width = max(len(r) for r in data)
-
-    # Count column: an early column (1..3) that is mostly small integers.
-    count_col = None
-    for c in range(1, min(width, 4)):
-        hits = sum(
-            1 for r in data
-            if c < len(r) and _INT_CELL_RE.match((r[c] or "").strip())
-        )
-        if hits >= max(3, int(len(data) * 0.6)):
-            count_col = c
-            break
-    if count_col is None:
-        return None
-
-    # Material columns by content density; earliest = door leaf, latest = frame.
-    mat_cols = []
-    for c in range(width):
-        if c in (0, count_col):
-            continue
-        hits = sum(
-            1 for r in data
-            if c < len(r) and (r[c] or "").strip().upper() in _SCHED_MAT
-        )
-        if hits >= 2:
-            mat_cols.append(c)
-    if not mat_cols:
-        return None
-    mat_cols.sort()
-    door_col = mat_cols[0]
-    frame_col = mat_cols[-1] if len(mat_cols) > 1 else None
-
-    out: List[dict] = []
-    for r in data:
-        type_code = (r[0] or "").strip()
-        try:
-            count = int((r[count_col] or "0").strip() or 0)
-        except ValueError:
-            count = 0
-        if count <= 0:
-            continue
-        door_mat = (r[door_col] or "").strip().upper() if door_col < len(r) else ""
-        frame_mat = (
-            (r[frame_col] or "").strip().upper()
-            if frame_col is not None and frame_col < len(r) else ""
-        )
-        comment = (r[-1] or "").strip() if r else ""
-        out.append({
-            "type": type_code,
-            "count": count,
-            "door_material": door_mat if door_mat in _SCHED_MAT else "",
-            "frame_material": frame_mat if frame_mat in _SCHED_MAT else "",
-            "comment": comment,
-        })
-    return out or None
-
-
-# Normalise material codes onto the estimator-name code set (SCW->SC, ALUM->AL...).
-_MAT_CODE_ALIAS = {
-    "SCW": "SC", "ALUM": "AL", "GLASS": "GL", "HMG": "HM", "GALV": "STL",
-}
-
-
-def _canon_mat(code: str) -> str:
-    return _MAT_CODE_ALIAS.get(code, code)
 
 
 def count_doors_by_material(
@@ -314,13 +219,16 @@ def count_doors_by_material(
     abbr: Optional[Dict[str, str]] = None,
     notes_text: str = "",
 ) -> List[dict]:
-    """Count doors and frames by material from parsed type+count door rows.
+    """Count doors and frames by material from parsed door-schedule rows.
 
-    Each row is ``{type, count, door_material, frame_material, comment}``. Doors
-    are grouped by ``door_material`` and frames by ``frame_material``; the counts
-    are summed via the ``count`` column (a type schedule enumerates *types*, the
-    Count column gives instances). A door whose comment references a NOTE that
-    the plan classifies as "HOLLOW METAL DOOR" is reclassified to HM.
+    Each row is ``{type, count, door_material, frame_material, comment}`` — the
+    shape :func:`schedule_extraction.extract_door_schedule` emits for EVERY
+    format. Doors are grouped by ``door_material`` and frames by
+    ``frame_material``; the counts are summed via ``count`` (a type schedule
+    enumerates *types* and its Count column gives instances; a per-opening
+    schedule prints one door per row and ``count`` is one). A door whose comment
+    references a NOTE that the plan classifies as "HOLLOW METAL DOOR" is
+    reclassified to HM.
 
     Returns ``[{name, quantity, unit, provenance, material}]`` sorted by name.
     """
@@ -368,47 +276,23 @@ def count_doors_by_material(
 
 
 def extract_door_component_counts(doc, notes_text: str = "") -> List[dict]:
-    """Read a type+count door schedule from an open fitz.Document.
+    """Read the door schedule from an open fitz.Document, whatever its format.
 
-    Scans pages whose text mentions a DOOR SCHEDULE, finds the type+count door
-    table, and returns material-grouped door / frame counts (or ``[]`` when the
-    set has no type+count door schedule — e.g. a per-opening schedule, which
-    keeps its existing ``schedule_extraction`` path). Never raises.
+    Delegates row parsing to the ONE unified extractor
+    (:func:`schedule_extraction.extract_door_schedule`) and keeps the note-aware
+    material grouping. Returns ``[{name, quantity, unit, provenance, material}]``
+    or ``[]`` when the set has no parsable door schedule. Never raises.
     """
     try:
-        from bobbytailor.deterministic.schedule_extraction import _cells
-    except Exception:  # noqa: BLE001
+        from bobbytailor.deterministic.schedule_extraction import extract_door_schedule
+        ds = extract_door_schedule(doc)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("extract_door_component_counts: schedule read failed: %s", exc)
         return []
-    all_notes = [notes_text] if notes_text else []
-    door_rows: List[dict] = []
-    try:
-        page_count = doc.page_count
-    except Exception:  # noqa: BLE001
+    if not ds or not ds.rows:
         return []
-    for i in range(page_count):
-        try:
-            page = doc[i]
-            page_text = page.get_text() or ""
-        except Exception:  # noqa: BLE001
-            continue
-        if "DOOR SCHEDULE" not in page_text.upper():
-            continue
-        all_notes.append(page_text)
-        try:
-            tables = list(page.find_tables().tables)
-        except Exception:  # noqa: BLE001
-            tables = []
-        for t in tables:
-            try:
-                rows = [_cells(r) for r in t.extract()]
-            except Exception:  # noqa: BLE001
-                continue
-            parsed = _parse_count_door_rows(rows)
-            if parsed:
-                door_rows.extend(parsed)
-    if not door_rows:
-        return []
-    return count_doors_by_material(door_rows, notes_text="\n".join(all_notes))
+    notes = "\n".join(t for t in (notes_text, ds.notes_text) if t)
+    return count_doors_by_material(ds.rows, notes_text=notes)
 
 
 # ── Comprehensive naming-relevant text extraction (AI naming-pass input) ──────

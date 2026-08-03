@@ -25,7 +25,10 @@ from bobbytailor.deterministic.schedule_extraction import (
     _tag_column,
     _tag_tokens,
     accepted_door_tables,
+    canonical_material_code,
+    door_schedule_to_legend,
     extract_door_schedule,
+    reclassified_panel_counts,
 )
 
 UPLOADS = os.path.join(os.path.dirname(__file__), os.pardir, "uploads")
@@ -253,6 +256,29 @@ def test_bobs_schedule_table_is_accepted_and_read():
     assert ds.frame_counts.get("HM") == 12
 
 
+@pytest.mark.skipif(not os.path.exists(BOBS), reason="Bob's plans PDF not present")
+def test_bobs_legend_item_names_are_canonical_not_prose():
+    """The ITEM field must be what the aggregator and the scorer match on."""
+    doc = _open(BOBS)
+    try:
+        legend = door_schedule_to_legend(extract_door_schedule(doc))
+    finally:
+        doc.close()
+    items = {r["ITEM"] for r in legend["rows"]}
+    assert {"Doors-HM", "Doors-WD", "Door Frames-HM"}.issubset(items)
+    for item in items:
+        assert "(door schedule)" not in item, f"prose suffix leaked into ITEM: {item}"
+        assert "Solid Core" not in item and "Hollow Metal" not in item, item
+    # The prose survives where a human reads it.
+    descriptions = {r["DESCRIPTION"] for r in legend["rows"]}
+    assert any("Solid Core Wood" in d for d in descriptions)
+    # Quantities pass through verbatim — a counted door is never re-wasted.
+    by_item = {r["ITEM"]: int(r["QTY"]) for r in legend["rows"]}
+    assert by_item["Doors-HM"] == 5
+    assert by_item["Doors-WD"] == 7
+    assert by_item["Door Frames-HM"] == 12
+
+
 @pytest.mark.skipif(not os.path.exists(MOXY), reason="Moxy plans PDF not present")
 def test_moxy_door_schedule_is_read_from_its_own_sheet():
     doc = _open(MOXY)
@@ -265,10 +291,29 @@ def test_moxy_door_schedule_is_read_from_its_own_sheet():
     assert ds.pages == [7], f"unexpected schedule pages {ds.pages}"
     assert ds.openings >= 53, f"expected >=53 scheduled openings, got {ds.openings}"
     # Material breakdown read from the table (raw codes, pre-canonicalisation).
-    assert ds.panel_counts.get("SCW") == 41
+    assert ds.panel_counts.get("SCW") == 40
     assert ds.panel_counts.get("GLASS") == 6
-    assert ds.frame_counts.get("HM") == 41
-    assert ds.frame_counts.get("GALV") == 7
+    assert ds.frame_counts.get("HM") == 40
+    assert ds.frame_counts.get("GALV") == 6
+
+
+@pytest.mark.skipif(not os.path.exists(MOXY), reason="Moxy plans PDF not present")
+def test_moxy_emits_canonical_names_instead_of_prose():
+    """Moxy's 42 doors parsed correctly and scored MISSING purely on the NAME.
+
+    ``Doors - Solid Core Wood (door schedule)`` shares no useful tokens with the
+    golden's ``Doors-WD``, so no matcher could bridge it (INV-07 §3). Nothing
+    about the parse changes here — only what the row is called.
+    """
+    doc = _open(MOXY)
+    try:
+        legend = door_schedule_to_legend(extract_door_schedule(doc))
+    finally:
+        doc.close()
+    items = {r["ITEM"] for r in legend["rows"]}
+    assert "Doors-WD" in items
+    assert "Door Frames-HM" in items
+    assert not any("(door schedule)" in i for i in items)
 
 
 @pytest.mark.skipif(not os.path.exists(CROW), reason="Crow plans PDF not present")
@@ -286,9 +331,47 @@ def test_crow_type_schedule_is_read_by_the_same_parser():
     assert (table["tag_col"], table["count_col"]) == (0, 1)
     assert ds.found
     assert ds.pages == [4]
-    # One record per printed TYPE row (the count column is applied in 23-04 T3).
-    assert ds.openings == 9, f"expected 9 type rows, got {ds.openings}"
-    assert ds.panel_counts.get("IM") == 5
-    assert ds.panel_counts.get("STL") == 2
-    assert ds.panel_counts.get("ALUM") == 2
-    assert ds.frame_counts.get("HM") == 5
+    # The Count column is honoured: 2+68+2+24+2+1+1+1+4.
+    assert ds.openings == 105, f"expected 105 openings, got {ds.openings}"
+    assert ds.panel_counts.get("IM") == 29     # as PRINTED, before the note
+    assert ds.panel_counts.get("STL") == 70
+    assert ds.panel_counts.get("ALUM") == 6
+    assert ds.frame_counts.get("HM") == 29
+
+
+@pytest.mark.skipif(not os.path.exists(CROW), reason="Crow plans PDF not present")
+def test_crow_note_driven_hm_reclassification_survives_the_parser_merge():
+    """Crow's golden fixture has NO door rows, so the saved-run scorer cannot
+    catch a door regression here — these assertions are the only guard.
+
+    The 29 P-series doors print ``IM`` and are named hollow metal because the
+    plan's own NOTE 1 / NOTE 2 bodies say *16 GA. HOLLOW METAL DOORS*. Deleting
+    the type+count parser without moving that reclassification would silently
+    emit ``Doors-IM``, which matches none of the aggregator's door patterns.
+    """
+    doc = _open(CROW)
+    try:
+        ds = extract_door_schedule(doc)
+        legend = door_schedule_to_legend(ds)
+    finally:
+        doc.close()
+    assert dict(reclassified_panel_counts(ds)) == {"HM": 29, "ALUM": 6, "STL": 70}
+    by_item = {r["ITEM"]: int(r["QTY"]) for r in legend["rows"]}
+    assert by_item["Doors-HM"] == 29
+    assert by_item["Door Frames-HM"] == 29
+    assert "Doors-IM" not in by_item
+
+
+def test_solid_core_wood_canonicalises_to_the_wood_code():
+    """SCW -> WD, not SC: aggregator.py has ``door.*\\bwd\\b`` and no ``\\bsc\\b``."""
+    assert canonical_material_code("SCW") == "WD"
+    assert canonical_material_code("ALUM") == "AL"
+    assert canonical_material_code("GLASS") == "GL"
+    assert canonical_material_code("HM") == "HM"
+
+
+def test_the_type_plus_count_parser_is_gone():
+    """One parser, not two — the count column absorbed its only distinct logic."""
+    from bobbytailor.deterministic import component_library
+
+    assert not hasattr(component_library, "_parse_count_door_rows")

@@ -165,6 +165,21 @@ def test_count_doors_note_aware_hm_reclassification():
     assert "Doors-IM" not in by_name
 
 
+def test_count_doors_solid_core_wood_is_named_with_the_wood_code():
+    """SCW -> WD, not SC.
+
+    ``aggregator.ITEM_NAME_MAP`` carries ``door.*\\bwd\\b`` -> Doors-WD and no
+    ``\\bsc\\b`` pattern at all, so ``Doors-SC`` matched none of the door rules
+    and fell into the generic "Doors" bucket. One letter, and a correctly
+    counted door became unscorable (INV-07 §3).
+    """
+    rows = [{"type": "T1", "count": 6, "door_material": "SCW", "frame_material": "HM"}]
+    by_name = {d["name"]: d["quantity"] for d in count_doors_by_material(rows)}
+    assert by_name["Doors-WD"] == 6
+    assert "Doors-SC" not in by_name
+    assert by_name["Door Frames-HM"] == 6
+
+
 def test_count_doors_no_note_keeps_printed_material():
     rows = [{"type": "OD1", "count": 6, "door_material": "STL",
              "frame_material": "", "comment": "NOTE 3"}]
