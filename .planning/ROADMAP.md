@@ -958,6 +958,129 @@ Plans:
 - [x] 22-03-PLAN.md — Legacy docs archive + web asset move into package (wave 3, RESTRUCTURE-SPEC-S4/S5)
 - [x] 22-04-PLAN.md — Doc truth fixes + dead JS removal + GitNexus reindex (wave 4, RESTRUCTURE-SPEC-S6/S7/S8)
 
+### Phase 23: Measurement Engine Completion
+
+**Goal:** The measurement layer produces a number for every quantity the drawing set actually contains, on ANY sheet composition — not just Crow's single-floor-plan shape. Moxy's per-room areas bind to line items, Bob's civil/elevation quantities get measured, and a sheet that contributes nothing says so loudly instead of silently reporting 0.
+
+**Depends on:** Phase 22
+
+**Requirements:** V4-MEAS-01 … V4-MEAS-06
+
+**Why this is first:** This is the single largest accuracy gap on record. `docs/PIPELINE-GROUND-TRUTH.md` §12b is explicit — "the app does not work on Moxy" because nothing in the measurement layer produces per-room areas; §9 shows Bob's golden quantities (Gas Piping 886 LF civil, Exterior Painting 16,219 SF elevation, Lintels 179 LF) are measured by no engine at all. Naming and scale are already solved; a name and a ruler cannot rescue a measurement that was never taken.
+
+**Success Criteria** (what must be TRUE):
+
+1. `_fuse_room_fills` binds measured room geometry to takeoff line items for BOTH ceiling area (RCP basis) and wall area (perimeter × height, AR basis) — Moxy Gyp Wall stops reporting ~2% of golden
+2. The ID-412/ID-416 ~2× clip defect is fixed at the clip (not by a guestroom-sized plausibility threshold, which overfits — §14.2)
+3. Elevation sheets yield wall-area SF and civil sheets yield linework LF, so a plan set with no floor plan still produces quantities (Bob's)
+4. Finish-schedule → room binding assigns WC-1…WC-10 areas to the rooms that carry those finishes
+5. Rail/linework LF is measured from linework (Crow Guard/Hand Rail stop reporting ~5 LF against 420/438)
+6. Door schedules parse across at least the Crow, Bob's, and Moxy formats
+7. Any sheet that produces zero measurable geometry emits an explicit coverage flag — a blank is never reported as a zero
+
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 23 to break down)
+
+### Phase 24: Binding Determinism & Text-Anchored Labeling
+
+**Goal:** The same plan run twice produces the same take-off. Every binding that currently flips between runs is either made deterministic, anchored to text the model can read rather than a shape it must recognize, or explicitly flagged — never silently guessed.
+
+**Depends on:** Phase 23
+
+**Requirements:** V4-DET-01 … V4-DET-05
+
+**Why:** `.planning/research/VISION-MODEL-EVIDENCE-2026.md` establishes the mechanism with 3-0 verified evidence: text-anchored classes are recognized at 0.65–0.92 accuracy, symbol-conveyed classes at 0.03–0.39. CMU-vs-tilt-up, columns, and bollards are all symbol-conveyed, which is exactly why they flip (ground truth §10). Separately, temperature=0 does NOT make hosted APIs deterministic — the cause is batch-size-dependent GPU reduction kernels — so the fix must be structural, not a sampling parameter.
+
+**Success Criteria** (what must be TRUE):
+
+1. Set-of-Mark prompts supply each candidate's nearest plan text (keynote, tag, schedule row, abbreviation); a candidate with no text anchor is flagged, never named from shape alone
+2. CMU vs tilt-up wall class is selected deterministically by thickness + location, not by a vision label — the 8 ↔ 11,294 SF flip cannot recur
+3. Fusion output uses dependency-ordered schema topology (wall skeleton defined first, rooms expressed as references to it) so geometric gaps are structurally impossible
+4. Ensemble voting is wired onto every remaining identification pass that can flip
+5. A determinism harness runs the same fixture N× and asserts identical line items — regression protection for the whole class of bug
+
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 24 to break down)
+
+### Phase 25: Deterministic Symbol Detection
+
+**Goal:** Repeated objects that exist only as graphical symbols — columns, bollards — are found by geometry over the vector primitives we already extract, validated against POSITION and SHAPE rather than against the golden count.
+
+**Depends on:** Phase 24
+
+**Requirements:** V4-SYM-01 … V4-SYM-04
+
+**Why, and the scope fence:** Ground truth §10/§11 proved the current shape-signature clusterer never isolates the real 132 columns at all — every high-count group is a collinear row of dimension ticks (yspan=0), and the celebrated "136 columns" was a coincidence. The research says general VLMs cannot fill this gap (item localization is their single worst subtask; doors/windows 0.03–0.39). **This phase deliberately stays non-ML** to honor the REQUIREMENTS.md "custom symbol training" exclusion: it borrows CADSpotting's *representation* idea — densely sample points along vector primitives using coordinates only, ignoring primitive type and layer — which is plain computational geometry. Escalating to a small local trained model requires explicit user approval and is NOT assumed here.
+
+**Success Criteria** (what must be TRUE):
+
+1. A 2-D lattice/cluster detector runs over coordinate-sampled vector primitives and isolates genuinely 2-D-distributed repeated objects
+2. Detections are validated by position and shape against the drawing — never tuned until the count matches golden (the §10 coincidence trap is a documented, forbidden methodology)
+3. Collinear tick strips and grid bubbles can never be emitted as objects (the existing flag-don't-guess guard is preserved and extended)
+4. Where detection genuinely fails, the item is flagged for human review with its evidence — an honest gap beats a coincidental hit
+
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 25 to break down)
+
+### Phase 26: Learning Loop & Autonomy
+
+**Goal:** Human intervention is limited to supplying a manifest and a calibration, both are captured as learning, and the system explains WHY each intervention was needed — so the same intervention is not required a second time and the trend toward autonomy is measurable rather than asserted.
+
+**Depends on:** Phase 25
+
+**Requirements:** V4-LEARN-01 … V4-LEARN-05
+
+**Why:** The capture→distill→retrieve→inject loop already exists and is well tested (ground truth: naming corrections carry forward via vocabulary; `apply_learned_quantity_flags` deliberately only FLAGS, never injects, to prevent self-amplification). What is missing is the *intervention* half of the user's contract: the manifest and the calibration are supplied fresh every run with no memory, and nothing records why they were needed.
+
+**Success Criteria** (what must be TRUE):
+
+1. A supplied manifest is captured as learning — the same project (and similar project types) no longer needs it re-supplied
+2. A supplied calibration is captured the same way, keyed to the drawing/viewport it corrected
+3. Each intervention records a machine-readable REASON (e.g. "unit counts absent from the drawing set — CS-04 not in the PDF"; "printed scale unreadable on this viewport"), so the user can see whether it was an input gap or a code gap
+4. An autonomy metric is emitted per run: how many quantities came from geometry, from schedules, from learning, and from human input — trending human input toward zero across repeat runs
+5. The anti-amplification guarantee is preserved: learned COUNTS still only flag for re-verification, never silently substitute
+
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 26 to break down)
+
+### Phase 27: Production Hardening
+
+**Goal:** The behavioral and structural debt deliberately deferred out of Phase 22 is closed, so the app is deployable without caveats: one config surface, no god-module, both front doors behaving identically, and no silent-failure paths left in the accuracy-critical code.
+
+**Depends on:** Phase 26
+
+**Requirements:** V4-PROD-01 … V4-PROD-07
+
+**Source:** `.planning/codebase/RESTRUCTURE-SPEC.md` §7 items 1–13 plus `.planning/codebase/CONCERNS.md` severity-ranked findings. Every item here is a behavior change, which is exactly why Phase 22 excluded them.
+
+**Success Criteria** (what must be TRUE):
+
+1. **Front-door parity closed** — the StackCT scraper no longer re-implements `run_project`'s tail and no longer skips the autonomous vocabulary/naming pass, so StackCT-run accuracy is comparable to PDF-run accuracy (currently it is not)
+2. `takeoff_pipeline.py` (3,209 LOC) is split behind re-export shims with the ~14 patch-by-module-path test files still green
+3. One typed config surface: import-time `validate_required_env()` removed, `load_dotenv(override=True)` precedence inversion fixed, the stale settings-UI model allowlist regenerated from config, the 5 independent env readers collapsed
+4. `debug=True` in the root entry is gated by environment
+5. The warehouse-tuned 30 ft wall-height default and the room engine's single-CAD-template `PLAN_TITLE_RE` / ≤900 SF ceilings are generalized or made explicit inputs
+6. `output/` and `uploads/` are anchored to a configured data root rather than CWD
+7. Rate limiting, upload magic-byte sniffing, and the remaining CONCERNS security items are closed
+
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 27 to break down)
+
 ---
 *Roadmap created: 2026-05-26*  
 *Updated: 2026-06-03 — Phase 20 Takeoff Measurement Precision added (7 plans, 5 waves)*  

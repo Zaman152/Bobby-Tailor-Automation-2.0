@@ -167,6 +167,54 @@
 - [x] **V3-PROD-01**: Plans-only accuracy gate — vision_only_benchmark as CI-invocable gate; item-found ≥95%; zero silent misses
 - [x] **V3-PROD-02**: Live-testing readiness — flagged-subset human review workflow, per-run API cost budget guard, structured error recovery, deployment docs
 
+### Production Revamp v4 — accuracy, determinism, autonomy (Phases 23–27)
+
+Evidence base: `docs/PIPELINE-GROUND-TRUTH.md` (honest measured accuracy),
+`.planning/research/VISION-MODEL-EVIDENCE-2026.md` (2026 deep research, 18 verified claims),
+`.planning/codebase/{CONCERNS,ARCHITECTURE}.md` (repo audit).
+
+**Phase 23 — Measurement Engine Completion**
+
+- **V4-MEAS-01**: Room fills bind to takeoff line items for ceiling area (RCP basis) AND wall area (perimeter × height, AR basis)
+- **V4-MEAS-02**: The ID-412/ID-416 ~2× clip defect fixed at the clip, not by a guestroom-sized plausibility threshold
+- **V4-MEAS-03**: Sheet-composition-agnostic measurement — elevation wall-area SF and civil linework LF, so a set with no floor plan still yields quantities
+- **V4-MEAS-04**: Finish-schedule → room binding (WC-1…WC-10 assigned to the rooms carrying those finishes)
+- **V4-MEAS-05**: Rail/linework LF measured from linework
+- **V4-MEAS-06**: Per-format door-schedule parsing across Crow, Bob's, and Moxy formats; zero-geometry sheets emit an explicit coverage flag (blank never reported as zero)
+
+**Phase 24 — Binding Determinism & Text-Anchored Labeling**
+
+- **V4-DET-01**: Set-of-Mark prompts carry each candidate's nearest plan text; no text anchor ⇒ flagged, never named from shape
+- **V4-DET-02**: CMU vs tilt-up wall class selected deterministically by thickness + location, not by a vision label
+- **V4-DET-03**: Dependency-ordered fusion schema (wall skeleton first, rooms as references) so geometric gaps are structurally impossible
+- **V4-DET-04**: Ensemble voting wired onto every remaining flip-capable identification pass
+- **V4-DET-05**: Determinism harness — same fixture N× asserts identical line items
+
+**Phase 25 — Deterministic Symbol Detection** (non-ML by scope decision)
+
+- **V4-SYM-01**: 2-D lattice detector over coordinate-sampled vector primitives isolates genuinely 2-D-distributed repeated objects
+- **V4-SYM-02**: Detections validated by position/shape; tuning to the golden count is a forbidden methodology
+- **V4-SYM-03**: Collinear tick strips and grid bubbles can never be emitted as objects
+- **V4-SYM-04**: Undetectable items are flagged with evidence rather than guessed
+
+**Phase 26 — Learning Loop & Autonomy**
+
+- **V4-LEARN-01**: A supplied manifest is captured as learning; the same project/type stops needing it
+- **V4-LEARN-02**: A supplied calibration is captured, keyed to the drawing/viewport it corrected
+- **V4-LEARN-03**: Every intervention records a machine-readable REASON distinguishing input gap from code gap
+- **V4-LEARN-04**: Per-run autonomy metric — quantities by provenance (geometry / schedule / learned / human), trending human toward zero
+- **V4-LEARN-05**: Anti-amplification preserved — learned counts only flag for re-verification, never silently substitute
+
+**Phase 27 — Production Hardening**
+
+- **V4-PROD-01**: Front-door parity — scraper stops re-implementing `run_project`'s tail and runs the vocabulary/naming pass
+- **V4-PROD-02**: `takeoff_pipeline.py` split behind re-export shims, suite green
+- **V4-PROD-03**: One typed config surface (no import-time validation, dotenv precedence fixed, settings allowlist generated, 5 env readers collapsed)
+- **V4-PROD-04**: `debug=True` environment-gated
+- **V4-PROD-05**: Warehouse-tuned 30 ft wall height and single-CAD-template room-engine ceilings generalized or made explicit inputs
+- **V4-PROD-06**: `output/`/`uploads/` anchored to a configured data root, not CWD
+- **V4-PROD-07**: Rate limiting, upload magic-byte sniffing, remaining CONCERNS security items closed
+
 ## v2 Requirements
 
 ### Architecture & Scale
