@@ -62,6 +62,7 @@ PASS_MATRIX              = _spm.PASS_MATRIX
 MODEL_ROUTING            = _spm.MODEL_ROUTING
 WILDCARD_SHEET_TYPE      = _spm.WILDCARD_SHEET_TYPE
 classify_sheet_type_from_text = _spm.classify_sheet_type_from_text
+classify_sheet_type_verbose   = _spm.classify_sheet_type_verbose
 plan_passes              = _spm.plan_passes
 pick_model_for_pass      = _spm.pick_model_for_pass
 resolve_routed_model     = _spm.resolve_routed_model
@@ -511,3 +512,184 @@ class TestModelRoutingV2:
     def test_wildcard_rows_present_for_new_pass_types(self):
         for pass_type in ("classify", "semantic", "legend", "schedule", "verify_retry"):
             assert (WILDCARD_SHEET_TYPE, pass_type) in MODEL_ROUTING
+
+
+# ---------------------------------------------------------------------------
+# classify_sheet_type_verbose — the classifier states its reason (23-01 / INV-08)
+# ---------------------------------------------------------------------------
+
+class TestClassifySheetTypeVerbose:
+    """The verbose form reports WHICH keyword decided a verdict, and where.
+
+    'No artifact anywhere records it' is the Gap 8 defect. These tests pin the
+    reason-reporting contract; they change no classification outcome.
+    """
+
+    # -- shape ---------------------------------------------------------------
+
+    def test_returns_a_four_tuple(self):
+        result = classify_sheet_type_verbose("A2.1 FLOOR PLAN")
+        assert isinstance(result, tuple) and len(result) == 4
+        assert all(isinstance(x, str) for x in result)
+
+    def test_wrapper_signature_is_unchanged(self):
+        """CRITICAL-risk symbol: 3 direct callers depend on the 2-arg shape."""
+        import inspect
+        params = inspect.signature(classify_sheet_type_from_text).parameters
+        assert list(params) == ["title_block_text", "full_page_text"]
+
+    # -- the live COVER PLATE defect, recorded as a fact ---------------------
+
+    def test_cover_plate_collision_is_recorded_not_repaired(self):
+        """Moxy pages 23-38: an electrical keynote kills 16 guestroom sheets.
+
+        This test PINS the live defect (INV-08 §1.2) as a recorded fact. The
+        structural repair belongs to plan 23-06, gated on the four-set check —
+        when it lands, this expectation changes deliberately, in that plan.
+        """
+        text = "PROVIDE LABEL ON THE LIGHT SWITCH COVER PLATE INDICATING MASTER"
+        sheet_type, source, keyword, context = classify_sheet_type_verbose(text)
+        assert sheet_type == "title_sheet"
+        assert source == "title_block"
+        assert keyword == "COVER"
+        assert "PLATE" in context
+
+    def test_bare_cover_is_not_trusted_in_full_page_text(self):
+        """The same phrase in page text must NOT reach the title_sheet branch."""
+        sheet_type, source, keyword, _ctx = classify_sheet_type_verbose(
+            "", "PROVIDE LABEL ON THE LIGHT SWITCH COVER PLATE"
+        )
+        assert sheet_type != "title_sheet"
+        assert (sheet_type, source, keyword) == ("floor_plan", "default", "")
+
+    # -- source attribution --------------------------------------------------
+
+    def test_source_is_title_block_when_the_title_block_decides(self):
+        assert classify_sheet_type_verbose("A2.1 FLOOR PLAN", "NOTES")[1] == "title_block"
+
+    def test_source_is_full_page_text_when_the_title_block_is_empty(self):
+        sheet_type, source, keyword, _ctx = classify_sheet_type_verbose(
+            "", "OVERALL FLOOR PLAN"
+        )
+        assert (sheet_type, source) == ("floor_plan", "full_page_text")
+        assert keyword == "FLOOR PLAN"
+
+    def test_source_is_default_when_nothing_matches(self):
+        assert classify_sheet_type_verbose("", "") == ("floor_plan", "default", "", "")
+        assert classify_sheet_type_verbose("ZZZ 12345") == (
+            "floor_plan", "default", "", "",
+        )
+
+    # -- keyword attribution per branch --------------------------------------
+
+    @pytest.mark.parametrize(
+        "text,expected_type,expected_keyword",
+        [
+            ("CS-00 COVER SHEET",            "title_sheet", "COVER SHEET"),
+            ("A0.1 SHEET INDEX",             "title_sheet", "SHEET INDEX"),
+            ("E2.0 PANEL SCHEDULE",          "schedule",    "PANEL SCHEDULE"),
+            ("A3.0 ROOF PLAN",               "roof_plan",   "ROOF PLAN"),
+            ("A5.1 EXTERIOR ELEVATION",      "elevation",   "ELEVATION"),
+            ("C1.0 SITE PLAN",               "civil_site",  "SITE PLAN"),
+            ("A9.1 WALL SECTION",            "detail",      "SECTION"),
+            ("A2.1 FLOOR PLAN",              "floor_plan",  "FLOOR PLAN"),
+            ("M2.1 MECHANICAL PLAN",         "mep_plan",    "M2.1"),
+        ],
+    )
+    def test_keyword_names_the_deciding_match(self, text, expected_type,
+                                              expected_keyword):
+        sheet_type, _source, keyword, context = classify_sheet_type_verbose(text)
+        assert sheet_type == expected_type
+        assert keyword == expected_keyword
+        assert keyword in context or expected_type == "mep_plan"
+
+    def test_plan_viewport_title_reports_the_matched_phrase(self):
+        sheet_type, _source, keyword, context = classify_sheet_type_verbose(
+            "KING SUITE B - RCP PLAN"
+        )
+        assert sheet_type == "floor_plan"
+        assert "RCP" in keyword and "PLAN" in keyword
+        assert "KING SUITE B" in context
+
+    # -- context is bounded and auditable ------------------------------------
+
+    def test_context_is_bounded(self):
+        """T-23-03: the context is a phrase, never a dump of the drawing."""
+        long_text = "X" * 500 + " FLOOR PLAN " + "Y" * 500
+        _t, _s, keyword, context = classify_sheet_type_verbose(long_text)
+        assert keyword == "FLOOR PLAN"
+        assert len(context) <= len(keyword) + 2 * 25 + 2
+        assert "FLOOR PLAN" in context
+
+    def test_context_is_empty_only_when_nothing_matched(self):
+        assert classify_sheet_type_verbose("QQ 999")[3] == ""
+        assert classify_sheet_type_verbose("A2.1 FLOOR PLAN")[3] != ""
+
+    # -- determinism ---------------------------------------------------------
+
+    def test_keyword_choice_is_deterministic_across_repeated_calls(self):
+        """A frozenset iterates in hash order; the recorded reason must not."""
+        text = "A9.1 ENLARGED DETAIL AND BUILDING SECTION"
+        results = {classify_sheet_type_verbose(text) for _ in range(25)}
+        assert len(results) == 1
+
+    def test_earliest_match_wins_when_several_keywords_hit(self):
+        """'DETAIL' precedes 'SECTION' in the text, so DETAIL is the reason."""
+        assert classify_sheet_type_verbose(
+            "ENLARGED DETAIL AND BUILDING SECTION"
+        )[2] == "DETAIL"
+        assert classify_sheet_type_verbose(
+            "BUILDING SECTION AND ENLARGED DETAIL"
+        )[2] == "SECTION"
+
+
+class TestVerboseEquivalenceSweep:
+    """classify_sheet_type_from_text is a projection — NO outcome may move.
+
+    Shape 3 of the Validation Architecture (invariance / no-regression diff).
+    This task adds reporting; a single differing verdict here is a routing
+    change, and a routing change here is 16 sheets appearing or vanishing.
+    """
+
+    SWEEP = [
+        # (title_block_text, full_page_text)
+        ("CS-00 COVER SHEET 25-13.01", ""),
+        ("A0.1 SHEET INDEX", "DRAWING INDEX"),
+        ("E2.0 PANEL SCHEDULE", "PANEL SCHEDULE NOTES"),
+        ("A3.0 ROOF PLAN", "ROOF PLAN AND GAS PIPING"),
+        ("A5.1 EXTERIOR ELEVATIONS", "NORTH ELEVATION"),
+        ("C1.0 GRADING PLAN", "SITE PLAN"),
+        ("A9.1 WALL SECTIONS AND DETAILS", "TYPICAL DETAIL"),
+        ("A2.1 OVERALL FLOOR PLAN", "FLOOR PLAN"),
+        ("M2.1 MECHANICAL PLAN", "MECHANICAL PLAN"),
+        ("", ""),
+        ("", "OVERALL FLOOR PLAN"),
+        ("ID-411", "KING SUITE B - RCP PLAN"),
+        ("PROVIDE LABEL ON THE LIGHT SWITCH COVER PLATE", ""),
+        ("", "PROVIDE LABEL ON THE LIGHT SWITCH COVER PLATE"),
+        ("A1.0 LEVEL 7", "LEVEL 7 - AR PLAN"),
+        ("ZZZ 12345", "NO KEYWORDS ANYWHERE"),
+    ]
+
+    def test_sweep_covers_every_branch(self):
+        assert len(self.SWEEP) >= 12
+        produced = {classify_sheet_type_from_text(t, f) for t, f in self.SWEEP}
+        for expected in ("title_sheet", "schedule", "roof_plan", "elevation",
+                         "civil_site", "detail", "floor_plan", "mep_plan"):
+            assert expected in produced, "sweep does not exercise %r" % expected
+
+    @pytest.mark.parametrize("title_block,full_page", SWEEP)
+    def test_wrapper_equals_verbose_first_element(self, title_block, full_page):
+        assert classify_sheet_type_from_text(title_block, full_page) == \
+            classify_sheet_type_verbose(title_block, full_page)[0]
+
+    @pytest.mark.parametrize("title_block,full_page", SWEEP)
+    def test_verbose_always_reports_a_source(self, title_block, full_page):
+        _t, source, keyword, context = classify_sheet_type_verbose(
+            title_block, full_page
+        )
+        assert source in ("title_block", "full_page_text", "default")
+        if source == "default":
+            assert (keyword, context) == ("", "")
+        else:
+            assert keyword != ""

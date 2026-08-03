@@ -175,6 +175,41 @@ def _kw_regex(keyword: str) -> "re.Pattern":
     return re.compile(r"\b%s\b" % re.escape(keyword))
 
 
+# Characters of surrounding text kept either side of a keyword match, so the
+# ledger can show WHY a page was classified the way it was. ~25 each side is
+# enough to read the phrase the keyword landed in ("...LIGHT SWITCH COVER PLATE
+# INDICATING...") and short enough that the report never becomes a text dump of
+# the drawing (INV-08 threat T-23-03).
+_CONTEXT_PAD = 25
+
+
+def _find_hit(text: str, keywords: "frozenset[str]") -> Optional[tuple]:
+    """(keyword, start, end) for the deciding whole-word keyword match, or None.
+
+    "Deciding" is defined deterministically as the EARLIEST match in *text*,
+    tie-broken by the longest keyword and then alphabetically. Determinism
+    matters: a frozenset iterates in hash order, which varies between processes
+    under PYTHONHASHSEED, so "return whichever keyword `any()` happened to hit
+    first" would make the recorded reason irreproducible — the exact opposite of
+    what the coverage ledger exists to provide.
+
+    The verdict itself is unaffected by the choice (any match means the same
+    branch is taken), so this is a reporting refinement, never a routing change.
+    """
+    best: Optional[tuple] = None
+    for kw in sorted(keywords):
+        m = _kw_regex(kw).search(text)
+        if m is None:
+            continue
+        cand = (m.start(), -len(kw), kw, m.end())
+        if best is None or cand < best:
+            best = cand
+    if best is None:
+        return None
+    start, _neg_len, kw, end = best
+    return kw, start, end
+
+
 def _hit(text: str, keywords: "frozenset[str]") -> bool:
     """True when any keyword appears in *text* as a WHOLE WORD (text is upper).
 
@@ -184,8 +219,118 @@ def _hit(text: str, keywords: "frozenset[str]") -> bool:
     "SECTION" match "SECTIONAL" and "DETAIL" match "DETAILED". Multi-word
     keywords ("FLOOR PLAN") are matched with boundaries at each end, so normal
     phrase hits are unaffected.
+
+    A thin projection of _find_hit — same matching, the reason discarded.
     """
-    return any(_kw_regex(kw).search(text) for kw in keywords)
+    return _find_hit(text, keywords) is not None
+
+
+def _context_around(text: str, start: int, end: int) -> str:
+    """~25 characters either side of a match — the auditable trail of a verdict."""
+    return text[max(0, start - _CONTEXT_PAD):min(len(text), end + _CONTEXT_PAD)]
+
+
+def _verdict(sheet_type: str, source: str, src: str, hit: tuple) -> tuple:
+    keyword, start, end = hit
+    return sheet_type, source, keyword, _context_around(src, start, end)
+
+
+def classify_sheet_type_verbose(
+    title_block_text: str, full_page_text: str = "",
+) -> "tuple":
+    """Classify a page AND state the evidence that decided it.
+
+    Identical routing to classify_sheet_type_from_text — this function IS the
+    implementation, and the 1-arg-style wrapper below is a projection of its
+    first element. It exists because "16 guestroom prototype sheets were dropped
+    and no artifact anywhere says why" cost this project days: recording the
+    deciding keyword and the phrase it landed in turns the next collision into a
+    two-second diagnosis (INV-08 §1.2, risk 5).
+
+    Args:
+        title_block_text: Text from the title block area (bottom-right ~15%).
+        full_page_text:   Complete page text used as secondary fallback.
+
+    Returns:
+        (sheet_type, source, keyword, context) where
+          * sheet_type — one of the eight canonical types;
+          * source     — "title_block" | "full_page_text" | "default";
+          * keyword    — the keyword (or matched phrase) whose hit decided it,
+                         "" when nothing matched;
+          * context    — ~25 chars either side of that hit inside the text that
+                         produced it, "" when nothing matched.
+    """
+
+    for is_title_block, src_raw in ((True, title_block_text), (False, full_page_text)):
+        if not src_raw:
+            continue
+        src = src_raw.upper()
+        source = "title_block" if is_title_block else "full_page_text"
+
+        # Title / cover pages — checked before "schedule" to catch "INDEX".
+        # Unambiguous phrases match anywhere; the bare words ("COVER", "INDEX")
+        # are trusted ONLY in the title block, because title_sheet SKIPS the
+        # sheet entirely and a real drawing's notes say "WALL COVERING".
+        hit = _find_hit(src, _KW_TITLE)
+        if hit is None and is_title_block:
+            hit = _find_hit(src, _KW_TITLE_BLOCK_ONLY)
+        if hit is not None:
+            return _verdict("title_sheet", source, src, hit)
+
+        # Dense tabular content
+        hit = _find_hit(src, _KW_SCHEDULE)
+        if hit is not None:
+            return _verdict("schedule", source, src, hit)
+
+        # Roof plan — must come before generic ELEVATION / PLAN
+        hit = _find_hit(src, _KW_ROOF)
+        if hit is not None:
+            return _verdict("roof_plan", source, src, hit)
+
+        # An explicit "<NAME> - AR/RCP PLAN" viewport title is specific, strong
+        # evidence that this sheet carries MEASURABLE plan drawings, and it
+        # outranks the generic ELEVATION keyword below. A sheet is a COLLECTION
+        # of drawings and the type is only its dominant one: Moxy's guestroom
+        # prototypes carry interior elevations AND the AR/RCP plans that hold
+        # every guestroom quantity (Gyp Ceiling/Gyp Wall). Classified
+        # "elevation", they never reach the deterministic engine — the sheets
+        # that matter most are the ones skipped.
+        m = _PLAN_VIEWPORT_RE.search(src)
+        if m:
+            return _verdict(
+                "floor_plan", source, src,
+                (m.group(0).strip(), m.start(), m.end()),
+            )
+
+        # Elevations / facades
+        hit = _find_hit(src, _KW_ELEV)
+        if hit is not None:
+            return _verdict("elevation", source, src, hit)
+
+        # Civil / site plans
+        hit = _find_hit(src, _KW_CIVIL)
+        if hit is not None:
+            return _verdict("civil_site", source, src, hit)
+
+        # Details and sections
+        hit = _find_hit(src, _KW_DETAIL)
+        if hit is not None:
+            return _verdict("detail", source, src, hit)
+
+        # MEP: sheet ID prefix (M/P/E + digit) in title block + "PLAN" keyword
+        first_token = src.split()[0] if src.split() else ""
+        if _MEP_PREFIX_RE.match(first_token) and "PLAN" in src:
+            return _verdict(
+                "mep_plan", source, src, (first_token, 0, len(first_token)),
+            )
+
+        # Generic floor / area plans
+        hit = _find_hit(src, _KW_FLOOR)
+        if hit is not None:
+            return _verdict("floor_plan", source, src, hit)
+
+    logger.debug("classify_sheet_type: no keyword match in title block or page text — defaulting to floor_plan")
+    return "floor_plan", "default", "", ""
 
 
 def classify_sheet_type_from_text(title_block_text: str, full_page_text: str = "") -> str:
@@ -196,6 +341,9 @@ def classify_sheet_type_from_text(title_block_text: str, full_page_text: str = "
 
     Routing is content-driven — never based on project name or sheet-ID pattern.
 
+    Thin projection of classify_sheet_type_verbose: the verdict without the
+    reason. The signature and every outcome are unchanged for every input.
+
     Args:
         title_block_text: Text extracted from the title block area (bottom-right ~15%).
         full_page_text:   Complete page text used as secondary fallback.
@@ -205,61 +353,7 @@ def classify_sheet_type_from_text(title_block_text: str, full_page_text: str = "
                 "title_sheet", "roof_plan", "mep_plan".
         Defaults to "floor_plan" when no keyword matches (safest: runs count+measure).
     """
-
-    for is_title_block, src_raw in ((True, title_block_text), (False, full_page_text)):
-        if not src_raw:
-            continue
-        src = src_raw.upper()
-
-        # Title / cover pages — checked before "schedule" to catch "INDEX".
-        # Unambiguous phrases match anywhere; the bare words ("COVER", "INDEX")
-        # are trusted ONLY in the title block, because title_sheet SKIPS the
-        # sheet entirely and a real drawing's notes say "WALL COVERING".
-        if _hit(src, _KW_TITLE) or (is_title_block and _hit(src, _KW_TITLE_BLOCK_ONLY)):
-            return "title_sheet"
-
-        # Dense tabular content
-        if _hit(src, _KW_SCHEDULE):
-            return "schedule"
-
-        # Roof plan — must come before generic ELEVATION / PLAN
-        if _hit(src, _KW_ROOF):
-            return "roof_plan"
-
-        # An explicit "<NAME> - AR/RCP PLAN" viewport title is specific, strong
-        # evidence that this sheet carries MEASURABLE plan drawings, and it
-        # outranks the generic ELEVATION keyword below. A sheet is a COLLECTION
-        # of drawings and the type is only its dominant one: Moxy's guestroom
-        # prototypes carry interior elevations AND the AR/RCP plans that hold
-        # every guestroom quantity (Gyp Ceiling/Gyp Wall). Classified
-        # "elevation", they never reach the deterministic engine — the sheets
-        # that matter most are the ones skipped.
-        if _PLAN_VIEWPORT_RE.search(src):
-            return "floor_plan"
-
-        # Elevations / facades
-        if _hit(src, _KW_ELEV):
-            return "elevation"
-
-        # Civil / site plans
-        if _hit(src, _KW_CIVIL):
-            return "civil_site"
-
-        # Details and sections
-        if _hit(src, _KW_DETAIL):
-            return "detail"
-
-        # MEP: sheet ID prefix (M/P/E + digit) in title block + "PLAN" keyword
-        first_token = src.split()[0] if src.split() else ""
-        if _MEP_PREFIX_RE.match(first_token) and "PLAN" in src:
-            return "mep_plan"
-
-        # Generic floor / area plans
-        if _hit(src, _KW_FLOOR):
-            return "floor_plan"
-
-    logger.debug("classify_sheet_type: no keyword match in title block or page text — defaulting to floor_plan")
-    return "floor_plan"
+    return classify_sheet_type_verbose(title_block_text, full_page_text)[0]
 
 
 def plan_passes(sheet_type: str, title_block_text: str = "") -> list[str]:
