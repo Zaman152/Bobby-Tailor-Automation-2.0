@@ -72,13 +72,24 @@ Every fill carries `plan_name`, `plan_kind` (AR/FF/RCP/FC/EM), `scale_fpi=4.0`, 
    items, which is exactly what you would see if they were consumed by the ordinary
    manifest→line-item path instead of being assembled into the room-mix multiplier. Verify whether
    `room_mix` is non-empty at the call site before changing anything else.
-2. **The 2× clip defect has a sharp new clue.** On both defective sheets the over-reach hits **AR and
-   RCP but not FC/EM** (ID-412 FC = 211.0 vs golden 231; ID-416 FC = 154.1). The clip constants
-   `_FILL_CLIP_UP_PT = 620.0` / `_FILL_CLIP_SIDE_PT = 260.0` (`takeoff_pipeline.py:1770-1771`) are a
-   fixed-size window around the scale callout; on these two sheets the AR/RCP drawings sit adjacent
-   to their opposite-hand twin and the window swallows it. The fix is to bound the clip by the
-   drawing's own extent (its border linework or the midpoint to the neighbouring callout), not to
-   shrink the constants — shrinking them is the overfit §14.2 explicitly forbids.
+2. ~~**The 2× clip defect has a sharp new clue.** On both defective sheets the over-reach hits AR and
+   RCP but not FC/EM… the window swallows the adjacent opposite-hand twin.~~
+   **RETRACTED 2026-08-03 — this diagnosis was WRONG. See INV-02, which refutes it with three
+   independent probes.** I inferred "the clip leaked" from the ~455 SF readings without testing the
+   clip. INV-02 tested it: widening the clip by ±80 pt/side changes ID-412 by **0.0 SF** and ID-416 by
+   0.5 SF (they are the *least* clip-sensitive of all 16 sheets), every counted region sits inside 47%
+   of the clip, and the drawing's **own printed overall dimensions** `17'-0 1/8" × 26'-9 1/8"` =
+   **455.2 SF** match the fill's 458.3 SF at ratio **1.007**. A KING SUITE C really is ~455 SF — a
+   suite, not a standard room.
+   **The real defect is the multiplier**, not the geometry: `total_for_units()`
+   (`room_fill.py:268`) multiplies that correct area by `unit_count: 2` taken from
+   `human_inputs/moxy_knoxville.json` — a value a prior session derived from golden `Doors-WD 2 EA`,
+   which on a suite means *entry door + connecting door*, not two units. **The human input is wrong,
+   and it is applied silently at `confidence: "high"`.** Same signature on ID-412/416/420/422.
+   Lesson for this programme: an unverified human multiplier is as dangerous as a hallucinated
+   quantity, and my own "measure it and eyeball the ratio" reasoning reproduced exactly the
+   peeking-style error §14.3 warns about. `docs/PIPELINE-GROUND-TRUTH.md` §14.2 needs the same
+   correction.
 
 ### 1c. THE ROOT CAUSE — the title-block window silently deletes 16 of Moxy's 40 sheets
 
@@ -180,11 +191,13 @@ Two honest caveats, both pointing at real remaining work rather than at this num
   sum to it; the missing ~9,600 SF should come from the non-prototype plans (Level 1 lobby, Pop-Up
   Hub, Level 7). So a chunk of the residual is coverage, not error — which is exactly why INV-08's
   coverage ledger matters for interpreting any score.
-- **The clip defect affects FOUR sheets, not two.** p28/p32/p36/p38 all measure ~451–459 SF where a
-  guestroom is ~230. §14.2 named only ID-412/ID-416; ID-420 and ID-422 show the same signature.
-  Correcting them *lowers* the total (~-1,800 SF), moving it away from this golden — further evidence
-  the residual is missing coverage elsewhere, and a warning that "closer to golden" must never be the
-  acceptance test for the clip fix (§14.3's peeking trap).
+- ~~The clip defect affects FOUR sheets, not two.~~ **CORRECTED:** p28/p32/p36/p38 (ID-412/416/420/422)
+  measure ~451–459 SF because those units genuinely *are* that size (suites/accessible units), and
+  INV-02 proved the fill matches each drawing's own printed dimensions to ~0.7%. The four-sheet
+  signature is real but it is a **bad `unit_count` in the manifest**, not a clip leak. Their
+  contribution to the 49,046 total is therefore roughly double what it should be, so the honest
+  measured total is *lower* still and the missing coverage (non-guestroom ceilings) is
+  correspondingly *larger* than the 16.4% headline suggests.
 
 **Bottom line for planning: the highest-value single change in the entire programme is the
 title-block/classifier fix.** It converts an item reporting nothing into one reporting within ~16%,
