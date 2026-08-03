@@ -978,11 +978,26 @@ Plans:
 6. Door schedules parse across at least the Crow, Bob's, and Moxy formats
 7. Any sheet that produces zero measurable geometry emits an explicit coverage flag — a blank is never reported as a zero
 
-**Plans:** 0 plans
+**Plans:** 16 plans (9 waves)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 23 to break down)
+- [ ] 23-01-PLAN.md — Coverage ledger + provenance + verbose classifier + skip veto + coverage probe (wave 1, SP-8)
+- [ ] 23-02-PLAN.md — Printed-scale parser hardening: anchored paper-inch parse, split stacked fractions (wave 1, SP-2)
+- [ ] 23-03-PLAN.md — Flagged-zero contract: quantity Optional, drop records, coverage.json + COVERAGE section (wave 2, SP-8)
+- [ ] 23-04-PLAN.md — Door-schedule unification: phrase materials, count column, legend guard, canonical names (wave 2, gap 7)
+- [ ] 23-05-PLAN.md — Tag-pairing primitives: tag_pairing / finish_tags / room_tags (wave 2, SP-6)
+- [ ] 23-06-PLAN.md — Structural title-block identification + keyword-context guard, four-set gated (wave 2)
+- [ ] 23-07-PLAN.md — Page-space rotation correctness across clip, adjacency and callout binding (wave 3, SP-1)
+- [ ] 23-08-PLAN.md — Room-mix census wiring + finish-tag flagged rows + finish-schedule unit fix (wave 4, SP-10)
+- [ ] 23-09-PLAN.md — Region geometry primitive: shared labeller, contour trace, perimeter, shape ratio (wave 4, SP-3)
+- [ ] 23-10-PLAN.md — Open-run chainer core + styled harvest + viewport title-band fix (wave 4, SP-5)
+- [ ] 23-11-PLAN.md — Geometric clip cell + printed-extent cross-check replacing the plausibility cap (wave 5, SP-4)
+- [ ] 23-12-PLAN.md — Open-run selectors: annotated linetype + rail, position-validated (wave 6, SP-5)
+- [ ] 23-13-PLAN.md — Wall-area binder + basis registry + one-area-one-item arbitration + multiplier honesty (wave 6, SP-9)
+- [ ] 23-14-PLAN.md — Elevation facade measurement: silhouette, datums, routing, keynote attribution (wave 7, gap 3)
+- [ ] 23-15-PLAN.md — Linear-run binders + phantom-LF kill + ambiguity gate + canonical naming (wave 8, SP-7)
+- [ ] 23-16-PLAN.md — Correct the record + lock the free acceptance harness (wave 9)
 
 ### Phase 24: Binding Determinism & Text-Anchored Labeling
 
