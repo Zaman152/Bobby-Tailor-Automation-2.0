@@ -39,6 +39,10 @@ import math
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
 
+from bobbytailor.deterministic.printed_scale import (
+    _MASK_KINDS as _VIEWPORT_MASK_KINDS,
+)
+from bobbytailor.deterministic.room_fill import to_page_space
 from bobbytailor.deterministic.walls import (
     MAX_SEGMENTS,
     MIN_THICKNESS_FT,
@@ -1381,3 +1385,97 @@ def extract_rail_runs(
         run.scale_fpi = scale_fpi
         run.is_typical = typical
     return runs
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# SCALE BINDING — a run is measured at its own drawing's scale, or not at all
+# ═════════════════════════════════════════════════════════════════════════════
+
+# The same containment slack printed_scale._contains grants a label that sits
+# a hair outside its region — coordinate rounding, never a different drawing.
+CONTAIN_MARGIN_PT = 6.0
+
+
+def _display_box(page, bbox) -> Tuple[float, float, float, float]:
+    """*bbox* mapped to DISPLAY (page) space via THE one rotation transform.
+
+    Identity on an unrotated page and when *page* cannot answer, exactly like
+    ``printed_scale._in_page_space`` — this module does not own a second copy
+    of the rotation matrix (D-03).
+    """
+    if page is None:
+        return tuple(float(v) for v in bbox)
+    try:
+        import fitz  # noqa: PLC0415 — optional at import time for test stubs
+
+        rect = to_page_space(page, fitz.Rect(*bbox))
+        return float(rect.x0), float(rect.y0), float(rect.x1), float(rect.y1)
+    except Exception:  # noqa: BLE001 — binding must never raise
+        return tuple(float(v) for v in bbox)
+
+
+def run_scale_fpp(page, run, viewports, printed_by_region) -> Optional[float]:
+    """Feet-per-point of the drawing that CONTAINS *run*, or ``None``.
+
+    The containment test runs in DISPLAY space — the space the sheet is read
+    in — with both the run's bbox and every viewport's bbox mapped through
+    ``room_fill.to_page_space``, the same discipline the area path follows
+    (INV-04 §4 BUG-C: on a ``/Rotate 270`` sheet, mixing spaces binds a run to
+    the wrong drawing). On unrotated pages the transform is the identity by
+    construction.
+
+    The owner is the SMALLEST containing non-mask viewport: when a detail is
+    nested inside a plan, the detail is the drawing the run belongs to. If
+    that drawing has no printed callout of its own, the answer is ``None`` and
+    *run* is flagged — a run is NEVER measured at a borrowed scale. On Bob's
+    roof plan, borrowing the page's fallback 1.0 ft/in would report the
+    ~880 LF gas main as roughly eighty (T-23-47, critical). The larger
+    containing plan's scale is NOT consulted either: the outer drawing's
+    scale is not the inner drawing's.
+
+    On success the run is stamped with the callout's feet-per-inch (and its
+    title, when the run carries none) and the callout's feet-per-point is
+    returned. The caller converts: ``run.length_lf(fpp)``.
+    """
+    try:
+        run_box = _display_box(page, run.bbox_pt)
+        containing = []
+        for vp in viewports:
+            if getattr(vp, "kind", "") in _VIEWPORT_MASK_KINDS:
+                continue
+            box = _display_box(page, vp.bbox_pt)
+            if (
+                box[0] - CONTAIN_MARGIN_PT <= run_box[0]
+                and run_box[2] <= box[2] + CONTAIN_MARGIN_PT
+                and box[1] - CONTAIN_MARGIN_PT <= run_box[1]
+                and run_box[3] <= box[3] + CONTAIN_MARGIN_PT
+            ):
+                area = max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
+                containing.append((area, getattr(vp, "region_id", "")))
+        if not containing:
+            run.needs_review = True
+            run.review_reason = (
+                "no viewport contains this run — not measured (a borrowed "
+                "page scale is an order-of-magnitude error)"
+            )
+            return None
+        containing.sort()
+        owner_id = containing[0][1]
+        printed = (printed_by_region or {}).get(owner_id)
+        if printed is None:
+            run.needs_review = True
+            run.review_reason = (
+                "the containing drawing (%s) has no printed scale of its own "
+                "— not measured (a borrowed page scale is an "
+                "order-of-magnitude error)" % (owner_id or "unknown")
+            )
+            return None
+        run.scale_fpi = printed.feet_per_inch
+        if not run.viewport_title:
+            run.viewport_title = printed.title
+        return printed.feet_per_point
+    except Exception as exc:  # noqa: BLE001 — untrusted input must not crash
+        logger.warning("Run scale binding failed: %s", exc)
+        run.needs_review = True
+        run.review_reason = "scale binding failed: %s" % exc
+        return None

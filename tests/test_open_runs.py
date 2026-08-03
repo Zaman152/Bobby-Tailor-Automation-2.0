@@ -29,6 +29,7 @@ from bobbytailor.deterministic.open_runs import (
     extract_open_runs,
     extract_rail_runs,
     run_lf,
+    run_scale_fpp,
 )
 from bobbytailor.deterministic.walls import MAX_SEGMENTS, MIN_THICKNESS_FT
 
@@ -1033,3 +1034,166 @@ def test_the_left_ramp_hatch_field_cannot_become_a_run():
         # A pass-through straight segment may exceed the clip diagonal, but
         # nothing may approach the 4.8x of the recorded hatch phantom.
         assert run.length_pt <= 2.0 * clip_diag
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# run_scale_fpp — a run is measured at its own drawing's scale, or not at all
+#
+# THE BAND IS THE CONTRACT. The gas-run assertion below is a BAND — the
+# estimator's 886.77 LF plus or minus five percent — and never an equality.
+# The residual inside the band is terminal drops beyond one stub hop, and it
+# is ACCEPTED: constants must NOT be tuned to close it. The second hop
+# demonstrably absorbs leader arrowheads (INV-04 §4), and a constant fitted
+# until the number matches the estimator is the coincidence trap this phase
+# exists to abolish (D-07).
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+class _FakeViewport:
+    def __init__(self, region_id, bbox_pt, kind="detail"):
+        self.region_id = region_id
+        self.bbox_pt = bbox_pt
+        self.kind = kind
+
+
+class _FakePrintedScale:
+    def __init__(self, feet_per_inch, title=""):
+        self.feet_per_inch = feet_per_inch
+        self.feet_per_point = feet_per_inch / 72.0
+        self.title = title
+
+
+@pytest.mark.skipif(not BOBS_PDF.is_file(), reason="Bob's PDF fixture missing")
+def test_the_gas_run_measures_inside_the_band_at_its_own_drawings_scale():
+    """The gas main resolves ITS OWN drawing's printed 3/32" = 1'-0" scale
+    (10.667 ft/in) and lands between 840 and 935 LF. Before the scale fixes,
+    the page resolved a borrowed 1.0 ft/in and this same geometry read
+    79.5 LF (INV-04 §4)."""
+    from bobbytailor.deterministic.printed_scale import (
+        extract_printed_scales,
+        match_scales_to_viewports,
+    )
+    from bobbytailor.deterministic.viewports import segment_viewports
+
+    doc = fitz.open(BOBS_PDF)
+    page = doc[3]
+    viewports = segment_viewports(page)
+    by_region = match_scales_to_viewports(
+        extract_printed_scales(page), viewports, page=page
+    )
+    rect = page.rect
+    clip = (0.0, 0.0, max(rect.x1, rect.y1), max(rect.x1, rect.y1))
+    runs = extract_linetype_runs(page, doc, clip)
+    total_lf = 0.0
+    for run in runs:
+        fpp = run_scale_fpp(page, run, viewports, by_region)
+        assert fpp is not None, (
+            "gas run %s did not resolve its drawing's scale" % run.candidate_id
+        )
+        assert run.scale_fpi == pytest.approx(10.6667, abs=0.001)
+        total_lf += run.length_lf(fpp)
+    doc.close()
+
+    assert runs, "no gas runs detected"
+    # 886.77 +/- 5% — a BAND, never an equality (see module note above).
+    assert 840.0 <= total_lf <= 935.0
+
+
+@pytest.mark.skipif(not CROW_PDF.is_file(), reason="Crow Cass PDF fixture missing")
+def test_a_run_in_a_viewport_with_no_callout_is_flagged_never_measured():
+    """Crow page 2 carries a real drawing region with NO printed scale of its
+    own. A run inside it gets no fpp and carries needs_review — it is never
+    measured at the page scale or a neighbour's (T-23-47)."""
+    from bobbytailor.deterministic.printed_scale import (
+        extract_printed_scales,
+        match_scales_to_viewports,
+    )
+    from bobbytailor.deterministic.viewports import segment_viewports
+
+    doc = fitz.open(CROW_PDF)
+    page = doc[2]
+    viewports = segment_viewports(page)
+    by_region = match_scales_to_viewports(
+        extract_printed_scales(page), viewports, page=page
+    )
+
+    # Non-vacuity: the region exists, is not masked, and owns no scale.
+    unscaled = [
+        vp for vp in viewports
+        if vp.kind not in ("title_block", "legend", "schedule")
+        and vp.region_id not in by_region
+        and (vp.bbox_pt[2] - vp.bbox_pt[0]) > 100
+    ]
+    assert unscaled, "every Crow p2 viewport now owns a scale — pick a new page"
+    target = unscaled[0]
+    x0, y0 = target.bbox_pt[0] + 60.0, target.bbox_pt[1] + 60.0
+    run = OpenRun(
+        polyline_pt=((x0, y0), (x0 + 100.0, y0)), length_pt=100.0
+    )
+    fpp = run_scale_fpp(page, run, viewports, by_region)
+    doc.close()
+
+    assert fpp is None
+    assert run.needs_review is True
+    assert "no printed scale" in run.review_reason
+    assert run.length_lf(fpp or 0.0) == 0.0  # no quantity can be produced
+
+
+def test_containment_is_resolved_in_display_space_on_a_rotated_page():
+    """The space-mixing trap, pinned: on a /Rotate 270 page, viewport B's
+    DISPLAY box lands exactly over the run's UNROTATED bbox. An
+    implementation that compared the unrotated run against display-space
+    viewport boxes would bind the run to B and measure it at B's scale. The
+    correct same-space containment binds it to A."""
+    doc = fitz.open()
+    page = doc.new_page(width=600, height=600)
+    page.set_rotation(270)
+
+    vp_a = _FakeViewport("A", (0.0, 0.0, 300.0, 300.0))
+    vp_b = _FakeViewport("B", (300.0, 0.0, 600.0, 300.0))
+    by_region = {"A": _FakePrintedScale(4.0, "THE RIGHT DRAWING"),
+                 "B": _FakePrintedScale(1.0, "THE WRONG DRAWING")}
+    run = OpenRun(
+        polyline_pt=((50.0, 50.0), (250.0, 250.0)),
+        length_pt=283.0,
+    )
+
+    # Non-vacuity of the trap: B's display box contains the unrotated bbox.
+    from bobbytailor.deterministic.open_runs import _display_box
+
+    b_disp = _display_box(page, vp_b.bbox_pt)
+    rb = run.bbox_pt
+    assert (b_disp[0] <= rb[0] and rb[2] <= b_disp[2]
+            and b_disp[1] <= rb[1] and rb[3] <= b_disp[3])
+
+    fpp = run_scale_fpp(page, run, [vp_a, vp_b], by_region)
+    doc.close()
+    assert fpp == pytest.approx(4.0 / 72.0)
+    assert run.scale_fpi == pytest.approx(4.0)
+    assert run.viewport_title == "THE RIGHT DRAWING"
+
+
+def test_a_masked_viewport_never_owns_a_run():
+    """A title block that spatially contains a run is not a drawing."""
+    vp_mask = _FakeViewport("T", (0.0, 0.0, 600.0, 600.0), kind="title_block")
+    run = OpenRun(polyline_pt=((50.0, 50.0), (250.0, 50.0)), length_pt=200.0)
+    fpp = run_scale_fpp(None, run, [vp_mask], {"T": _FakePrintedScale(4.0)})
+    assert fpp is None
+    assert run.needs_review is True
+
+
+def test_the_smallest_containing_drawing_owns_the_run():
+    """A detail nested inside a plan owns its own runs; if the detail prints
+    no scale, the run is flagged rather than borrowing the plan's — the outer
+    drawing's scale is not the inner drawing's."""
+    plan = _FakeViewport("PLAN", (0.0, 0.0, 600.0, 600.0))
+    detail = _FakeViewport("DET", (100.0, 100.0, 300.0, 300.0))
+    run = OpenRun(polyline_pt=((120.0, 150.0), (280.0, 150.0)), length_pt=160.0)
+
+    both = {"PLAN": _FakePrintedScale(8.0), "DET": _FakePrintedScale(1.0)}
+    assert run_scale_fpp(None, run, [plan, detail], both) == pytest.approx(1.0 / 72.0)
+
+    run2 = OpenRun(polyline_pt=((120.0, 150.0), (280.0, 150.0)), length_pt=160.0)
+    plan_only = {"PLAN": _FakePrintedScale(8.0)}
+    assert run_scale_fpp(None, run2, [plan, detail], plan_only) is None
+    assert run2.needs_review is True
