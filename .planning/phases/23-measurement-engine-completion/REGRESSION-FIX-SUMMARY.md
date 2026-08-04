@@ -2,8 +2,10 @@
 phase: 23
 type: regression-fix
 subsystem: fusion / aggregation / measurement
-tags: [regression, arbitration, building-layers, D-11, library-fallback, plan-titles, INV-00, SP-9]
+tags: [regression, arbitration, building-layers, D-11, library-fallback, plan-titles, INV-00, SP-9,
+       cost-telemetry, budget-truncation, unit-class, provenance]
 evidence-run: output/VisionOnly_P23V_Crow_20260804_141952
+evidence-run-2: output/VisionOnly_P23V2_Crow_20260804_181352
 status: complete
 ---
 
@@ -321,3 +323,365 @@ runs each, then verified together by one full-suite run before being committed a
 atomically-scoped commits (they touch disjoint modules: `aggregator.py`; `takeoff_pipeline.py`;
 `room_fill.py` + the `fusion.py` cross-region rule). A per-commit full suite costs ~46 minutes; this
 sequencing was a deliberate, recorded trade rather than an omission.
+
+---
+---
+
+# Round 2 — Crow $0.599 validation run (evidence: `output/VisionOnly_P23V2_Crow_20260804_181352`)
+
+A second paid plans-only Crow run, taken after the Round 1 fixes above, exposed **four further
+defects**. None is a scoring regression; all four are *honesty* defects — the report told the user
+things that were not true about what the run cost, what it covered, and where its numbers came from.
+All four are fixed, one commit each. **Every verification below is FREE**: the saved run re-read, and
+its own recorded values replayed through the fixed functions. No API key was touched.
+
+| defect | what the report said | what was true |
+|---|---|---|
+| **C1** | `api_usage.total_cost_usd = $0.1766` | the guard had spent **$0.598807** (3.4x) |
+| **C2** | `coverage_pct_pages: 100.0`, both truncated sheets `"measured"` | the budget exhausted mid-run and A-401/A-601 skipped their remaining passes |
+| **C3** | `Tilt Up Wall 5.0 SF`, `confidence: high`, `needs_review: false` | the object measures **106,992 SF**; the 5 was a count of panel symbols |
+| **C4** | `items_human_input: 5` | **no manifest, no human input file** existed on this run |
+
+Nothing here was tuned to golden. C3's success criterion is *"the suppressed 106,992 SF candidate is
+reinstated when its superseder dies"*, verified by replaying the saved rejection records through the
+real fixed function — not by watching a number move toward 108,443.
+
+---
+
+## C1 — cost telemetry under-reported the run by 3.4x
+
+**Committed:** `fix(23-regression): report the guard's actual spend, not the sum of sheet stamps`
+
+### What broke
+
+The same run, two numbers, from one artifact:
+
+```json
+"api_usage": { "total_cost_usd": 0.1766, ... }
+"budget":    { "cap_usd": 0.6, "spent_usd": 0.598807, "exhausted": false }
+```
+
+`reporter.py:101` summed only the per-sheet `_cost_usd` stamps. That sum cannot be complete, for two
+structural reasons:
+
+1. **The project-level passes belong to no sheet.** The naming-convention and object-vocabulary reads
+   run ONCE for the whole set, before the per-sheet loop (`run_project` → `_build_naming_conventions`),
+   and charge the run `BudgetGuard`. No per-sheet stamp can ever carry them — **$0.422162 of this run,
+   70% of its cost, was structurally invisible.**
+2. **Sheets 2-4 stamped `$0.0` with an empty `_model_used`.** A sheet whose merged dict never inherits
+   the analyzer's usage stamp reads free.
+
+This is load-bearing: every cost estimate the app shows and every budget the user sets is downstream
+of this number.
+
+### The corrected contract
+
+> `api_usage.total_cost_usd` **is** the BudgetGuard's ledger. The guard is the only complete record —
+> it is the thing that actually refused the last charge.
+
+The split is **published, not fabricated**: `sheet_attributed_cost_usd` is what sheets stamped, and the
+entire remainder goes to ONE honest `project_level_cost_usd` bucket. No per-sheet ratio split is
+invented. The remainder is signed on purpose — a negative value would mean sheets stamped more than
+the guard accepted, a real discrepancy that must surface rather than be clamped away. Rounding moved
+4dp → 6dp to match the guard's own precision; at 4dp the equality was already off by $0.000407.
+
+A run with no guard (pre-21, the scraper path) still uses the per-sheet sum — unchanged.
+
+### Verification (free)
+
+```
+sheet-attributed 0.176645   guard 0.598807   project_level 0.422162
+old reported     0.1766  ->  under-report factor 3.39
+```
+
+Pinned by `test_reported_total_cost_equals_budget_guard_spend`, which replays the exact Crow shape
+(sheet 1 at $0.176645, sheets 2-4 at $0, guard at $0.598807) and asserts
+`total_cost_usd == budget.spent_usd`.
+
+---
+
+## C2 — budget truncation was silent
+
+**Committed:** `fix(23-regression): make budget truncation loud — a cut-short run is not complete`
+
+### What broke
+
+The guard exhausted mid-run and A-401/A-601 skipped their remaining passes. The report said nothing:
+the phrase **"budget exhausted" occurs 0 times** anywhere in `takeoff.json`, both truncated rows read
+`"disposition": "measured"`, and `coverage_pct_pages` read **100.0**. A silent coverage loss —
+precisely the class phase 23 abolished everywhere else.
+
+Two independent root causes:
+
+**1. `exhausted` answers the wrong question.** It asks whether budget *remains*. Crow finished with
+**$0.0012 of its $0.60 cap unspent**, so `exhausted` was `false` — while the guard had refused a
+~$0.21 charge and stopped scheduled work.
+
+```
+BudgetGuard(0.6); charge(0.598807); charge(0.21) -> BudgetExceeded
+  exhausted       False      <- budget remains
+  refused_charges 1
+  truncated       True       <- ...and work was stopped anyway
+```
+
+`BudgetGuard` now counts refusals and exposes `truncated`. `exhausted` keeps its old meaning verbatim;
+nothing was renamed.
+
+**2. `run_sheet`'s `_budget_exhausted` flag died on the sheet dict.** It never reached the coverage
+ledger, so the row kept its `measured` default. `_record_sheet_coverage` now propagates it.
+
+### The corrected contract
+
+> A run that stopped early must never present as complete.
+
+- New sheet disposition **`measured_budget_truncated`**. It earns its own value because its gap has a
+  different *cause* and a different *remedy* from `MEASURED_PARTIAL`: a partial is explained by
+  something on the page (an off-scale viewport, a drawing with no printed scale) and never closes; a
+  truncation is explained by the cap and closes by raising it and re-running.
+- `SheetCoverage.budget_truncated` is a separate field, so the fact survives when a stronger
+  disposition (`ERRORED`, a skip) outranks it.
+- Truncated sheets are **excluded from `sheets_measured`**, so `coverage_pct_pages` can no longer read
+  100% on a run that stopped early.
+- The ledger raises a loud escalation naming the pages, and it **leads** `coverage_warnings` because it
+  invalidates the completeness of everything after it. It is derived from the *guard*, not from any
+  sheet, so a truncation taken on a project-level pass — which leaves no ledger row — is still loud.
+- `summary.txt` gains `!! BUDGET EXHAUSTED — THIS RUN IS INCOMPLETE` under API USAGE and a
+  `CUT SHORT (budget spent)` line under COVERAGE. The Excel **About** sheet gains a `RUN INCOMPLETE`
+  fact, since that workbook is what a client actually bids from.
+
+### Tests corrected (both made STRICTER)
+
+- `test_seven_sheet_dispositions_are_distinct` → `test_every_sheet_disposition_is_distinct`: asserts
+  eight AND that the list equals `SHEET_DISPOSITIONS`.
+- `test_every_page_is_accounted_for_in_exactly_one_disposition` (the four-set gate) now includes
+  `sheets_budget_truncated` in the sum. **Without that term the accounting invariant would silently
+  lose truncated pages — the exact shape of the defect the new disposition exists to prevent.**
+
+### Verification (free)
+
+An end-to-end `run_project` on a stubbed analyzer whose second charge blows the cap: the ledger row
+lands `measured_budget_truncated` with a reason, `sheets_measured` drops to 0, `coverage_pct_pages`
+goes 100% → **0.0%**, and both strings reach `summary.txt`.
+
+---
+
+## C3 — a two-stage rejection cascade published a confident wrong number
+
+**Committed:** `fix(23-regression): undo a supersession whose superseder dies; never publish a number
+in the wrong unit class`
+
+The worst failure class in the run: **the right answer was in the audit trail the whole time.**
+
+### What broke
+
+From the saved run's own `fusion_rejected`, verbatim:
+
+```json
+{"candidate_id":"WALL-TC1","source":"wall_classes","answer":"Tilt Up Wall",
+ "reason":"superseded_by_room_fill","quantity":106992.0,"unit":"SF"}
+
+{"candidate_id":"FILL-2","source":"arbitration","answer":"Tilt Up Wall",
+ "reason":"one_area_one_item","quantity":31104.0,"unit":"SF",
+ "detail":"backed by the same measured region (fill:FILL-2) as 'Concrete Pad' ..."}
+```
+
+Stage 1 suppressed the 106,992 SF thickness-class estimate **because FILL-2 was about to publish the
+same object from a measured region**. Stage 2 then killed FILL-2. Both died, nothing named
+"Tilt Up Wall" was left — so a symbol **count of five tilt-up panels** inherited the name and shipped:
+
+```
+Tilt Up Wall  5.0 SF   item_type: concrete_slab  formula: "count"
+                       confidence: high   needs_review: false
+```
+
+Golden asks 108,443 SF; the suppressed candidate is **1.3%** from it.
+
+### (a) A supersession whose superseder dies is not a supersession
+
+Stage 1 was **correct at the time**. Its correctness was *conditional* on FILL-2 surviving, and that
+condition was never re-checked.
+
+`_suppress_superseded_wall_items` now returns its `(superseded, superseders, rejection_record)`
+triples — keyed on the superseder's **identity**, not its name — and a new
+`_reinstate_orphaned_supersessions` runs after arbitration. If no superseder survived, the original is
+restored and **its rejection record is withdrawn from the audit trail**; the trail must not claim a
+suppression that was undone.
+
+Two guards stop this recreating the double-count the supersession existed to prevent:
+
+- the superseder must actually be gone (identity, not name);
+- **nothing else of that name may survive** — if another row publishes the object, the original stays
+  suppressed.
+
+A reinstated row is **flagged**, and its reason names the disagreeing route's number. It is restored
+after two independent arbitration decisions fired on it, and the two routes differed by 3.4x; an
+estimator is owed the magnitude *and* that history.
+
+### (b) A number may not publish in a unit of a different measurement class
+
+Both directions shipped on the same run:
+
+| published | what it actually was |
+|---|---|
+| `Tilt Up Wall 5.0 SF` | a **count** of five panels, rendered as an **area** |
+| `LED Wall Pack 34,214 EA` (`formula: "count x 1.1"`) | a 31,104 SF wall **area**, rendered as a **count** |
+
+There is no factor between "how many" and "how much", so such a number means nothing. New module
+`src/bobbytailor/pipeline/units.py` holds **one** definition of what a unit measures — *two*
+definitions of this rule is how the two halves of this defect drifted apart — shared by two
+enforcement points:
+
+- **fusion `_withhold_unit_class_violations`** (final publication gate): a component whose measure
+  BASIS conflicts with its bound UNIT has its quantity withheld and the withheld value recorded. The
+  row **survives**, flagged. A blank with a reason is honest; a deletion is not.
+- **aggregator**: canonicalising a NAME may not silently reclassify its UNIT. Naming precedence let the
+  library's `SF` overwrite the reading's own `EA` — which is *literally* how `5.0 SF` was produced. A
+  class-crossing canonicalisation now withholds the number and materialises an explicit BLANK row
+  (`unit_class_conflict_unmeasured`), mirroring the existing degenerate-reading contract. Where a real
+  same-class measurement of the object landed, that keeps its quantity and carries a note that the
+  conflicting reading was **not summed** into it.
+
+Both fire only when **both** classes are known and differ. An unrecognised unit or unmapped basis is
+left alone: a wrong guess here blanks a *good* quantity, which is worse than the defect.
+
+### Test corrected (made STRICTER)
+
+`test_aggregate_uses_manifest_name_and_unit_verbatim` asserted that a `0.15 CY` reading — a printed
+detail dimension pushed through the slab-**volume** calculator, the same family Round 1's D2
+documented — publishes as a `Bollards` row sourced `"manifest"`. That is 0.15 cubic yards of concrete
+presented as a count of bollards: the same defect one class over. It now uses a COUNT reading (so the
+manifest's naming authority is still pinned) and a new sibling,
+`test_a_manifest_unit_may_not_reclassify_the_measurement`, asserts the volume case publishes a BLANK
+while keeping the manifest's name and unit.
+
+### Verification (free — the saved records through the real functions)
+
+The three-row cascade, rebuilt from the saved rejection records' own numbers and run through
+`_suppress_superseded_wall_items` → `_arbitrate_one_area_one_item` →
+`_reinstate_orphaned_supersessions` in `fuse_sheet`'s exact order:
+
+- exactly one `Tilt Up Wall` row publishes, at **106,992.0 SF**, and it is the *original* object;
+- its `superseded_by_room_fill` record is gone from `fusion_rejected`;
+- the superseder's own `one_area_one_item` rejection stands — it really was arbitrated away;
+- with the anchor removed (a VALID supersession) the room-fill row publishes instead and the estimate
+  stays suppressed;
+- with another same-named row surviving, **no reinstatement happens** — no double count.
+
+And the combined end state through the real `aggregate_takeoff`:
+
+```
+PUBLISHED: 106992.0 SF | NEEDS REVIEW | needs_review=True
+  - a reading in a DIFFERENT measurement class was NOT summed into this quantity
+    ('tilt-up concrete panel' read 5.0 LF via formula 'count' and this row publishes in SF
+     — linear vs area)
+  - reinstated: ...
+```
+
+---
+
+## C4 — `HUMAN INPUT` on a run with no human input
+
+**Committed:** `fix(23-regression): HUMAN INPUT is earned — stop labelling machine reads human`
+
+### What broke
+
+`coverage.items_human_input: 5`, on a plans-only run with **no manifest and no human input file of any
+kind**:
+
+| row | source | provenance |
+|---|---|---|
+| Doors - Steel 70 EA | `plan_schedule_legend` | HUMAN INPUT |
+| Doors - Hollow Metal 29 EA | `plan_schedule_legend` | HUMAN INPUT |
+| Door Frames - Hollow Metal 29 EA | `plan_schedule_legend` | HUMAN INPUT |
+| Doors - Aluminum 6 EA | `plan_schedule_legend` | HUMAN INPUT |
+| Mobilization 1 EA | (app-injected convention) | HUMAN INPUT |
+
+The four door rows were parsed **by the app** off the door schedule printed on the plans. The fifth is
+the app's own injected convention. All five presented app-generated data as human-vouched — which
+inverts the one distinction this vocabulary exists to draw, and inflates apparent trust in exactly the
+rows a reviewer would otherwise check.
+
+Root cause: `_row_status` returned `HUMAN INPUT` for **any** row sourced `plan_schedule_legend`. But
+`takeoff_legend` has two very different producers and the tag could not tell them apart:
+
+| producer | origin |
+|---|---|
+| `devtools/companion_takeoff.py` | an estimator's own take-off, from a **human input file** |
+| `deterministic/schedule_extraction.py` (Crow's doors), `plan_deterministic_legends.py`, `rooms.py`, `footprint_takeoff.py`, vision tables | read off the **plans** |
+
+### The corrected contract
+
+> `HUMAN INPUT` means a human handed us this number, in a file. It is **earned**, never defaulted into.
+
+Legends now declare their origin: `legend_origin: "human_input"` on the companion-take-off ingest,
+`"plan_parsed"` on every plan-read constructor. The calculator propagates it onto the emitted item and
+the aggregator onto the bucket. A **missing** marker defaults to `plan_parsed` — fail-closed. The class
+is not deleted: a companion take-off still publishes as `HUMAN INPUT`.
+
+**Mobilization** gets a new status, `ITEM_STANDARD = "STANDARD ITEM"`. Nobody measured it and nobody
+supplied it — the app injects it. `NOT MEASURED` would lie in the other direction (its quantity is
+real and publishable), so it gets the value that says exactly what it is. `coverage.summary()` gains
+`items_standard`; `summary.txt` renders the line only when one exists; the Excel About legend
+documents it and sharpens the `MEASURED` / `HUMAN INPUT` wording.
+
+### Test corrected (made STRICTER)
+
+`test_the_legend_row_is_not_flagged_by_the_trace` asserted a legend row with no `legend_origin`
+publishes as `HUMAN INPUT` — the very conflation this defect *is*. It now asserts `MEASURED`, and a
+new sibling asserts the human-input half of the contract still holds.
+`test_every_row_carries_a_provenance_from_the_four_value_vocabulary` was renamed and now also pins
+Mobilization's status.
+
+### Verification (free — the saved run's own rows through the real aggregator)
+
+```
+BEFORE HUMAN INPUT rows: ['Door Frames - Hollow Metal', 'Doors - Aluminum',
+                          'Doors - Hollow Metal', 'Doors - Steel', 'Mobilization']
+AFTER  HUMAN INPUT rows: []
+  the four door rows -> MEASURED
+  Mobilization        -> STANDARD ITEM
+```
+
+---
+
+## Verification summary
+
+**Offline gate, run in full before every one of the four commits** (~47 min each):
+
+| after | result |
+|---|---|
+| baseline | 1870 passed, 1 skipped, 2 deselected |
+| C1 | **1873** passed (+3) |
+| C2 | **1882** passed (+9) |
+| C4 | **1889** passed (+7) |
+| C3 | **1944** passed (+55) |
+
+`tests/test_phase23_acceptance.py` and `tests/test_four_set_coverage.py` green throughout (the
+four-set gate is invoked by acceptance check 1).
+
+**No paid API was invoked at any point.** No `pytest -m golden`, no `accuracy_gate.sh`, no
+`vision_only_benchmark.py`, no `golden_convergence.py`, no `ANTHROPIC_API_KEY`, `.env` never read.
+Every verification is either the saved run re-read for free or its own recorded values replayed
+through the fixed functions.
+
+### On the score, stated honestly
+
+Re-scoring the saved artifact still reports **30% overall / 33% qty-when-found**, because
+**the artifact is unchanged** — the scorer reads the JSON the paid run wrote, not the fixed code. What
+these commits change is what the *next* run will produce; that comparison costs money and was
+deliberately not made. Claiming an accuracy improvement here would be exactly the kind of unearned
+statement C1–C4 are about.
+
+What *is* demonstrated, by calling the fixed functions on the saved run's own recorded values:
+
+- the reported cost equals the guard's spend (C1);
+- a truncated run cannot report 100% page coverage (C2);
+- the 106,992 SF candidate is reinstated when its superseder dies, and the 5.0 count is withheld
+  rather than summed (C3);
+- a manifest-free run reports zero `HUMAN INPUT` rows (C4).
+
+### Note on a defect NOT fixed
+
+The scorer output shows `+ SYM-1 … SYM-35` and `+ ROOM-3 … ROOM-6` as EXTRA items — unnamed geometry
+clusters published under their candidate IDs. That is the autonomous-naming gap already recorded as
+the count-side problem for Phase 24/25, and it is untouched here by design.
