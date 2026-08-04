@@ -126,6 +126,105 @@ def test_library_resolves_detected_name_via_alias():
     assert hm["source"] == "library"
 
 
+# ── A library fallback never publishes an unflagged near-zero ─────────────────
+
+
+def test_a_degenerate_library_reading_publishes_a_blank_not_a_number():
+    """Crow shipped "Sealed Concrete 0.15 SF ... needs_review=False".
+
+    The reading was a printed DETAIL DIMENSION (a 12" tapered slab at a dock
+    leveler) pushed through the slab-volume calculator and published under an
+    SF unit. A fabricated 0.15 SF is strictly worse than a blank: it is
+    unflagged AND it occupies the row a real measurement would have filled.
+    """
+    library = [
+        {"name": "Sealed Concrete", "aliases": ["concrete slab"], "basis": "area",
+         "unit": "SF", "source": "abbreviation"},
+    ]
+    items = [
+        {"description": "Concrete slab tapered thickness - dock leveler",
+         "item_type": "concrete_slab", "calculated_quantity": 0.15,
+         "calculated_unit": "SF", "source_sheet": "A-401"},
+    ]
+    row = next(
+        r for r in aggregate_takeoff(items, library=library)
+        if r["item"] == "Sealed Concrete"
+    )
+    assert row["quantity"] is None          # a BLANK, never the 0.15
+    assert row["quantity_fmt"] == "—"
+    assert row["needs_review"] is True
+    assert row["measured"] is False
+    assert row["provenance"] == "NOT MEASURED"
+    assert row["source"] == "library_fallback_unmeasured"
+    # The dropped reading is on the record, so this is not a silent deletion.
+    assert any("BLANK, not a zero" in r for r in row["review_reasons"])
+    assert any("0.15" in r for r in row["review_reasons"])
+
+
+def test_a_degenerate_library_reading_is_not_summed_into_a_real_measurement():
+    """Where the object WAS genuinely measured, the near-zero is dropped from
+    the total and the survivor says so — it never quietly adds 0.15 SF."""
+    library = [
+        {"name": "Sealed Concrete", "aliases": ["concrete slab"], "basis": "area",
+         "unit": "SF", "source": "abbreviation"},
+    ]
+    items = [
+        {"description": "concrete slab", "item_type": "concrete_slab",
+         "calculated_quantity": 395673.0, "calculated_unit": "SF",
+         "source_sheet": "A-101"},
+        {"description": "Concrete slab tapered thickness - dock leveler",
+         "item_type": "concrete_slab", "calculated_quantity": 0.15,
+         "calculated_unit": "SF", "source_sheet": "A-401"},
+    ]
+    row = next(
+        r for r in aggregate_takeoff(items, library=library)
+        if r["item"] == "Sealed Concrete"
+    )
+    assert row["quantity"] == 395673.0      # NOT 395673.15
+    assert any("was NOT summed into this quantity" in r
+               for r in row["review_reasons"])
+
+
+def test_a_real_library_measurement_still_publishes_its_quantity():
+    """The rule targets degenerate readings, not the library naming path: a
+    measurable quantity is published (flagged as a naming hypothesis)."""
+    library = [
+        {"name": "Pipe Guardrail", "aliases": ["pipe guard rail"], "basis": "linear",
+         "unit": "LF", "source": "abbreviation"},
+    ]
+    items = [
+        {"description": "pipe guard rail at dock", "item_type": "component",
+         "calculated_quantity": 46.2, "calculated_unit": "LF",
+         "source_sheet": "A-401"},
+    ]
+    row = next(
+        r for r in aggregate_takeoff(items, library=library)
+        if r["item"] == "Pipe Guardrail"
+    )
+    assert row["quantity"] == 46.2
+    assert row["provenance"] == "MEASURED"
+
+
+def test_a_degenerate_count_is_untouched_by_the_measure_rule():
+    """EA is counted, not dimensioned — the sub-one rule is about SF/LF/CY and
+    must not reach a count that legitimately rounds to zero."""
+    library = [
+        {"name": "Doors-HM", "aliases": ["hollow metal door"], "basis": "count",
+         "unit": "EA", "source": "abbreviation"},
+    ]
+    items = [
+        {"description": "hollow metal door", "item_type": "component",
+         "calculated_quantity": 0.4, "calculated_unit": "EA",
+         "source_sheet": "A6"},
+    ]
+    row = next(
+        r for r in aggregate_takeoff(items, library=library)
+        if r["item"] == "Doors-HM"
+    )
+    assert row["source"] == "library"       # not the unmeasured blank path
+    assert row["quantity"] == 0.0           # a measured zero stays a zero
+
+
 def test_library_absent_leaves_naming_unchanged():
     """Empty/omitted library ⇒ prior static-map naming (additive-only)."""
     items = [

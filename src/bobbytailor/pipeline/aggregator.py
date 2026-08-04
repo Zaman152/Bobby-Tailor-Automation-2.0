@@ -21,7 +21,37 @@ logger = logging.getLogger(__name__)
 # ``manifest_missing`` shipped a numeric zero for a blank (INV-08 §2 row S12),
 # which every consumer — takeoff.json, the exporter, scoring — read as "the
 # building has none of this".
-_UNMEASURED_SOURCES = frozenset({"manifest_missing", "expected_not_measured"})
+#: A name whose ONLY evidence was a library-named fallback reading too small to
+#: be a real building quantity. The object was NOT measured, and saying so is
+#: the whole point — see :func:`_degenerate_measure`.
+LIBRARY_FALLBACK_UNMEASURED = "library_fallback_unmeasured"
+
+_UNMEASURED_SOURCES = frozenset({
+    "manifest_missing", "expected_not_measured", LIBRARY_FALLBACK_UNMEASURED,
+})
+
+#: Units in which a building quantity is counted, not dimensioned. A value in
+#: these units below one whole unit is not a small measurement — it is a
+#: mis-scaled or mis-typed one.
+_MEASURE_UNITS = frozenset({"SF", "LF", "SY", "CY", "SQ", "FT", "CF"})
+
+
+def _degenerate_measure(qty, unit) -> bool:
+    """True when a quantity is too small to be a real measured building figure.
+
+    No drawing carries 0.15 square feet of floor finish or 0.02 linear feet of
+    handrail. On Crow all three such rows came from the same place: a printed
+    DETAIL dimension ("TAPERED CONCRETE SLAB", 12 in; "4\\"-0\\"" curb width;
+    "1 1/2\\" O.D. HANDRAIL") was pushed through the slab-volume calculator as
+    though the dimension were an area, and the resulting cubic yards were
+    published under an SF/LF unit.
+    """
+    if (unit or "").strip().upper() not in _MEASURE_UNITS:
+        return False
+    try:
+        return abs(float(qty)) < 1.0
+    except (TypeError, ValueError):
+        return False
 
 # A learned expectation weaker than this is a one-off, not a pattern. Same
 # threshold the learned-context prompt renderer applies, so an item cannot be
@@ -439,6 +469,10 @@ def aggregate_takeoff(
     # guarantee against telling a client "your tilt-up walls were not measured"
     # when they WERE, under the name a human previously corrected them to.
     library_bound: set = set()
+    # Library-named readings dropped for being degenerate, keyed by the name
+    # they would have published under. Materialised after the row loop so the
+    # object still gets a ROW — an explicit blank, never a silent deletion.
+    suppressed_library: Dict[str, List[Dict]] = defaultdict(list)
     for item in calculated_items:
         if item.get("qty_source") == "plan_schedule_legend":
             desc = item.get("description", "")
@@ -557,6 +591,28 @@ def aggregate_takeoff(
                 continue
         if (canonical_unit or unit or "").lower() in ("ea", "each"):
             qty = float(round(qty))
+
+        # ── A library-named fallback never publishes an unflagged quantity ───
+        #
+        # source "library" means the object's IDENTITY was inferred from an
+        # alias table rather than read off the drawing, so the row is a naming
+        # HYPOTHESIS and has to say so. On Crow three printed detail DIMENSIONS
+        # were library-named into estimator-standard objects and published as
+        # "Sealed Concrete 0.15 SF", "Concrete Curb 0.05 LF" and "Pipe Handrail
+        # 0.02 LF", all at needs_review=False. That is strictly worse than a
+        # blank: unflagged, AND occupying the row a real measurement of the
+        # same object would have filled.
+        if bucket_source == "library" and _degenerate_measure(
+            qty, canonical_unit or unit
+        ):
+            suppressed_library[canonical_name].append({
+                "sheet": item.get("source_sheet"),
+                "qty": qty,
+                "unit": (canonical_unit or unit or "").upper(),
+                "description": desc,
+            })
+            continue
+
         bucket = buckets[canonical_name]
         bucket["quantity"] += qty
         bucket["unit"] = canonical_unit or unit
@@ -580,6 +636,47 @@ def aggregate_takeoff(
             "qty": qty,
             "description": desc,
             "formula": item.get("formula_applied") or item.get("formula", ""),
+        })
+
+    # ── Suppressed library readings become BLANKS, never silence ─────────────
+    #
+    # Dropping the number is only half the contract. An object whose sole
+    # evidence was a degenerate reading must still appear, saying "not
+    # measured" — otherwise the fix trades a fabricated 0.15 SF for a deletion,
+    # and INV-08's whole point is that a deletion and a zero read the same to a
+    # client. Where a real measurement of the same object DID land, the bucket
+    # keeps its quantity and carries a note that the degenerate reading was
+    # dropped rather than summed into it.
+    for name, dropped in suppressed_library.items():
+        detail = "; ".join(
+            "%r read %s %s on %s"
+            % (d["description"], d["qty"], d["unit"], d["sheet"] or "?")
+            for d in dropped
+        )
+        if buckets.get(name, {}).get("has_rows"):
+            buckets[name]["needs_review"] = True
+            buckets[name]["review_reasons"].add(
+                "a library-named reading too small to be a real measurement "
+                "was NOT summed into this quantity (%s)" % detail
+            )
+            continue
+        bucket = buckets[name]
+        bucket["unit"] = dropped[0]["unit"]
+        bucket["item_type"] = bucket["item_type"] or "library_object"
+        bucket["needs_review"] = True
+        bucket["confidence"] = "low"
+        bucket["source"] = LIBRARY_FALLBACK_UNMEASURED
+        bucket["review_reasons"].add(
+            "the only reading that resolved to this library object was too "
+            "small to be a real measurement and was NOT published — this is a "
+            "BLANK, not a zero (%s)" % detail
+        )
+        bucket["source_rows"].append({
+            "sheet": None,
+            "qty": None,
+            "description": "%s (library-named reading suppressed as degenerate,"
+                           " not measured on the plans)" % name,
+            "formula": "library_fallback_not_measured",
         })
 
     # Only enrich with standard line items when a genuine take-off was produced.
