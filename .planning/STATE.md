@@ -6,14 +6,14 @@ current_phase: 23
 current_phase_name: measurement-engine-completion
 status: in-progress
 stopped_at: Completed 23-13-PLAN.md
-last_updated: "2026-08-04T02:07:56.040Z"
+last_updated: "2026-08-04T05:36:11.019Z"
 last_activity: 2026-08-04
-last_activity_desc: 23-10 built the ONE open-run chainer core (SP-5) that INV-04 and INV-06 both proposed separately; walls._harvest is now a projection of a styled harvester (83-page byte-identical diff) and Crow's STAIR PLAN viewport is a drawing again, so all five estimator rail marks are unmasked and correctly scaled; suite 1637 -> 1683
+last_activity_desc: "23-13 opened the wall gate honestly: BASIS_BINDERS replaced the _ROOM_FILL_BASES frozenset, wall area binds perimeter × drawing-height × count (every real prototype height comes from its own RCP tag, never the poisoned 15-ft roof callout), one measured region backs at most one line item (Crow's six-items footprint defect defused with every suppression audited), and the multiplier flag fires on exactly ID-412/416/420/422 with human_inputs untouched; suite 1719 -> 1764"
 progress:
   total_phases: 28
   completed_phases: 19
   total_plans: 121
-  completed_plans: 111
+  completed_plans: 112
   percent: 68
 ---
 
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 23 (measurement-engine-completion) — IN PROGRESS
-Plan: 14 of 17 complete (wave 6 done)
+Plan: 15 of 17 complete (wave 6 done)
 Status: waves 1-5 done; wave 6 done — 23-12 (open-run selectors) and 23-13 (wall binder + SP-9 registry + one-area-one-item arbitration + honest multiplier) both landed; next is 23-14 (elevation facade, wave 7). SP-4 still carried forward under DEF-23-SP4.
 Last activity: 2026-08-04 — 23-13 opened the wall gate honestly: BASIS_BINDERS replaced the _ROOM_FILL_BASES frozenset, wall area binds perimeter × drawing-height × count (every real prototype height comes from its own RCP tag, never the poisoned 15-ft roof callout), one measured region backs at most one line item (Crow's six-items footprint defect defused with every suppression audited), and the multiplier flag fires on exactly ID-412/416/420/422 with human_inputs untouched; suite 1719 -> 1764
 
@@ -79,6 +79,7 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 | Phase 23 P10 | ~5h | 3 tasks | 7 files |
 | Phase 23 P12 | 2h15m | 3 tasks | 2 files |
 | Phase 23 P13 | ~2h45m | 4 tasks | 6 files |
+| Phase 23-measurement-engine-completion P14 P14 | 205 min | 4 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,9 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 - [Phase ?]: 23-13: D-08 partition convention resolved from the take-off's own markup — board faces (a shared partition traced once per side); the legend label states no convention
 - [Phase ?]: 23-13: the multiplier-review flag is structural (census-vs-manifest disputed bit + manifest-only counts above one), not blanket count>1 — a blanket rule would have flagged all nine census-confirmed sheets and violated D-10
 - [Phase ?]: 23-13: a room-fill wall row supersedes the same-named thickness-class row even as a flagged zero — an honest flagged gap beats a confident wrong number
+- [Phase ?]: 23-14: facade = filled silhouette via complement labelling (one shared labeller); elevation joins the deterministic routing set with _PLAN_SHEET_TYPES untouched — wall pairing can never run on a facade (empty-walls negative test)
+- [Phase ?]: 23-14: the no-datum flag is waived only when the independent footprint width validates the blob (Bob's front 249.2 ft vs depth 250.0); learned human height outranks the Tier-0 datum span; 'datum' deliberately NOT a trusted height source for room-fill walls (T-23-51)
+- [Phase ?]: 23-14: material attribution is text-anchored (keynote -> its drawing's legend -> naming layer); gross confident, splits flagged, never a ratio; perimeter x datum-height is a cross-check that flags (Crow 6.4%) and never publishes (D-11); DEF-23-14A cross-sheet dedupe deferred
 
 ### 22-04 Decisions
 
@@ -401,7 +405,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-04T02:07:56.033Z
+Last session: 2026-08-04T05:35:31.027Z
 Stopped at: Completed 23-13-PLAN.md
 Resume file: None
 
