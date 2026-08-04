@@ -1576,7 +1576,10 @@ def moxy_real_bundles():
     import fitz
 
     from bobbytailor.devtools.object_manifest import load_manifest
-    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+    from bobbytailor.pipeline.takeoff_pipeline import (
+        TakeoffPipeline,
+        _room_mix_meta_payload,
+    )
 
     pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
     pipe._project_wall_height = 15.0
@@ -1594,13 +1597,7 @@ def moxy_real_bundles():
     return {
         "fills": fills,
         "room_mix": dict(resolution.counts),
-        "room_mix_meta": {
-            name: {
-                "source": resolution.sources.get(name, ""),
-                "note": resolution.name_flags.get(name, ""),
-            }
-            for name in resolution.counts
-        },
+        "room_mix_meta": _room_mix_meta_payload(resolution, manifest),
     }
 
 
@@ -1662,3 +1659,191 @@ def test_a_wall_binds_a_real_quantity_where_the_architectural_fill_is_honest(
     assert row["wall_height_ft"] == 9.0
     assert row["wall_height_source"] == "drawing"
     assert "board faces" in row["formula"]
+
+
+# ── Task 4: the selector's one coordinated change ────────────────────────────
+
+
+def _extent_fill(cid, ratio, kind="RCP", name="KING A", area=230.0,
+                 needs_review=False):
+    from bobbytailor.deterministic.room_fill import RoomFillResult
+
+    return RoomFillResult(
+        area_sf=area, candidate_id=cid, plan_kind=kind, plan_name=name,
+        viewport_title="%s - %s PLAN" % (name, kind), extent_ratio=ratio,
+        needs_review=needs_review,
+        review_reason="flagged" if needs_review else "",
+    )
+
+
+def test_two_validating_fills_of_one_name_return_nothing_with_an_ambiguity_flag():
+    """Never silently take the smaller: two drawings of the same name on one
+    sheet both validating make the unit AMBIGUOUS."""
+    from bobbytailor.deterministic.room_fill import select_fill_for_basis
+
+    fills = [
+        _extent_fill("FILL-1", 1.02, area=229.4),
+        _extent_fill("FILL-2", 0.99, area=451.1),
+    ]
+    ambiguity: list = []
+    pick = select_fill_for_basis(fills, "ceiling_area", ambiguity_out=ambiguity)
+    assert pick is None
+    assert len(ambiguity) == 1
+    assert "AMBIGUOUS" in ambiguity[0]
+    assert "KING A - RCP PLAN" in ambiguity[0]
+
+
+def test_the_ambiguity_lands_in_item_coverage_not_in_silence():
+    """Through the binder: an ambiguous selection produces a record, not a
+    vanished row."""
+    bundle = {
+        "room_fills": [
+            _extent_fill("FILL-1", 1.02, area=229.4),
+            _extent_fill("FILL-2", 0.99, area=451.1),
+        ],
+        "sheet_name": "p-amb",
+    }
+    result = fuse_sheet(
+        bundle, {},
+        vocabulary=[{"name": "Gyp Ceiling", "measure": "ceiling_area",
+                     "unit": "SF"}],
+    )
+    assert not [c for c in result["components"] if c["name"] == "Gyp Ceiling"]
+    items = bundle.get("item_coverage") or []
+    assert len(items) == 1
+    assert "AMBIGUOUS" in items[0].reason
+
+
+def test_the_validated_fill_beats_a_clean_fill_with_no_extent_ratio():
+    """Prefer the fill whose extent ratio is closest to one — the old
+    smallest-area rule is gone (its rationale was the falsified opposite-hand
+    misdiagnosis)."""
+    from bobbytailor.deterministic.room_fill import select_fill_for_basis
+
+    fills = [
+        _extent_fill("FILL-1", None, area=100.0),   # smaller, no ratio
+        _extent_fill("FILL-2", 1.01, area=451.1),   # larger, validates
+    ]
+    pick = select_fill_for_basis(fills, "ceiling_area")
+    assert pick.candidate_id == "FILL-2", (
+        "the validated fill wins; the smaller area is not a selection rule"
+    )
+
+
+def test_a_single_flagged_candidate_is_returned_with_its_flag_intact():
+    """Availability (23-03 preserved): every candidate flagged -> the smallest
+    flagged one WITH ITS FLAG, never nothing."""
+    from bobbytailor.deterministic.room_fill import select_fill_for_basis
+
+    fills = [_extent_fill("FILL-1", 2.4, area=458.5, needs_review=True)]
+    pick = select_fill_for_basis(fills, "ceiling_area")
+    assert pick is not None
+    assert pick.needs_review is True
+    assert pick.area_sf == 458.5
+
+
+def test_the_wall_discipline_is_unchanged_and_stays_architectural():
+    """Keep AR for wall area. The shape gate flags the leak; switching to the
+    RCP to dodge it would be a discipline violation chosen for its output."""
+    from bobbytailor.deterministic.room_fill import BASIS_PLAN_KIND
+
+    assert BASIS_PLAN_KIND["wall_area"] == "AR"
+
+
+# ── Task 4: the honest multiplier ────────────────────────────────────────────
+
+
+def test_a_count_above_one_downgrades_confidence_and_records_the_source():
+    bundle = {"room_fills": [_wall_fill()], "sheet_name": "p23"}
+    result = fuse_sheet(
+        bundle, {}, vocabulary=_gyp_wall_vocab(), room_mix={"king a": 26},
+    )
+    row = [c for c in result["components"] if c["name"] == "Gyp Wall"][0]
+    assert row["confidence"] == "medium", (
+        "a number the drawing set does not itself contain must not be "
+        "reported as high-confidence"
+    )
+    assert row["unit_count"] == 26
+    assert row["unit_count_source"]  # recorded, whatever it is
+    assert row["needs_review"] is False, (
+        "the downgrade is a confidence statement, not a review flag — a bare "
+        "room_mix has nothing to cross-check against"
+    )
+
+
+def test_a_count_of_one_does_not_downgrade():
+    bundle = {"room_fills": [_wall_fill(name="BUNK B")], "sheet_name": "p33"}
+    result = fuse_sheet(
+        bundle, {}, vocabulary=_gyp_wall_vocab(), room_mix={"bunk b": 1},
+    )
+    row = [c for c in result["components"] if c["name"] == "Gyp Wall"][0]
+    assert row["confidence"] == "high"
+    assert row["unit_count"] == 1
+
+
+def test_a_disputed_count_appends_the_units_not_doors_sentence():
+    bundle = {"room_fills": [_wall_fill(name="KING SUITE C",
+                                        **{"extent_ratio": 1.01})],
+              "sheet_name": "p28"}
+    result = fuse_sheet(
+        bundle, {}, vocabulary=_gyp_wall_vocab(),
+        room_mix={"king suite c": 1},
+        room_mix_meta={"king suite c": {"source": "unit_tag_census",
+                                        "note": "census 1 vs manifest 2",
+                                        "disputed": True}},
+    )
+    row = [c for c in result["components"] if c["name"] == "Gyp Wall"][0]
+    assert row["needs_review"] is True
+    assert "verify the count is units rather than doors" in row["review_reason"]
+    assert "1.01" in row["review_reason"], (
+        "the sentence names the observed extent ratio — the evidence that one "
+        "unit was measured"
+    )
+
+
+# THE D-10 acceptance: page -> whether the multiplier review flag fires on the
+# ceiling row. ID-412/416/420/422 (pages 28/32/36/38) disagree with their own
+# drawings — KING SUITE C and BUNK A are census-vs-manifest DISPUTES, ACC QQ
+# RIS and ACC BUNK are manifest-only counts of 2 that nothing in the drawings
+# confirms. The other NINE sheets' counts are census-confirmed (or agree), and
+# the flag must be CLEAR — including KING SUITE A/B, whose counts arrive via
+# an abbreviation match but AGREE with the manifest.
+MULTIPLIER_FLAG_BY_PAGE = [
+    (23, False),   # ID-407 KING A, census 26
+    (24, False),   # ID-408 KING B, census 15
+    (25, False),   # ID-409 KING C, census 5
+    (26, False),   # ID-410 KING SUITE A, census 5 == manifest 5
+    (27, False),   # ID-411 KING SUITE B, census 2 == manifest 2
+    (28, True),    # ID-412 KING SUITE C, census 1 vs manifest 2 — DISPUTED
+    (29, False),   # ID-413 QQ A, census 90
+    (30, False),   # ID-414 QQ B, census 6
+    (31, False),   # ID-415 QQ C, census 15
+    (32, True),    # ID-416 BUNK A, census 1 vs manifest 2 — DISPUTED
+    (33, False),   # ID-417 BUNK B, census 1
+    (36, True),    # ID-420 ACC QQ RIS, manifest-only 2 — unconfirmed
+    (38, True),    # ID-422 ACC BUNK, manifest-only 2 — unconfirmed
+]
+
+
+def test_the_multiplier_flag_fires_on_exactly_the_four_defective_sheets(
+    moxy_real_bundles,
+):
+    """D-10 / INV-02 step 7: the four suspect counts are FLAGGED, never
+    corrected — `git diff human_inputs/` stays empty — and the flag is exact:
+    it fires on the four sheets that disagree with their own drawings and on
+    none of the nine whose counts the drawings confirm."""
+    marker = "verify the count is units rather than doors"
+    vocab = [{"name": "Gyp Ceiling", "measure": "ceiling_area", "unit": "SF"}]
+    fired, clear = [], []
+    for page, expected in MULTIPLIER_FLAG_BY_PAGE:
+        result = _fuse_moxy_page(moxy_real_bundles, page, vocab)
+        rows = [c for c in result["components"] if c["name"] == "Gyp Ceiling"]
+        assert len(rows) == 1, "p%d must bind its ceiling" % page
+        has_marker = marker in rows[0]["review_reason"]
+        (fired if has_marker else clear).append(page)
+        assert has_marker is expected, (
+            "p%d: multiplier flag %s but expected %s — reason: %r"
+            % (page, "fired" if has_marker else "clear",
+               "fired" if expected else "clear", rows[0]["review_reason"])
+        )
+    assert fired == [28, 32, 36, 38], "exactly those four, and no others"

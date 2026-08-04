@@ -340,20 +340,38 @@ def plan_titles(page) -> List[tuple]:
     return out
 
 
-def select_fill_for_basis(fills: Sequence[RoomFillResult], basis: str) -> Optional[RoomFillResult]:
+def select_fill_for_basis(
+    fills: Sequence[RoomFillResult],
+    basis: str,
+    ambiguity_out: Optional[List[str]] = None,
+) -> Optional[RoomFillResult]:
     """The fill whose drawing discipline measures *basis* (ceiling -> RCP …).
 
-    Returns ``None`` **only** when no drawing of the right discipline was
-    measured at all — the caller must then flag, never substitute a different
-    drawing's area.
+    ONE coordinated selection rule (23-13 Task 4), reconciling three separate
+    proposals so this function is not edited three times in three directions:
 
-    Flagged candidates are NOT filtered away. The old ``and not f.needs_review``
-    made a flagged fill vanish, so a discipline whose every drawing was flagged
-    returned ``None`` and the caller's ``continue`` deleted the row: flag-don't-
-    guess degraded into drop-and-be-silent, breaking the contract this very
-    docstring states (INV-08 §2 rows S8-S9). A flagged fill now comes back
-    **with its flag intact**, so the caller emits a NEEDS REVIEW row carrying a
-    real measured number instead of nothing at all.
+    * **Selection** — prefer the fill whose extent ratio is closest to one,
+      breaking ties by candidate identifier. The old ``min(area)`` "the
+      smaller is the single unit" rule is GONE: its rationale rested on the
+      opposite-hand-clip misdiagnosis this phase falsified (INV-02). If two
+      same-discipline fills BOTH validate against their own printed extent,
+      nothing is returned and the ambiguity is flagged through
+      *ambiguity_out* — two drawings of the same name on one sheet make the
+      unit ambiguous, and silently taking the smaller is a guess.
+    * **Discipline** — unchanged (:data:`BASIS_PLAN_KIND`): wall area stays on
+      the architectural drawing. The shape gate flags a degenerate AR fill;
+      switching disciplines to dodge the leak would be a selection rule
+      chosen for its output.
+    * **Availability** — when EVERY candidate is flagged, the smallest flagged
+      one is returned WITH ITS FLAG INTACT rather than nothing (the 23-03
+      repair): a discipline whose every drawing was flagged used to return
+      ``None`` and the caller's ``continue`` deleted the row — flag-don't-
+      guess degraded into drop-and-be-silent (INV-08 §2 rows S8-S9).
+
+    Returns ``None`` when no drawing of the right discipline was measured at
+    all, or when the choice between validated candidates is ambiguous (then a
+    reason is appended to *ambiguity_out*). The caller must flag — never
+    substitute a different drawing's area, and never take a silent pick.
     """
     want = BASIS_PLAN_KIND.get((basis or "").strip().lower())
     if not want:
@@ -361,13 +379,45 @@ def select_fill_for_basis(fills: Sequence[RoomFillResult], basis: str) -> Option
     matches = [f for f in fills if f.plan_kind == want]
     if not matches:
         return None
-    # Prefer a clean measurement; fall back to a flagged one rather than to
-    # silence. Existing behaviour is preserved exactly whenever any unflagged
-    # candidate of the right discipline exists.
-    pool = [f for f in matches if not f.needs_review] or matches
-    # One drawing per discipline per prototype sheet; if a sheet repeats it
-    # (opposite hand), the smaller is the single unit — the larger spans both.
-    return min(pool, key=lambda f: f.area_sf)
+    clean = [f for f in matches if not f.needs_review]
+    if not clean:
+        # Availability: every candidate is flagged. The smallest flagged one,
+        # flag intact, beats silence (23-03 / INV-08 §4 step 8).
+        return min(matches, key=lambda f: f.area_sf)
+    if len(clean) == 1:
+        return clean[0]
+    # Several clean candidates. A candidate VALIDATES when its measured area
+    # sits inside the tolerance of the drawing's own printed extent.
+    validated = [
+        f for f in clean
+        if f.extent_ratio is not None and f.extent_ratio <= EXTENT_TOLERANCE
+    ]
+    if len(validated) >= 2:
+        if ambiguity_out is not None:
+            names = sorted(
+                {str(f.viewport_title or f.plan_name or f.candidate_id)
+                 for f in validated}
+            )
+            ambiguity_out.append(
+                "%d %s drawings on one sheet (%s) each validate against "
+                "their own printed extent — which one is the unit is "
+                "AMBIGUOUS; nothing was selected, and the smaller was not "
+                "silently taken" % (len(validated), want, ", ".join(names))
+            )
+        return None
+    if validated:
+        return validated[0]
+    # No candidate validates (no printed extent on a clean synthetic fill, or
+    # every ratio is off): closest to one wins, candidate id breaks ties, and
+    # a fill with no ratio at all ranks last. Area size plays no part.
+    return min(
+        clean,
+        key=lambda f: (
+            abs(float(f.extent_ratio) - 1.0)
+            if f.extent_ratio is not None else float("inf"),
+            str(f.candidate_id),
+        ),
+    )
 
 
 @dataclass

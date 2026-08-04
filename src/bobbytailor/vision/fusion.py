@@ -1522,13 +1522,17 @@ def _fuse_wall_classes(
             )
 
 
-def _item_not_measured(bundle: dict, info: dict) -> None:
+def _item_not_measured(bundle: dict, info: dict, reason: str = "") -> None:
     """The explicit NOT MEASURED row for a basis no drawing answers.
 
     Substituting another discipline's area would be a guess (a ceiling is
     taken off the RCP, not off the architectural plan), so the honest outcome
     is an explicit blank — never a bare ``continue``, which leaves the item
     with no row at all and its quantity read as a zero (INV-08 §2 row S9).
+
+    *reason* overrides the default wording — the selector's AMBIGUITY refusal
+    (two drawings of one name both validating) is a different failure than
+    "no drawing of the right discipline", and the record must say which.
     """
     from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
         BASIS_PLAN_KIND,
@@ -1547,9 +1551,11 @@ def _item_not_measured(bundle: dict, info: dict) -> None:
             quantity=None,
             basis=info["basis"],
             source_sheets=[str(bundle.get("sheet_name") or "")],
-            reason="no %s plan drawing was measured on this sheet for "
-                   "basis %r — measuring it off a different discipline's "
-                   "drawing would be a guess" % (want_kind, info["basis"]),
+            reason=reason or (
+                "no %s plan drawing was measured on this sheet for "
+                "basis %r — measuring it off a different discipline's "
+                "drawing would be a guess" % (want_kind, info["basis"])
+            ),
             expected_from="vocabulary",
         )
     )
@@ -1577,6 +1583,52 @@ def _unit_count_for(pick, ctx: dict) -> "Tuple[Optional[int], bool, str, dict]":
     return (int(count) if known else None), known, source, meta
 
 
+#: The exact sentence fragment the D-10 acceptance greps for. On the real
+#: defective Moxy sheets (ID-412/416/420/422 — a suite's entry + connecting
+#: door counted as two units) this is precisely the sentence that would have
+#: caught the error.
+_MULTIPLIER_REVIEW_MARKER = "verify the count is units rather than doors"
+
+
+def _multiplier_review_reason(pick, count, known, source, meta) -> str:
+    """The multiplier-suspicion sentence, or "" when the count is trustworthy.
+
+    Fires when the count is IN DISPUTE (the in-plan census and the manifest
+    disagree — the census value is published, the manifest is a cross-check
+    that FLAGS, never edits, per 23-CONTEXT resolution 3) or when a count
+    above one comes from the manifest alone and nothing in the drawings
+    confirms it. A census-confirmed count — QQ A's 90, KING A's 26 — does NOT
+    fire: a number read off the drawing set's own key plans is the drawings
+    speaking, not a human guess (SP-10).
+    """
+    if not known:
+        return ""
+    disputed = bool(meta.get("disputed"))
+    # "Unconfirmed" means the RESOLUTION itself says the count came from the
+    # manifest alone (its meta carries an explicit source) — not a legacy
+    # caller passing a bare room_mix with no meta at all, which has nothing
+    # to cross-check against and is handled by the count-source field alone.
+    unconfirmed = (
+        str(meta.get("source") or "") == _UNIT_COUNT_SOURCE_MANIFEST
+        and count > 1
+    )
+    if not (disputed or unconfirmed):
+        return ""
+    if pick.extent_ratio is not None:
+        return (
+            "ONE %r unit was measured against its drawing's own printed "
+            "extent at ratio %.2f and then multiplied by %d (count source: "
+            "%s) — %s"
+            % (pick.plan_name, pick.extent_ratio, count, source,
+               _MULTIPLIER_REVIEW_MARKER)
+        )
+    return (
+        "ONE %r unit was measured and multiplied by %d (count source: %s), "
+        "a count the drawings do not confirm — %s"
+        % (pick.plan_name, count, source, _MULTIPLIER_REVIEW_MARKER)
+    )
+
+
 def _bind_enclosed_area(
     bundle: dict, components: List[dict], info: dict, fills, ctx: dict
 ) -> None:
@@ -1593,9 +1645,10 @@ def _bind_enclosed_area(
         total_for_units,
     )
 
-    pick = select_fill_for_basis(fills, info["basis"])
+    ambiguity: List[str] = []
+    pick = select_fill_for_basis(fills, info["basis"], ambiguity_out=ambiguity)
     if pick is None:
-        _item_not_measured(bundle, info)
+        _item_not_measured(bundle, info, reason=ambiguity[0] if ambiguity else "")
         return
     count, known_count, count_source, meta = _unit_count_for(pick, ctx)
     qty = total_for_units(pick.area_sf, count if known_count else None)
@@ -1611,13 +1664,22 @@ def _bind_enclosed_area(
         )
     if known_count and meta.get("note"):
         reasons.append(str(meta["note"]))
+    multiplier_reason = _multiplier_review_reason(
+        pick, count, known_count, count_source, meta
+    )
+    if multiplier_reason:
+        reasons.append(multiplier_reason)
     components.append(
         {
             "name": info["name"],
             "quantity": qty,
             "unit": info["unit"],
             "provenance": "geometry",
-            "confidence": "medium" if reasons else "high",
+            # A count above one is a number the drawing being measured does
+            # not itself contain — it must not be reported as high-confidence
+            # (SP-10, T-23-52). A single-unit clean row stays high.
+            "confidence": "medium"
+            if (reasons or (known_count and count > 1)) else "high",
             "candidate_id": pick.candidate_id,
             "name_source": "room_fill",
             "basis": info["basis"],
@@ -1678,9 +1740,10 @@ def _bind_wall_area(
         wall_perimeter_for_unit,
     )
 
-    pick = select_fill_for_basis(fills, info["basis"])
+    ambiguity: List[str] = []
+    pick = select_fill_for_basis(fills, info["basis"], ambiguity_out=ambiguity)
     if pick is None:
-        _item_not_measured(bundle, info)
+        _item_not_measured(bundle, info, reason=ambiguity[0] if ambiguity else "")
         return
     count, known_count, count_source, meta = _unit_count_for(pick, ctx)
 
@@ -1711,6 +1774,11 @@ def _bind_wall_area(
         )
     if known_count and meta.get("note"):
         reasons.append(str(meta["note"]))
+    multiplier_reason = _multiplier_review_reason(
+        pick, count, known_count, count_source, meta
+    )
+    if multiplier_reason:
+        reasons.append(multiplier_reason)
 
     base_fields = {
         "name": info["name"],
@@ -1786,7 +1854,10 @@ def _bind_wall_area(
     component.update(
         {
             "quantity": qty,
-            "confidence": "medium" if reasons else "high",
+            # A count above one is not in the drawing being measured — never
+            # high-confidence (SP-10, T-23-52).
+            "confidence": "medium"
+            if (reasons or (known_count and count > 1)) else "high",
             "wall_height_ft": height,
             "wall_height_source": source,
             "formula": formula,

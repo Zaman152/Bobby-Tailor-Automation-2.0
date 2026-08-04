@@ -808,6 +808,32 @@ def _manifest_unit_counts(manifest) -> dict:
     return mix
 
 
+def _room_mix_meta_payload(resolution, manifest) -> dict:
+    """The ``room_mix_meta`` dict ``fuse_sheet`` receives, in ONE place.
+
+    Carries, per unit type: the count's ``source`` (census | manifest |
+    assumed), any resolver ``note`` (a disagreement, an abbreviation match, a
+    manifest fallback), and ``disputed`` — True when the estimator's manifest
+    declares a DIFFERENT count than the one published. The binder's
+    multiplier-review flag reads ``disputed`` structurally rather than
+    grepping the note's wording, so the flag cannot rot when the note's prose
+    changes (D-10: the manifest is a cross-check that FLAGS disagreement; the
+    file itself is never edited).
+    """
+    declared = _manifest_unit_counts(manifest)
+    return {
+        name: {
+            "source": resolution.sources.get(name, ""),
+            "note": resolution.name_flags.get(name, ""),
+            "disputed": (
+                declared.get(name) is not None
+                and int(declared[name]) != int(resolution.counts[name])
+            ),
+        }
+        for name in resolution.counts
+    }
+
+
 def _manifest_scale_fpi(manifest) -> Optional[float]:
     """Project drawing scale (feet per inch) from a manifest assumption, if any.
 
@@ -2943,13 +2969,9 @@ class TakeoffPipeline:
             wall_height_source=getattr(self, "_project_wall_height_source", None),
             material_tag_ledger=getattr(self, "_material_tag_ledger", None),
             room_mix=dict(room_mix_resolution.counts),
-            room_mix_meta={
-                name: {
-                    "source": room_mix_resolution.sources.get(name, ""),
-                    "note": room_mix_resolution.name_flags.get(name, ""),
-                }
-                for name in room_mix_resolution.counts
-            },
+            room_mix_meta=_room_mix_meta_payload(
+                room_mix_resolution, getattr(self, "_manifest", None)
+            ),
         )
         merged = merge_with_provenance([fused])
 
