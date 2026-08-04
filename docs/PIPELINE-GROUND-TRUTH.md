@@ -170,18 +170,58 @@ tripped the SDK's ">10 min ⇒ streaming required" guard and killed the pass ins
 had returned invalid JSON), and Bob's **name-found rate rose 8% → 33%** (Doors, Canopy now found).
 
 **But Bob's overall is still ~8%, and this pinpoints the real remaining frontier: the MEASUREMENT
-engine is floor-plan-centric.** Bob's golden quantities are Gas Piping 886 LF (civil linework),
-Exterior Painting CMU 16,219 SF + EIFS 3,053 SF (elevation wall areas), Lintels 179 LF (structural) —
-**none measured by the floor-plan walls/rooms/footprint engine.** Crow is a warehouse (everything on
-one floor plan); Bob's is a retail fit-out (quantities across civil + elevations + schedules).
+engine is floor-plan-centric.** Bob's golden quantities are Gas Piping 886 LF (~~civil linework~~ —
+see the correction below), Exterior Painting CMU 16,219 SF + EIFS 3,053 SF (elevation wall areas),
+Lintels 179 LF (structural) — **none measured by the floor-plan walls/rooms/footprint engine.** Crow
+is a warehouse (everything on one floor plan); Bob's is a retail fit-out (quantities across
+~~civil~~ + elevations + schedules).
 
 **So the naming is now general; the measurement is not.** The next program is a
-**sheet-type-aware measurement layer**: civil linework LF (piping/curb/utilities on C-sheets),
-elevation wall-area SF (painting/EIFS/cladding on elevations), schedule-driven counts per format, in
-addition to the floor-plan engine — then the fusion binds the (now-general) names to whichever
-measurement produced the number. Plus the learning loop, then re-validate across all 4 plans.
+**sheet-type-aware measurement layer**: ~~civil linework LF (piping/curb/utilities on C-sheets)~~
+open-run linear LF on ANY plan sheet (see the correction below), elevation wall-area SF
+(painting/EIFS/cladding on elevations), schedule-driven counts per format, in addition to the
+floor-plan engine — then the fusion binds the (now-general) names to whichever measurement produced
+the number. Plus the learning loop, then re-validate across all 4 plans.
 Session API spend to date ≈ $16. Context is very large — continue in a FRESH session using this doc
 + memories as the plan.
+
+> ### CORRECTION (2026-08-04, phase 23 / plan 23-16, decision D-01) — there is no civil sheet
+>
+> **The old claim (struck above):** Bob's Gas Piping 886 LF is *civil linework*, and reaching it
+> needs a *civil-sheet* engine reading *piping/curb/utilities on C-sheets*. The evidence offered
+> for it was a `C402.4` sheet reference found in the set.
+>
+> **The falsifying evidence.** The uploaded Bob's plan set has **seven sheets and no C-sheet and no
+> P-sheet at all**, read straight off the per-page title blocks:
+>
+> | page | sheet | title |
+> |---|---|---|
+> | 0 | CS-1 | COVER SHEET |
+> | 1 | A1.1 | FLOOR FINISH PLAN |
+> | 2 | A2.0 | REFLECTED CEILING PLAN |
+> | 3 | A3.0 | **ROOF PLAN** ← the gas run is drawn here |
+> | 4 | A4.0 | FRONT ELEVATION DEMOLITION / ELEVATIONS |
+> | 5 | A8.1 | door + hardware schedules |
+> | 6 | A8.3 | STANDARD DETAILS |
+>
+> The `C402.4` cited as proof of a civil sheet is an **IECC energy-code table reference inside a
+> note on A4.0**, matched by a sheet-number regex. The take-off's own legend puts `Gas Piping
+> 886.77 LF` on **page 0 of the marked-up set, which is A3.0** — a `roof_plan`, a sheet type
+> already inside `_PLAN_SHEET_TYPES`. The Chelsea set (32 pages) likewise contains no civil sheet.
+> The run itself is an **annotated CAD linetype**: the line is broken at a regular ~33.7 pt pitch
+> and each gap carries the literal word `GAS` drawn as 39 SHX micro-strokes.
+>
+> **Citation:** `INV-04-civil-linework.md` §1 (the seven-sheet listing and the energy-code table
+> reference), §2 (the linetype), §3 (the selection recipe).
+>
+> **The delivered contract.** No civil-sheet engine was built and none is needed. The frontier was
+> **open-run linear measurement on any plan sheet**, and that is what shipped:
+> `deterministic/open_runs.py` chains open polylines, `extract_linetype_runs` finds the run by its
+> repeating line-breaking glyph mark (160 of 160 detected marks within 12 pt of the polyline the
+> estimator actually traced, and **zero** runs across all 76 pages of Crow + Chelsea + Moxy), and
+> `run_scale_fpp` measures it at its own drawing's printed 3/32" = 1'-0". Bob's gas main reaches a
+> line item at **877.6 LF** inside the ±5% band, named `Gas Piping` from the sheet's own general
+> note. (Plans 23-10, 23-12, 23-15.)
 
 ## 10. DECISIVE offline finding (2026-07-15) — "136 Columns" was COINCIDENTAL; no real column cluster
 
@@ -351,14 +391,53 @@ guestrooms**, which independently confirms the model:
 
 ID-413 alone (90 × QQ A) is 22,843 SF = 39% of the whole Gyp Ceiling total.
 
-**13.3 BLOCKER A — the multiplier is NOT IN THE INPUT.** The drawing index (p1) lists
-**`CS-04 GUESTROOM MATRIX`** and `LEVEL 01–07 RCP PLAN`s, but the 40-page PDF contains **neither
-CS-04 nor the guestroom floors (LEVELS 02–06)** — only Level 1 Lobby, Pop-Up Hub, Level 7, and the 18
-prototype sheets. p2's "UNIT TYPE" is a *legend of tag symbols*, not counts; Level 7 carries no unit
-tags. **Nothing in this PDF states "90 × QQ A".** The estimator had the full set; our input is a
-subset. No LLM or geometry can derive a number the document does not contain — this is an INPUT gap,
-not a code gap. Resolution (user decision 2026-07-17): **the human supplies unit counts in the
-manifest** (an estimator knows the room mix) — the sanctioned human-in-the-loop channel.
+**13.3 ~~BLOCKER A — the multiplier is NOT IN THE INPUT.~~ FALSIFIED — see the correction below.**
+The drawing index (p1) lists **`CS-04 GUESTROOM MATRIX`** and `LEVEL 01–07 RCP PLAN`s, but the
+40-page PDF contains **neither CS-04 nor the guestroom floors (LEVELS 02–06)** — only Level 1 Lobby,
+Pop-Up Hub, Level 7, and the 18 prototype sheets. p2's "UNIT TYPE" is a *legend of tag symbols*, not
+counts; Level 7 carries no unit tags. ~~**Nothing in this PDF states "90 × QQ A".**~~ The estimator
+had the full set; our input is a subset. ~~No LLM or geometry can derive a number the document does
+not contain — this is an INPUT gap, not a code gap. Resolution (user decision 2026-07-17): **the
+human supplies unit counts in the manifest** (an estimator knows the room mix) — the sanctioned
+human-in-the-loop channel.~~
+
+> ### CORRECTION (2026-08-04, phase 23 / plan 23-16, decision D-01) — the multiplier IS in the input
+>
+> **The old claim (struck above):** "the multiplier is NOT IN THE INPUT"; "nothing in this PDF
+> states 90 × QQ A"; therefore the unit counts must come from a human via the manifest. The same
+> claim was carried in `_manifest_room_mix`'s docstring, which asserted the mix "is routinely not in
+> the drawing set at all … so **no reading of the plan can recover it**". Both were reasoned from
+> the ABSENCE of CS-04 and of the guestroom floor plans; neither was tested against the sheets the
+> PDF does contain.
+>
+> **The falsifying evidence — a blind census of the set's own unit key plans.** Pages 7 and 8
+> (`ID-001 LEVEL 01 KEY PLAN` / `ID-002 LEVEL 05 KEY PLAN`, selected structurally by their printed
+> DRAWING titles, not by a page-text search) carry **214 room tags with 214 distinct room numbers
+> and zero duplicates**. Counting them — before any golden number was read — yields:
+>
+> | unit type | from the drawings | §13.2's golden multiplier |
+> |---|---|---|
+> | QQ A | **90** | 90 |
+> | KING A | **26** | 26 |
+> | K SUITE B (= KING SUITE B) | **2** | 2 |
+> | BUNK B | **1** | 1 |
+>
+> **4 of 4 exact.** The room mix is in the input; it was simply on two sheets nobody had read as
+> data. (The census measures 214 tags where the investigation first reported 217; the three-tag
+> difference is multi-line room names and touches none of the four multipliers above.)
+>
+> **Citation:** `INV-05-finish-schedule-binding.md` §2 Key B (the census), plan `23-05-SUMMARY.md`
+> (the fail-closed reader) and `23-08-SUMMARY.md` (the wiring and the D-10 precedence).
+>
+> **The delivered contract.** `room_tags.derive_room_mix` reads the census on every run and
+> `TakeoffPipeline._resolve_room_mix` publishes it under one precedence: **the drawings win**
+> wherever the census has a count, the manifest fills only names the drawings never state, a
+> disagreement is **flagged on the row that uses the number** naming both values and both sources,
+> and a census that cannot be trusted (a duplicated room number) refuses **wholesale** rather than
+> publishing a partial count. Eleven of Moxy's fifteen unit types are now drawing-derived and every
+> count carries `unit_count_source` into its formula string. `human_inputs/moxy_knoxville.json` is
+> **not edited** — the two counts it gets wrong (`BUNK A`, `KING SUITE C`: 2 where the drawings say
+> 1) are surfaced as flags, which is how the estimator finds them.
 
 **13.4 BLOCKER B — the room engine cannot extract Moxy's rooms.** With the scale now correct
 (§13.5), on ID-411: `extract_walls` → 41 walls, but `extract_rooms` → 8 fragments of **17 SF** each
@@ -380,7 +459,7 @@ error on every room**. Now reads Moxy p27 → 13 scales @ 4.0 ft/in, p9 @ 5.33. 
 **Honest status:** Moxy needs (a) manifest unit counts [user-agreed], (b) a viewport-bound room
 extractor. Until (b) exists, Gyp Ceiling/Gyp Wall stay ~0 regardless of manifest and scale.
 
-## 14. The room-measurement engine (2026-07-17) — Gyp Ceiling 0 → 7.0%
+## 14. The room-measurement engine (2026-07-17) — Gyp Ceiling 0 → 7.0% *(by direct probe, NOT by a run — see the correction in §14 below)*
 
 **`deterministic/room_fill.py` (Recipe E).** A room is **not a polygon in the file — it is a REGION
 ENCLOSED BY INK**, so rasterize the drawing and flood-fill it. Built because every vector route
@@ -405,7 +484,63 @@ fill's `plan_name`. It is a COUNT, never a quantity — and it is an estimator i
 genuinely absent from the drawing set* (§13.3). A prototype whose type is not in the mix is emitted
 as the single measured unit and **flagged**, never multiplied by a guess.
 
-**Blind result (no golden peeking), Moxy Gyp Ceiling — was 0:**
+**Blind result (no golden peeking), Moxy Gyp Ceiling — was 0.**
+
+> ### CORRECTION (2026-08-04, phase 23 / plan 23-16, decision D-01) — how this figure was produced, and the table recomputed
+>
+> **The old claim (implicit in this section's heading and its TOTAL row):** that the pipeline had
+> taken Moxy Gyp Ceiling from 0 to a **7.0%** blind error — i.e. that a RUN produced these numbers.
+>
+> **The falsifying evidence, in two parts.**
+>
+> 1. **The figure came from a PROBE calling the engine directly, not from a run.** The saved run
+>    that postdates every room-engine and classifier commit of that day
+>    (`VisionOnly_Moxy_Knoxville_20260717_045741`) contains `room_fill` **0 times**, `unit_count`
+>    **0 times** and `plan_name` **0 times**, and every `unit_type` prototype landed as an empty
+>    `0.0` line item. **A real run could not reach these sheets at all**: the classifier discarded
+>    **18 of Moxy's 40 pages**, including all 16 guestroom prototypes (pages 23–38), because
+>    `COVER` matched inside an electrical keynote reading `LIGHT SWITCH COVER PLATE` that bled into
+>    the title-block crop. `title_sheet` means an empty pass list, which means the sheet is skipped
+>    before geometry runs. The numbers below are real measurements of real drawings; what was not
+>    real was the claim that a client would receive them.
+> 2. **The TOTAL row does not equal the sum of its own rows.** The nine per-sheet rows sum to
+>    **44,011** measured against **41,912** golden (+5.0%), not the **45,837 / 42,835 = 7.0%**
+>    printed. Whatever the total was computed over, it was not this table, and the two cannot both
+>    be the basis.
+>
+> **Citation:** `INV-00-live-run-evidence.md` §1 (the run artifacts and the direct-invocation
+> proof), `INV-08-coverage-flags.md` §1.1–§1.2 (the 18 skipped pages and the deciding keyword),
+> plans `23-01-SUMMARY.md` and `23-06-SUMMARY.md` (the fix: Moxy 18 → 2 classifier-discarded pages,
+> with Crow, Bob's and Chelsea byte-identical).
+>
+> **The recomputation, on ONE stated basis.** Basis: **the shipped engine's measured RCP fill for
+> each prototype sheet × the unit count the in-plan census resolves for that plan name** (§13.3's
+> correction), scored against the same golden per-sheet figures this table already quoted. Measured
+> offline today, zero API — all nine per-sheet values reproduce the originals exactly:
+>
+> | sheet | plan | measured/unit | × units (source) | = measured | golden | err |
+> |---|---|---|---|---|---|---|
+> | ID-415 | QQ C | 284.3 | 15 (census) | 4,264.5 | 4,255 | **+0.2%** |
+> | ID-414 | QQ B | 309.5 | 6 (census) | 1,857.0 | 1,843 | **+0.8%** |
+> | ID-417 | BUNK B | 274.6 | 1 (census) | 274.6 | 271 | **+1.3%** |
+> | ID-409 | KING C | 217.6 | 5 (census) | 1,088.0 | 1,064 | **+2.3%** |
+> | ID-411 | KING SUITE B | 341.7 | 2 (census) | 683.4 | 707 | **−3.3%** |
+> | ID-407 | KING A | 229.4 | 26 (census) | 5,964.4 | 5,748 | **+3.8%** |
+> | ID-410 | KING SUITE A | 362.5 | 5 (census) | 1,812.5 | 1,884 | **−3.8%** |
+> | ID-408 | KING B | 235.5 | 15 (census) | 3,532.5 | 3,297 | +7.1% |
+> | ID-413 | QQ A | 272.6 | 90 (census) | 24,534.0 | 22,843 | +7.4% |
+> | **TOTAL** | | | | **44,010.9** | **41,912** | **+5.0%** |
+>
+> **This table EXCLUDES four sheets, and all four now carry a multiplier flag.** ID-412 (KING SUITE
+> C) and ID-416 (BUNK A) are published at the census count **1** while the manifest declares **2** —
+> a disagreement, flagged, with the manifest untouched; ID-420 (ACC QQ RIS) and ID-422 (ACC BUNK)
+> have no key-plan tag at all, so their count of 2 is manifest-only and is flagged as **not derived
+> from the drawings**. Correcting those multipliers legitimately moves the Gyp Ceiling total
+> **AWAY** from golden, and **that movement is not a regression** — it is the point of §14.3. This
+> total is therefore a record of one basis, not a target: nothing in the suite asserts against it.
+> (Plans 23-08, 23-13.)
+
+**The original table, as published on 2026-07-17 (measured by direct probe, not by a run):**
 
 | sheet | measured/unit | × units | golden | err |
 |-------|---------------|---------|--------|-----|
@@ -428,10 +563,66 @@ COLLECTION of drawings; its type is only the dominant one. An explicit `"- AR/RC
 title now outranks a stray ELEVATION keyword (not FF/EM/FC — those carry no take-off geometry).
 Moxy floor_plan **10 → 26**; Crow/Bob's unchanged.
 
-**14.2 OPEN DEFECT — do not paper over.** ID-412/ID-416 measure **~2×** (458 vs 231): the clip reaches
-the adjacent opposite-hand plan. The 900 SF plausibility guard does not catch them. Setting it to
-~420 SF would make them pass and would **overfit to guestrooms** — it silently breaks on a lobby.
-Fix the clip, not the threshold.
+**14.2 OPEN DEFECT — do not paper over.** ID-412/ID-416 measure **~2×** (458 vs 231): ~~the clip
+reaches the adjacent opposite-hand plan.~~ **FALSIFIED — see the correction below.** The 900 SF
+plausibility guard does not catch them. Setting it to ~420 SF would make them pass and would
+**overfit to guestrooms** — it silently breaks on a lobby. **Fix the clip, not the threshold** —
+that instruction stands, and is the one part of this passage the evidence upholds.
+
+> ### CORRECTION (2026-08-04, phase 23 / plan 23-16, decision D-01) — the clip is EXONERATED; the multiplier is the defect
+>
+> **The old claim (struck above):** ID-412 and ID-416 read ~2× because *the clip reaches the
+> adjacent opposite-hand plan*. It was inferred from the ~455 SF readings; the clip itself was
+> never tested. (The investigator who first proposed it has formally retracted it —
+> `INV-00-live-run-evidence.md` §1b, "RETRACTED 2026-08-03 — this diagnosis was WRONG".)
+>
+> **The falsifying evidence — three independent geometric probes, all free and offline.**
+>
+> 1. **Clip-width sweep.** Varying the clip's half-width over a **240 pt range** changes ID-412 by
+>    **0.0 SF** and ID-416 by **0.5 SF** — while it moves ID-415 by **+57.5 SF (+20%)** and ID-407
+>    by **+38.8 SF (+17%)**. If the 2× came from the clip, the two "defective" sheets would be the
+>    MOST clip-sensitive; they are the LEAST.
+> 2. **Where the counted ink physically sits.** Every enclosed region the fill counts on ID-412 lies
+>    inside a 339 × 502 pt column — **47% of the 715 × 612 pt clip**. Nothing from a neighbour is
+>    inside it. (Adjacent clips do overlap by 8–48% on *every* prototype sheet, and the two
+>    "defective" ones are not even the worst — ID-416 is the 4th lowest.)
+> 3. **The drawing's own printed dimensions.** ID-412 prints `17'-0 1/8" × 26'-9 1/8"` = **455.2
+>    SF** against a measured fill of **458.3 SF** — a ratio of **1.007**. A clip that had swallowed
+>    a second unit would read ≈ 2.0. Thirteen of the sixteen prototypes land in 0.976–1.073, and
+>    ID-412 and ID-416 are among the *tightest* fits in the whole set.
+>
+> **The real defect is a unit count in the human input.** `human_inputs/moxy_knoxville.json`
+> declares `unit_count: 2` for these sheets, derived from the golden `Doors-WD 2 EA` — but on a
+> suite those two wood doors are an **entry door plus a connecting door in ONE unit** (the sheet's
+> own key note 3 reads *"WHEN CONNECTING DOOR IS USED…"*). So a correct 458.3 SF was multiplied by
+> 2 and published at `confidence: "high"`. Four sheets share the signature: **ID-412, ID-416,
+> ID-420, ID-422**. The 900 SF guard could never have caught it — it sat on the **wrong side of the
+> multiplication**, seeing 458 SF and passing it, while the 917 SF that was actually wrong was
+> produced later in fusion where no guard looked.
+>
+> **Citation:** `INV-02-clip-defect.md` §2 (region positions), §3 (the clip-width sweep and the
+> overlap table), §4 (the printed-dimension probe and the multiplier), §5 (the wrong-side guard);
+> retraction in `INV-00-live-run-evidence.md` §1b.
+>
+> **The delivered contract, on both halves.**
+> - *The threshold:* `_MAX_UNIT_SF = 900.0` and `flag_implausible_unit` are **deleted**. Their
+>   replacement is `cross_check_extent`, a **dimensionless ratio** against the drawing's own printed
+>   overall extent (`EXTENT_TOLERANCE = 1.25`, read off the observed distribution: thirteen honest
+>   sheets at 0.976–1.073, a genuine two-plan leak at ≈ 2.0). The same number governs a 250 SF guest
+>   room and a 12,000 SF ballroom — asserted by scaling both sides by fifty. It **flags, never
+>   filters**: a sheet printing no dimension pair is NEEDS REVIEW carrying its measurement, and a
+>   test greps `room_fill.py` so no new square-foot constant can reintroduce the shape. (Plan 23-11.)
+> - *The root cause:* a multiplier-review flag now fires on **exactly** ID-412/416/420/422 and on
+>   none of the nine census-confirmed sheets, keyed off a structural census-vs-manifest disagreement
+>   rather than a blanket "count > 1"; any count above one downgrades confidence and carries its
+>   source. (Plan 23-13.)
+> - *"Fix the clip, not the threshold" is still owed in part.* The clip WAS made rotation-correct
+>   and page-space-bounded (plan 23-07 — it was rendering a band across the whole sheet on
+>   `/Rotate 270` pages). The fully geometric, viewport-bounded clip cell is **NOT done**: its
+>   proposed partition rule is falsified on the fixtures (best variant reproduces 4 of 16 sheets),
+>   and it is blocked behind an unanswered domain question — *what should a dimension-string
+>   corridor contribute to a room's measured area?* — recorded as **DEF-23-SP4**. That is stated
+>   here rather than quietly dropped.
 
 **14.3 Methodology warning (cost us hours).** "Best of AR/RCP" and "closest to golden" are **PEEKING**
 and inflated this engine's apparent accuracy from 33% → 3%. Fix the selection rule BLIND, then score.
