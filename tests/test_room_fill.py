@@ -13,16 +13,21 @@ import pytest
 
 from bobbytailor.deterministic.room_fill import (
     EXTENT_TOLERANCE,
+    MAX_HONEST_SHAPE_RATIO,
     MAX_REGION_SF,
     RoomFillResult,
     cross_check_extent,
+    drawing_ceiling_heights,
     from_page_space,
     label_mask,
     measure_enclosed_area,
     printed_extent_bound,
+    resolve_drawing_height,
     select_fill_for_basis,
     to_page_space,
     total_for_units,
+    wall_area_for_unit,
+    wall_perimeter_for_unit,
 )
 
 # 1/4" = 1'-0"  ->  4 ft per inch  ->  4/72 ft per point (Moxy's guestroom scale)
@@ -800,6 +805,12 @@ def moxy_prototype_fills():
     from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
 
     pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    # The POISONED project answer is deliberately armed (23-13): Moxy's project
+    # resolver returns 15 ft from a roof-plan "CLEAR REQ'D" callout at source
+    # "plan". With it armed, the height assertions below prove the per-drawing
+    # tag WINS over it — not merely that no project height was available.
+    pipe._project_wall_height = 15.0
+    pipe._project_wall_height_source = "plan"
     doc = fitz.open(MOXY_PDF)
     try:
         out = {
@@ -1439,3 +1450,244 @@ def test_every_prototype_sheet_reports_a_perimeter_at_all(moxy_prototype_fills):
         assert fill.perimeter_lf > 0.0, name
         assert len(fill.region_perimeters) == len(fill.regions)
         assert all(p > 0.0 for p in fill.region_perimeters), name
+
+
+# ── 23-13 Task 1: billable perimeter, wall area, and the drawing's own height ─
+#
+# The primitives the wall binder consumes. The threshold is geometric and
+# published (MAX_HONEST_SHAPE_RATIO); nothing here consults a golden quantity.
+
+
+def _fill_with_geometry(regions, perimeters, ratios, **kw):
+    return RoomFillResult(
+        area_sf=round(sum(regions), 1), regions=list(regions),
+        region_perimeters=list(perimeters), region_shape_ratios=list(ratios),
+        perimeter_lf=round(sum(perimeters), 1), **kw
+    )
+
+
+def test_wall_area_for_unit_multiplies_perimeter_by_height():
+    assert wall_area_for_unit(60.0, 9.0) == 540.0
+    assert wall_area_for_unit(56.1, 9.0) == pytest.approx(504.9)
+    assert wall_area_for_unit(0.0, 9.0) == 0.0
+
+
+def test_a_leaking_dominant_region_returns_zero_perimeter_with_the_ratio_named():
+    """The INV-01 architectural-leak signature: dominant ratio 8.62 > 8.0.
+
+    Zero plus a reason — the caller flags; a fabricated linear-foot figure is
+    never emitted."""
+    fill = _fill_with_geometry([173.5, 11.5], [113.6, 24.0], [8.62, 9.1])
+    billable, reason = wall_perimeter_for_unit(fill)
+    assert billable == 0.0
+    assert "8.62" in reason and "8.0" in reason
+    assert "UNMEASURED" in reason, "a zero here is 'not measured', never 'no walls'"
+
+
+def test_billable_perimeter_sums_honest_regions_and_names_dropped_cells():
+    """Dominant honest, one annotation cell: the cell's LF is dropped AND named."""
+    fill = _fill_with_geometry(
+        [121.8, 34.2, 13.4], [56.1, 30.4, 42.3], [5.08, 5.20, 11.56]
+    )
+    billable, reason = wall_perimeter_for_unit(fill)
+    assert billable == pytest.approx(86.5)  # 56.1 + 30.4, never the 42.3
+    assert "11.56" in reason and "13.4 SF" in reason, (
+        "a dropped annotation cell is named, never silently discarded"
+    )
+
+
+def test_a_clean_fill_bills_every_region_with_no_reason():
+    fill = _fill_with_geometry([121.8, 34.2], [56.1, 30.4], [5.08, 5.20])
+    billable, reason = wall_perimeter_for_unit(fill)
+    assert billable == pytest.approx(86.5)
+    assert reason == ""
+
+
+def test_an_unmeasured_dominant_perimeter_refuses_rather_than_bills_zero_length():
+    fill = _fill_with_geometry([121.8, 34.2], [0.0, 30.4], [0.0, 5.20])
+    billable, reason = wall_perimeter_for_unit(fill)
+    assert billable == 0.0
+    assert "UNMEASURED" in reason
+
+
+def test_a_fill_with_no_region_perimeters_refuses():
+    fill = RoomFillResult(area_sf=200.0, regions=[200.0])
+    billable, reason = wall_perimeter_for_unit(fill)
+    assert billable == 0.0
+    assert "no per-region perimeters" in reason
+
+
+def test_the_shape_threshold_is_the_published_constant():
+    """wall_perimeter_for_unit consumes MAX_HONEST_SHAPE_RATIO — the one 23-09
+    published — not a private copy that could drift."""
+    import inspect
+
+    from bobbytailor.deterministic import room_fill
+
+    sig = inspect.signature(room_fill.wall_perimeter_for_unit)
+    assert sig.parameters["max_shape_ratio"].default is MAX_HONEST_SHAPE_RATIO
+
+
+def _page_with_text(lines):
+    """A page carrying text lines at distinct positions, plus their clip."""
+    doc = fitz.open()
+    page = doc.new_page(width=800, height=800)
+    y = 150.0
+    for text in lines:
+        page.insert_text(fitz.Point(120.0, y), text, fontsize=10)
+        y += 40.0
+    return doc, page, fitz.Rect(80, 80, 700, y + 40)
+
+
+def test_the_taller_ceiling_tag_wins_and_the_source_is_the_drawing():
+    """9'-0\" bedroom + 8'-0\" bath soffit -> 9.0, source 'drawing'.
+
+    The wall boarded to full height is the tall one (INV-01 §5)."""
+    doc, page, clip = _page_with_text(['9\'-0"', '8\'-0"'])
+    heights = drawing_ceiling_heights(page, clip)
+    assert heights == [8.0, 9.0]
+    h, src = resolve_drawing_height(page, clip, 15.0, "plan")
+    assert h == 9.0 and src == "drawing", (
+        "the drawing's own tag must beat the poisoned 15 ft project answer"
+    )
+    doc.close()
+
+
+def test_an_aff_mounting_height_is_excluded_and_never_becomes_the_height():
+    """8'-1\"AFF is a towel-bar mounting height, not a ceiling. In-band, taller
+    than the real 8'-0\" soffit — and it must still lose."""
+    doc, page, clip = _page_with_text(['8\'-1"AFF', '8\'-0"'])
+    assert drawing_ceiling_heights(page, clip) == [8.0]
+    h, src = resolve_drawing_height(page, clip, None, "")
+    assert h == 8.0 and src == "drawing"
+    doc.close()
+
+
+def test_tokens_outside_the_ceiling_band_are_ignored():
+    doc, page, clip = _page_with_text(['2\'-2"', '15\'-0"', '30\'-0"'])
+    assert drawing_ceiling_heights(page, clip) == []
+    doc.close()
+
+
+def test_no_tag_falls_back_to_the_project_height_with_its_source_carried():
+    doc, page, clip = _page_with_text(["GENERAL NOTES"])
+    h, src = resolve_drawing_height(page, clip, 15.0, "plan")
+    assert h == 15.0 and src == "plan", (
+        "the fallback is honest about WHERE the number came from — the binder "
+        "flags any source that is not the drawing"
+    )
+    doc.close()
+
+
+def test_no_tag_and_no_project_height_resolves_to_nothing_so_the_caller_flags():
+    doc, page, clip = _page_with_text(["GENERAL NOTES"])
+    assert resolve_drawing_height(page, clip, None, "") == (None, "")
+    assert resolve_drawing_height(page, None, None, "") == (None, "")
+    doc.close()
+
+
+def test_a_line_outside_the_clip_is_not_a_tag_of_this_drawing():
+    doc, page, clip = _page_with_text(['9\'-0"'])
+    elsewhere = fitz.Rect(700, 700, 790, 790)  # excludes the text
+    assert drawing_ceiling_heights(page, elsewhere) == []
+    doc.close()
+
+
+# ── 23-13 Task 1: the real-PDF height + billable-perimeter assertions ────────
+#
+# The fixture arms the POISONED project answer (15 ft, source "plan") before
+# measuring, so every assertion below proves the drawing's own tag wins over
+# an available authoritative-looking wrong number — the actual trap.
+
+# (page, expected height) — every prototype RCP prints 9'-0" except BUNK A
+# (p32), whose RCP prints 9'-8". The plan's acceptance says "nine feet"
+# everywhere; the drawing on p32 says 9'-8", and the MEASUREMENT wins over the
+# plan literal (the 23-09 rule). What matters is identical either way:
+# the source is the DRAWING, and the value is never the roof-plan 15.
+MOXY_PROTOTYPE_HEIGHTS = [
+    (23, 9.0), (24, 9.0), (25, 9.0), (26, 9.0), (27, 9.0), (28, 9.0),
+    (29, 9.0), (30, 9.0), (31, 9.0), (32, 9.667), (33, 9.0), (34, 9.0),
+    (35, 9.0), (36, 9.0), (37, 9.0), (38, 9.0),
+]
+
+
+def test_every_prototype_reports_its_height_from_the_drawing_never_fifteen(
+    moxy_prototype_fills,
+):
+    for page, expected in MOXY_PROTOTYPE_HEIGHTS:
+        for fill in moxy_prototype_fills[page]:
+            assert fill.wall_height_source == "drawing", (
+                "p%d %s: source %r — the poisoned 15 ft 'plan' answer was "
+                "armed and must lose to the drawing's own tag"
+                % (page, fill.viewport_title, fill.wall_height_source)
+            )
+            assert fill.wall_height_ft == pytest.approx(expected, abs=0.01), (
+                "p%d %s: height %r" % (page, fill.viewport_title,
+                                       fill.wall_height_ft)
+            )
+            assert fill.wall_height_ft != 15.0
+
+
+def test_the_aff_mounting_tags_on_the_real_em_clips_are_excluded():
+    """p38 ACC BUNK EM clip prints 8'-1\"AFF and 7'-4\"AFF — both in band,
+    both mounting heights. Neither may surface as a ceiling tag."""
+    import os
+
+    if not os.path.exists(MOXY_PDF):
+        pytest.skip("the real Moxy plan set is not present")
+    from bobbytailor.deterministic.printed_scale import extract_printed_scales
+    from bobbytailor.deterministic.room_fill import plan_titles
+    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+    pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    doc = fitz.open(MOXY_PDF)
+    try:
+        page = doc[38]
+        scales = extract_printed_scales(page)
+        em = [tb for name, kind, tb in plan_titles(page) if kind == "EM"]
+        assert em, "ACC BUNK - EM PLAN must exist on page 38"
+        _ps, clip = pipe._fill_clip_for_title(page, scales, em[0])
+        assert clip is not None
+        heights = drawing_ceiling_heights(page, clip)
+        assert 8.083 not in [round(h, 3) for h in heights]
+        assert 7.333 not in [round(h, 3) for h in heights]
+    finally:
+        doc.close()
+
+
+# The INV-01 §4 prototypes: pages 23/27/29 leak on the architectural fill
+# (8.62 / 9.04 / 8.54); page 33's architectural fill is HONEST (4.37) and the
+# measurement wins over the plan's "four architectural zeros" literal, exactly
+# as 23-09 pinned 451.1 over the plan's 451.0.
+MOXY_AR_LEAK_PAGES = [23, 27, 29]
+
+
+def test_the_reflected_ceiling_fill_bills_a_perimeter_on_the_inv01_prototypes(
+    moxy_prototype_fills,
+):
+    for page in (23, 27, 29, 33):
+        fill = _dominant(moxy_prototype_fills, page, "RCP")
+        billable, _reason = wall_perimeter_for_unit(fill)
+        assert billable > 0.0, "p%d RCP must bill a perimeter" % page
+
+
+@pytest.mark.parametrize("page", MOXY_AR_LEAK_PAGES)
+def test_the_leaking_architectural_fill_refuses_with_a_reason(
+    moxy_prototype_fills, page,
+):
+    """The leak signature reproduced blind: zero + a reason, never a number."""
+    fill = _dominant(moxy_prototype_fills, page, "AR")
+    billable, reason = wall_perimeter_for_unit(fill)
+    assert billable == 0.0
+    assert "shape ratio" in reason and "UNMEASURED" in reason
+
+
+def test_the_honest_architectural_fill_on_page_33_bills_its_perimeter(
+    moxy_prototype_fills,
+):
+    """BUNK B AR measures 4.37 — inside the honest band. A detector that fired
+    everywhere would be a gate, not a detector (23-09: 'it is not a detector
+    that fires everywhere')."""
+    fill = _dominant(moxy_prototype_fills, 33, "AR")
+    billable, _reason = wall_perimeter_for_unit(fill)
+    assert billable > 0.0

@@ -132,6 +132,44 @@ MAX_HONEST_SHAPE_RATIO = 8.0
 # not a quantity in square feet and must never become one.
 EXTENT_TOLERANCE = 1.25
 
+# How a partition shared by two rooms is billed (D-08, resolved from DATA).
+#
+# The question: does a wall item bill BOARD FACES (a shared partition counted
+# once per side) or WALL LENGTH once? The Moxy take-off's own legend label is
+# silent — it reads just "Gyp Wall <n> SF" with no convention stated — but the
+# estimator's own markup answers it: on ID-407 (KING A) the Gyp Wall trace runs
+# along BOTH faces of the bedroom/bath partition (parallel strokes at x 426.5
+# and 433.0 pt, y 579.0 and 587.3 pt — 6.5-8.3 pt apart, one wall thickness at
+# 1/4" = 1'-0"), and the same double-face tracing repeats on ID-411 and ID-413.
+# The unit's envelope is traced once, on its room-side face.
+#
+# Summing every billable enclosed region's OUTER perimeter implements exactly
+# that convention: the bedroom region's contour runs along the bedroom face of
+# the shared partition, the bathroom region's contour along the bathroom face,
+# and the envelope appears once. This constant exists so the wall binder's
+# audit trail can NAME the convention instead of leaving it implicit.
+PARTITION_CONVENTION = (
+    "board faces: a partition shared by two regions is billed once per side "
+    "(the sum of every billable region's outer perimeter); read off the "
+    "take-off's own Gyp Wall markup, which traces a shared partition on both "
+    "faces — the legend label itself states no convention"
+)
+
+# Plausible ceiling-height band for a per-drawing height tag, in feet. Read off
+# the real sheets: every Moxy prototype RCP prints its room height (9'-0",
+# 9'-8" on BUNK A) and its bath/entry soffit (8'-0") inside the clip; fixture
+# mounting tags carry the AFF marker and are excluded by MARKER, not by band.
+CEILING_HEIGHT_BAND_FT = (7.0, 12.0)
+
+# The above-finished-floor marker. A span containing it is a fixture MOUNTING
+# height (8'-1" AFF towel bar), never a ceiling height.
+AFF_MARKER = "AFF"
+
+# Feet-and-inches token: 9'-0", 9'-8", 10'-10 3/8", 8' - 4" …
+FEET_INCHES_RE = re.compile(
+    r"(\d{1,2})'\s*-?\s*(\d{1,2})(?:\s+(\d+)/(\d+))?\s*\"?"
+)
+
 
 @dataclass
 class FilledRegion:
@@ -182,6 +220,15 @@ class RoomFillResult:
     # than the bug it is meant to catch).
     bound_sf: Optional[float] = None
     extent_ratio: Optional[float] = None
+    # The wall height this unit's quantities multiply by, and WHERE it came
+    # from. Resolved per drawing (the unit's own reflected-ceiling clip prints
+    # it) with the project resolver as a flagged fallback — never silently. A
+    # source that is not "drawing" or "learned" must flag downstream: the
+    # project answer on Moxy is 15 ft harvested from a roof-plan clearance
+    # callout, and multiplying a guest-room perimeter by it is a ~67%
+    # overstatement that today arrives UNFLAGGED (INV-01 §5).
+    wall_height_ft: Optional[float] = None
+    wall_height_source: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -200,6 +247,8 @@ class RoomFillResult:
             "region_shape_ratios": self.region_shape_ratios,
             "bound_sf": self.bound_sf,
             "extent_ratio": self.extent_ratio,
+            "wall_height_ft": self.wall_height_ft,
+            "wall_height_source": self.wall_height_source,
         }
 
 
@@ -966,6 +1015,175 @@ def cross_check_extent(
             "before billing" % (result.area_sf, ratio, bound_sf, EXTENT_TOLERANCE),
         )
     return result
+
+
+def wall_perimeter_for_unit(
+    result: RoomFillResult,
+    max_shape_ratio: float = MAX_HONEST_SHAPE_RATIO,
+) -> "tuple[float, str]":
+    """The perimeter that should be BILLED for this unit, with its reason.
+
+    Sums ``region_perimeters`` over regions whose blind shape ratio is at or
+    below *max_shape_ratio* — the honest rooms. Regions above it are
+    annotation/dimension cells (measured 11.6-13.4 on the real sheets, where a
+    13.4 SF cell contributes more linear feet than a 121.8 SF bedroom); their
+    LF is dropped and NAMED in the reason, never silently.
+
+    If the DOMINANT region itself exceeds the threshold — the leaking
+    architectural fills, measured 8.54-9.04 — the whole measurement is
+    untrustworthy as a perimeter and ``(0.0, reason)`` is returned so the
+    caller flags instead of emitting a fabricated linear-foot figure. The same
+    refusal applies when the dominant region's perimeter is UNMEASURED (the
+    trace hit its cap): a zero there is "not measured", never "no walls".
+
+    The threshold's rationale is geometric (see
+    :data:`MAX_HONEST_SHAPE_RATIO`): 4.0 is a square, the worst honest room
+    measured 5.08, and 8.0 is roughly a two-times margin. It is NOT fitted to
+    any quantity and may never be.
+
+    The convention this sum implements is :data:`PARTITION_CONVENTION` —
+    board faces, read off the take-off's own markup (D-08).
+    """
+    perims = list(result.region_perimeters or [])
+    ratios = list(result.region_shape_ratios or [])
+    if not perims or len(perims) != len(ratios):
+        return 0.0, (
+            "no per-region perimeters are recorded on this fill, so there is "
+            "no billable perimeter — the wall area is UNMEASURED, not zero"
+        )
+    # ``regions``/``region_perimeters``/``region_shape_ratios`` are parallel
+    # and ordered by area DESC (measure_enclosed_area), so index 0 is the
+    # dominant region.
+    if perims[0] <= 0.0:
+        return 0.0, (
+            "the dominant region's perimeter is UNMEASURED (the contour walk "
+            "hit its cap), so no billable perimeter exists — flag, never a "
+            "fabricated figure"
+        )
+    if ratios[0] > max_shape_ratio:
+        return 0.0, (
+            "the dominant region's shape ratio %.2f exceeds the honest-room "
+            "maximum %.1f — the fill is leaking through door swings or "
+            "dimension strings (the INV-01 architectural-leak signature), so "
+            "its perimeter would be fabricated linear feet; the wall area is "
+            "UNMEASURED, not zero" % (ratios[0], max_shape_ratio)
+        )
+    billable = 0.0
+    dropped: List[str] = []
+    areas = list(result.regions or [])
+    for i, (p, r) in enumerate(zip(perims, ratios)):
+        if p <= 0.0:
+            continue
+        if r > max_shape_ratio:
+            area_txt = "%.1f SF" % areas[i] if i < len(areas) else "?"
+            dropped.append("%s at ratio %.2f (%.1f LF)" % (area_txt, r, p))
+            continue
+        billable += p
+    reason = ""
+    if dropped:
+        reason = (
+            "%d annotation-shaped region(s) dropped from the billable "
+            "perimeter (shape ratio above %.1f): %s"
+            % (len(dropped), max_shape_ratio, "; ".join(dropped))
+        )
+    return round(billable, 1), reason
+
+
+def wall_area_for_unit(perimeter_lf: float, height_ft: float) -> float:
+    """Billable perimeter x wall height -> one unit's wall area, in SF.
+
+    One line, named, so the formula string and the tests have a single anchor
+    — the linear sibling of :func:`total_for_units`.
+    """
+    return round(float(perimeter_lf) * float(height_ft), 1)
+
+
+def drawing_ceiling_heights(page, clip) -> List[float]:
+    """Ceiling-height tags printed INSIDE *clip*, in feet, deduplicated.
+
+    Scans text lines fully inside the clip (page space — the space the clip
+    from ``_fill_clip_for_title`` lives in); accepts feet-and-inches tokens in
+    :data:`CEILING_HEIGHT_BAND_FT`; REJECTS any span containing
+    :data:`AFF_MARKER`, because ``8'-1" AFF`` is a fixture MOUNTING height,
+    not a ceiling.
+
+    Pass the REFLECTED-CEILING clip: printing the room height is what an RCP
+    is for. An architectural plan's clip is full of room DIMENSIONS
+    (``10'-10 3/8"``) that land in the same band and would be mistaken for
+    heights — the caller (:func:`resolve_drawing_height` via the pipeline)
+    therefore reads the RCP sibling of the same plan name, exactly as
+    :func:`printed_extent_bound` reads the architectural sibling.
+    """
+    out: List[float] = []
+    box = _rect(clip)
+    if box is None:
+        return out
+    lo, hi = CEILING_HEIGHT_BAND_FT
+    try:
+        blocks = page.get_text("dict")["blocks"]
+    except Exception:  # noqa: BLE001 — a height harvest must never kill a run
+        return out
+    for b in blocks:
+        for line in b.get("lines", []):
+            bbox = line.get("bbox")
+            if not bbox or len(bbox) < 4:
+                continue
+            pbox = _rect(to_page_space(page, _rect(bbox)))
+            if pbox is None:
+                continue
+            if not (box.x0 <= pbox.x0 and pbox.x1 <= box.x1
+                    and box.y0 <= pbox.y0 and pbox.y1 <= box.y1):
+                continue
+            txt = "".join(s.get("text", "") for s in line.get("spans", []))
+            if AFF_MARKER in txt.upper():
+                continue
+            for m in FEET_INCHES_RE.finditer(txt):
+                feet = int(m.group(1)) + int(m.group(2)) / 12.0
+                if m.group(3) and m.group(4):
+                    try:
+                        feet += int(m.group(3)) / int(m.group(4)) / 12.0
+                    except ZeroDivisionError:
+                        continue
+                if lo <= feet <= hi:
+                    value = round(feet, 3)
+                    if value not in out:
+                        out.append(value)
+    return sorted(out)
+
+
+def resolve_drawing_height(
+    page,
+    clip,
+    project_height_ft: Optional[float] = None,
+    project_height_source: str = "",
+) -> "tuple[Optional[float], str]":
+    """``(height_ft, source)`` — most specific first, and never a silent guess.
+
+    Precedence: the drawing's own ceiling tag (source ``"drawing"``), then
+    whatever the project resolver produced (its source carried through —
+    ``"learned"`` wins inside the resolver already, then ``"plan"``, then
+    ``"default"``), then ``(None, "")`` so the caller FLAGS.
+
+    The TALLER tag wins when the clip prints several: within one unit the
+    reflected ceiling plan prints the room height and the lower bath/entry
+    soffit, and the wall boarded to full height is the tall one (INV-01 §5).
+
+    Anything whose source is not ``"drawing"`` (or ``"learned"``) must set
+    needs-review downstream with the source named: Moxy's project answer is
+    15 ft from a roof-plan ``CLEAR REQ'D`` callout whose source reads
+    ``"plan"``, which is precisely the trap that does not flag today.
+    """
+    if clip is not None:
+        tags = drawing_ceiling_heights(page, clip)
+        if tags:
+            return max(tags), "drawing"
+    try:
+        height = float(project_height_ft) if project_height_ft is not None else None
+    except (TypeError, ValueError):
+        height = None
+    if height is not None and height > 0:
+        return height, (project_height_source or "default")
+    return None, ""
 
 
 def total_for_units(area_sf: float, unit_count: int) -> float:

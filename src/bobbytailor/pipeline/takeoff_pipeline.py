@@ -2412,6 +2412,7 @@ class TakeoffPipeline:
             measure_enclosed_area,
             plan_titles,
             printed_extent_bound,
+            resolve_drawing_height,
         )
 
         drops: List[DrawingCoverage] = []
@@ -2459,6 +2460,23 @@ class TakeoffPipeline:
                 ar_rects.setdefault(plan_name, []).append(
                     from_page_space(page, ar_clip)
                 )
+
+        # The unit's WALL HEIGHT is printed inside its reflected-ceiling clip —
+        # printing the room height is what an RCP is for — so the RCP sibling
+        # of the SAME plan name is located by the same clip recipe and its
+        # rectangle answers the height for every fill of that name. Reading the
+        # architectural clip instead would mistake room DIMENSIONS
+        # (10'-10 3/8") for heights; reading the project resolver instead
+        # inherits the 15 ft roof-plan clearance callout at source "plan",
+        # which does not flag (INV-01 §5). Page space, like the clip itself.
+        rcp_kind = BASIS_PLAN_KIND.get("ceiling_area")
+        rcp_rects: dict = {}
+        for plan_name, plan_kind, tb in titles:
+            if plan_kind != rcp_kind:
+                continue
+            _ps, rcp_clip = self._fill_clip_for_title(page, scales, tb)
+            if rcp_clip is not None:
+                rcp_rects.setdefault(plan_name, rcp_clip)
         mask_rects = [
             vp.bbox_pt for vp in (viewports or ())
             if getattr(vp, "kind", "") in _MASK_VIEWPORT_KINDS
@@ -2551,6 +2569,19 @@ class TakeoffPipeline:
             result.plan_name = plan_name
             result.plan_kind = plan_kind
             result.viewport_title = "%s - %s PLAN" % (plan_name, plan_kind)
+            # Height precedence, most specific first: the unit's own
+            # reflected-ceiling tag ("drawing"), then the project resolver
+            # (whose own precedence is learned → plan → default, source
+            # carried), then nothing — and anything not read from the drawing
+            # flags downstream rather than multiplying silently.
+            result.wall_height_ft, result.wall_height_source = (
+                resolve_drawing_height(
+                    page,
+                    rcp_rects.get(plan_name),
+                    getattr(self, "_project_wall_height", None),
+                    getattr(self, "_project_wall_height_source", None) or "",
+                )
+            )
             out.append(result)
             if oversize:
                 # Measured, but not everything inside the clip was kept. The
@@ -2575,9 +2606,14 @@ class TakeoffPipeline:
                     )
                 )
             logger.info(
-                "sheet %r: %s %r enclosed area %.1f SF at %.2f ft/in%s",
+                "sheet %r: %s %r enclosed area %.1f SF at %.2f ft/in, "
+                "perimeter %.1f LF, wall height %s (source %s)%s",
                 sheet_name, result.candidate_id, result.viewport_title,
                 result.area_sf, result.scale_fpi or 0.0,
+                result.perimeter_lf,
+                ("%.2f ft" % result.wall_height_ft)
+                if result.wall_height_ft is not None else "UNRESOLVED",
+                result.wall_height_source or "none",
                 " [needs review]" if result.needs_review else "",
             )
         return out, drops
