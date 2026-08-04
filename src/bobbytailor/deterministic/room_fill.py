@@ -170,6 +170,143 @@ FEET_INCHES_RE = re.compile(
     r"(\d{1,2})'\s*-?\s*(\d{1,2})(?:\s+(\d+)/(\d+))?\s*\"?"
 )
 
+# ── Elevation facades (23-14 / INV-03) ───────────────────────────────────────
+#
+# A facade is a FILLED SILHOUETTE subdivided by joint and reveal lines — not a
+# void enclosed by walls. The naive room flood fill fragments Bob's front
+# elevation into 63 voids summing 4,561 SF; complement labelling (flood the
+# FREE pixels from the clip border, invert, take the largest component)
+# returns ONE clean blob per elevation on all three fixtures that draw
+# elevations, with no tuning (INV-03 §3.1-3.2).
+
+# The word that names an elevation drawing in its own printed callout title.
+ELEVATION_TITLE_RE = re.compile(r"\bELEVATIONS?\b", re.IGNORECASE)
+
+# Orientation classification. An exterior facade names its orientation either
+# directly BEFORE the elevation word ("FRONT ELEVATION NEW", "SIDE ELEVATION
+# TYPE A") or directly AFTER it ("LEASING ELEVATION FRONT", "BUILDING
+# ELEVATION SOUTH …", "16-BAY GARAGE ELEVATION SIDE1"). A title with NEITHER —
+# "MAIN ENTRY LOUNGE ELEVATION A", "ELEVATION GUEST ENTRY DOOR", "ELEVATION
+# VIEW" — is an interior or detail elevation, and it is EXCLUDED from
+# new-work exterior quantities rather than guessed at (23-CONTEXT decision 4:
+# interior elevations are excluded; WC areas must not be synthesized).
+_ELEV_ORIENT_BEFORE_RE = re.compile(
+    r"\b(TRUCK\s+DOCK|NORTH|SOUTH|EAST|WEST|FRONT|REAR|BACK|SIDE)\s+"
+    r"ELEVATIONS?\b",
+    re.IGNORECASE,
+)
+_ELEV_ORIENT_AFTER_RE = re.compile(
+    r"\bELEVATIONS?\s*-?\s*(NORTH|SOUTH|EAST|WEST|FRONT|REAR|BACK|SIDE)\d?\b",
+    re.IGNORECASE,
+)
+# Intent: a demolition/existing elevation describes what is REMOVED, not what
+# is built — Bob's page 4 carries FRONT ELEVATION DEMOLITION (6,134 SF) beside
+# FRONT ELEVATION NEW (6,245 SF), and counting both doubles the front facade.
+_ELEV_DEMO_RE = re.compile(r"\b(DEMOLITION|DEMO|EXISTING)\b", re.IGNORECASE)
+_ELEV_INTERIOR_RE = re.compile(r"\bINTERIOR\b", re.IGNORECASE)
+
+# A dedicated drawing-title text line ("FRONT ELEVATION DEMOLITION" at 25 pt)
+# is short; a general note that happens to contain the word ELEVATIONS is a
+# sentence. Measured on the real sheets: every true title line is <= 45 chars,
+# the shortest offending note is 73.
+_ELEV_TITLE_MAX_CHARS = 60
+
+# Render resolution for facade silhouettes. Elevations are wide-format —
+# Crow's south facade band is 2,441 x 335 pt — so the room-fill 160 DPI would
+# be a 12-million-pixel clip. 80 DPI resolved every facade on all three
+# fixtures in INV-03 §3.2 with no tuning, and the budget below bounds the
+# worst case rather than raising any resolution constant (R11 / T-23-56).
+FACADE_DPI = 80
+MAX_FACADE_PIXELS = 6_000_000
+
+
+@dataclass
+class FacadeResult:
+    """One elevation facade measured as a complement-labelled silhouette.
+
+    ``area_sf`` is the DOMINANT solid component — the facade blob — measured
+    at the drawing's own printed scale. ``void_areas_sf`` lists enclosed free
+    regions inside that blob (openings) so a net area can be reported beside
+    the gross; ``sub_components`` lists the OTHER solid components (Bob's
+    EIFS sign band is a detached 142 SF component beside the 6,245 SF facade)
+    so a positioned keynote tag can later claim one as a material sub-region.
+
+    Identity fields (``title`` … ``excluded``) are stamped by the pipeline
+    from :func:`elevation_titles`; the measurement itself knows only geometry.
+    """
+
+    area_sf: float                    # dominant component, gross SF
+    bbox_ft: tuple = (0.0, 0.0)       # (w_ft, h_ft) of the dominant component
+    bbox_pt: tuple = ()               # dominant bbox in PAGE space (x0,y0,x1,y1)
+    fill_ratio: float = 0.0           # dominant px / its bbox px
+    component_count: int = 0          # solid components >= min_region_sf
+    void_areas_sf: List[float] = field(default_factory=list)
+    sub_components: List[dict] = field(default_factory=list)
+    candidate_id: str = ""
+    scale_fpi: Optional[float] = None
+    sheet_name: str = ""
+    # Identity (from the callout title):
+    title: str = ""
+    orientation: str = ""
+    is_demo: bool = False
+    is_interior: bool = False
+    excluded: bool = False            # True => not a new-work exterior quantity
+    excluded_reason: str = ""
+    # Datum band (23-14 Task 2; None until elevation_datums finds a pair):
+    datum_height_ft: Optional[float] = None
+    band_cropped: bool = False
+    area_uncropped_sf: Optional[float] = None
+    # Material attribution (23-14 Task 4; text-anchored keynotes only):
+    materials: List[dict] = field(default_factory=list)
+    needs_review: bool = False
+    review_reason: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "area_sf": self.area_sf,
+            "bbox_ft": list(self.bbox_ft),
+            "bbox_pt": list(self.bbox_pt),
+            "fill_ratio": self.fill_ratio,
+            "component_count": self.component_count,
+            "void_areas_sf": self.void_areas_sf,
+            "sub_components": self.sub_components,
+            "candidate_id": self.candidate_id,
+            "scale_fpi": self.scale_fpi,
+            "sheet_name": self.sheet_name,
+            "title": self.title,
+            "orientation": self.orientation,
+            "is_demo": self.is_demo,
+            "is_interior": self.is_interior,
+            "excluded": self.excluded,
+            "excluded_reason": self.excluded_reason,
+            "datum_height_ft": self.datum_height_ft,
+            "band_cropped": self.band_cropped,
+            "area_uncropped_sf": self.area_uncropped_sf,
+            "materials": self.materials,
+            "needs_review": self.needs_review,
+            "review_reason": self.review_reason,
+        }
+
+
+@dataclass
+class ElevationTitle:
+    """One elevation drawing found by its OWN printed-scale callout title.
+
+    ``scale`` is the :class:`~bobbytailor.deterministic.printed_scale.
+    PrintedScale` the title is bound to — each elevation is measured at THAT
+    callout's own feet-per-point, never a page-level scale.
+    ``callout_bbox_pt`` is the callout's bbox in PAGE space, the space the
+    sheet is read in, so callers can stack clips top-to-bottom as a reader
+    would.
+    """
+
+    title: str
+    orientation: str          # "" => not classifiable as an exterior facade
+    is_demo: bool
+    is_interior: bool
+    scale: object             # PrintedScale
+    callout_bbox_pt: tuple    # page-space (x0, y0, x1, y1)
+
 
 @dataclass
 class FilledRegion:
@@ -910,6 +1047,311 @@ def measure_enclosed_area(
         result.needs_review = True
         result.review_reason = "; ".join(notes)
     return result
+
+
+def measure_facade_area(
+    page,
+    clip,
+    feet_per_point: float,
+    dpi: int = FACADE_DPI,
+    candidate_id: str = "",
+    max_pixels: int = MAX_FACADE_PIXELS,
+    min_region_sf: float = MIN_REGION_SF,
+) -> Optional[FacadeResult]:
+    """Measure one elevation facade as a complement-labelled silhouette.
+
+    Same contract as :func:`measure_enclosed_area` — its sibling: the clip is
+    in DRAWING space and is mapped through :func:`to_page_space` before
+    rendering; it returns ``None`` on any failure and never raises.
+
+    The recipe (INV-03 §3.2), sharing THE one labeller (:func:`label_mask`):
+
+    1. render the clip and threshold to ink / free;
+    2. label the FREE pixels; every free component touching the clip border is
+       the BACKGROUND (this is the flood from all four borders);
+    3. ``solid = NOT background`` — ink plus everything the outline encloses;
+    4. label the solid; the LARGEST component is the facade.
+
+    A room flood fill keeps the voids; this keeps their complement. The same
+    drawing that fragments into 63 voids returns one blob here, because a
+    facade's joints and reveals subdivide free space but never disconnect ink.
+
+    The render resolution is chosen PER CLIP so the pixel budget is bounded:
+    elevations are wide-format, and *dpi* is only ever lowered to fit
+    *max_pixels*, never raised (R11 / threat T-23-56).
+
+    Returns a :class:`FacadeResult` carrying the dominant blob's gross area,
+    its bbox in feet and in page-space points, its fill ratio, the component
+    count, the enclosed void areas (openings — so a net can be reported
+    beside the gross), and the other solid components (a detached sign band)
+    for later material claiming. Identity fields are left blank for the
+    caller to stamp.
+    """
+    if not feet_per_point or feet_per_point <= 0:
+        return None
+    try:
+        import fitz  # noqa: PLC0415 — optional at import time for test stubs
+
+        page_clip = _rect(to_page_space(page, clip))
+        if page_clip is None or page_clip.is_empty:
+            return None
+        # Per-clip pixel budget: lower the zoom until the render fits. The
+        # constant itself is never raised — a hostile 20,000 pt clip renders
+        # coarser, not bigger.
+        zoom = dpi / 72.0
+        n_budget = page_clip.width * zoom * page_clip.height * zoom
+        if n_budget > max_pixels and page_clip.width * page_clip.height > 0:
+            zoom = math.sqrt(max_pixels / (page_clip.width * page_clip.height))
+        pix = page.get_pixmap(
+            clip=page_clip, matrix=fitz.Matrix(zoom, zoom), colorspace=fitz.csGRAY
+        )
+    except Exception as exc:  # noqa: BLE001 — a defective page must not kill a run
+        logger.debug("facade: render failed for %s: %s", candidate_id, exc)
+        return None
+    if not pix.width or not pix.height:
+        return None
+
+    width, height = pix.width, pix.height
+    n_px = width * height
+    px_area_sf = (1.0 / (zoom * zoom)) * feet_per_point * feet_per_point
+
+    free = free_mask(pix.samples, n_px)
+    free_labelled = label_mask(free, width, height)
+
+    # Background lookup table: free components touching the clip border.
+    is_background = bytearray(free_labelled.count + 1)
+    for k in range(free_labelled.count):
+        if free_labelled.touches_edge[k]:
+            is_background[k + 1] = 1
+
+    solid = bytearray(n_px)
+    free_labels = free_labelled.labels
+    for i in range(n_px):
+        if not free[i] or not is_background[free_labels[i]]:
+            solid[i] = 1
+
+    solid_labelled = label_mask(solid, width, height)
+    if not solid_labelled.count:
+        return None
+
+    order = sorted(
+        range(solid_labelled.count),
+        key=lambda k: solid_labelled.counts[k],
+        reverse=True,
+    )
+    dominant_label = order[0] + 1
+    dominant_px = solid_labelled.counts[order[0]]
+    if dominant_px * px_area_sf < min_region_sf:
+        return None
+
+    # One pass for every solid component's bbox (needed for the dominant's
+    # fill ratio AND for sub-component claiming).
+    bboxes: dict = {}
+    solid_labels = solid_labelled.labels
+    for i in range(n_px):
+        lab = solid_labels[i]
+        if not lab:
+            continue
+        x = i % width
+        y = i // width
+        bb = bboxes.get(lab)
+        if bb is None:
+            bboxes[lab] = [x, y, x, y]
+        else:
+            if x < bb[0]:
+                bb[0] = x
+            elif x > bb[2]:
+                bb[2] = x
+            if y < bb[1]:
+                bb[1] = y
+            elif y > bb[3]:
+                bb[3] = y
+
+    px_len_ft = (1.0 / zoom) * feet_per_point
+
+    def _bbox_ft(bb):
+        return (
+            round((bb[2] - bb[0] + 1) * px_len_ft, 1),
+            round((bb[3] - bb[1] + 1) * px_len_ft, 1),
+        )
+
+    def _bbox_pt(bb):
+        return (
+            round(page_clip.x0 + bb[0] / zoom, 1),
+            round(page_clip.y0 + bb[1] / zoom, 1),
+            round(page_clip.x0 + (bb[2] + 1) / zoom, 1),
+            round(page_clip.y0 + (bb[3] + 1) / zoom, 1),
+        )
+
+    dom_bb = bboxes[dominant_label]
+    dom_bbox_px = (dom_bb[2] - dom_bb[0] + 1) * (dom_bb[3] - dom_bb[1] + 1)
+
+    # Enclosed voids of the dominant component: free components that touch no
+    # border and whose seed pixel now lies inside the dominant solid.
+    voids: List[float] = []
+    for k in range(free_labelled.count):
+        if free_labelled.touches_edge[k]:
+            continue
+        area = free_labelled.counts[k] * px_area_sf
+        if area < min_region_sf:
+            continue
+        if solid_labels[free_labelled.starts[k]] == dominant_label:
+            voids.append(round(area, 1))
+    voids.sort(reverse=True)
+
+    sub_components: List[dict] = []
+    component_count = 1
+    for k in order[1:]:
+        area = solid_labelled.counts[k] * px_area_sf
+        if area < min_region_sf:
+            continue
+        component_count += 1
+        if len(sub_components) < 32:
+            bb = bboxes[k + 1]
+            w_ft, h_ft = _bbox_ft(bb)
+            sub_components.append(
+                {
+                    "area_sf": round(area, 1),
+                    "bbox_ft": [w_ft, h_ft],
+                    "bbox_pt": list(_bbox_pt(bb)),
+                }
+            )
+
+    dom_w_ft, dom_h_ft = _bbox_ft(dom_bb)
+    return FacadeResult(
+        area_sf=round(dominant_px * px_area_sf, 1),
+        bbox_ft=(dom_w_ft, dom_h_ft),
+        bbox_pt=_bbox_pt(dom_bb),
+        fill_ratio=round(dominant_px / dom_bbox_px, 3) if dom_bbox_px else 0.0,
+        component_count=component_count,
+        void_areas_sf=voids,
+        sub_components=sub_components,
+        candidate_id=candidate_id,
+        scale_fpi=round(feet_per_point * 72.0, 4),
+    )
+
+
+def elevation_titles(page) -> List[ElevationTitle]:
+    """Every elevation drawing on *page*, found by its OWN callout title.
+
+    Driven off the printed-scale callouts rather than viewport segmentation:
+    on Crow, ``segment_viewports`` merges four elevations into two regions and
+    mislabels a 2,464 pt band as a legend, while the four scale callouts are
+    exact (INV-03 §2.2). The callout is the reliable anchor for "one drawing".
+
+    Two title sources, in order:
+
+    1. A DEDICATED title text line — Bob's prints ``FRONT ELEVATION
+       DEMOLITION`` at 25 pt on the callout's own baseline while the callout
+       block itself absorbed a keynote sentence, so the drawing's own big
+       title outranks whatever text bled into the callout. A candidate line
+       must contain the elevation word, be title-short
+       (:data:`_ELEV_TITLE_MAX_CHARS`), read HORIZONTALLY (a rotated
+       title-block strip like Chelsea's "ELEVATIONS -" is taller than wide in
+       page space), and its page-space vertical band must intersect the
+       callout's. Lines and callouts pair one-to-one, nearest centre first.
+    2. The callout's own extracted title, when it contains the elevation word
+       and no dedicated line claimed the callout.
+
+    Classification is by TITLE, never by guess: the orientation is the
+    compass/relative word adjacent to the elevation word ("" when none — an
+    interior or detail elevation, excluded from exterior quantities);
+    demolition/existing and interior intent are flagged so a demolition
+    facade is never summed with the new-work facade drawn beside it.
+
+    Sorted by callout position as the sheet is read (page-space y, then x).
+    Never raises; a page with no callouts yields ``[]``.
+    """
+    try:
+        import fitz  # noqa: PLC0415
+        from bobbytailor.deterministic.printed_scale import (  # noqa: PLC0415
+            extract_printed_scales,
+        )
+    except Exception:  # noqa: BLE001
+        return []
+
+    try:
+        scales = extract_printed_scales(page) or []
+    except Exception:  # noqa: BLE001
+        return []
+    if not scales:
+        return []
+    scale_boxes = []
+    for s in scales:
+        box = _rect(to_page_space(page, _rect(s.bbox_pt)))
+        scale_boxes.append(box)
+
+    # Candidate dedicated title lines.
+    lines: List[tuple] = []
+    try:
+        blocks = page.get_text("dict")["blocks"]
+    except Exception:  # noqa: BLE001
+        blocks = []
+    for b in blocks:
+        for line in b.get("lines", []):
+            txt = " ".join(
+                "".join(sp.get("text", "") for sp in line.get("spans", [])).split()
+            )
+            if not txt or len(txt) > _ELEV_TITLE_MAX_CHARS:
+                continue
+            if not ELEVATION_TITLE_RE.search(txt):
+                continue
+            box = _rect(to_page_space(page, _rect(line.get("bbox"))))
+            if box is None or box.width <= box.height:
+                continue
+            lines.append((txt, box))
+
+    # One-to-one pairing: nearest centres first, y-bands must intersect.
+    candidates: List[tuple] = []
+    for li, (_txt, lbox) in enumerate(lines):
+        for si, sbox in enumerate(scale_boxes):
+            if sbox is None:
+                continue
+            if min(lbox.y1, sbox.y1) - max(lbox.y0, sbox.y0) <= 0:
+                continue
+            d = math.hypot(
+                (lbox.x0 + lbox.x1) / 2 - (sbox.x0 + sbox.x1) / 2,
+                (lbox.y0 + lbox.y1) / 2 - (sbox.y0 + sbox.y1) / 2,
+            )
+            candidates.append((d, li, si))
+    candidates.sort()
+    titles_by_scale: dict = {}
+    used_lines = set()
+    for _d, li, si in candidates:
+        if li in used_lines or si in titles_by_scale:
+            continue
+        used_lines.add(li)
+        titles_by_scale[si] = lines[li][0]
+
+    out: List[ElevationTitle] = []
+    for si, s in enumerate(scales):
+        title = titles_by_scale.get(si)
+        if title is None:
+            if ELEVATION_TITLE_RE.search(s.title or ""):
+                title = s.title
+            else:
+                continue
+        m = _ELEV_ORIENT_BEFORE_RE.search(title)
+        orientation = m.group(1) if m else ""
+        if not orientation:
+            m = _ELEV_ORIENT_AFTER_RE.search(title)
+            orientation = m.group(1) if m else ""
+        orientation = " ".join(orientation.upper().split())
+        box = scale_boxes[si]
+        out.append(
+            ElevationTitle(
+                title=title,
+                orientation=orientation,
+                is_demo=bool(_ELEV_DEMO_RE.search(title)),
+                is_interior=bool(_ELEV_INTERIOR_RE.search(title)),
+                scale=s,
+                callout_bbox_pt=(
+                    tuple(box) if box is not None else tuple(s.bbox_pt)
+                ),
+            )
+        )
+    out.sort(key=lambda e: (e.callout_bbox_pt[1], e.callout_bbox_pt[0]))
+    return out
 
 
 def _add_reason(result: RoomFillResult, reason: str) -> RoomFillResult:

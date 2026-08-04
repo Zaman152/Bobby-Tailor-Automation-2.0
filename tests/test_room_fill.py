@@ -1691,3 +1691,291 @@ def test_the_honest_architectural_fill_on_page_33_bills_its_perimeter(
     fill = _dominant(moxy_prototype_fills, 33, "AR")
     billable, _reason = wall_perimeter_for_unit(fill)
     assert billable > 0.0
+
+
+# ── elevation facades: complement labelling + callout titles (23-14) ─────────
+#
+# A facade is a FILLED SILHOUETTE subdivided by joint/reveal lines, not a void
+# enclosed by walls: the room flood fill fragments Bob's front elevation into
+# 63 pieces, while the complement of the border-connected background returns
+# ONE blob per elevation on all three fixtures that draw them (INV-03 §3).
+
+BOBS_PDF = "uploads/Bob's Discount Furniture - Kennesaw, GA-plans.pdf"
+CROW_UPLOAD_PDF = "uploads/Crow - Cass White Road-Plans.pdf"
+CHELSEA_PDF = "uploads/Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf"
+
+# 1/8" = 1'-0" — the elevation scale on Bob's and Chelsea.
+FPP_EIGHTH = 8.0 / 72.0
+
+
+def _facade_page(width_ft=40.0, height_ft=20.0, fpp=FPP_EIGHTH):
+    """A page holding one filled rectangle of a KNOWN size — exact ground truth."""
+    doc = fitz.open()
+    page = doc.new_page(width=800, height=600)
+    x0, y0 = 100.0, 100.0
+    rect = fitz.Rect(x0, y0, x0 + width_ft / fpp, y0 + height_ft / fpp)
+    page.draw_rect(rect, color=(0, 0, 0), fill=(0, 0, 0), width=0.5)
+    clip = fitz.Rect(rect.x0 - 40, rect.y0 - 40, rect.x1 + 40, rect.y1 + 40)
+    return doc, page, rect, clip
+
+
+def test_a_filled_rectangle_measures_its_known_area_and_bbox():
+    """Exact ground truth: 40 x 20 ft at 1/8\" = 1'-0\" is 800 SF."""
+    from bobbytailor.deterministic.room_fill import measure_facade_area
+
+    doc, page, _rect_, clip = _facade_page(40.0, 20.0)
+    try:
+        result = measure_facade_area(page, clip, FPP_EIGHTH, candidate_id="F1")
+        assert result is not None
+        assert abs(result.area_sf - 800.0) / 800.0 < 0.02
+        w_ft, h_ft = result.bbox_ft
+        assert abs(w_ft - 40.0) / 40.0 < 0.02
+        assert abs(h_ft - 20.0) / 20.0 < 0.02
+        assert result.fill_ratio > 0.95, "a filled rectangle fills its own bbox"
+        assert result.component_count == 1
+        assert result.candidate_id == "F1"
+    finally:
+        doc.close()
+
+
+def test_a_subdivided_rectangle_is_still_one_component_of_the_same_area():
+    """THE property the void fill lacks: joint lines subdivide free space but
+    never disconnect ink, so the silhouette stays whole. The same drawing
+    measured as voids returns one fragment per cell."""
+    from bobbytailor.deterministic.room_fill import measure_facade_area
+
+    fpp = FPP_EIGHTH
+    doc = fitz.open()
+    page = doc.new_page(width=800, height=600)
+    x0, y0 = 100.0, 100.0
+    x1, y1 = x0 + 40.0 / fpp, y0 + 20.0 / fpp
+    for a, b in (((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)),
+                 ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))):
+        page.draw_line(fitz.Point(*a), fitz.Point(*b), width=1.0)
+    # thin interior "joint" lines cutting the facade into six cells
+    for fx in (x0 + (x1 - x0) / 3, x0 + 2 * (x1 - x0) / 3):
+        page.draw_line(fitz.Point(fx, y0), fitz.Point(fx, y1), width=1.0)
+    page.draw_line(fitz.Point(x0, (y0 + y1) / 2), fitz.Point(x1, (y0 + y1) / 2),
+                   width=1.0)
+    clip = fitz.Rect(x0 - 40, y0 - 40, x1 + 40, y1 + 40)
+    try:
+        result = measure_facade_area(page, clip, fpp)
+        assert result is not None
+        assert result.component_count == 1, (
+            "joint lines must not fragment the silhouette"
+        )
+        assert abs(result.area_sf - 800.0) / 800.0 < 0.02
+        # contrast: the void fill sees the six cells, not one facade
+        voids = measure_enclosed_area(page, clip, fpp)
+        assert voids is not None and len(voids.regions) >= 6
+    finally:
+        doc.close()
+
+
+def test_an_opening_stays_in_the_gross_and_appears_in_the_void_list():
+    """Gross beside net: a window opening is INSIDE the silhouette. The gross
+    keeps it; the void list names it so a net can be derived."""
+    from bobbytailor.deterministic.room_fill import measure_facade_area
+
+    fpp = FPP_EIGHTH
+    doc, page, rect, clip = _facade_page(40.0, 20.0, fpp)
+    opening = fitz.Rect(rect.x0 + 10.0 / fpp, rect.y0 + 5.0 / fpp,
+                        rect.x0 + 20.0 / fpp, rect.y0 + 10.0 / fpp)
+    page.draw_rect(opening, color=(1, 1, 1), fill=(1, 1, 1), width=0.5)
+    try:
+        result = measure_facade_area(page, clip, fpp)
+        assert result is not None
+        assert abs(result.area_sf - 800.0) / 800.0 < 0.02, (
+            "the gross includes the opening"
+        )
+        assert any(abs(v - 50.0) / 50.0 < 0.1 for v in result.void_areas_sf), (
+            "the 10 x 5 ft opening must appear in the void list, got %r"
+            % (result.void_areas_sf,)
+        )
+    finally:
+        doc.close()
+
+
+def test_measure_facade_area_returns_none_and_never_raises_on_failure():
+    from bobbytailor.deterministic.room_fill import measure_facade_area
+
+    doc, page, _rect_, clip = _facade_page()
+    try:
+        assert measure_facade_area(page, clip, 0.0) is None
+        assert measure_facade_area(page, clip, -1.0) is None
+    finally:
+        doc.close()
+
+    class _Broken:
+        def get_pixmap(self, **_kw):
+            raise RuntimeError("defective page")
+
+    assert measure_facade_area(_Broken(), (0, 0, 10, 10), FPP_EIGHTH) is None
+
+
+def test_elevation_titles_returns_empty_on_a_page_with_nothing():
+    from bobbytailor.deterministic.room_fill import elevation_titles
+
+    doc = fitz.open()
+    page = doc.new_page(width=200, height=200)
+    try:
+        assert elevation_titles(page) == []
+    finally:
+        doc.close()
+
+
+def test_elevation_titles_on_bobs_page_4_flags_the_demolition(tmp_path):
+    """Four elevations found by their OWN titles — including the demolition,
+    whose callout block absorbed a keynote sentence and whose real title is a
+    dedicated 25 pt line on the callout's baseline."""
+    import os
+
+    if not os.path.exists(BOBS_PDF):
+        pytest.skip("the real Bob's plan set is not present")
+    from bobbytailor.deterministic.room_fill import elevation_titles
+
+    doc = fitz.open(BOBS_PDF)
+    try:
+        entries = elevation_titles(doc[4])
+    finally:
+        doc.close()
+    assert len(entries) >= 4
+    demo = [e for e in entries if e.is_demo]
+    assert len(demo) == 1
+    assert demo[0].title == "FRONT ELEVATION DEMOLITION"
+    assert demo[0].orientation == "FRONT"
+    by_title = {e.title: e for e in entries}
+    assert by_title["FRONT ELEVATION NEW"].orientation == "FRONT"
+    assert by_title["REAR ELEVATION NEW"].orientation == "REAR"
+    assert by_title["TRUCK DOCK ELEVATION NEW"].orientation == "TRUCK DOCK"
+    assert not by_title["FRONT ELEVATION NEW"].is_demo
+
+
+def test_elevation_titles_on_crow_page_1_returns_the_four_orientations():
+    import os
+
+    if not os.path.exists(CROW_UPLOAD_PDF):
+        pytest.skip("the real Crow plan set is not present")
+    from bobbytailor.deterministic.room_fill import elevation_titles
+
+    doc = fitz.open(CROW_UPLOAD_PDF)
+    try:
+        entries = elevation_titles(doc[1])
+    finally:
+        doc.close()
+    assert len(entries) == 4
+    assert {e.orientation for e in entries} == {"NORTH", "SOUTH", "EAST", "WEST"}
+    assert not any(e.is_demo or e.is_interior for e in entries)
+
+
+def test_elevation_titles_on_chelsea_page_9_returns_four_entries():
+    import os
+
+    if not os.path.exists(CHELSEA_PDF):
+        pytest.skip("the real Chelsea plan set is not present")
+    from bobbytailor.deterministic.room_fill import elevation_titles
+
+    doc = fitz.open(CHELSEA_PDF)
+    try:
+        entries = elevation_titles(doc[9])
+    finally:
+        doc.close()
+    assert len(entries) == 4
+    orientations = sorted(e.orientation for e in entries)
+    assert orientations == ["BACK", "FRONT", "SIDE", "SIDE"]
+
+
+def _elev_band_clips(page, entries):
+    """Minimal band clips for a TITLES-ONLY test: previous elevation callout
+    (or page edge) up to this callout, split at x-midpoints between callouts
+    sharing a band. The production clip — viewport-bounded — is
+    ``TakeoffPipeline._measure_elevation_areas``'s (23-14 Task 3)."""
+    clips = []
+    for e in entries:
+        x0c, y0c, x1c, y1c = e.callout_bbox_pt
+        prev = 0.0
+        for o in entries:
+            if o.callout_bbox_pt[3] <= y0c and o.callout_bbox_pt[3] > prev:
+                prev = o.callout_bbox_pt[3]
+        x0, x1 = 0.0, page.rect.width
+        cx = (x0c + x1c) / 2
+        for o in entries:
+            if o is e:
+                continue
+            ox0, oy0, ox1, oy1 = o.callout_bbox_pt
+            if min(oy1, y1c) - max(oy0, y0c) <= 0:
+                continue
+            ocx = (ox0 + ox1) / 2
+            if ocx < cx:
+                x0 = max(x0, (ox1 + x0c) / 2)
+            elif ocx > cx:
+                x1 = min(x1, (x1c + ox0) / 2)
+        clips.append(fitz.Rect(x0 + 2, prev + 2, x1 - 2, y0c - 2))
+    return clips
+
+
+def test_chelsea_facades_have_one_dominant_component_per_titled_elevation():
+    """A different drafting office, same code, no tuning: every titled
+    elevation on pages 9-12 yields ONE dominant silhouette (largest component
+    at least twice the runner-up)."""
+    import os
+
+    if not os.path.exists(CHELSEA_PDF):
+        pytest.skip("the real Chelsea plan set is not present")
+    from bobbytailor.deterministic.room_fill import (
+        elevation_titles,
+        measure_facade_area,
+    )
+
+    doc = fitz.open(CHELSEA_PDF)
+    measured = 0
+    try:
+        for pno in (9, 10, 11, 12):
+            page = doc[pno]
+            entries = elevation_titles(page)
+            assert len(entries) == 4, "page %d must title four elevations" % pno
+            for e, clip in zip(entries, _elev_band_clips(page, entries)):
+                result = measure_facade_area(
+                    page, from_page_space(page, clip),
+                    e.scale.feet_per_point,
+                )
+                assert result is not None, "%s p%d measured nothing" % (e.title, pno)
+                if result.sub_components:
+                    ratio = result.area_sf / result.sub_components[0]["area_sf"]
+                    assert ratio >= 2.0, (
+                        "%s p%d: dominant %.0f SF vs runner-up %.0f SF"
+                        % (e.title, pno, result.area_sf,
+                           result.sub_components[0]["area_sf"])
+                    )
+                measured += 1
+    finally:
+        doc.close()
+    assert measured == 16
+
+
+def test_bobs_front_elevation_silhouette_and_its_detached_sign_band():
+    """The INV-03 §3.2 numbers, reproduced by the shipped code: the front
+    facade is ONE 6,245 SF blob 249 ft wide, and the EIFS sign band is a
+    detached ~142 SF sub-component the material pass can later claim."""
+    import os
+
+    if not os.path.exists(BOBS_PDF):
+        pytest.skip("the real Bob's plan set is not present")
+    from bobbytailor.deterministic.room_fill import measure_facade_area
+
+    doc = fitz.open(BOBS_PDF)
+    try:
+        page = doc[4]
+        # The FRONT ELEVATION NEW band, in page space (probe-derived: from the
+        # demolition callout's bottom to the front callout's top).
+        clip = from_page_space(page, fitz.Rect(104, 516, 2351, 1029))
+        result = measure_facade_area(page, clip, 8.0 / 72.0)
+    finally:
+        doc.close()
+    assert result is not None
+    assert abs(result.area_sf - 6245.0) < 65.0
+    assert 245.0 <= result.bbox_ft[0] <= 255.0
+    assert any(
+        abs(sub["area_sf"] - 142.0) < 15.0 and abs(sub["bbox_ft"][0] - 32.0) < 4.0
+        for sub in result.sub_components
+    ), "the detached sign band must be reported as a sub-component"
