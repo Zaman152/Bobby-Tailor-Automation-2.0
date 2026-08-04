@@ -256,8 +256,14 @@ VECTOR_MIN_WORDS = 100
 _PLAN_SHEET_TYPES = ("floor_plan", "civil_site", "roof_plan")
 # Sheet types eligible for the deterministic-first vector branch. Schedule
 # sheets join because find_tables() reads their rows verbatim (text-layer
-# ground truth); other types keep the legacy vision passes.
-_DETERMINISTIC_SHEET_TYPES = _PLAN_SHEET_TYPES + ("schedule",)
+# ground truth); elevation sheets join (23-14) because a facade is measured
+# deterministically as a complement-labelled silhouette — while
+# _PLAN_SHEET_TYPES above is DELIBERATELY untouched: that tuple is what gates
+# extract_walls / extract_rooms / cluster_symbols / footprint_from_page, so
+# leaving it alone is what keeps wall pairing off facades BY CONSTRUCTION
+# (21-13's guarantee, pinned by the empty-walls negative test). Other types
+# keep the legacy vision passes.
+_DETERMINISTIC_SHEET_TYPES = _PLAN_SHEET_TYPES + ("schedule", "elevation")
 
 # Half-width, in points, of the band searched either side of a plan title's
 # centre for the printed scale callout that belongs to it. This is NOT a new
@@ -1114,6 +1120,43 @@ def _resolve_project_wall_height(
             return round(max(material), 2), "plan"
 
     return _WALL_HEIGHT_DEFAULT_FT, "default"
+
+
+def _flag_same_orientation_pairs(facades) -> None:
+    """Two SURVIVING same-orientation facades flag each other.
+
+    Bob's page 4 draws FRONT ELEVATION DEMOLITION beside FRONT ELEVATION NEW
+    at almost the same area. Title-based exclusion removes the demolition;
+    this guard is the backstop for the day a demolition title is NOT
+    recognised — a same-orientation pair that both survive into new-work
+    quantities is suspicious, and BOTH flag rather than one being silently
+    picked. (Chelsea's genuine side-by-side SIDE pairs also flag: two real
+    side elevations of near-equal area are exactly what a missed demolition
+    would look like, and a human confirms in seconds.)
+    """
+    by_orientation: dict = {}
+    for facade in facades or ():
+        if getattr(facade, "excluded", False):
+            continue
+        orientation = getattr(facade, "orientation", "") or ""
+        if not orientation:
+            continue
+        by_orientation.setdefault(orientation, []).append(facade)
+    for orientation, group in by_orientation.items():
+        if len(group) < 2:
+            continue
+        titles = ", ".join(repr(f.title) for f in group)
+        reason = (
+            "%d surviving %s elevations on one sheet (%s) — verify none is a "
+            "demolition or duplicate of another before their areas are summed"
+            % (len(group), orientation, titles)
+        )
+        for facade in group:
+            facade.needs_review = True
+            facade.review_reason = (
+                "%s; %s" % (facade.review_reason, reason)
+                if facade.review_reason else reason
+            )
 
 
 def _learned_scale_prior(learned, sheet_name: str) -> Optional[float]:
@@ -2322,6 +2365,18 @@ class TakeoffPipeline:
                 )
             except Exception as exc:  # noqa: BLE001 — footprint is additive
                 logger.debug("footprint_from_page failed on %r: %s", sheet_name, exc)
+        # The most recent trustworthy footprint is kept for the elevation
+        # width cross-check (23-14): a facade blob's width is validated
+        # against the floor plan's INDEPENDENTLY measured dimension — two
+        # measurements sharing no code path, no sheet and no scale. A
+        # high-confidence footprint is never displaced by a weaker one.
+        if footprint is not None:
+            stored = getattr(self, "_project_footprint", None)
+            if stored is None or (
+                str(getattr(footprint, "confidence", "")) == "high"
+                and str(getattr(stored, "confidence", "")) != "high"
+            ):
+                self._project_footprint = footprint
 
         # Enclosed-region room measurement (Recipe E). The centerline
         # polygonization above returns nothing usable on drawing styles that
@@ -2360,6 +2415,33 @@ class TakeoffPipeline:
                 )
             )
 
+        # Elevation facade measurement (23-14). Anchored on elevation-titled
+        # printed-scale callouts, measured as complement-labelled silhouettes
+        # at each callout's OWN scale, cropped to each drawing's own datum
+        # band. Additive: any failure leaves `elevation_areas` empty and the
+        # sheet behaves as before. NOT gated on the sheet type, for the same
+        # reason room fills are not — Chelsea puts nine elevations on sheets
+        # typed floor_plan — and NOT gated on _PLAN_SHEET_TYPES, which stays
+        # exactly what it was so wall pairing can never run on a facade.
+        elevation_areas: list = []
+        try:
+            elevation_areas, elev_drops = self._measure_elevation_areas(
+                page, viewports, sheet_name
+            )
+            coverage_drops.extend(elev_drops)
+        except Exception as exc:  # noqa: BLE001 — measurement is additive
+            logger.debug("elevation measurement failed on %r: %s", sheet_name, exc)
+            coverage_drops.append(
+                DrawingCoverage(
+                    region_id="page",
+                    title=sheet_name,
+                    disposition=ERRORED,
+                    reason="elevation facade measurement raised %s: %s — every "
+                           "elevation on this sheet is unmeasured, not zero"
+                           % (type(exc).__name__, exc),
+                )
+            )
+
         # Finish/material callouts (INV-05 §2 Key A). The masks the bundle
         # already computed are MANDATORY here — a door-schedule tag column and a
         # legend key look exactly like a plan-body callout (threat T-23-30).
@@ -2385,6 +2467,12 @@ class TakeoffPipeline:
             "wall_lf_by_class": wall_lf,
             "rooms": rooms,
             "room_fills": room_fills,
+            "elevation_areas": elevation_areas,
+            # The most recent trustworthy footprint from ANOTHER sheet — the
+            # independent side of the elevation cross-check (D-11: the
+            # perimeter x datum-height route FLAGS disagreement; it never
+            # publishes a second quantity).
+            "reference_footprint": getattr(self, "_project_footprint", None),
             "material_tags": material_tags,
             "viewports": viewports,
             "schedules": schedules,
@@ -2718,6 +2806,274 @@ class TakeoffPipeline:
                 " [needs review]" if result.needs_review else "",
             )
         return out, drops
+
+    # ── Elevation facades (23-14) ────────────────────────────────────────────
+    #
+    # The fill-ratio floor below which a "facade" blob is annotation rather
+    # than facade (INV-03 step 7). Measured, not tuned: every real facade on
+    # Bob's / Crow / Chelsea reads 0.44-0.93; Moxy's sparse partial-court
+    # elevations read 0.11-0.33 and must flag.
+    _ELEV_FILL_RATIO_FLOOR = 0.4
+    # A facade blob's width should match one of the floor plan's measured
+    # footprint dimensions — two measurements sharing no code path, no sheet
+    # and no scale (INV-03 §3.3: Bob's front reads 249-250 ft against the
+    # page-1 footprint's depth_ft=250.0). Beyond this relative tolerance the
+    # facade flags.
+    _ELEV_WIDTH_TOL = 0.20
+    _ELEV_CLIP_PAD_PT = 2.0
+
+    def _elevation_clips(self, page, entries, viewports) -> list:
+        """``[(entry, clip)]`` — one PAGE-space band clip per elevation callout.
+
+        The callout is the anchor (viewport segmentation merges Crow's four
+        elevations into two regions — INV-03 §2.2): each drawing occupies the
+        band from the PREVIOUS elevation callout (or the drawing-area edge) up
+        to its own callout, x-bounded by the viewport hosting the callout
+        (which is what keeps Bob's keyed-notes column and Chelsea's notes
+        panel out of the silhouette), and split at x-midpoints between
+        callouts sharing a band (Chelsea prints its two SIDE elevations side
+        by side over side-by-side callouts).
+        """
+        vps = []
+        for vp in viewports or ():
+            bbox = getattr(vp, "bbox_pt", None)
+            if not bbox:
+                continue
+            try:
+                box = to_page_space(page, fitz.Rect(*bbox))
+            except Exception:  # noqa: BLE001
+                continue
+            vps.append((getattr(vp, "kind", ""), box))
+        out = []
+        for e in entries:
+            x0c, y0c, x1c, y1c = e.callout_bbox_pt
+            prev = 0.0
+            for o in entries:
+                if o.callout_bbox_pt[3] <= y0c and o.callout_bbox_pt[3] > prev:
+                    prev = o.callout_bbox_pt[3]
+            cx = (x0c + x1c) / 2.0
+            x0, x1 = 0.0, float(page.rect.width)
+            best_overlap = 0.0
+            for kind, vb in vps:
+                if kind in _MASK_VIEWPORT_KINDS:
+                    continue
+                if not (vb.x0 <= cx <= vb.x1):
+                    continue
+                overlap = min(vb.y1, y0c) - max(vb.y0, prev)
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    x0, x1 = vb.x0, vb.x1
+            if best_overlap <= 0.0:
+                # No hosting viewport: keep the full width minus the mask
+                # viewports on this callout's side.
+                for kind, vb in vps:
+                    if kind not in _MASK_VIEWPORT_KINDS:
+                        continue
+                    if vb.x0 > cx:
+                        x1 = min(x1, vb.x0)
+                    elif vb.x1 < cx:
+                        x0 = max(x0, vb.x1)
+            for o in entries:
+                if o is e:
+                    continue
+                ox0, oy0, ox1, oy1 = o.callout_bbox_pt
+                if min(oy1, y1c) - max(oy0, y0c) <= 0:
+                    continue
+                ocx = (ox0 + ox1) / 2.0
+                if ocx < cx:
+                    x0 = max(x0, (ox1 + x0c) / 2.0)
+                elif ocx > cx:
+                    x1 = min(x1, (x1c + ox0) / 2.0)
+            pad = self._ELEV_CLIP_PAD_PT
+            out.append((e, fitz.Rect(x0 + pad, prev + pad, x1 - pad, y0c - pad)))
+        return out
+
+    def _facade_width_matches(self, facade, footprint):
+        """``True``/``False``/``None`` — blob width vs the measured footprint.
+
+        ``None`` when no footprint has been measured yet (nothing to check —
+        never a flag for want of a cross-check that could not exist).
+        """
+        if footprint is None:
+            return None
+        dims = []
+        for attr in ("width_ft", "depth_ft"):
+            try:
+                value = float(getattr(footprint, attr, None) or 0.0)
+            except (TypeError, ValueError):
+                value = 0.0
+            if value > 0:
+                dims.append(value)
+        if not dims or not facade.bbox_ft or facade.bbox_ft[0] <= 0:
+            return None
+        width = float(facade.bbox_ft[0])
+        return any(abs(width - d) / d < self._ELEV_WIDTH_TOL for d in dims)
+
+    def _measure_elevation_areas(self, page, viewports, sheet_name: str) -> tuple:
+        """Measure each titled elevation as a facade silhouette, at its own scale.
+
+        ``(facades, drops)`` — the elevation analogue of
+        :func:`_measure_room_fills`, anchored on the printed-scale callouts
+        (:func:`room_fill.elevation_titles`). Each facade is measured at THAT
+        callout's own feet-per-point, cropped to its own datum band, and
+        validated by POSITION: the blob width against the independently
+        measured footprint dimension, the fill ratio against the annotation
+        floor, and the printed scale against the datum ladder's plausibility
+        band. A demolition/existing or interior elevation is measured but
+        EXCLUDED from new-work quantities with the reason on the record.
+
+        NOT gated on the sheet type — Chelsea puts nine elevations on sheets
+        typed ``floor_plan``, so the measurement gates on what is actually
+        present: an elevation-titled callout.
+        """
+        from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
+            datum_scale_check,
+            datum_wall_band,
+            elevation_datums,
+            elevation_titles,
+            measure_facade_area,
+        )
+
+        drops: List[DrawingCoverage] = []
+        try:
+            entries = elevation_titles(page)
+        except Exception as exc:  # noqa: BLE001 — additive
+            logger.debug("elevation titles failed on %r: %s", sheet_name, exc)
+            return [], drops
+        if not entries:
+            return [], drops
+
+        def _drop(cid, title, disposition, reason, fpi=None):
+            drops.append(
+                DrawingCoverage(
+                    region_id=cid,
+                    title=title,
+                    disposition=disposition,
+                    reason=reason,
+                    printed_scale_fpi=fpi,
+                )
+            )
+            logger.info(
+                "sheet %r: %s %r NOT measured — %s", sheet_name, cid, title, reason
+            )
+
+        footprint = getattr(self, "_project_footprint", None)
+        facades: list = []
+        for i, (entry, clip) in enumerate(
+            self._elevation_clips(page, entries, viewports)
+        ):
+            cid = "ELEV-%d" % (i + 1)
+            fpp = float(getattr(entry.scale, "feet_per_point", 0.0) or 0.0)
+            if fpp <= 0:
+                _drop(
+                    cid, entry.title, SKIPPED_NO_SCALE,
+                    "the printed scale beneath this elevation parsed to a "
+                    "non-positive feet-per-point — measuring at a borrowed "
+                    "scale would be a squared error",
+                )
+                continue
+            fpi = round(fpp * 72.0, 4)
+            if clip.is_empty or clip.height <= 10 or clip.width <= 10:
+                _drop(
+                    cid, entry.title, ERRORED,
+                    "the band clip for this elevation is degenerate "
+                    "(%.1f x %.1f pt)" % (clip.width, clip.height),
+                    fpi,
+                )
+                continue
+            datums = elevation_datums(page, clip)
+            band = datum_wall_band(datums)
+            facade = measure_facade_area(
+                page,
+                from_page_space(page, clip),
+                fpp,
+                candidate_id=cid,
+                crop_band_pt=(band[0], band[1]) if band else None,
+            )
+            if facade is None:
+                _drop(
+                    cid, entry.title, ERRORED,
+                    "no silhouette survived complement labelling inside this "
+                    "elevation's band — the drawing is unmeasured, not zero",
+                    fpi,
+                )
+                continue
+            facade.sheet_name = sheet_name
+            facade.title = entry.title
+            facade.orientation = entry.orientation
+            facade.is_demo = entry.is_demo
+            facade.is_interior = entry.is_interior
+            if band:
+                facade.datum_height_ft = band[2]
+
+            if entry.is_demo:
+                facade.excluded = True
+                facade.excluded_reason = (
+                    "demolition/existing elevation — it describes what is "
+                    "REMOVED and is excluded from new-work quantities"
+                )
+            elif entry.is_interior or not entry.orientation:
+                facade.excluded = True
+                facade.excluded_reason = (
+                    "interior or detail elevation (%r) — not an exterior "
+                    "facade; no interior finish area is synthesized from it"
+                    % (entry.title,)
+                )
+
+            reasons: List[str] = []
+            width_ok = self._facade_width_matches(facade, footprint)
+            if band is None:
+                if width_ok is not True:
+                    reasons.append(
+                        "no datum pair inside this elevation's band — its "
+                        "height is unvalidated, and no independently measured "
+                        "footprint width validates the blob either; verify "
+                        "before billing"
+                    )
+                # else: position-validated by an independent measurement — the
+                # blob width matches the floor plan's own footprint dimension.
+            else:
+                if datum_scale_check(datums, fpp) is False:
+                    reasons.append(
+                        "the printed scale is IMPLAUSIBLE against this "
+                        "drawing's own datum ladder (outside the ±30%% band) "
+                        "— a misparsed scale corrupts every quantity on the "
+                        "drawing"
+                    )
+            if facade.fill_ratio < self._ELEV_FILL_RATIO_FLOOR:
+                reasons.append(
+                    "the dominant blob's fill ratio %.2f is below the %.1f "
+                    "plausibility floor — it may be annotation rather than "
+                    "facade" % (facade.fill_ratio, self._ELEV_FILL_RATIO_FLOOR)
+                )
+            if width_ok is False:
+                dims = "%.1f x %.1f ft" % (
+                    float(getattr(footprint, "width_ft", 0.0) or 0.0),
+                    float(getattr(footprint, "depth_ft", 0.0) or 0.0),
+                )
+                reasons.append(
+                    "the blob's %.0f ft width matches neither independently "
+                    "measured footprint dimension (%s) within %.0f%%"
+                    % (facade.bbox_ft[0], dims, self._ELEV_WIDTH_TOL * 100)
+                )
+            if reasons:
+                facade.needs_review = True
+                facade.review_reason = (
+                    "%s; %s" % (facade.review_reason, "; ".join(reasons))
+                    if facade.review_reason else "; ".join(reasons)
+                )
+            facades.append(facade)
+            logger.info(
+                "sheet %r: %s %r facade %.1f SF at %.2f ft/in (%s)%s%s",
+                sheet_name, cid, entry.title, facade.area_sf, fpi,
+                "datum-cropped %.2f ft" % facade.datum_height_ft
+                if facade.datum_height_ft else "no datum band",
+                " [excluded: %s]" % facade.excluded_reason
+                if facade.excluded else "",
+                " [needs review]" if facade.needs_review else "",
+            )
+        _flag_same_orientation_pairs(facades)
+        return facades, drops
 
     @staticmethod
     def _record_sheet_coverage(row: SheetCoverage, extracted: dict) -> None:
@@ -3658,6 +4014,10 @@ class TakeoffPipeline:
         self._schedules_cache = {}
         # Same for the document-level unit-mix resolution.
         self._room_mix_cache = {}
+        # And for the elevation width cross-check's reference footprint — a
+        # footprint measured in a PREVIOUS project must never validate this
+        # project's facades.
+        self._project_footprint = None
         # ONE finish-code review ledger per run: the cap on how many distinct
         # codes may open a review row is a RUN-level guarantee, and a per-sheet
         # ledger would be no cap at all (threat T-23-31).

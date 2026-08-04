@@ -541,3 +541,179 @@ def test_is_vector_sheet_unreadable_page_is_raster():
             raise RuntimeError("corrupt page")
 
     assert is_vector_sheet(_Broken()) is False
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 23-14 — elevations reach the deterministic path WITHOUT opening the plan path
+# ═════════════════════════════════════════════════════════════════════════════
+
+BOBS_UPLOAD = Path("uploads/Bob's Discount Furniture - Kennesaw, GA-plans.pdf")
+CHELSEA_UPLOAD = Path(
+    "uploads/Invitation to Bid - 25-382 AL, Chelsea, Bear Creek Rd-Plans.pdf"
+)
+
+
+def test_routing_opened_and_the_plan_path_is_untouched():
+    """The single-restraint invariant: only the DETERMINISTIC set grew. The
+    plan tuple is what gates wall extraction, room extraction, symbol
+    clustering and footprint measurement, so leaving it alone preserves the
+    21-13 no-fabricated-walls guarantee BY CONSTRUCTION."""
+    from bobbytailor.pipeline.takeoff_pipeline import (
+        _DETERMINISTIC_SHEET_TYPES as D,
+        _PLAN_SHEET_TYPES as P,
+    )
+
+    assert "elevation" in D
+    assert "elevation" not in P
+    assert P == ("floor_plan", "civil_site", "roof_plan")
+
+
+@pytest.fixture(scope="module")
+def bobs_elevation_bundles():
+    """Bob's page 1 (floor plan — the independent footprint) then page 4
+    (elevation), measured ONCE through one pipeline, as a run would."""
+    if not BOBS_UPLOAD.exists():
+        pytest.skip("the real Bob's plan set is not present")
+    pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    doc = fitz.open(str(BOBS_UPLOAD))
+    try:
+        plan = pipe._deterministic_bundle(
+            doc[1], doc, str(BOBS_UPLOAD), 1, "A2.0", "floor_plan"
+        )
+        elevation = pipe._deterministic_bundle(
+            doc[4], doc, str(BOBS_UPLOAD), 4, "A4.0", "elevation"
+        )
+        forced = pipe._deterministic_bundle(
+            doc[4], doc, str(BOBS_UPLOAD), 4, "A4.0", "floor_plan"
+        )
+    finally:
+        doc.close()
+    return plan, elevation, forced
+
+
+def test_the_elevation_path_fabricates_no_walls_and_no_thickness_classes(
+    bobs_elevation_bundles,
+):
+    """THE negative test. The elevation bundle returns an EMPTY wall list AND
+    an EMPTY thickness-class mapping AND no footprint — while the elevation
+    areas are non-empty. The contrast is pinned in the same test: forcing the
+    same page to floor_plan pairs facade linework into fabricated walls
+    (measured today: 30 walls / 8 thickness classes; INV-03's earlier probe
+    of the same failure mode read 22/4 — the property protected is that the
+    elevation path emits ZERO, whatever the fabrication count of the day)."""
+    _plan, elevation, forced = bobs_elevation_bundles
+    assert elevation["walls"] == []
+    assert elevation["wall_lf_by_class"] == {}
+    assert elevation["footprint"] is None
+    assert len(elevation["elevation_areas"]) >= 3
+
+    # Contrast: the floor-plan path on the SAME page fabricates walls.
+    assert len(forced["walls"]) >= 20
+    assert len(forced["wall_lf_by_class"]) >= 4
+    # The elevation path must NEVER do that — the assertion above, restated
+    # as the invariant: zero, not merely fewer.
+    assert len(elevation["walls"]) == 0
+    assert len(elevation["wall_lf_by_class"]) == 0
+
+
+def test_bobs_front_elevation_width_matches_the_independent_footprint(
+    bobs_elevation_bundles,
+):
+    """Position validation, never count-tuning: the front facade blob's width
+    lands between 245 and 255 ft against the page-1 footprint's independently
+    measured depth of 250.0 ft. No golden painting figure is consulted."""
+    plan, elevation, _forced = bobs_elevation_bundles
+    footprint = plan["footprint"]
+    assert footprint is not None
+    assert abs(float(footprint.depth_ft) - 250.0) < 0.1
+
+    facades = {f.title: f for f in elevation["elevation_areas"]}
+    front = facades["FRONT ELEVATION NEW"]
+    assert 245.0 <= front.bbox_ft[0] <= 255.0
+    assert not front.excluded
+    # Width-validated by the independent measurement: the front facade needs
+    # no review even though Bob's prints no datum ladder.
+    assert front.needs_review is False, front.review_reason
+
+
+def test_the_demolition_elevation_is_present_but_excluded(bobs_elevation_bundles):
+    _plan, elevation, _forced = bobs_elevation_bundles
+    facades = {f.title: f for f in elevation["elevation_areas"]}
+    demo = facades["FRONT ELEVATION DEMOLITION"]
+    assert demo.excluded is True
+    assert "demolition" in demo.excluded_reason.lower()
+    assert demo.area_sf > 5000.0, "measured, on the record — just never billed"
+
+
+def test_a_surviving_same_orientation_pair_flags_both():
+    """The backstop for a missed demolition title: two surviving FRONT
+    facades flag each other; an excluded demolition creates no pair."""
+    from bobbytailor.deterministic.room_fill import FacadeResult
+    from bobbytailor.pipeline.takeoff_pipeline import _flag_same_orientation_pairs
+
+    a = FacadeResult(area_sf=6245.0, title="FRONT ELEVATION NEW",
+                     orientation="FRONT")
+    b = FacadeResult(area_sf=6134.0, title="FRONT ELEVATION DEMOLITION",
+                     orientation="FRONT")
+    _flag_same_orientation_pairs([a, b])
+    assert a.needs_review and b.needs_review
+    assert "FRONT" in a.review_reason and "demolition" in a.review_reason.lower()
+
+    c = FacadeResult(area_sf=6245.0, title="FRONT ELEVATION NEW",
+                     orientation="FRONT")
+    d = FacadeResult(area_sf=6134.0, title="FRONT ELEVATION DEMOLITION",
+                     orientation="FRONT", excluded=True,
+                     excluded_reason="demolition")
+    _flag_same_orientation_pairs([c, d])
+    assert c.needs_review is False, "an excluded demolition creates no pair"
+
+
+def test_chelsea_yields_one_dominant_component_per_titled_elevation():
+    """Generality across a different drafting office, same code, no tuning:
+    the elevation pass over pages 9-12, 13-16 and 18 returns exactly one
+    dominant component per titled elevation. 29 exterior elevation drawings
+    are titled on those pages (INV-03 §1.3 tallied 21 before the dedicated
+    title-line recovery landed; the count is measured, not assumed)."""
+    if not CHELSEA_UPLOAD.exists():
+        pytest.skip("the real Chelsea plan set is not present")
+    pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    doc = fitz.open(str(CHELSEA_UPLOAD))
+    measured = 0
+    try:
+        for pno in (9, 10, 11, 12, 13, 14, 15, 16, 18):
+            page = doc[pno]
+            facades, _drops = pipe._measure_elevation_areas(page, [], "p%d" % pno)
+            live = [f for f in facades if not f.excluded]
+            for f in live:
+                assert f.area_sf > 0, "%s p%d measured nothing" % (f.title, pno)
+                assert f.fill_ratio >= 0.4, (
+                    "%s p%d: fill %.2f — annotation, not a facade"
+                    % (f.title, pno, f.fill_ratio)
+                )
+                dominant_ok = (
+                    f.component_count == 1
+                    or not f.sub_components
+                    or f.area_sf >= 2.0 * f.sub_components[0]["area_sf"]
+                )
+                assert dominant_ok, (
+                    "%s p%d: dominant %.0f SF vs runner-up %.0f SF"
+                    % (f.title, pno, f.area_sf,
+                       f.sub_components[0]["area_sf"] if f.sub_components else 0)
+                )
+                measured += 1
+    finally:
+        doc.close()
+    assert measured == 29
+
+
+def test_a_raster_elevation_still_falls_back_to_the_legacy_flow():
+    """_route_deterministic's raster branch refuses non-plan types, so a
+    scanned elevation degrades to the legacy vision flow unchanged."""
+    import inspect
+
+    from bobbytailor.pipeline import takeoff_pipeline as tp
+
+    src = inspect.getsource(tp.TakeoffPipeline._route_deterministic)
+    assert "resolved_type not in _PLAN_SHEET_TYPES" in src, (
+        "the raster guard that keeps a scanned elevation on the legacy flow"
+    )
