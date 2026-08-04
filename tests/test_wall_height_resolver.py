@@ -13,7 +13,10 @@ import os
 import fitz
 import pytest
 
-from bobbytailor.pipeline.takeoff_pipeline import _resolve_project_wall_height
+from bobbytailor.pipeline.takeoff_pipeline import (
+    _resolve_project_wall_height,
+    _wall_height_cross_check_note,
+)
 
 CROW = "tests/fixtures/crow_cass/crow_cass_plans.pdf"
 
@@ -112,21 +115,58 @@ def test_learning_failure_never_raises():
     )
 
 
-# ── Tier 0: the elevation datum span (23-14) ─────────────────────────────────
+# ── The elevation datum span is a CROSS-CHECK, not an override (D-11) ────────
 #
-# The drawing set's own printed vertical ruler — top datum to finish floor —
-# is the authoritative wall height: it IS the wall being measured stating its
-# own height. It beats every keyword tier and the default; a prior HUMAN
-# correction (learned) still outranks it.
+# 23-14 made the datum ladder beat every keyword tier, on the argument that
+# Crow's "36' CLEAR" understates the panels by 20%. The live run falsified it:
+# the ladder reads 48 ft, and 2,972 LF of measured perimeter x 48 ft published
+# 142,661 SF of tilt-up wall against a golden 108,443 SF (31.6% error) where
+# the plan's own 36' CLEAR gives 1.3%. That published figure is precisely the
+# perimeter x datum-height product the elevation binder's coverage note
+# promises never to publish — the datum height had simply left the elevation
+# route through this resolver.
+#
+# So the ladder now sits BELOW the plan's own statement and only flags
+# disagreement. It still beats a blind default, because where the plan states
+# nothing there is no first route to displace.
 
 
-def test_a_datum_span_beats_every_keyword_tier():
+def test_the_plans_own_stated_height_outranks_the_datum_ladder():
+    """D-11: a second measurement route cross-checks the first, never
+    replaces it. Reversing this was the Crow tilt-up regression."""
     height, source = _resolve_project_wall_height(
         "GENERAL NOTES\n3. T.O. WALL 35'-0\" TYP. U.N.O.\n36' CLEAR",
         datum_span_ft=45.17,
     )
-    assert abs(height - 45.17) < 0.01
-    assert source == "datum"
+    assert abs(height - 36.0) < 0.01
+    assert source == "plan"
+
+
+def test_the_datum_ladder_flags_its_disagreement_and_publishes_nothing():
+    note = _wall_height_cross_check_note(36.0, "plan", 48.0)
+    assert note is not None
+    assert "DISAGREES" in note
+    assert "publishes no height (D-11)" in note
+    assert "36" in note and "48" in note
+
+
+def test_the_datum_ladder_records_agreement_too():
+    note = _wall_height_cross_check_note(36.0, "plan", 35.0)
+    assert note is not None
+    assert "agrees" in note
+    assert "publishes no height (D-11)" in note
+
+
+def test_no_cross_check_note_when_the_ladder_is_the_published_height():
+    """Nothing to reconcile: the ladder was the only measured route."""
+    assert _wall_height_cross_check_note(48.0, "datum", 48.0) is None
+
+
+def test_no_cross_check_note_without_a_ladder():
+    assert _wall_height_cross_check_note(36.0, "plan", None) is None
+    assert _wall_height_cross_check_note(36.0, "plan", 0.0) is None
+    assert _wall_height_cross_check_note(None, "plan", 48.0) is None
+    assert _wall_height_cross_check_note(36.0, "plan", "junk") is None
 
 
 def test_a_datum_span_beats_the_default():

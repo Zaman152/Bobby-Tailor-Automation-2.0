@@ -1050,16 +1050,23 @@ def _resolve_project_wall_height(
     Replaces the manifest ``height_ft`` role under the plans-only mandate.
     Precedence (per the binding spec): a learned ``wall_height_ft`` assumption
     wins when present (a prior HUMAN correction outranks everything, matching
-    the learning-loop mandate); then an ELEVATION DATUM SPAN — the drawing
-    set's own printed vertical ruler, top datum to finish floor — which beats
-    every keyword tier and the default (23-14 / INV-03 step 12: Crow's
-    T/ PANEL ladder is the authoritative wall height; the 36' CLEAR callout is
-    an interior clearance that understates the panels by 20%); otherwise the
-    plan text layer is read for a wall/clear height callout near a wall
-    keyword (``T.O. WALL``, ``TOP OF WALL``, ``CLEAR``/``CLR``,
-    ``WALL HEIGHT``, or a feet-inches token near ``TILT``/``CMU``/``PANEL``);
-    a robust (max plausible, 8'-60') value is taken. When nothing parses, a
+    the learning-loop mandate); then the plan text layer, read for a wall/clear
+    height callout near a wall keyword (``T.O. WALL``, ``TOP OF WALL``,
+    ``CLEAR``/``CLR``, ``WALL HEIGHT``, or a feet-inches token near
+    ``TILT``/``CMU``/``PANEL``), taking a robust (max plausible, 8'-60')
+    value; then the ELEVATION DATUM SPAN. When nothing parses at all, a
     flagged industrial default (30.0 ft) applies.
+
+    The datum span sits BELOW the plan callout, not above it — 23-14 put it on
+    top on the argument that "Crow's 36' CLEAR understates the panels by 20%",
+    and the live run falsified that: the datum ladder reads 48 ft, and
+    2,972 LF of measured perimeter x 48 ft published 142,661 SF of tilt-up
+    wall against a golden 108,443 SF (31.6% error) where the plan's own 36'
+    CLEAR gives 1.3%. Worse, that published figure IS the perimeter x
+    datum-height product the elevation binder's own coverage note promises
+    never to publish (D-11): the datum height simply left the elevation route
+    through this resolver and multiplied the perimeter somewhere else. A
+    second measurement route cross-checks the first; it does not replace it.
 
     Args:
         pages_text: Concatenated plan text layer (elevations / sections /
@@ -1089,15 +1096,10 @@ def _resolve_project_wall_height(
         if height and height > 0:
             return height, "learned"
 
-    # Tier 0 — the elevation datum span: the drawing set's own printed
-    # vertical ruler. Authoritative over every keyword tier and the default,
-    # because it IS the wall being measured stating its own height.
     try:
         span = float(datum_span_ft) if datum_span_ft is not None else None
     except (TypeError, ValueError):
         span = None
-    if span is not None and span > 0:
-        return round(span, 2), "datum"
 
     text = pages_text or ""
     if text:
@@ -1119,7 +1121,64 @@ def _resolve_project_wall_height(
         if material:
             return round(max(material), 2), "plan"
 
+    # The elevation datum span, LAST among the measured tiers. It is a second
+    # measurement ROUTE, and D-11 says a second route cross-checks the first and
+    # never replaces it: when the plan states its own height, that statement
+    # stands and the datum ladder only flags disagreement
+    # (:meth:`TakeoffPipeline._wall_height_cross_check`). Where the plan states
+    # nothing there is no first route to displace and no reconciliation to
+    # fabricate, so a measured ladder still beats the blind default.
+    if span is not None and span > 0:
+        return round(span, 2), "datum"
+
     return _WALL_HEIGHT_DEFAULT_FT, "default"
+
+
+#: How far the elevation datum ladder may sit from the plan's own stated wall
+#: height before the two are reported as disagreeing. Wide enough that parapet
+#: vs. clear-height bookkeeping does not cry wolf, narrow enough that Crow's
+#: 36 ft vs 48 ft (a third of the height) is caught.
+_WALL_HEIGHT_CROSS_CHECK_TOL = 0.10
+
+
+def _wall_height_cross_check_note(
+    height_ft, source, datum_span_ft
+) -> Optional[str]:
+    """The datum ladder's verdict on the published wall height, or None.
+
+    D-11 in one sentence: a second measurement route flags disagreement and
+    publishes nothing. The elevation datum span is that second route for the
+    wall height, so when the plan states a height of its own the ladder is
+    reduced to this note — it never becomes the number that multiplies the
+    measured perimeter.
+    """
+    try:
+        span = float(datum_span_ft) if datum_span_ft is not None else None
+        height = float(height_ft) if height_ft is not None else None
+    except (TypeError, ValueError):
+        return None
+    if not span or span <= 0 or not height or height <= 0:
+        return None
+    if source == "datum":
+        return None  # the ladder IS the published height; nothing to reconcile
+    rel = abs(span - height) / height
+    if rel <= _WALL_HEIGHT_CROSS_CHECK_TOL:
+        return (
+            "wall-height cross-check: the published %.2f ft (%s) agrees with "
+            "the elevation datum ladder's %.2f ft within %.1f%%. The ladder is "
+            "a cross-check only and publishes no height (D-11)"
+            % (height, source, span, rel * 100.0)
+        )
+    return (
+        "wall-height cross-check: the published %.2f ft (%s) DISAGREES with "
+        "the elevation datum ladder's %.2f ft by %.0f%% — BOTH are flagged, "
+        "neither is preferred, and the ladder publishes no height (D-11). "
+        "Every wall area derived from the published height inherits this "
+        "uncertainty; a datum ladder measures parapet-to-floor and a plan "
+        "callout may state clear height, and which one the walls are bid at "
+        "is an estimator's call, not a silent substitution"
+        % (height, source, span, rel * 100.0)
+    )
 
 
 def _legend_for_drawing(legends: dict, is_demo: bool) -> dict:
@@ -1416,6 +1475,9 @@ class TakeoffPipeline:
         # bind as SF (LF × height). None until run_project resolves it.
         self._project_wall_height: Optional[float] = None
         self._project_wall_height_source: Optional[str] = None
+        # The elevation datum ladder's verdict on that height (D-11: the second
+        # route flags, it never publishes). Set by run_project.
+        self._wall_height_cross_check: Optional[str] = None
         # Optional reliable drawing scale (feet per inch) for geometry measurement.
         self._scale_fpi = None
         # Finish-code review ledger: one per run so the cap on how many
@@ -3669,6 +3731,12 @@ class TakeoffPipeline:
             # Recorded only where a unit count could actually be applied — a
             # sheet with no measured drawing has nothing to multiply.
             bundle.setdefault("coverage_notes", []).extend(room_mix_resolution.flags)
+        # The wall-height cross-check rides on the sheet whose walls the height
+        # actually multiplies, so the note sits beside the number it questions
+        # rather than on an unrelated schedule page.
+        cross_check = getattr(self, "_wall_height_cross_check", None)
+        if cross_check and bundle.get("wall_lf_by_class"):
+            bundle.setdefault("coverage_notes", []).append(cross_check)
         fused = fuse_sheet(
             bundle,
             vision_labels,
@@ -4331,14 +4399,23 @@ class TakeoffPipeline:
         # Resolved ONCE for the whole project BEFORE the per-sheet loop so the
         # fusion wall_area binding (LF × height → SF) has a height on every
         # sheet. Precedence: learned wall_height_ft > plan-text callout >
-        # flagged 30 ft industrial default. Whatever the source, it is flagged
-        # on derived wall-area items — never a silent substitution.
+        # elevation datum span > flagged 30 ft industrial default. Whatever the
+        # source, it is flagged on derived wall-area items — never a silent
+        # substitution.
+        datum_span_ft = self._project_datum_span(pages)
         wall_height_ft, wall_height_source = _resolve_project_wall_height(
             plan_text, None, self._learned_context,
-            datum_span_ft=self._project_datum_span(pages),
+            datum_span_ft=datum_span_ft,
         )
         self._project_wall_height = wall_height_ft
         self._project_wall_height_source = wall_height_source
+        self._wall_height_cross_check = _wall_height_cross_check_note(
+            wall_height_ft, wall_height_source, datum_span_ft
+        )
+        if self._wall_height_cross_check:
+            logger.info(
+                "run_project: %s", self._wall_height_cross_check
+            )
         logger.info(
             "run_project: project wall height → %.1f ft (source=%s)",
             wall_height_ft, wall_height_source,
