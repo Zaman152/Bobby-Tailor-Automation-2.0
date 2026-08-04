@@ -1868,6 +1868,222 @@ def _bind_wall_area(
     components.append(component)
 
 
+#: The two-route disagreement threshold (23-14, D-11). INV-03 measured 0.95%
+#: agreement between Crow's silhouette sum and the perimeter x datum-height
+#: route — two measurements sharing no code path, no sheet and no scale — so
+#: 15% is a loose net that catches structural disagreement without firing on
+#: honest noise. When it trips, BOTH routes flag; neither is preferred, and
+#: the second route NEVER publishes a quantity: only three of four facades
+#: are drawn on one fixture, so a reconciled-looking number would be a
+#: fabrication.
+_ELEVATION_CROSS_CHECK_TOL = 0.15
+
+
+def _fuse_elevation_areas(bundle, components, info, ctx) -> None:
+    """Facade silhouettes → wall-area line items (23-14).
+
+    Reached through ``BASIS_BINDERS["wall_area"]`` (the SP-9 registry — no
+    parallel gate anywhere) and guarded to emit once per sheet however many
+    wall-area vocabulary items ask.
+
+    THE HONESTY BOUNDARY, which is the whole point:
+
+    * the GROSS facade area per surviving elevation is emitted at high
+      confidence — it is fully deterministic and position-validated;
+    * a per-material SPLIT exists only where a keynote tag sits inside a
+      closed sub-region whose boundary the fill actually found (a detached
+      sign band), and it is FLAGGED by design;
+    * the unclaimed remainder goes to the DOMINANT material (most tags) with
+      needs-review naming every tag seen. NEVER split by a ratio, NEVER
+      divided by the number of distinct materials;
+    * no text-anchored material at all → the row is named by the drawing's
+      own title and flagged. Attribution requires an anchor; a guess is
+      forbidden.
+
+    A demolition or interior elevation emits NO component — it is measured,
+    and its exclusion is a coverage note, so the record shows the drawing was
+    seen rather than missed.
+
+    The perimeter x datum-height CROSS-CHECK (D-11): compared against the
+    reference footprint measured on ANOTHER sheet by different code at a
+    different scale. Disagreement beyond
+    :data:`_ELEVATION_CROSS_CHECK_TOL` flags BOTH routes; agreement is
+    recorded as a note. Either way the second route publishes NO quantity.
+    """
+    if bundle.get("_elevation_areas_bound"):
+        return
+    facades = bundle.get("elevation_areas") or []
+    if not facades:
+        return
+    bundle["_elevation_areas_bound"] = True
+
+    def _note(text: str) -> None:
+        bundle.setdefault("coverage_notes", []).append(text)
+
+    live = [f for f in facades if not _field(f, "excluded", False)]
+    for facade in facades:
+        if _field(facade, "excluded", False):
+            _note(
+                "elevation %r measured %.1f SF but is EXCLUDED from new-work "
+                "quantities: %s"
+                % (_field(facade, "title", "?"),
+                   float(_field(facade, "area_sf", 0.0) or 0.0),
+                   _field(facade, "excluded_reason", "") or "excluded")
+            )
+
+    # ── The cross-check: flags disagreement, never publishes a quantity ──────
+    cross_reason = ""
+    footprint = bundle.get("reference_footprint")
+    perimeter = None
+    if footprint is not None:
+        try:
+            p = _field(footprint, "perimeter_lf", None)
+            perimeter = float(p) if p is not None else None
+        except (TypeError, ValueError):
+            perimeter = None
+    datum_heights = [
+        float(_field(f, "datum_height_ft", 0.0) or 0.0)
+        for f in live
+        if _field(f, "datum_height_ft", None)
+    ]
+    if perimeter and perimeter > 0 and datum_heights and live:
+        datum_h = max(datum_heights)
+        silhouette = sum(float(_field(f, "area_sf", 0.0) or 0.0) for f in live)
+        expected = perimeter * datum_h
+        if expected > 0:
+            rel = abs(silhouette - expected) / expected
+            if rel > _ELEVATION_CROSS_CHECK_TOL:
+                cross_reason = (
+                    "the facade silhouette sum %.0f SF DISAGREES with the "
+                    "independent perimeter x datum-height route (%.1f LF x "
+                    "%.2f ft = %.0f SF) by %.0f%% — BOTH routes are flagged; "
+                    "neither is preferred, and the second route publishes no "
+                    "quantity" % (silhouette, perimeter, datum_h, expected,
+                                  rel * 100.0)
+                )
+                _note(cross_reason)
+            else:
+                _note(
+                    "elevation cross-check: silhouette sum %.0f SF vs the "
+                    "independent perimeter x datum-height route %.1f LF x "
+                    "%.2f ft = %.0f SF — agreement within %.1f%%. The second "
+                    "route is a cross-check only and publishes no quantity "
+                    "(D-11)" % (silhouette, perimeter, datum_h, expected,
+                                rel * 100.0)
+                )
+
+    # ── Emission: one component per (material, orientation) ──────────────────
+    for facade in live:
+        title = str(_field(facade, "title", "") or "facade")
+        candidate_id = str(_field(facade, "candidate_id", "") or "ELEV")
+        area_sf = float(_field(facade, "area_sf", 0.0) or 0.0)
+        scale_fpi = float(_field(facade, "scale_fpi", 0.0) or 0.0)
+        datum_height = _field(facade, "datum_height_ft", None)
+        datum_txt = (
+            ", datum band %.2f ft" % float(datum_height)
+            if datum_height else ", no datum band"
+        )
+        base_formula = "%s @ %.2f ft/in%s" % (title, scale_fpi, datum_txt)
+        facade_flag = (
+            str(_field(facade, "review_reason", "") or "")
+            if _field(facade, "needs_review", False) else ""
+        )
+        materials = list(_field(facade, "materials", None) or [])
+
+        rows = []  # (name, quantity_sf, extra_reasons, region_ref)
+        if not materials:
+            rows.append((
+                title,
+                area_sf,
+                ["no text-anchored material attribution — no keynote tag "
+                 "inside this drawing names a wall material, so the facade "
+                 "is named by its own title and flagged; a guessed material "
+                 "is never applied"],
+                "facade:%s" % candidate_id,
+            ))
+        else:
+            dominant = materials[0]
+            others = materials[1:]
+            for m in others:
+                claimed = m.get("claimed_sf")
+                if claimed:
+                    rows.append((
+                        m["material"],
+                        float(claimed),
+                        ["per-material split from a closed sub-region whose "
+                         "boundary the fill actually found, claimed by keynote "
+                         "tag(s) %s — the split is flagged by design; the "
+                         "gross facade is the confident figure"
+                         % ", ".join(m.get("tags") or [])],
+                        "facade:%s:%s" % (candidate_id, m["material"]),
+                    ))
+            reasons = []
+            if others:
+                seen = "; ".join(
+                    "%s (tag %s x%d)" % (
+                        m["material"], ",".join(m.get("tags") or []),
+                        int(m.get("count") or 0),
+                    )
+                    for m in others
+                )
+                reasons.append(
+                    "keynote tags name more than one material on this facade "
+                    "— %s — but no tag draws the boundary, so the unclaimed "
+                    "remainder goes to the dominant material %r (tag %s x%d); "
+                    "never split by ratio and never divided by the material "
+                    "count; verify the split"
+                    % (seen, dominant["material"],
+                       ",".join(dominant.get("tags") or []),
+                       int(dominant.get("count") or 0))
+                )
+            rows.append((
+                dominant["material"],
+                area_sf,
+                reasons,
+                "facade:%s" % candidate_id,
+            ))
+
+        for name, quantity, extra_reasons, region_ref in rows:
+            reasons = list(extra_reasons)
+            if facade_flag:
+                reasons.append(facade_flag)
+            if cross_reason:
+                reasons.append(cross_reason)
+            components.append(
+                {
+                    "name": name,
+                    "quantity": round(float(quantity), 1),
+                    "unit": "SF",
+                    "provenance": "geometry",
+                    "confidence": "high" if not reasons else "medium",
+                    "candidate_id": candidate_id,
+                    "name_source": "elevation_fill",
+                    "basis": _WALL_AREA_BASIS,
+                    "region_ref": region_ref,
+                    "orientation": str(_field(facade, "orientation", "") or ""),
+                    "formula": "%.1f SF facade silhouette (%s)"
+                               % (float(quantity), base_formula),
+                    "needs_review": bool(reasons),
+                    "review_reason": "; ".join(reasons),
+                }
+            )
+
+
+def _bind_wall_area_basis(bundle, components, info, fills, ctx) -> None:
+    """THE registered ``wall_area`` binder: room fills AND/OR facades.
+
+    One registry entry answers the basis (SP-9 — no parallel frozenset):
+    sheets with plan fills bind perimeter x height through
+    :func:`_bind_wall_area` exactly as before; sheets with elevation areas
+    bind facade silhouettes through :func:`_fuse_elevation_areas` (guarded to
+    run once); Chelsea's mixed sheets do both. With no elevation areas on the
+    bundle this is byte-identical to the 23-13 binder.
+    """
+    if fills:
+        _bind_wall_area(bundle, components, info, fills, ctx)
+    _fuse_elevation_areas(bundle, components, info, ctx)
+
+
 # ── The basis-to-binder registry (SP-9, D-03) ────────────────────────────────
 #
 # ONE registry answers every measure basis the enclosed-region engine can bind.
@@ -1893,7 +2109,10 @@ def register_basis_binder(basis: str, binder: Callable) -> None:
 register_basis_binder("ceiling_area", _bind_enclosed_area)
 register_basis_binder("roof_area", _bind_enclosed_area)
 register_basis_binder("floor_area", _bind_enclosed_area)
-register_basis_binder(_WALL_AREA_BASIS, _bind_wall_area)
+# wall_area routes through ONE dispatcher answering both wall geometries —
+# room-fill perimeter x height AND elevation facade silhouettes (23-14). The
+# elevation binder is reached only through this registry entry.
+register_basis_binder(_WALL_AREA_BASIS, _bind_wall_area_basis)
 
 
 def _fuse_room_fills(
@@ -1934,58 +2153,74 @@ def _fuse_room_fills(
         bundle.setdefault("coverage_notes", []).append(text)
 
     fills = bundle.get("room_fills") or []
-    if not fills:
+    facades = bundle.get("elevation_areas") or []
+    if not fills and not facades:
         _note(
             "no measurable plan drawing on this sheet — no enclosed-region area "
             "was produced, which is NOT the same as measuring zero area"
         )
         return
     vocab_map = vocab_map or {}
-
-    # Objects the vocabulary/manifest asks for whose basis has a registered
-    # binder, deduped by canonical name.
-    wanted: Dict[str, dict] = {}
-    for info in vocab_map.values():
-        basis = str(info.get("basis") or "").strip().lower()
-        name = info.get("name")
-        if not name or basis not in BASIS_BINDERS:
-            continue
-        wanted.setdefault(str(name).strip().lower(), {"name": name, "basis": basis,
-                                                      "unit": info.get("unit") or "SF"})
-    if not wanted:
-        # THE plans-only failure mode (INV-08 §2 row S8): with no manifest the
-        # vocabulary frequently carries no `basis`, so every successfully
-        # measured area on the sheet is discarded here — silently, and after
-        # the work of measuring it was already done.
-        _note(
-            "%d room fill(s) measured totalling %.1f SF (%s) but no vocabulary "
-            "or manifest item carries an area basis, so the measurements were "
-            "DISCARDED — nothing was measured as zero; the areas exist and have "
-            "no line item to bind to"
-            % (
-                len(fills),
-                sum(float(getattr(f, "area_sf", 0.0) or 0.0) for f in fills),
-                ", ".join(
-                    sorted(
-                        {
-                            str(getattr(f, "viewport_title", "") or
-                                getattr(f, "plan_kind", "") or "?")
-                            for f in fills
-                        }
-                    )
-                ),
-            )
-        )
-        return
-
     ctx = {
         "room_mix": room_mix or {},
         "room_mix_meta": room_mix_meta or {},
         "wall_height_ft": wall_height_ft,
         "wall_height_source": wall_height_source,
     }
-    for info in wanted.values():
-        BASIS_BINDERS[info["basis"]](bundle, components, info, fills, ctx)
+
+    if fills:
+        # Objects the vocabulary/manifest asks for whose basis has a registered
+        # binder, deduped by canonical name.
+        wanted: Dict[str, dict] = {}
+        for info in vocab_map.values():
+            basis = str(info.get("basis") or "").strip().lower()
+            name = info.get("name")
+            if not name or basis not in BASIS_BINDERS:
+                continue
+            wanted.setdefault(str(name).strip().lower(),
+                              {"name": name, "basis": basis,
+                               "unit": info.get("unit") or "SF"})
+        if not wanted:
+            # THE plans-only failure mode (INV-08 §2 row S8): with no manifest
+            # the vocabulary frequently carries no `basis`, so every
+            # successfully measured area on the sheet is discarded here —
+            # silently, and after the work of measuring it was already done.
+            _note(
+                "%d room fill(s) measured totalling %.1f SF (%s) but no "
+                "vocabulary or manifest item carries an area basis, so the "
+                "measurements were DISCARDED — nothing was measured as zero; "
+                "the areas exist and have no line item to bind to"
+                % (
+                    len(fills),
+                    sum(float(getattr(f, "area_sf", 0.0) or 0.0) for f in fills),
+                    ", ".join(
+                        sorted(
+                            {
+                                str(getattr(f, "viewport_title", "") or
+                                    getattr(f, "plan_kind", "") or "?")
+                                for f in fills
+                            }
+                        )
+                    ),
+                )
+            )
+        else:
+            for info in wanted.values():
+                BASIS_BINDERS[info["basis"]](bundle, components, info, fills, ctx)
+
+    # Elevation backstop (23-14): a measured facade is never discarded for
+    # want of a vocabulary basis — the plans-only silent-zero failure this
+    # phase abolishes. Still reached through THE registry: the lookup below
+    # is the same ``wall_area`` entry the wanted-loop dispatches to, so there
+    # is exactly one path to the elevation binder and no parallel gate.
+    if facades and not bundle.get("_elevation_areas_bound"):
+        binder = BASIS_BINDERS.get(_WALL_AREA_BASIS)
+        if binder is not None:
+            binder(
+                bundle, components,
+                {"name": "", "basis": _WALL_AREA_BASIS, "unit": "SF"},
+                [], ctx,
+            )
 
 
 def _fuse_project_area_items(

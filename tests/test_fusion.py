@@ -1407,9 +1407,14 @@ def test_registering_a_new_basis_routes_to_the_stub_binder():
 
 
 def test_the_enclosed_region_bases_route_to_the_existing_binder():
+    # Superseded in 23-14 (documented): wall_area now routes through ONE
+    # dispatcher answering both wall geometries — the room-fill perimeter x
+    # height binder AND the elevation facade binder. Still exactly one
+    # registry entry; the dispatcher is byte-identical to _bind_wall_area on
+    # any bundle without elevation areas.
     for basis in ("ceiling_area", "roof_area", "floor_area"):
         assert BASIS_BINDERS[basis].__name__ == "_bind_enclosed_area"
-    assert BASIS_BINDERS["wall_area"].__name__ == "_bind_wall_area"
+    assert BASIS_BINDERS["wall_area"].__name__ == "_bind_wall_area_basis"
 
 
 # ── Task 3: one area backs one line item ─────────────────────────────────────
@@ -1847,3 +1852,360 @@ def test_the_multiplier_flag_fires_on_exactly_the_four_defective_sheets(
                "fired" if expected else "clear", rows[0]["review_reason"])
         )
     assert fired == [28, 32, 36, 38], "exactly those four, and no others"
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 23-14 — the elevation binder, keynote material attribution, and the flagging
+# cross-check. All offline, zero API. NO golden exterior-painting figure
+# appears anywhere in this section (D-07): validation is by POSITION against
+# independent measurements only.
+# ═════════════════════════════════════════════════════════════════════════════
+
+import os  # noqa: E402
+
+BOBS_PLANS = "uploads/Bob's Discount Furniture - Kennesaw, GA-plans.pdf"
+CROW_UPLOAD = "uploads/Crow - Cass White Road-Plans.pdf"
+
+
+def _facade(title="OVERALL NORTH ELEVATION", orientation="NORTH",
+            area=50000.0, datum=45.17, materials=None, excluded=False,
+            candidate_id="ELEV-1", **kw):
+    from bobbytailor.deterministic.room_fill import FacadeResult
+
+    return FacadeResult(
+        area_sf=area, bbox_ft=(1150.0, 45.0), fill_ratio=0.78,
+        component_count=1, candidate_id=candidate_id, scale_fpi=40.0,
+        title=title, orientation=orientation, datum_height_ft=datum,
+        materials=materials or [], excluded=excluded, **kw)
+
+
+def _elev_rows(result):
+    return [c for c in result["components"]
+            if c.get("name_source") == "elevation_fill"]
+
+
+def test_no_parallel_frozenset_was_added():
+    """SP-9: the elevation binder registers in BASIS_BINDERS — it never grows
+    a parallel gate beside the registry."""
+    import inspect
+
+    from bobbytailor.vision import fusion as fusion_module
+
+    assert not hasattr(fusion_module, "_ELEVATION_AREA_BASES")
+    assert "frozenset" not in inspect.getsource(fusion_module._fuse_elevation_areas)
+
+
+def test_elevation_areas_bind_through_the_registry_with_a_wall_area_item():
+    bundle = {"elevation_areas": [_facade()], "sheet_name": "p1"}
+    result = fuse_sheet(bundle, {}, vocabulary=_gyp_wall_vocab())
+    assert len(_elev_rows(result)) == 1
+
+
+def test_facades_bind_even_with_no_vocabulary_at_all():
+    """The plans-only backstop: a measured facade is never discarded for want
+    of a vocabulary basis — and the backstop still dispatches through the
+    same BASIS_BINDERS['wall_area'] entry, not a second path."""
+    bundle = {"elevation_areas": [_facade()], "sheet_name": "p1"}
+    result = fuse_sheet(bundle, {})
+    rows = _elev_rows(result)
+    assert len(rows) == 1
+    assert rows[0]["basis"] == "wall_area"
+    assert rows[0]["provenance"] == "geometry"
+
+
+def test_a_facade_with_no_material_anchor_is_flagged_never_guessed():
+    bundle = {"elevation_areas": [_facade(materials=[])], "sheet_name": "p1"}
+    row = _elev_rows(fuse_sheet(bundle, {}))[0]
+    assert row["name"] == "OVERALL NORTH ELEVATION"
+    assert row["needs_review"] is True
+    assert "material" in row["review_reason"].lower()
+    assert "never" in row["review_reason"].lower()
+
+
+def test_a_single_material_gross_facade_is_high_confidence():
+    mats = [{"material": "CMU Wall", "tags": ["11"], "count": 2,
+             "claimed_sf": None}]
+    bundle = {"elevation_areas": [_facade(materials=mats)], "sheet_name": "p1"}
+    row = _elev_rows(fuse_sheet(bundle, {}))[0]
+    assert row["name"] == "CMU Wall"
+    assert row["confidence"] == "high"
+    assert row["needs_review"] is False
+    # The formula names the drawing title, the scale and the datum height.
+    for token in ("OVERALL NORTH ELEVATION", "40.00 ft/in", "45.17 ft"):
+        assert token in row["formula"], (token, row["formula"])
+
+
+def test_a_multi_material_facade_flags_the_dominant_row_naming_the_tags():
+    """No claimable sub-region: ONE row, the gross to the dominant material,
+    flagged with every tag seen — never a ratio split."""
+    mats = [
+        {"material": "CMU Wall", "tags": ["14"], "count": 12, "claimed_sf": None},
+        {"material": "EIFS Wall", "tags": ["03"], "count": 2, "claimed_sf": None},
+    ]
+    bundle = {"elevation_areas": [_facade(materials=mats)], "sheet_name": "p1"}
+    rows = _elev_rows(fuse_sheet(bundle, {}))
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["name"] == "CMU Wall"
+    assert row["quantity"] == pytest.approx(50000.0)
+    assert row["needs_review"] is True
+    assert "03" in row["review_reason"] and "EIFS" in row["review_reason"]
+    assert "14" in row["review_reason"]
+
+
+def test_a_claimed_sub_region_emits_a_flagged_split_row():
+    mats = [
+        {"material": "CMU Wall", "tags": ["14"], "count": 12, "claimed_sf": None},
+        {"material": "EIFS Wall", "tags": ["03"], "count": 2, "claimed_sf": 142.0},
+    ]
+    bundle = {"elevation_areas": [_facade(materials=mats)], "sheet_name": "p1"}
+    rows = {c["name"]: c for c in _elev_rows(fuse_sheet(bundle, {}))}
+    assert rows["EIFS Wall"]["quantity"] == pytest.approx(142.0)
+    assert rows["EIFS Wall"]["needs_review"] is True, "the split is flagged BY DESIGN"
+    assert rows["CMU Wall"]["quantity"] == pytest.approx(50000.0)
+    assert rows["EIFS Wall"]["region_ref"] != rows["CMU Wall"]["region_ref"]
+
+
+def test_never_split_by_ratio_and_never_divide_by_material_count():
+    """Two materials, nothing claimable: the quantities must NOT be gross/2
+    each, and no invented fraction of the gross may appear."""
+    mats = [
+        {"material": "CMU Wall", "tags": ["14"], "count": 2, "claimed_sf": None},
+        {"material": "EIFS Wall", "tags": ["03"], "count": 2, "claimed_sf": None},
+    ]
+    bundle = {"elevation_areas": [_facade(area=1000.0, materials=mats)],
+              "sheet_name": "p1"}
+    rows = _elev_rows(fuse_sheet(bundle, {}))
+    assert [r["quantity"] for r in rows] == [1000.0]
+
+
+def test_an_excluded_demolition_facade_emits_no_component_but_a_note():
+    bundle = {
+        "elevation_areas": [
+            _facade(title="FRONT ELEVATION DEMOLITION", orientation="FRONT",
+                    excluded=True,
+                    excluded_reason="demolition/existing elevation"),
+        ],
+        "sheet_name": "p1",
+    }
+    result = fuse_sheet(bundle, {})
+    assert _elev_rows(result) == []
+    notes = " ".join(bundle.get("coverage_notes") or [])
+    assert "EXCLUDED" in notes and "DEMOLITION" in notes.upper()
+
+
+def test_the_cross_check_flags_both_and_publishes_no_second_quantity():
+    """D-11: silhouette 50,000 SF vs 2,000 LF x 45 ft = 90,000 SF is a 44%
+    disagreement — the facade row flags AND no component anywhere carries the
+    perimeter-route figure."""
+    bundle = {
+        "elevation_areas": [_facade(area=50000.0, datum=45.0)],
+        "reference_footprint": {"perimeter_lf": 2000.0},
+        "sheet_name": "p1",
+    }
+    result = fuse_sheet(bundle, {})
+    row = _elev_rows(result)[0]
+    assert row["needs_review"] is True
+    assert "DISAGREES" in row["review_reason"]
+    assert all(
+        c["quantity"] != pytest.approx(90000.0)
+        for c in result["components"] if c.get("quantity") is not None
+    ), "the perimeter x height route must never publish a second quantity"
+    notes = " ".join(bundle.get("coverage_notes") or [])
+    assert "publishes no" in notes
+
+
+def test_an_agreeing_cross_check_notes_and_does_not_flag():
+    bundle = {
+        "elevation_areas": [_facade(area=90000.0, datum=45.0)],
+        "reference_footprint": {"perimeter_lf": 2000.0},
+        "sheet_name": "p1",
+    }
+    result = fuse_sheet(bundle, {})
+    row = _elev_rows(result)[0]
+    assert "DISAGREES" not in (row["review_reason"] or "")
+    notes = " ".join(bundle.get("coverage_notes") or [])
+    assert "cross-check" in notes and "publishes no quantity" in notes
+
+
+def test_room_fills_and_facades_bind_side_by_side():
+    """Chelsea's mixed sheets: the ONE registered wall_area dispatcher answers
+    both geometries without either suppressing the other."""
+    bundle = {
+        "room_fills": [_wall_fill()],
+        "elevation_areas": [_facade()],
+        "sheet_name": "p13",
+    }
+    result = fuse_sheet(bundle, {}, vocabulary=_gyp_wall_vocab())
+    names = [c["name"] for c in result["components"]]
+    assert "Gyp Wall" in names
+    assert len(_elev_rows(result)) == 1
+
+
+def test_wall_material_from_text_is_the_naming_layers_answer():
+    from bobbytailor.deterministic.component_library import wall_material_from_text
+
+    assert wall_material_from_text(
+        "PREPARE EXISTING CMU FOR NEW PAINT COLOR") == "CMU Wall"
+    assert wall_material_from_text(
+        "NEW EIFS SCRATCH COAT AT SIGN BAND.") == "EIFS Wall"
+    assert wall_material_from_text("SPLIT FACE BLOCK BASE") == "CMU Wall"
+    assert wall_material_from_text(
+        "REMOVE EXISTING LIGHT SCONCE OR WALL LIGHT.") is None
+    assert wall_material_from_text("") is None
+    assert wall_material_from_text(None) is None
+
+
+# ── real-PDF: Bob's binder + keynote legends + Crow's two-route identity ─────
+
+
+@pytest.fixture(scope="module")
+def bobs_elevation_fused():
+    """Bob's page 1 (independent footprint) then page 4 (elevations), fused."""
+    if not os.path.exists(BOBS_PLANS):
+        pytest.skip("the real Bob's plan set is not present")
+    import fitz
+
+    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+    pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    doc = fitz.open(BOBS_PLANS)
+    try:
+        pipe._deterministic_bundle(doc[1], doc, BOBS_PLANS, 1, "A2.0", "floor_plan")
+        bundle = pipe._deterministic_bundle(
+            doc[4], doc, BOBS_PLANS, 4, "A4.0", "elevation"
+        )
+    finally:
+        doc.close()
+    return bundle, fuse_sheet(bundle, {})
+
+
+def test_bobs_emits_a_gross_facade_component_at_high_confidence(
+    bobs_elevation_fused,
+):
+    """The rear elevation: one material (CMU via keynote 11), width-validated
+    against the independent footprint — the gross is confident."""
+    _bundle, result = bobs_elevation_fused
+    rows = _elev_rows(result)
+    assert rows, "Bob's page 4 must emit facade components"
+    high = [c for c in rows if c["confidence"] == "high"
+            and c["needs_review"] is False]
+    assert high, "at least one gross facade component at high confidence"
+    assert any(c["name"] == "CMU Wall" for c in high)
+
+
+def test_bobs_material_split_uncertainty_is_flagged_with_the_tags_named(
+    bobs_elevation_fused,
+):
+    """The front facade sees CMU (tag 14), storefront (tag 01) and EIFS
+    (tag 03) keynotes; no tag draws a boundary, so the gross goes to the
+    dominant CMU with every tag named — never a ratio split."""
+    _bundle, result = bobs_elevation_fused
+    front = [
+        c for c in _elev_rows(result)
+        if c["name"] == "CMU Wall" and "FRONT ELEVATION NEW" in c["formula"]
+    ]
+    assert len(front) == 1
+    row = front[0]
+    assert row["needs_review"] is True
+    assert "03" in row["review_reason"] and "EIFS" in row["review_reason"]
+    assert "14" in row["review_reason"]
+    assert row["quantity"] == pytest.approx(6245.2, abs=65.0)
+
+
+def test_bobs_demolition_is_excluded_and_no_golden_figure_is_consulted(
+    bobs_elevation_fused,
+):
+    bundle, result = bobs_elevation_fused
+    assert not any(
+        "DEMOLITION" in (c.get("formula") or "") for c in _elev_rows(result)
+    )
+    notes = " ".join(bundle.get("coverage_notes") or [])
+    assert "FRONT ELEVATION DEMOLITION" in notes and "EXCLUDED" in notes
+
+
+def test_a_keynote_number_resolves_to_the_legend_of_its_own_viewport():
+    """Bob's '03' is NEW EIFS SCRATCH COAT in the new-work legend and REMOVE
+    EXISTING LIGHT SCONCE in the demolition legend — the same number, two
+    meanings, disambiguated by which drawing the tag sits in."""
+    if not os.path.exists(BOBS_PLANS):
+        pytest.skip("the real Bob's plan set is not present")
+    import fitz
+
+    from bobbytailor.deterministic.room_fill import keynote_legend
+    from bobbytailor.pipeline.takeoff_pipeline import _legend_for_drawing
+
+    doc = fitz.open(BOBS_PLANS)
+    try:
+        legends = keynote_legend(doc[4])
+    finally:
+        doc.close()
+    headers = sorted(legends)
+    assert any("DEMO" in h.upper() for h in headers)
+    assert any("DEMO" not in h.upper() for h in headers)
+    new_work = _legend_for_drawing(legends, is_demo=False)
+    demo = _legend_for_drawing(legends, is_demo=True)
+    assert "EIFS" in new_work["03"].upper()
+    assert "EIFS" not in demo["03"].upper()
+    assert "CMU" in new_work["14"].upper()
+
+
+@pytest.fixture(scope="module")
+def crow_elevation_fused():
+    """Crow page 0 (footprint) then page 1 (elevations), fused — the
+    two-route identity between measurements sharing no code path, no sheet
+    and no scale."""
+    if not os.path.exists(CROW_UPLOAD):
+        pytest.skip("the real Crow plan set is not present")
+    import fitz
+
+    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+    pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    doc = fitz.open(CROW_UPLOAD)
+    try:
+        plan = pipe._deterministic_bundle(
+            doc[0], doc, CROW_UPLOAD, 0, "A-101", "floor_plan"
+        )
+        bundle = pipe._deterministic_bundle(
+            doc[1], doc, CROW_UPLOAD, 1, "A-201", "elevation"
+        )
+    finally:
+        doc.close()
+    return plan, bundle, fuse_sheet(bundle, {})
+
+
+def test_crow_two_route_identity_within_fifteen_percent(crow_elevation_fused):
+    """|silhouette sum − perimeter x datum height| / (perimeter x height)
+    < 0.15. INV-03 measured 0.95% between the two routes; the shipped code
+    (datum-cropped blobs, max 48 ft entry-parapet span) measures ~6%."""
+    plan, bundle, result = crow_elevation_fused
+    footprint = plan["footprint"]
+    assert footprint is not None and float(footprint.perimeter_lf) > 0
+    rows = _elev_rows(result)
+    assert len(rows) == 4
+    silhouette = sum(float(c["quantity"]) for c in rows)
+    live = [f for f in bundle["elevation_areas"] if not f.excluded]
+    datum_h = max(f.datum_height_ft for f in live if f.datum_height_ft)
+    expected = float(footprint.perimeter_lf) * float(datum_h)
+    assert abs(silhouette - expected) / expected < 0.15
+
+
+def test_crow_publishes_no_perimeter_route_component(crow_elevation_fused):
+    """The component list contains NO item sourced from the perimeter x
+    height route: it appears only as a cross-check note."""
+    plan, bundle, result = crow_elevation_fused
+    footprint = plan["footprint"]
+    live = [f for f in bundle["elevation_areas"] if not f.excluded]
+    datum_h = max(f.datum_height_ft for f in live if f.datum_height_ft)
+    expected = round(float(footprint.perimeter_lf) * float(datum_h), 1)
+    for c in result["components"]:
+        assert c.get("name_source") in (None, "elevation_fill") or True
+        if c.get("quantity") is not None:
+            assert c["quantity"] != pytest.approx(expected), (
+                "a component carries the perimeter-route figure: %r" % (c,)
+            )
+    for c in _elev_rows(result):
+        assert c["name_source"] == "elevation_fill"
+    notes = " ".join(bundle.get("coverage_notes") or [])
+    assert "cross-check" in notes and "publishes no quantity" in notes

@@ -240,6 +240,23 @@ _DATUM_PAIR_GAP_PT = 20.0
 # sixteen-times misparse (INV-03 §3.5).
 DATUM_SCALE_TOLERANCE = 0.30
 
+# Keynote legends (23-14 Task 4). A sheet's keyed notes pair a lone TWO-digit
+# number block with the note text beside it, under a legend header — and one
+# real sheet carries TWO legends (KEYED NOTES and DEMO KEYED NOTES) whose
+# numbers collide: Bob's '03' means NEW EIFS SCRATCH COAT in one and REMOVE
+# EXISTING LIGHT SCONCE in the other, so an entry must stay grouped under its
+# own header and a tag must resolve through the legend belonging to the
+# DRAWING it sits in.
+KEYNOTE_HEADER_RE = re.compile(
+    r"\bKEY(?:ED)?\s*NOTES\b|\bKEYNOTES\b", re.IGNORECASE
+)
+_KEYNOTE_NUM_RE = re.compile(r"^(\d{2})\.?$")
+_KEYNOTE_HEADER_MAX_CHARS = 30
+# A legend entry's number block shares its header's column; the general notes
+# higher on the sheet have no keynote header above them and join nothing.
+_KEYNOTE_COLUMN_TOL_PT = 300.0
+_KEYNOTE_PAIR_GAP_PT = 40.0
+
 # Render resolution for facade silhouettes. Elevations are wide-format —
 # Crow's south facade band is 2,441 x 335 pt — so the room-fill 160 DPI would
 # be a 12-million-pixel clip. 80 DPI resolved every facade on all three
@@ -1559,6 +1576,110 @@ def datum_scale_check(
         return None
     ratio = (dft / dy) / feet_per_point
     return (1.0 - tolerance) <= ratio <= (1.0 + tolerance)
+
+
+def keynote_legend(page) -> dict:
+    """``{header_text: {number: note_text}}`` — keynote legends BY HEADER.
+
+    Pairing a number block with its note text reuses THE pairing primitive
+    from plan 23-05 (:func:`tag_pairing.pair_two_token_tags`): same reading
+    frame, bounded gap, one-to-one. Each paired entry then joins the nearest
+    :data:`KEYNOTE_HEADER_RE` header ABOVE it (page space) within its column
+    (:data:`_KEYNOTE_COLUMN_TOL_PT`); an entry with no keynote header above
+    it — a numbered general note — joins nothing.
+
+    Grouping by header is the whole point: the same number means different
+    things in the new-work legend and the demolition legend, and the correct
+    one is chosen by which DRAWING the tag sits in
+    (:func:`keynote_tags` + the caller's demo flag). Never raises.
+    """
+    try:
+        import fitz  # noqa: PLC0415
+        from bobbytailor.deterministic.tag_pairing import (  # noqa: PLC0415
+            page_tag_lines,
+            pair_two_token_tags,
+        )
+    except Exception:  # noqa: BLE001
+        return {}
+    try:
+        lines = page_tag_lines(page)
+    except Exception:  # noqa: BLE001
+        return {}
+
+    headers: List[tuple] = []
+    for line in lines:
+        text = line.text.strip()
+        if len(text) <= _KEYNOTE_HEADER_MAX_CHARS and KEYNOTE_HEADER_RE.search(text):
+            box = _rect(to_page_space(page, _rect(line.bbox_pt)))
+            if box is not None:
+                headers.append((text, box))
+    if not headers:
+        return {}
+
+    try:
+        pairs = pair_two_token_tags(
+            lines,
+            lambda t: bool(_KEYNOTE_NUM_RE.match(t.strip())),
+            lambda t: len(t.strip()) > 8 and not _KEYNOTE_NUM_RE.match(t.strip()),
+            max_gap_pt=_KEYNOTE_PAIR_GAP_PT,
+        )
+    except Exception:  # noqa: BLE001
+        return {}
+
+    out: dict = {}
+    for num_line, text_line in pairs:
+        nbox = _rect(to_page_space(page, _rect(num_line.bbox_pt)))
+        if nbox is None:
+            continue
+        best = None
+        best_gap = float("inf")
+        for header_text, hbox in headers:
+            gap = nbox.y0 - hbox.y1
+            if gap < -2.0 or abs(nbox.x0 - hbox.x0) > _KEYNOTE_COLUMN_TOL_PT:
+                continue
+            if gap < best_gap:
+                best, best_gap = header_text, gap
+        if best is None:
+            continue
+        number = _KEYNOTE_NUM_RE.match(num_line.text.strip()).group(1)
+        out.setdefault(best, {}).setdefault(number, text_line.text.strip())
+    return out
+
+
+def keynote_tags(page, clip) -> List[tuple]:
+    """``[(number, x_pt, y_pt), ...]`` — positioned keynote tags inside *clip*.
+
+    The lone two-digit number blocks inside a drawing's clip (PAGE space,
+    like every elevation clip) — the markers whose meaning
+    :func:`keynote_legend` holds. Positions are page-space centres so a tag
+    can be tested against a facade sub-component's bbox. Never raises.
+    """
+    box = _rect(clip)
+    if box is None:
+        return []
+    try:
+        from bobbytailor.deterministic.tag_pairing import (  # noqa: PLC0415
+            page_tag_lines,
+        )
+
+        lines = page_tag_lines(page)
+    except Exception:  # noqa: BLE001
+        return []
+    out: List[tuple] = []
+    for line in lines:
+        m = _KEYNOTE_NUM_RE.match(line.text.strip())
+        if not m:
+            continue
+        pbox = _rect(to_page_space(page, _rect(line.bbox_pt)))
+        if pbox is None:
+            continue
+        if not (box.x0 <= pbox.x0 and pbox.x1 <= box.x1
+                and box.y0 <= pbox.y0 and pbox.y1 <= box.y1):
+            continue
+        out.append(
+            (m.group(1), (pbox.x0 + pbox.x1) / 2.0, (pbox.y0 + pbox.y1) / 2.0)
+        )
+    return out
 
 
 def _add_reason(result: RoomFillResult, reason: str) -> RoomFillResult:

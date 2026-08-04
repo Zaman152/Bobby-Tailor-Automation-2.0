@@ -865,6 +865,46 @@ def normalize_estimator_name(name: str, aliases=()) -> tuple:
     return original, list(out_aliases)
 
 
+# ── Wall-material vocabulary (23-14 — the naming layer, not a fusion dict) ────
+#
+# The words a keynote/legend text uses to name a WALL MATERIAL, mapped to the
+# estimator take-off term. This is the material signal available on real
+# elevation sheets — Bob's facade fills are all white (no hatch, INV-03 §3.4),
+# so attribution is TEXT-ANCHORED: a positioned keynote tag whose legend text
+# names one of these materials. First match wins, like every naming table
+# here. GENERAL construction terminology only; data-driven — add a row to
+# cover a new material, never a special case in fusion.
+_WALL_MATERIAL_RULES = [
+    (r"\bcmu\b|concrete\s*masonry|split\s*face|(masonry|block)\s*wall", "CMU Wall"),
+    (r"\beifs\b|dryvit|exterior\s*insulation\s*(and\s*)?finish", "EIFS Wall"),
+    (r"\bstucco\b", "Stucco Wall"),
+    (r"\bbrick\b", "Brick Wall"),
+    (r"metal\s*panel", "Metal Panel Wall"),
+    (r"storefront|curtain\s*wall", "Storefront"),
+    (r"tilt.?up|site.?cast.*concrete.*panel", "Tilt Up Wall"),
+]
+
+_WALL_MATERIAL_MAP = [
+    (re.compile(pat, re.IGNORECASE), canonical)
+    for pat, canonical in _WALL_MATERIAL_RULES
+]
+
+
+def wall_material_from_text(text) -> Optional[str]:
+    """The canonical wall material a keynote/legend *text* names, or ``None``.
+
+    ``None`` means the text anchors NO wall material — and the caller must
+    flag rather than guess (a keynote about a light sconce attributes
+    nothing). Never raises.
+    """
+    if not text:
+        return None
+    for pattern, canonical in _WALL_MATERIAL_MAP:
+        if pattern.search(str(text)):
+            return canonical
+    return None
+
+
 def apply_estimator_names(entries: List[dict]) -> List[dict]:
     """Rewrite each library entry's ``name`` to the estimator take-off term.
 

@@ -395,3 +395,23 @@ building-type-free — but it is a new plan, not a task.
 
 **NOT fixed in 23-11** because the answer is not ours to choose. Fitting a clip until sixteen numbers
 agreed would be the coincidence trap this phase exists to abolish, wearing a new costume.
+
+## DEF-23-14A — a facade silhouette and a tilt-up perimeter x height row can double-represent one wall across SHEETS
+
+**Found during:** 23-14 Task 4 (the elevation binder design).
+**Where:** `fusion._fuse_wall_classes` (tilt-up: perimeter x height on the FLOOR-PLAN sheet, when a
+vision label / vocabulary names a tilt-up wall_area class) vs `fusion._fuse_elevation_areas`
+(facade silhouettes on the ELEVATION sheet).
+
+**Evidence (real, zero API):** on Crow, the floor-plan sheet can bind `Tilt Up Wall` =
+2,972 LF x height, while page 1 now emits four facade rows summing 133,478 SF. These are the SAME
+exterior walls measured by two routes on two sheets. One-area-one-item arbitration is PER-SHEET
+(`fuse_sheet`), so nothing arbitrates across the pair. Today the facade rows are flagged (no
+text-anchored material on Crow) and the D-11 cross-check note names both figures, so the overlap is
+visible, never silent — but an aggregator summing both under one item name would double-count.
+
+**Why not fixed in 23-14:** cross-sheet arbitration is an AGGREGATION concern (the per-sheet
+arbitration contract was deliberately scoped in 23-13), and suppressing the tilt-up binding would
+break pinned 23-08/23-13 behaviour. The honest boundary shipped: the second route flags and
+publishes no quantity on the elevation sheet; the cross-sheet dedupe belongs with the aggregator
+(23-15/23-16 or Phase 24 scoring will surface it on the real Crow report).

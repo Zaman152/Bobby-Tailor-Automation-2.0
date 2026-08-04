@@ -1122,6 +1122,76 @@ def _resolve_project_wall_height(
     return _WALL_HEIGHT_DEFAULT_FT, "default"
 
 
+def _legend_for_drawing(legends: dict, is_demo: bool) -> dict:
+    """The keynote legend belonging to THIS drawing — demo or new-work.
+
+    A tag's meaning depends on which drawing it sits in: Bob's '03' is NEW
+    EIFS SCRATCH COAT inside FRONT ELEVATION NEW and REMOVE EXISTING LIGHT
+    SCONCE inside FRONT ELEVATION DEMOLITION. A demolition drawing resolves
+    through the DEMO-headed legend(s); everything else through the rest.
+    """
+    picked = {
+        header: entries
+        for header, entries in (legends or {}).items()
+        if ("DEMO" in header.upper()) == bool(is_demo)
+    }
+    merged: dict = {}
+    for entries in picked.values():
+        for number, text in entries.items():
+            merged.setdefault(number, text)
+    return merged
+
+
+def _attribute_facade_materials(facade, tags, legend) -> list:
+    """Text-anchored material attribution for one facade, sorted by evidence.
+
+    Each positioned keynote tag inside the drawing resolves through ITS
+    drawing's legend to a note text; the naming layer
+    (:func:`component_library.wall_material_from_text`) says whether that
+    text names a wall material. A tag whose legend text names no material
+    attributes nothing — flagged downstream, never guessed.
+
+    A tag sitting INSIDE a sub-component the fill actually found (a detached
+    sign band) CLAIMS that sub-region's area as the material's measurable
+    split; each sub-region is claimable once. Everything else is evidence of
+    presence only — the tag count orders the materials, the boundary is never
+    invented, and no ratio split ever happens here or downstream.
+    """
+    from bobbytailor.deterministic.component_library import (  # noqa: PLC0415
+        wall_material_from_text,
+    )
+
+    if not tags or not legend:
+        return []
+    materials: dict = {}
+    claimed_subs: set = set()
+    subs = list(getattr(facade, "sub_components", None) or [])
+    for number, x, y in tags:
+        material = wall_material_from_text(legend.get(number))
+        if not material:
+            continue
+        record = materials.setdefault(
+            material, {"material": material, "tags": [], "count": 0,
+                       "claimed_sf": None}
+        )
+        record["count"] += 1
+        if number not in record["tags"]:
+            record["tags"].append(number)
+        for j, sub in enumerate(subs):
+            if j in claimed_subs:
+                continue
+            bx0, by0, bx1, by1 = sub.get("bbox_pt", (0, 0, 0, 0))
+            if bx0 <= x <= bx1 and by0 <= y <= by1:
+                claimed_subs.add(j)
+                record["claimed_sf"] = (
+                    (record["claimed_sf"] or 0.0) + float(sub["area_sf"])
+                )
+                break
+    return sorted(
+        materials.values(), key=lambda m: (-m["count"], m["material"])
+    )
+
+
 def _flag_same_orientation_pairs(facades) -> None:
     """Two SURVIVING same-orientation facades flag each other.
 
@@ -2931,6 +3001,8 @@ class TakeoffPipeline:
             datum_wall_band,
             elevation_datums,
             elevation_titles,
+            keynote_legend,
+            keynote_tags,
             measure_facade_area,
         )
 
@@ -2942,6 +3014,16 @@ class TakeoffPipeline:
             return [], drops
         if not entries:
             return [], drops
+
+        # The sheet's keynote legends, harvested ONCE — grouped by header so
+        # a demolition drawing's tags resolve through the DEMO legend and a
+        # new-work drawing's through the keyed notes, even where the numbers
+        # collide (Bob's '03': EIFS scratch coat vs. removed light sconce).
+        legends: dict = {}
+        try:
+            legends = keynote_legend(page)
+        except Exception as exc:  # noqa: BLE001 — attribution is additive
+            logger.debug("keynote legend harvest failed on %r: %s", sheet_name, exc)
 
         def _drop(cid, title, disposition, reason, fpi=None):
             drops.append(
@@ -3005,6 +3087,18 @@ class TakeoffPipeline:
             facade.is_interior = entry.is_interior
             if band:
                 facade.datum_height_ft = band[2]
+            if legends:
+                try:
+                    facade.materials = _attribute_facade_materials(
+                        facade,
+                        keynote_tags(page, clip),
+                        _legend_for_drawing(legends, entry.is_demo),
+                    )
+                except Exception as exc:  # noqa: BLE001 — attribution is additive
+                    logger.debug(
+                        "material attribution failed on %r %s: %s",
+                        sheet_name, cid, exc,
+                    )
 
             if entry.is_demo:
                 facade.excluded = True
