@@ -936,7 +936,14 @@ task — and given the offline-only, no-network posture of this phase, the defau
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED during planning, 2026-08-05 — all four answered FREE, zero API)
+
+> **OQ-1** -> resolved by plan **24-06**: `ENSEMBLE_N` is persisted into `takeoff.json` via `run_settings` telemetry.
+> **OQ-2** -> resolved by plan **24-05**: PER-PROJECT scope, via a NEW additive table — `learning_vocabulary` has no `project_key` column and its `UNIQUE(project_type, raw_pattern, canonical_name, unit)` would require a destructive rebuild to add one. Per-type is retained as a suggestion source only.
+> **OQ-3** -> resolved by plan **24-04**: unnamed-geometry records get their OWN top-level `unnamed_geometry` key; overloading `fusion_rejected` would corrupt the C3a reinstatement logic added in the phase-23 regression fix.
+> **OQ-4** -> answered **NO** (see ROADMAP Phase 24 note): the 56-EA cluster has no text anchor. Measured over all four Crow sheets — of 107 symbol groups, **81 carry no `contained_texts` at all**, 26 carry pure drafting noise, and **0 carry a genuine object name**. The 56 is page-0 `SYM-2` and the 136 is `SYM-1`; both have zero text. Consequence: the nearest-non-masked-word primitive IS the anchor ladder, not an enhancement to it.
+
+### Original questions
 
 1. **Was `ENSEMBLE_N` 3 or 1 on the saved runs?**
    - What we know: the default is 3 (`config.py:57`); `_build_project_vocabulary` votes when `n>1`.
