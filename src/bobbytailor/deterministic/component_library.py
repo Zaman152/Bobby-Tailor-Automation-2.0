@@ -126,11 +126,73 @@ _NOTE_OBJECTS = [
 ]
 
 
+# ── Linear-phrase basis classification (23-15, INV-04 §5) ─────────────────────
+
+# A generic linear-system phrase is an optional MATERIAL modifier followed by a
+# linear-system HEAD NOUN, harvested from the sheet's own general notes — so a
+# "GAS PIPING" note yields ``basis=linear, unit=LF`` with NO model call. The
+# material vocabulary is a closed set: "EXHAUST DUCT" (equipment callout) and
+# "CONDENSATE DRAIN" (discharge note) must NOT become library entries, and a
+# bare head noun ("CONDUIT OR PIPE") is a fragment, never a system name.
+_LINEAR_MATERIALS = (
+    "GAS", "STORM", "SANITARY", "SEWER", "WATER", "FUEL",
+    "IRRIGATION", "STEEL", "COPPER", "PVC", "HDPE",
+)
+_LINEAR_HEAD_NOUNS = (
+    "PIPING", "PIPE", "CONDUIT", "DUCT", "DRAIN", "CURB", "FENCE", "RAIL",
+    "SEWER", "WATER", "STORM",
+)
+_LINEAR_PHRASE_RE = re.compile(
+    r"\b(%s)\s+(%s)\b" % ("|".join(_LINEAR_MATERIALS), "|".join(_LINEAR_HEAD_NOUNS)),
+    re.IGNORECASE,
+)
+# Words that may legitimately FOLLOW a genuine head noun (function words / verbs
+# of a note sentence). Any other following word means the matched noun modifies
+# a FURTHER noun and is not the head ("STORM WATER POLLUTION PREVENTION",
+# "CONDENSATE DRAIN CONNECTIONS") — the phrase is rejected.
+_HEAD_NOUN_FOLLOWERS = frozenset({
+    "to", "shall", "will", "is", "are", "be", "and", "or", "at", "in", "on",
+    "of", "for", "with", "per", "from", "the", "a", "an", "re", "see", "as",
+    "by", "must", "may", "not", "below", "above", "under", "shown", "where",
+})
+
+
+def _linear_phrases_from_notes(text: str) -> List[dict]:
+    """Harvest ``MATERIAL + HEAD`` linear-system phrases from note prose.
+
+    Each surviving phrase becomes ``{name, basis: linear, unit: LF,
+    source: sheet_note}`` — e.g. ``"ALL GAS PIPING TO BE PREPPED..."`` yields
+    ``Gas Piping``. Deterministic, zero API.
+    """
+    out: List[dict] = []
+    seen = set()
+    for m in _LINEAR_PHRASE_RE.finditer(text or ""):
+        follower = re.match(r"\s+([A-Za-z]+)", text[m.end():])
+        if follower and follower.group(1).lower() not in _HEAD_NOUN_FOLLOWERS:
+            continue  # the matched noun modifies a further noun — not the head
+        name = _title("%s %s" % (m.group(1), m.group(2)))
+        key = _norm(name)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "name": name,
+            "aliases": [],
+            "basis": "linear",
+            "unit": "LF",
+            "source": "sheet_note",
+        })
+    return out
+
+
 def harvest_from_notes(text: str) -> List[dict]:
     """Extract conservative object-noun library entries from keynote / note prose.
 
     Returns a de-duplicated list of ``{name, aliases, basis, unit, source}``.
     Only whole-word object nouns are matched; sentences are never emitted.
+    Linear-system ``MATERIAL + HEAD`` phrases (23-15) are harvested alongside
+    the curated nouns — "GAS PIPING" classifies itself ``linear``/``LF`` from
+    the sheet's own note, with no model call.
     """
     if not text:
         return []
@@ -149,6 +211,11 @@ def harvest_from_notes(text: str) -> List[dict]:
                 "unit": unit,
                 "source": "keynote",
             })
+    for entry in _linear_phrases_from_notes(text):
+        if entry["name"] in seen:
+            continue
+        seen.add(entry["name"])
+        out.append(entry)
     return out
 
 

@@ -24,6 +24,7 @@ from bobbytailor.deterministic.component_library import (
 
 UPLOADS = os.path.join(os.path.dirname(__file__), os.pardir, "uploads")
 CROW = os.path.join(UPLOADS, "Crow - Cass White Road-Plans.pdf")
+BOBS = os.path.join(UPLOADS, "Bob's Discount Furniture - Kennesaw, GA-plans.pdf")
 
 
 # ── Abbreviation parsing ──────────────────────────────────────────────────────
@@ -95,6 +96,94 @@ def test_harvest_from_notes_dedups():
     text = "LADDER ... ACCESS LADDER ... ladder again"
     lib = harvest_from_notes(text)
     assert sum(1 for e in lib if e["name"] == "Ladder") == 1
+
+
+# ── 23-15: linear-phrase basis classification (INV-04 §5) ─────────────────────
+
+
+def test_a_gas_piping_note_classifies_itself_linear_lf():
+    """The exact A3.0 note: a material + head-noun phrase yields the linear
+    basis and the LF unit from the sheet's own text, with no model call."""
+    lib = harvest_from_notes(
+        "ALL GAS PIPING TO BE PREPPED AND PAINTED YELLOW. RE: P2.0.")
+    gas = next(e for e in lib if e["name"] == "Gas Piping")
+    assert (gas["basis"], gas["unit"], gas["source"]) == ("linear", "LF", "sheet_note")
+
+
+def test_equipment_fragments_and_discharge_notes_are_not_head_nouns():
+    """INV-04 §5's negative set: 'CONDUIT OR PIPE' and 'EXHAUST DUCT' are
+    equipment-callout fragments and the condensate sentence is a discharge
+    note — none becomes a linear-basis library entry."""
+    text = (
+        "CONDUIT OR PIPE\n"
+        "EXHAUST DUCT\n"
+        "ALL CONDENSATE DRAIN CONNECTIONS, TRAPS AND PIPING TO DISCHARGE "
+        "AWAY FROM UNITS.\n"
+        "STORM WATER POLLUTION PREVENTION PLAN\n"
+    )
+    lib = harvest_from_notes(text)
+    assert [e for e in lib if e.get("source") == "sheet_note"] == []
+
+
+def test_a_library_verbatim_rail_name_produces_the_spaced_canonical_form():
+    """SP-7 part a: the saved run emitted 'Guardrail'/'Handrail' because the
+    library-verbatim path bypassed ITEM_NAME_MAP. One canonical name form,
+    one place that decides it — whichever path named the item."""
+    from bobbytailor.pipeline.aggregator import (
+        aggregate_takeoff, canonical_library_name,
+    )
+    assert canonical_library_name("Guardrail", "LF") == ("Guard Rail", "LF")
+    assert canonical_library_name("Handrail", "LF") == ("Hand Rail", "LF")
+    # A name the map does not know stays verbatim (novel plan vocabulary).
+    assert canonical_library_name("Fiber Cement Panel", "SF") == (
+        "Fiber Cement Panel", "SF")
+
+    lib = [{"name": "Guardrail", "aliases": ["steel pipe guardrail"],
+            "basis": "linear", "unit": "LF"}]
+    rows = aggregate_takeoff([
+        {"description": "steel pipe guardrail run", "item_type": "guard_rail",
+         "calculated_quantity": 53.0, "calculated_unit": "LF",
+         "source_sheet": "A-401"},
+    ], library=lib)
+    names = [r["item"] for r in rows]
+    assert "Guard Rail" in names
+    # Neither a measured row NOR a phantom expected-not-measured row may
+    # carry the unspaced form.
+    assert "Guardrail" not in names
+
+
+@pytest.mark.skipif(not os.path.exists(BOBS), reason="Bob's plans PDF not present")
+def test_bobs_roof_plan_yields_a_gas_piping_linear_entry():
+    """Real-PDF: harvesting from Bob's page index 3 (A3.0 ROOF PLAN) yields a
+    Gas Piping entry with the linear basis and LF unit, sourced from the
+    sheet's own note — no model call anywhere in the path."""
+    import fitz
+    doc = fitz.open(BOBS)
+    try:
+        text = doc[3].get_text()
+    finally:
+        doc.close()
+    lib = harvest_component_library([text])
+    gas = next(e for e in lib if e["name"] == "Gas Piping")
+    assert gas["basis"] == "linear"
+    assert gas["unit"] == "LF"
+    assert gas["source"] == "sheet_note"
+
+
+@pytest.mark.skipif(not os.path.exists(CROW), reason="Crow plans PDF not present")
+def test_crow_rail_entries_are_unchanged_linear_lf():
+    """Real-PDF: both rail entries keep the linear basis and LF unit."""
+    import fitz
+    doc = fitz.open(CROW)
+    try:
+        texts = [doc[i].get_text() for i in range(doc.page_count)]
+    finally:
+        doc.close()
+    lib = harvest_component_library(texts)
+    for name in ("Guard Rail", "Hand Rail"):
+        entry = next(e for e in lib if e["name"] == name)
+        assert entry["basis"] == "linear"
+        assert entry["unit"] == "LF"
 
 
 # ── harvest_component_library orchestration ───────────────────────────────────

@@ -241,6 +241,32 @@ def _inject_standard_line_items(buckets: Dict[str, Dict]) -> None:
         })
 
 
+def canonical_library_name(name: str, unit: str = "") -> tuple:
+    """Route a library-verbatim name through THE one canonicalisation (SP-7a).
+
+    The saved Crow run emitted ``Guardrail`` / ``Handrail`` while ITEM_NAME_MAP
+    canonicalises both to their spaced forms — because the library-verbatim
+    naming path bypassed the map entirely. One canonical name FORM, one place
+    that decides it: when a map rule matches AND its canonical name is the
+    same words as the library name (differing only in spacing / separators /
+    case), the map's form wins. A genuinely different name — novel plan
+    vocabulary like "Fiber Cement Panel", or the library's own more-specific
+    "Tilt Up Wall" — is kept verbatim: this normalises the FORM of one item's
+    name, it never renames one item to another (the mangling the
+    legend-verbatim comment below warns about). The library's own unit always
+    wins when present.
+    """
+    hay = (name or "").lower()
+    squashed = re.sub(r"[^a-z0-9]+", "", hay)
+    if not squashed:
+        return name, unit
+    for pattern, canon, default_unit in ITEM_NAME_MAP:
+        if re.search(pattern, hay, re.IGNORECASE):
+            if re.sub(r"[^a-z0-9]+", "", canon.lower()) == squashed:
+                return canon, (unit or default_unit)
+    return name, unit
+
+
 def _resolve_library_name(description: str, library) -> Optional[tuple]:
     """Resolve a raw description to a component-library ``(name, unit)`` via aliases.
 
@@ -312,6 +338,11 @@ def _expected_items_without_a_manifest(learned, library) -> "OrderedDict":
         basis = str(entry.get("basis") or "").strip()
         if not name or not basis:
             continue
+        # SP-7a: an expected-item placeholder must carry the SAME canonical
+        # form a measured row of the object would — otherwise an unspaced
+        # library "Guardrail" spawns a phantom NOT-MEASURED row beside the
+        # measured "Guard Rail" one.
+        name, _ = canonical_library_name(name, str(entry.get("unit") or ""))
         if _norm_item_key(name) in {_norm_item_key(k) for k in out}:
             continue
         out[name] = {
@@ -460,6 +491,9 @@ def aggregate_takeoff(
             lib_hit = _resolve_library_name(desc, library)
             if lib_hit is not None:
                 library_bound.add(lib_hit[0])
+                # Track the canonical form too — the expected-item guard below
+                # compares against canonicalised names (SP-7a).
+                library_bound.add(canonical_library_name(lib_hit[0], "")[0])
             if entry is not None:
                 canonical_name = entry.name
                 canonical_unit = (entry.unit or unit or "").strip().upper()
@@ -482,7 +516,10 @@ def aggregate_takeoff(
                     bucket_source = "learned"
                 else:
                     if lib_hit is not None:
-                        canonical_name = lib_hit[0]
+                        # SP-7a: the library name goes through the SAME
+                        # canonicalisation as every other naming path.
+                        canonical_name, _ = canonical_library_name(
+                            lib_hit[0], lib_hit[1])
                         canonical_unit = (lib_hit[1] or unit or "").strip().upper()
                         bucket_source = "library"
                     else:
