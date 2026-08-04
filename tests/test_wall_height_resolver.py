@@ -110,3 +110,48 @@ def test_learning_failure_never_raises():
         20.0,
         "plan",
     )
+
+
+# ── Tier 0: the elevation datum span (23-14) ─────────────────────────────────
+#
+# The drawing set's own printed vertical ruler — top datum to finish floor —
+# is the authoritative wall height: it IS the wall being measured stating its
+# own height. It beats every keyword tier and the default; a prior HUMAN
+# correction (learned) still outranks it.
+
+
+def test_a_datum_span_beats_every_keyword_tier():
+    height, source = _resolve_project_wall_height(
+        "GENERAL NOTES\n3. T.O. WALL 35'-0\" TYP. U.N.O.\n36' CLEAR",
+        datum_span_ft=45.17,
+    )
+    assert abs(height - 45.17) < 0.01
+    assert source == "datum"
+
+
+def test_a_datum_span_beats_the_default():
+    assert _resolve_project_wall_height("", datum_span_ft=48.0) == (48.0, "datum")
+
+
+def test_no_datum_span_returns_exactly_what_it_returns_today():
+    text = "GENERAL NOTES\n3. T.O. WALL 35'-0\" TYP. U.N.O.\n"
+    assert _resolve_project_wall_height(text) == _resolve_project_wall_height(
+        text, datum_span_ft=None
+    )
+    assert _resolve_project_wall_height("", datum_span_ft=None) == (30.0, "default")
+
+
+def test_a_learned_human_correction_still_outranks_the_datum():
+    class _Ctx:
+        def get_assumption_value(self, key):
+            return 22.0 if key == "wall_height_ft" else None
+
+    assert _resolve_project_wall_height(
+        "T.O. WALL 35'-0\"", None, _Ctx(), datum_span_ft=45.17
+    ) == (22.0, "learned")
+
+
+def test_an_invalid_datum_span_is_ignored():
+    assert _resolve_project_wall_height("", datum_span_ft=0.0) == (30.0, "default")
+    assert _resolve_project_wall_height("", datum_span_ft=-3.0) == (30.0, "default")
+    assert _resolve_project_wall_height("", datum_span_ft="junk") == (30.0, "default")

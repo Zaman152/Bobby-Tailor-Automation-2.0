@@ -1979,3 +1979,158 @@ def test_bobs_front_elevation_silhouette_and_its_detached_sign_band():
         abs(sub["area_sf"] - 142.0) < 15.0 and abs(sub["bbox_ft"][0] - 32.0) < 4.0
         for sub in result.sub_components
     ), "the detached sign band must be reported as a sub-component"
+
+
+# ── elevation datums: the drawing's own vertical ruler (23-14 Task 2) ────────
+
+
+def test_elevation_datums_reads_the_crow_north_ladder():
+    """The INV-03 §2.2 ladder, verbatim: T/ PANEL 45'-2\", T/ PANEL AT GUTTER
+    37'-9\", FINISH FLOOR 0'-0\", TRUCK COURT -4'-0\" — including the sign."""
+    import os
+
+    if not os.path.exists(CROW_UPLOAD_PDF):
+        pytest.skip("the real Crow plan set is not present")
+    from bobbytailor.deterministic.room_fill import (
+        datum_wall_band,
+        elevation_datums,
+    )
+
+    doc = fitz.open(CROW_UPLOAD_PDF)
+    try:
+        # The OVERALL NORTH ELEVATION band (page space, probe-derived).
+        clip = fitz.Rect(382, 1626, 2608, 1968)
+        datums = elevation_datums(doc[1], clip)
+    finally:
+        doc.close()
+    feet = sorted(round(f, 2) for _y, f, _l in datums)
+    assert 45.17 in feet, "T/ PANEL 45'-2\" must parse (got %r)" % feet
+    assert 37.75 in feet, "T/ PANEL AT GUTTER 37'-9\" must parse"
+    assert 0.0 in feet, "FINISH FLOOR 0'-0\" must parse"
+    assert -4.0 in feet, "TRUCK COURT -4'-0\" must parse WITH its sign"
+    labels = " | ".join(l for _y, _f, l in datums)
+    assert "FINISH FLOOR" in labels and "T/ PANEL" in labels
+    band = datum_wall_band(datums)
+    assert band is not None
+    y_top, y_floor, span = band
+    assert abs(span - 45.17) < 0.01
+    assert y_top < y_floor, "the top datum sits above the floor as read"
+
+
+def test_cropping_the_crow_facade_to_its_wall_band_lands_on_the_parapet():
+    """Uncropped, the north blob bbox reads 56 ft against a 45'-2\" parapet
+    (grid bubbles and dimension strings above the panel). Cropped to the
+    datum band it must land within ten percent of the printed datum."""
+    import os
+
+    if not os.path.exists(CROW_UPLOAD_PDF):
+        pytest.skip("the real Crow plan set is not present")
+    from bobbytailor.deterministic.room_fill import (
+        datum_wall_band,
+        elevation_datums,
+        measure_facade_area,
+    )
+
+    doc = fitz.open(CROW_UPLOAD_PDF)
+    try:
+        page = doc[1]
+        clip = fitz.Rect(382, 1626, 2608, 1968)   # north band, page space
+        fpp = 40.0 / 72.0
+        raw = measure_facade_area(page, from_page_space(page, clip), fpp)
+        assert raw is not None
+        assert 50.0 <= raw.bbox_ft[1] <= 66.0, (
+            "uncropped the blob runs over the parapet (measured 56 ft)"
+        )
+        band = datum_wall_band(elevation_datums(page, clip))
+        assert band is not None
+        cropped = measure_facade_area(
+            page, from_page_space(page, clip), fpp,
+            crop_band_pt=(band[0], band[1]),
+        )
+    finally:
+        doc.close()
+    assert cropped is not None and cropped.band_cropped
+    parapet = band[2]
+    assert abs(cropped.bbox_ft[1] - parapet) / parapet < 0.10, (
+        "cropped height %.1f ft must be within 10%% of the %.2f ft datum span"
+        % (cropped.bbox_ft[1], parapet)
+    )
+    assert cropped.area_uncropped_sf is not None
+    assert cropped.area_sf < cropped.area_uncropped_sf
+
+
+def test_the_datum_scale_band_accepts_crow_and_rejects_a_16x_misparse():
+    """The derived scale is a ±30%% plausibility band ONLY — noisy (Crow
+    measures 0.79-0.85x printed because label baselines are offset from
+    their leaders) but still tight enough to reject the Bob's-class
+    sixteen-times misparse."""
+    import os
+
+    if not os.path.exists(CROW_UPLOAD_PDF):
+        pytest.skip("the real Crow plan set is not present")
+    from bobbytailor.deterministic.room_fill import (
+        datum_scale_check,
+        elevation_datums,
+    )
+
+    doc = fitz.open(CROW_UPLOAD_PDF)
+    try:
+        datums = elevation_datums(doc[1], fitz.Rect(382, 1626, 2608, 1968))
+    finally:
+        doc.close()
+    fpp = 40.0 / 72.0
+    assert datum_scale_check(datums, fpp) is True
+    # A sixteen-times misparse (0.5 ft/in instead of 8.0 — scaled here to the
+    # 40 ft/in drawing) is far outside the band.
+    assert datum_scale_check(datums, fpp / 16.0) is False
+    assert datum_scale_check(datums, fpp * 16.0) is False
+    assert datum_scale_check([], fpp) is None
+    assert datum_scale_check(datums, 0.0) is None
+
+
+def test_a_clip_with_no_datum_pair_yields_no_band():
+    """Bob's page 4 prints NO datum ladder; Moxy's civic ladder is sea-level
+    based (T/ ROOF 969'-2\") — neither yields a wall band, and the caller
+    flags rather than crops by a guess."""
+    import os
+
+    from bobbytailor.deterministic.room_fill import (
+        datum_wall_band,
+        elevation_datums,
+    )
+
+    # Synthetic: a ladder with no zero-feet floor refuses.
+    assert datum_wall_band([(100.0, 969.17, "T/ ROOF"), (300.0, 963.5, "LEVEL 1")]) is None
+    assert datum_wall_band([]) is None
+    assert datum_wall_band([(100.0, 45.17, "T/ PANEL")]) is None
+
+    if not os.path.exists(BOBS_PDF):
+        pytest.skip("the real Bob's plan set is not present")
+    doc = fitz.open(BOBS_PDF)
+    try:
+        # The FRONT ELEVATION NEW band (page space).
+        datums = elevation_datums(doc[4], fitz.Rect(104, 516, 2351, 1029))
+    finally:
+        doc.close()
+    assert datum_wall_band(datums) is None
+
+
+def test_aff_mounting_heights_never_become_datums():
+    """+16'-0\" AFF on Bob's truck dock is an awning height, not a datum —
+    excluded by MARKER, exactly as the ceiling harvest excludes it."""
+    import os
+
+    if not os.path.exists(BOBS_PDF):
+        pytest.skip("the real Bob's plan set is not present")
+    from bobbytailor.deterministic.room_fill import elevation_datums
+
+    doc = fitz.open(BOBS_PDF)
+    try:
+        # The TRUCK DOCK band, which prints T/ AWNING +16'-0" AFF and
+        # 35'-3" OPENING dimension strings.
+        datums = elevation_datums(doc[4], fitz.Rect(584, 1541, 1376, 2093))
+    finally:
+        doc.close()
+    feet = [round(f, 2) for _y, f, _l in datums]
+    assert 16.0 not in feet, "an AFF mounting height is never a datum"
+    assert 35.25 not in feet, "an OPENING dimension is never a datum"

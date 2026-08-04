@@ -211,6 +211,35 @@ _ELEV_INTERIOR_RE = re.compile(r"\bINTERIOR\b", re.IGNORECASE)
 # the shortest offending note is 73.
 _ELEV_TITLE_MAX_CHARS = 60
 
+# Datum labels — the words an elevation prints beside its vertical ruler.
+# Measured on the real sheets: Crow prints T/ PANEL, T/ PANEL AT GUTTER,
+# FINISH FLOOR and TRUCK COURT; Chelsea prints PLATE BEARING / FLOOR spot
+# elevations prefixed "EL:"; Moxy's civic elevations print T/ ROOF against a
+# SEA-LEVEL datum (969'-2") — which is why the wall band below requires a
+# genuine zero-feet floor datum and refuses a base-963 ladder.
+ELEVATION_DATUM_LABEL_RE = re.compile(
+    r"FINISH\s*FLOOR|FIN\.?\s*FL(?:R|OOR)?\b|T\s*/|T\.?O\.?\s|TOP\s+OF\s"
+    r"|PARAPET|GUTTER|TRUCK\s+COURT|\bGRADE\b|B\.?O\.?\s|PLATE\s+BEARING"
+    r"|\bFLOOR\b|\bENTRY\b|\bEL\s*[:.]",
+    re.IGNORECASE,
+)
+# A feet-inches token near these markers is a dimension or a mounting height,
+# never a datum: "+16'-0\" AFF", "35'-3\" OPENING", "@ 24\" O.C.".
+_DATUM_EXCLUDE_RE = re.compile(
+    r"\bAFF\b|\bO\.?C\.?\b|OPENING|\bTYP\b|SCALE", re.IGNORECASE
+)
+# A datum VALUE line is short — "45' - 2\"", "EL: 30' - 5 1/8\"" — while a
+# note that happens to contain a feet token is a sentence.
+_DATUM_VALUE_MAX_CHARS = 20
+_DATUM_LABEL_MAX_CHARS = 40
+# A label line sits directly above/below its value line in the ladder.
+_DATUM_PAIR_GAP_PT = 20.0
+# The datum-derived scale is NOISY — the label baseline is offset from its
+# leader, so Crow's pairs read 0.79-0.85x the printed scale — and it must
+# NEVER override a printed scale. ±30% is still tight enough to reject a
+# sixteen-times misparse (INV-03 §3.5).
+DATUM_SCALE_TOLERANCE = 0.30
+
 # Render resolution for facade silhouettes. Elevations are wide-format —
 # Crow's south facade band is 2,441 x 335 pt — so the room-fill 160 DPI would
 # be a 12-million-pixel clip. 80 DPI resolved every facade on all three
@@ -1057,6 +1086,7 @@ def measure_facade_area(
     candidate_id: str = "",
     max_pixels: int = MAX_FACADE_PIXELS,
     min_region_sf: float = MIN_REGION_SF,
+    crop_band_pt: Optional[tuple] = None,
 ) -> Optional[FacadeResult]:
     """Measure one elevation facade as a complement-labelled silhouette.
 
@@ -1086,6 +1116,14 @@ def measure_facade_area(
     beside the gross), and the other solid components (a detached sign band)
     for later material claiming. Identity fields are left blank for the
     caller to stamp.
+
+    With *crop_band_pt* — a ``(y_top, y_floor)`` PAGE-space pair from
+    :func:`datum_wall_band` — the dominant blob is CROPPED to the wall band:
+    ``area_sf`` and ``bbox_ft`` describe only the rows between the top datum
+    and the finish floor, the uncropped gross is kept in
+    ``area_uncropped_sf``, and ``band_cropped`` is set. This is what drops
+    the roof, the gable and the annotation tail (INV-03 §3.3: a 56-64 ft
+    blob against a 45'-2\" parapet).
     """
     if not feet_per_point or feet_per_point <= 0:
         return None
@@ -1218,7 +1256,7 @@ def measure_facade_area(
             )
 
     dom_w_ft, dom_h_ft = _bbox_ft(dom_bb)
-    return FacadeResult(
+    result = FacadeResult(
         area_sf=round(dominant_px * px_area_sf, 1),
         bbox_ft=(dom_w_ft, dom_h_ft),
         bbox_pt=_bbox_pt(dom_bb),
@@ -1229,6 +1267,40 @@ def measure_facade_area(
         candidate_id=candidate_id,
         scale_fpi=round(feet_per_point * 72.0, 4),
     )
+
+    if crop_band_pt is not None:
+        try:
+            y_top, y_floor = float(crop_band_pt[0]), float(crop_band_pt[1])
+        except (TypeError, ValueError, IndexError):
+            return result
+        r0 = max(0, int((y_top - page_clip.y0) * zoom))
+        r1 = min(height, int((y_floor - page_clip.y0) * zoom) + 1)
+        if r1 > r0:
+            cropped_px = 0
+            cb = None
+            for y in range(r0, r1):
+                row = y * width
+                for x in range(dom_bb[0], dom_bb[2] + 1):
+                    if solid_labels[row + x] == dominant_label:
+                        cropped_px += 1
+                        if cb is None:
+                            cb = [x, y, x, y]
+                        else:
+                            if x < cb[0]:
+                                cb[0] = x
+                            elif x > cb[2]:
+                                cb[2] = x
+                            if y < cb[1]:
+                                cb[1] = y
+                            elif y > cb[3]:
+                                cb[3] = y
+            if cropped_px and cb is not None:
+                result.area_uncropped_sf = result.area_sf
+                result.area_sf = round(cropped_px * px_area_sf, 1)
+                result.bbox_ft = _bbox_ft(cb)
+                result.bbox_pt = _bbox_pt(cb)
+                result.band_cropped = True
+    return result
 
 
 def elevation_titles(page) -> List[ElevationTitle]:
@@ -1352,6 +1424,141 @@ def elevation_titles(page) -> List[ElevationTitle]:
         )
     out.sort(key=lambda e: (e.callout_bbox_pt[1], e.callout_bbox_pt[0]))
     return out
+
+
+def elevation_datums(page, clip) -> List[tuple]:
+    """``[(y_pt, feet, label), ...]`` — the drawing's own vertical ruler.
+
+    Parses a vertical position and a feet value from datum texts inside
+    *clip* (PAGE space, the space the sheet is read in — the same contract as
+    :func:`drawing_ceiling_heights`). A datum is either a short value line
+    carrying its own label ("EL: 30' - 5 1/8\""), or a short value line
+    ("45' - 2\"") paired with the label line printed within
+    :data:`_DATUM_PAIR_GAP_PT` of it ("T/ PANEL"). Reuses
+    :data:`FEET_INCHES_RE` — THE feet-and-inches parser of this module — with
+    a leading-minus check for below-grade datums ("-4' - 0\" TRUCK COURT").
+
+    Mounting heights and dimensions are excluded by MARKER
+    (:data:`_DATUM_EXCLUDE_RE`), not by band: "+16'-0\" AFF" is in any
+    plausible band and is an awning height, not a datum.
+
+    Sorted by vertical position. Never raises; no ladder yields ``[]``.
+    """
+    box = _rect(clip)
+    if box is None:
+        return []
+    try:
+        blocks = page.get_text("dict")["blocks"]
+    except Exception:  # noqa: BLE001 — a datum harvest must never kill a run
+        return []
+
+    values: List[tuple] = []
+    labels: List[tuple] = []
+    for b in blocks:
+        for line in b.get("lines", []):
+            txt = " ".join(
+                "".join(sp.get("text", "") for sp in line.get("spans", [])).split()
+            )
+            if not txt:
+                continue
+            pbox = _rect(to_page_space(page, _rect(line.get("bbox"))))
+            if pbox is None:
+                continue
+            if not (box.x0 <= pbox.x0 and pbox.x1 <= box.x1
+                    and box.y0 <= pbox.y0 and pbox.y1 <= box.y1):
+                continue
+            if _DATUM_EXCLUDE_RE.search(txt):
+                continue
+            m = FEET_INCHES_RE.search(txt)
+            is_label = bool(ELEVATION_DATUM_LABEL_RE.search(txt))
+            if m and len(txt) <= _DATUM_VALUE_MAX_CHARS:
+                feet = int(m.group(1)) + int(m.group(2)) / 12.0
+                if m.group(3) and m.group(4):
+                    try:
+                        feet += int(m.group(3)) / int(m.group(4)) / 12.0
+                    except ZeroDivisionError:
+                        pass
+                if m.start() > 0 and txt[m.start() - 1] == "-":
+                    feet = -feet
+                values.append((pbox, feet, txt, is_label))
+            elif is_label and len(txt) <= _DATUM_LABEL_MAX_CHARS:
+                labels.append((pbox, txt))
+
+    out: List[tuple] = []
+    for vbox, feet, vtxt, inline_label in values:
+        y_centre = round((vbox.y0 + vbox.y1) / 2.0, 1)
+        if inline_label:
+            out.append((y_centre, feet, vtxt))
+            continue
+        best = None
+        best_gap = _DATUM_PAIR_GAP_PT
+        for lbox, ltxt in labels:
+            gap = abs((lbox.y0 + lbox.y1) / 2.0 - (vbox.y0 + vbox.y1) / 2.0)
+            if gap > best_gap:
+                continue
+            # The label and its value share the ladder column; allow a small
+            # negative overlap for staggered leaders.
+            if min(vbox.x1, lbox.x1) - max(vbox.x0, lbox.x0) < -60.0:
+                continue
+            best, best_gap = ltxt, gap
+        if best is not None:
+            out.append((y_centre, feet, best))
+    return sorted(out)
+
+
+def datum_wall_band(datums) -> Optional[tuple]:
+    """``(y_top_pt, y_floor_pt, span_ft)`` — the wall band of a datum ladder.
+
+    From the TOP datum down to the FINISH-FLOOR datum (the entry whose feet
+    value is zero). Cropping the facade blob to this band drops the roof, the
+    gable and the annotation tail — the reason a Crow blob bbox reads
+    56-64 ft against a 45'-2\" parapet (INV-03 §3.3).
+
+    Requires a genuine zero-feet floor: Moxy's civic ladder is sea-level
+    based (T/ ROOF 969'-2\") and correctly yields ``None`` — a drawing with
+    no datum pair is FLAGGED by the caller, never cropped by a guess.
+    """
+    if not datums or len(datums) < 2:
+        return None
+    floor = None
+    for y, feet, _label in datums:
+        if abs(feet) <= 0.01:
+            floor = (y, feet)
+    if floor is None:
+        return None
+    top = max(datums, key=lambda d: d[1])
+    if top[1] <= 1.0 or top[0] >= floor[0]:
+        return None
+    return (top[0], floor[0], round(top[1] - floor[1], 2))
+
+
+def datum_scale_check(
+    datums,
+    feet_per_point: float,
+    tolerance: float = DATUM_SCALE_TOLERANCE,
+) -> Optional[bool]:
+    """Is the printed scale PLAUSIBLE against the datum ladder's own geometry?
+
+    ``|f_a - f_b| / |y_a - y_b|`` over the ladder's extreme pair is a free
+    feet-per-point estimate. It is noisy (label baselines are offset from
+    their leaders — Crow measures 0.79-0.85x printed) so it may only ever be
+    a ±*tolerance* plausibility band and must NEVER override a printed
+    scale; it exists to reject an order-of-magnitude misparse (a 16x wrong
+    scale reads ~13x outside the band).
+
+    Returns ``True``/``False``, or ``None`` when the ladder cannot answer
+    (fewer than two distinct datums, or no printed scale to check).
+    """
+    if not feet_per_point or feet_per_point <= 0 or not datums:
+        return None
+    lo = min(datums, key=lambda d: d[1])
+    hi = max(datums, key=lambda d: d[1])
+    dy = abs(hi[0] - lo[0])
+    dft = hi[1] - lo[1]
+    if dy < 1.0 or dft < 1.0:
+        return None
+    ratio = (dft / dy) / feet_per_point
+    return (1.0 - tolerance) <= ratio <= (1.0 + tolerance)
 
 
 def _add_reason(result: RoomFillResult, reason: str) -> RoomFillResult:

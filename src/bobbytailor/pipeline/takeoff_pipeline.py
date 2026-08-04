@@ -1036,16 +1036,24 @@ def _keyword_window_heights(text: str, upper: str, keywords) -> List[float]:
     return heights
 
 
-def _resolve_project_wall_height(pages_text, footprint=None, learned=None) -> "tuple[float, str]":
+def _resolve_project_wall_height(
+    pages_text, footprint=None, learned=None, datum_span_ft=None,
+) -> "tuple[float, str]":
     """Autonomously resolve the project wall/clear height, with its source.
 
     Replaces the manifest ``height_ft`` role under the plans-only mandate.
     Precedence (per the binding spec): a learned ``wall_height_ft`` assumption
-    wins when present; otherwise the plan text layer is read for a wall/clear
-    height callout near a wall keyword (``T.O. WALL``, ``TOP OF WALL``,
-    ``CLEAR``/``CLR``, ``WALL HEIGHT``, or a feet-inches token near
-    ``TILT``/``CMU``/``PANEL``); a robust (max plausible, 8'-60') value is
-    taken. When nothing parses, a flagged industrial default (30.0 ft) applies.
+    wins when present (a prior HUMAN correction outranks everything, matching
+    the learning-loop mandate); then an ELEVATION DATUM SPAN — the drawing
+    set's own printed vertical ruler, top datum to finish floor — which beats
+    every keyword tier and the default (23-14 / INV-03 step 12: Crow's
+    T/ PANEL ladder is the authoritative wall height; the 36' CLEAR callout is
+    an interior clearance that understates the panels by 20%); otherwise the
+    plan text layer is read for a wall/clear height callout near a wall
+    keyword (``T.O. WALL``, ``TOP OF WALL``, ``CLEAR``/``CLR``,
+    ``WALL HEIGHT``, or a feet-inches token near ``TILT``/``CMU``/``PANEL``);
+    a robust (max plausible, 8'-60') value is taken. When nothing parses, a
+    flagged industrial default (30.0 ft) applies.
 
     Args:
         pages_text: Concatenated plan text layer (elevations / sections /
@@ -1053,10 +1061,13 @@ def _resolve_project_wall_height(pages_text, footprint=None, learned=None) -> "t
         footprint:  Optional Footprint (unused for the value today; reserved so
                     callers can pass the measured extent for future bounds).
         learned:    Optional LearnedContext; a stored ``wall_height_ft`` wins.
+        datum_span_ft: Optional elevation datum span (ft) measured by
+                    ``TakeoffPipeline._project_datum_span``. ``None`` keeps
+                    this function byte-identical to its pre-23-14 behaviour.
 
     Returns:
-        ``(height_ft, source)`` where source is ``"learned"`` | ``"plan"`` |
-        ``"default"`` — the assumption is never silent.
+        ``(height_ft, source)`` where source is ``"learned"`` | ``"datum"`` |
+        ``"plan"`` | ``"default"`` — the assumption is never silent.
     """
     if learned is not None:
         try:
@@ -1071,6 +1082,16 @@ def _resolve_project_wall_height(pages_text, footprint=None, learned=None) -> "t
             height = None
         if height and height > 0:
             return height, "learned"
+
+    # Tier 0 — the elevation datum span: the drawing set's own printed
+    # vertical ruler. Authoritative over every keyword tier and the default,
+    # because it IS the wall being measured stating its own height.
+    try:
+        span = float(datum_span_ft) if datum_span_ft is not None else None
+    except (TypeError, ValueError):
+        span = None
+    if span is not None and span > 0:
+        return round(span, 2), "datum"
 
     text = pages_text or ""
     if text:
@@ -2011,6 +2032,60 @@ class TakeoffPipeline:
                     seen.add(key)
                     names.append(name)
         return names
+
+    def _project_datum_span(self, pages) -> Optional[float]:
+        """The largest elevation datum span (ft) printed anywhere in the set.
+
+        Scans every page's printed-scale callouts for exterior elevation
+        titles, harvests each elevation's datum ladder from the band between
+        consecutive callouts, and returns the MAX (top datum − finish floor)
+        span — the parapet of the tallest facade, which is THE wall height
+        the exterior envelope is built to. Zero API; text only.
+
+        ``None`` when no elevation prints a usable ladder (Bob's has no
+        datums at all; Moxy's civic ladder is sea-level based and yields no
+        band), in which case the resolver behaves exactly as it did before
+        23-14. Any failure is swallowed for the same reason.
+        """
+        from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
+            datum_wall_band,
+            elevation_datums,
+            elevation_titles,
+        )
+
+        pdf_path = next(
+            (p.get("pdf_path") for p in pages or [] if p.get("pdf_path")), None
+        )
+        if not pdf_path:
+            return None
+        spans: List[float] = []
+        try:
+            doc = fitz.open(pdf_path)
+        except Exception:  # noqa: BLE001 — the span is additive
+            return None
+        try:
+            for index in range(int(getattr(doc, "page_count", 0) or 0)):
+                try:
+                    page = doc[index]
+                    entries = [
+                        e for e in elevation_titles(page)
+                        if e.orientation and not e.is_demo and not e.is_interior
+                    ]
+                    for e in entries:
+                        y0c = e.callout_bbox_pt[1]
+                        prev = 0.0
+                        for o in entries:
+                            if o.callout_bbox_pt[3] <= y0c and o.callout_bbox_pt[3] > prev:
+                                prev = o.callout_bbox_pt[3]
+                        clip = fitz.Rect(0.0, prev, page.rect.width, y0c)
+                        band = datum_wall_band(elevation_datums(page, clip))
+                        if band is not None:
+                            spans.append(band[2])
+                except Exception as exc:  # noqa: BLE001 — per-page degradation
+                    logger.debug("datum-span scan failed on page %s: %s", index, exc)
+        finally:
+            doc.close()
+        return round(max(spans), 2) if spans else None
 
     def _resolve_room_mix(self, manifest, doc, pdf_path: Optional[str] = None):
         """The unit mix actually used, with the SOURCE of every count (D-10).
@@ -3622,6 +3697,7 @@ class TakeoffPipeline:
         # on derived wall-area items — never a silent substitution.
         wall_height_ft, wall_height_source = _resolve_project_wall_height(
             plan_text, None, self._learned_context,
+            datum_span_ft=self._project_datum_span(pages),
         )
         self._project_wall_height = wall_height_ft
         self._project_wall_height_source = wall_height_source
