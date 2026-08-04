@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: milestone
-current_phase: 23
-current_phase_name: measurement-engine-completion
-status: complete
-stopped_at: Completed 23-16-PLAN.md — PHASE 23 COMPLETE (17 of 17 plans)
-last_updated: "2026-08-04T12:00:00.000Z"
-last_activity: 2026-08-04
-last_activity_desc: "23-16 closed phase 23: the four disproved passages in docs/PIPELINE-GROUND-TRUTH.md are corrected with citations (no civil sheet; the multiplier IS in the input at 4/4; the clip is exonerated and an unverified unit_count is the defect; the 7.0% figure came from a probe, not a run — and its table's TOTAL row does not equal the sum of its own rows, recomputed at 44,010.9 vs 41,912 = +5.0%), ROADMAP criteria 2 and 4 plus V4-MEAS-02/04 are amended with original wording + falsifying evidence + citation + delivered contract, and tests/test_phase23_acceptance.py locks §5.3's thirteen checks as one free gate whose check 1 INVOKES the four-set gate; suite 1831 -> 1845 passed"
+current_phase: 24
+current_phase_name: binding-determinism-text-anchored-labeling
+status: in_progress
+stopped_at: Completed 24-01-PLAN.md (1 of 10 plans, wave 1)
+last_updated: "2026-08-04T23:08:12.121Z"
+last_activity: 2026-08-05
+last_activity_desc: "24-01 built the text-anchor primitive: deterministic/text_anchor.py answers 'which printed text is nearest this geometry' (contained word -> SP-6 two-token tag -> nearest single word -> RECORDED ABSENCE), and _deterministic_bundle now emits bundle['candidate_anchors'] for every symbol group, room and wall class BEFORE any vision call. The search radius is expressed in the page's own text heights rather than absolute points — measured free, median word height is 9.56 pt Crow, 9.64 Moxy, 7.56 Chelsea, 26.41 Bob's on an identical 3024x2160 sheet, so one absolute constant would generalise to one set and break another. 24-RESEARCH Open Question #4 is now a committed test: Crow page 0's two largest clusters (SYM-1 1.0x0.4 ft, SYM-2 0.8x0.87 ft, the bollard cluster) carry ZERO contained text, asserted by RANK so no count is ever compared to the human take-off. Suite 1944 -> 1972 passed, 0 regressions."
 progress:
   total_phases: 28
   completed_phases: 20
-  total_plans: 121
-  completed_plans: 114
-  percent: 71
+  total_plans: 131
+  completed_plans: 117
+  percent: 89
 ---
 
 # Project State
@@ -25,22 +25,29 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 23 — measurement-engine-completion
+**Current focus:** Phase 24 — binding-determinism-text-anchored-labeling
 
 ## Current Position
 
-Phase: 23 (measurement-engine-completion) — **COMPLETE**
-Plan: 17 of 17 complete (all nine waves done)
-Status: COMPLETE. All 17 plans executed; V4-MEAS-01…06 delivered or amended to the contract actually
-delivered. The phase's acceptance is one free command:
-`python3 -m pytest -q tests/test_phase23_acceptance.py` (thirteen §5.3 checks as 15 named tests,
-check 1 invoking the four-plan-set gate). Carried forward, named not dropped: **DEF-23-SP4** (the
-geometric viewport-bounded clip cell — blocked behind the domain question *what should a
-dimension-string corridor contribute to a room's measured area?*, which needs the take-off documents),
-plus DEF-23-07/08/11/13A/14A in `deferred-items.md`.
-Last activity: 2026-08-04 — 23-16 corrected the record and locked the harness (see last_activity_desc).
+Phase: 24 (binding-determinism-text-anchored-labeling) — **IN PROGRESS**
+Plan: 1 of 10 complete (wave 1 of 6)
+Status: 24-01 shipped the phase's one new deterministic primitive. Every symbol group, room and wall
+thickness class in the deterministic bundle now carries an anchor record — the words the drawing
+itself printed nearest to it, or a **recorded absence** — computed before any vision call. Masking is
+mandatory (a door-schedule tag column can never become a plan-body anchor), ties break by document
+order so repeat calls are byte-identical, and a text unit claimed by two candidates is withdrawn from
+BOTH with the contest named (SP-7c `bind_or_flag`); names are never round-robined.
+Ready for 24-04 (the unnamed-geometry ledger consumes `anchor_text is None`) and 24-07 (the SoM chip
+consumes the anchor text — and **must** wrap it in `<pdf_text>` delimiters, threat T-24-01).
+Last activity: 2026-08-05 — 24-01 built the text-anchor primitive (see last_activity_desc).
 
-Progress: [███████░░░] 71%
+Progress: [█████████░] 89%
+
+Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans. Carried forward, named not
+dropped: **DEF-23-SP4** (the geometric viewport-bounded clip cell — blocked behind the domain question
+*what should a dimension-string corridor contribute to a room's measured area?*, which needs the
+take-off documents), plus DEF-23-07/08/11/13A/14A in `deferred-items.md`. Its acceptance is one free
+command: `python3 -m pytest -q tests/test_phase23_acceptance.py`.
 
 Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 success criteria met.
 Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans; offline suite 1845 passed.
@@ -89,6 +96,7 @@ Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans; offline s
 | Phase 23-measurement-engine-completion P14 P14 | 205 min | 4 tasks | 9 files |
 | Phase 23 P15 | 1h45m | 3 tasks | 8 files |
 | Phase 23 P16 | ~4h15m | 4 tasks | 7 files |
+| Phase 24 P01 | 3h 20m | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -129,6 +137,10 @@ Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans; offline s
 - [Phase 23]: 23-15: run selectors receive NO mask rects — a false schedule bbox covering Bob's whole roof plan deleted every gas segment; the selectors' own gates are the validated defence
 - [Phase 23]: 23-15: the typical-detail reference is the sheet's coarsest printed callout, not the resolved page scale (still 1.0 ft/in on Bob's A3.0, which inverted the flag)
 - [Phase 23]: 23-15: Crow's rails ship as expected-not-measured flagged blanks — no sheet text names the runs deterministically; binding them is Phase 24 text-anchored labelling, and the phantom 5.8 LF is dead either way
+- [Phase 24]: 24-01: the anchor search radius is expressed in TEXT HEIGHTS (4.0) and derived from the page's own median word height, not pinned in absolute points — measured free: median word height 9.56 pt Crow, 9.64 Moxy, 7.56 Chelsea, 26.41 Bob's, all on an identical 3024x2160 pt sheet, so one absolute constant generalises to one plan set and breaks another
+- [Phase 24]: 24-01: the fusion drafting-noise predicate is deliberately NOT reused for anchor harvesting — it returns True for 'B-1' and 'P1', exactly the tags an anchor exists to harvest; whether an anchored name is publishable is 24-04's decision, not the harvester's
+- [Phase 24]: 24-01: a candidate with no plan text in range carries anchor_text=None as a RECORDED ABSENCE, and a text unit contested by two candidates is withdrawn from BOTH (SP-7c bind_or_flag) — names are never round-robined to whichever candidate was scanned first
+- [Phase 24]: 24-01: Open Question #4 answered NO and committed as a test — Crow page 0's two largest symbol clusters (SYM-1 1.0x0.4 ft, SYM-2 0.8x0.87 ft, the bollard cluster) carry ZERO contained_texts, asserted by RANK so no count is ever compared to the human take-off
 
 ### 22-04 Decisions
 
@@ -423,8 +435,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-04T12:00:00.000Z
-Stopped at: Completed 23-16-PLAN.md — PHASE 23 COMPLETE (17 of 17 plans)
+Last session: 2026-08-04T23:08:12.114Z
+Stopped at: Completed 24-01-PLAN.md (1 of 10 plans, wave 1)
 Resume file: None
 
 ### Phase 23 decisions so far
