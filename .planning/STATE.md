@@ -4,17 +4,17 @@ milestone: v2.0
 milestone_name: milestone
 current_phase: 23
 current_phase_name: measurement-engine-completion
-status: in-progress
-stopped_at: Completed 23-15-PLAN.md — 16 of 17 phase-23 plans done; only 23-16 (record + acceptance harness) remains
-last_updated: "2026-08-04T07:14:15.142Z"
+status: complete
+stopped_at: Completed 23-16-PLAN.md — PHASE 23 COMPLETE (17 of 17 plans)
+last_updated: "2026-08-04T12:00:00.000Z"
 last_activity: 2026-08-04
-last_activity_desc: "23-13 opened the wall gate honestly: BASIS_BINDERS replaced the _ROOM_FILL_BASES frozenset, wall area binds perimeter × drawing-height × count (every real prototype height comes from its own RCP tag, never the poisoned 15-ft roof callout), one measured region backs at most one line item (Crow's six-items footprint defect defused with every suppression audited), and the multiplier flag fires on exactly ID-412/416/420/422 with human_inputs untouched; suite 1719 -> 1764"
+last_activity_desc: "23-16 closed phase 23: the four disproved passages in docs/PIPELINE-GROUND-TRUTH.md are corrected with citations (no civil sheet; the multiplier IS in the input at 4/4; the clip is exonerated and an unverified unit_count is the defect; the 7.0% figure came from a probe, not a run — and its table's TOTAL row does not equal the sum of its own rows, recomputed at 44,010.9 vs 41,912 = +5.0%), ROADMAP criteria 2 and 4 plus V4-MEAS-02/04 are amended with original wording + falsifying evidence + citation + delivered contract, and tests/test_phase23_acceptance.py locks §5.3's thirteen checks as one free gate whose check 1 INVOKES the four-set gate; suite 1831 -> 1845 passed"
 progress:
   total_phases: 28
-  completed_phases: 19
+  completed_phases: 20
   total_plans: 121
-  completed_plans: 113
-  percent: 68
+  completed_plans: 114
+  percent: 71
 ---
 
 # Project State
@@ -29,14 +29,21 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 ## Current Position
 
-Phase: 23 (measurement-engine-completion) — IN PROGRESS
-Plan: 16 of 17 complete (wave 6 done)
-Status: waves 1-5 done; wave 6 done — 23-12 (open-run selectors) and 23-13 (wall binder + SP-9 registry + one-area-one-item arbitration + honest multiplier) both landed; next is 23-14 (elevation facade, wave 7). SP-4 still carried forward under DEF-23-SP4.
-Last activity: 2026-08-04 — 23-13 opened the wall gate honestly: BASIS_BINDERS replaced the _ROOM_FILL_BASES frozenset, wall area binds perimeter × drawing-height × count (every real prototype height comes from its own RCP tag, never the poisoned 15-ft roof callout), one measured region backs at most one line item (Crow's six-items footprint defect defused with every suppression audited), and the multiplier flag fires on exactly ID-412/416/420/422 with human_inputs untouched; suite 1719 -> 1764
+Phase: 23 (measurement-engine-completion) — **COMPLETE**
+Plan: 17 of 17 complete (all nine waves done)
+Status: COMPLETE. All 17 plans executed; V4-MEAS-01…06 delivered or amended to the contract actually
+delivered. The phase's acceptance is one free command:
+`python3 -m pytest -q tests/test_phase23_acceptance.py` (thirteen §5.3 checks as 15 named tests,
+check 1 invoking the four-plan-set gate). Carried forward, named not dropped: **DEF-23-SP4** (the
+geometric viewport-bounded clip cell — blocked behind the domain question *what should a
+dimension-string corridor contribute to a room's measured area?*, which needs the take-off documents),
+plus DEF-23-07/08/11/13A/14A in `deferred-items.md`.
+Last activity: 2026-08-04 — 23-16 corrected the record and locked the harness (see last_activity_desc).
 
-Progress: [██░░░░░░░░] 18%
+Progress: [███████░░░] 71%
 
 Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 success criteria met.
+Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans; offline suite 1845 passed.
 
 ## Performance Metrics
 
@@ -81,6 +88,7 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 | Phase 23 P13 | ~2h45m | 4 tasks | 6 files |
 | Phase 23-measurement-engine-completion P14 P14 | 205 min | 4 tasks | 9 files |
 | Phase 23 P15 | 1h45m | 3 tasks | 8 files |
+| Phase 23 P16 | ~4h15m | 4 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -407,11 +415,16 @@ None yet.
 - Pricing table may go stale — verify quarterly against Anthropic docs
 - GitNexus index stale after 21-01 package move (symbols indexed at old root paths) — run `npx gitnexus analyze` before impact analysis in later plans
 - 23-11 SP-4 clip cell STOPPED: the plan's midpoint anchor partition is falsified on all 16 Moxy prototype sheets (best variant reproduces 4/16). Needs a decision on what the pinned RCP areas mean. See 23-11-SUMMARY.md deviation 2.
+- [Phase 23]: 23-16: a correction states FOUR things or it is a scope reduction — the ORIGINAL wording, the falsifying evidence, the citation, and the delivered contract. Applied to docs/PIPELINE-GROUND-TRUTH.md's four disproved passages and to ROADMAP criteria 2/4 + V4-MEAS-02/04.
+- [Phase 23]: 23-16: an acceptance gate INVOKES the tests that own each criterion rather than copying their literals — check 1 calls tests/test_four_set_coverage.py's own assertion functions, so the gate cannot drift from the thing it re-asserts.
+- [Phase 23]: 23-16: a criterion the phase did NOT deliver is named in the gate with its blocker (clip invariance -> DEF-23-SP4; Bob's p3 page-level fpp -> DEF-23-08) and the delivered contract asserted in its place. Silently dropping it would reproduce, inside the gate, the exact failure the corrected passages document.
+- [Phase 23]: 23-16: §14's published TOTAL row does not equal the sum of its own nine rows (45,837/42,835 vs the measured 44,011/41,912 = +5.0%). All nine per-sheet values reproduce exactly on today's engine, so the rows are sound and only the total was unsourced.
+- [Phase 23]: 23-16: a published figure must state its PROVENANCE. §14's 7.0% came from a probe calling the engine directly; a real run could not reach those sheets because the classifier discarded 18 of Moxy's 40 pages.
 
 ## Session Continuity
 
-Last session: 2026-08-04T07:13:24.296Z
-Stopped at: Completed 23-13-PLAN.md
+Last session: 2026-08-04T12:00:00.000Z
+Stopped at: Completed 23-16-PLAN.md — PHASE 23 COMPLETE (17 of 17 plans)
 Resume file: None
 
 ### Phase 23 decisions so far

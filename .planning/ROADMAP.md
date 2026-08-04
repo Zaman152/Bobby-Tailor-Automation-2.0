@@ -978,7 +978,12 @@ Plans:
 6. Door schedules parse across at least the Crow, Bob's, and Moxy formats
 7. Any sheet that produces zero measurable geometry emits an explicit coverage flag — a blank is never reported as a zero
 
-**Plans:** 16/17 plans executed
+**Status:** COMPLETE (2026-08-04) — 17/17 plans executed. Carried forward, named not dropped:
+**DEF-23-SP4** (the geometric viewport-bounded clip cell, blocked behind a domain question) and the
+`deferred-items.md` register. The phase's acceptance is one free command:
+`python3 -m pytest -q tests/test_phase23_acceptance.py`.
+
+**Plans:** 17/17 plans executed
 
 Plans are listed in EXECUTION order; the wave in each plan's frontmatter is authoritative.
 
@@ -998,7 +1003,7 @@ Plans are listed in EXECUTION order; the wave in each plan's frontmatter is auth
 - [x] 23-13-PLAN.md — Wall-area binder + basis registry + one-area-one-item arbitration + multiplier honesty (wave 6, SP-9)
 - [x] 23-14-PLAN.md — Elevation facade measurement: silhouette, datums, routing, keynote attribution (wave 7, gap 3)
 - [x] 23-15-PLAN.md — Linear-run binders + phantom-LF kill + ambiguity gate + canonical naming (wave 8, SP-7)
-- [ ] 23-16-PLAN.md — Correct the record + lock the free acceptance harness (wave 9)
+- [x] 23-16-PLAN.md — Correct the record + lock the free acceptance harness (wave 9)
 
 ### Phase 24: Binding Determinism & Text-Anchored Labeling
 
