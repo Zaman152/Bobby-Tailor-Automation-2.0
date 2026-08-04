@@ -6,14 +6,14 @@ current_phase: 23
 current_phase_name: measurement-engine-completion
 status: in-progress
 stopped_at: Completed 23-13-PLAN.md
-last_updated: "2026-08-04T05:36:11.019Z"
+last_updated: "2026-08-04T07:14:15.142Z"
 last_activity: 2026-08-04
 last_activity_desc: "23-13 opened the wall gate honestly: BASIS_BINDERS replaced the _ROOM_FILL_BASES frozenset, wall area binds perimeter × drawing-height × count (every real prototype height comes from its own RCP tag, never the poisoned 15-ft roof callout), one measured region backs at most one line item (Crow's six-items footprint defect defused with every suppression audited), and the multiplier flag fires on exactly ID-412/416/420/422 with human_inputs untouched; suite 1719 -> 1764"
 progress:
   total_phases: 28
   completed_phases: 19
   total_plans: 121
-  completed_plans: 112
+  completed_plans: 113
   percent: 68
 ---
 
@@ -30,7 +30,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 23 (measurement-engine-completion) — IN PROGRESS
-Plan: 15 of 17 complete (wave 6 done)
+Plan: 16 of 17 complete (wave 6 done)
 Status: waves 1-5 done; wave 6 done — 23-12 (open-run selectors) and 23-13 (wall binder + SP-9 registry + one-area-one-item arbitration + honest multiplier) both landed; next is 23-14 (elevation facade, wave 7). SP-4 still carried forward under DEF-23-SP4.
 Last activity: 2026-08-04 — 23-13 opened the wall gate honestly: BASIS_BINDERS replaced the _ROOM_FILL_BASES frozenset, wall area binds perimeter × drawing-height × count (every real prototype height comes from its own RCP tag, never the poisoned 15-ft roof callout), one measured region backs at most one line item (Crow's six-items footprint defect defused with every suppression audited), and the multiplier flag fires on exactly ID-412/416/420/422 with human_inputs untouched; suite 1719 -> 1764
 
@@ -80,6 +80,7 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 | Phase 23 P12 | 2h15m | 3 tasks | 2 files |
 | Phase 23 P13 | ~2h45m | 4 tasks | 6 files |
 | Phase 23-measurement-engine-completion P14 P14 | 205 min | 4 tasks | 9 files |
+| Phase 23 P15 | 1h45m | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,10 @@ Phase 22 (production-restructure-cleanup) is COMPLETE — all 4 plans, all 7 suc
 - [Phase ?]: 23-14: facade = filled silhouette via complement labelling (one shared labeller); elevation joins the deterministic routing set with _PLAN_SHEET_TYPES untouched — wall pairing can never run on a facade (empty-walls negative test)
 - [Phase ?]: 23-14: the no-datum flag is waived only when the independent footprint width validates the blob (Bob's front 249.2 ft vs depth 250.0); learned human height outranks the Tier-0 datum span; 'datum' deliberately NOT a trusted height source for room-fill walls (T-23-51)
 - [Phase ?]: 23-14: material attribution is text-anchored (keynote -> its drawing's legend -> naming layer); gross confident, splits flagged, never a ratio; perimeter x datum-height is a cross-check that flags (Crow 6.4%) and never publishes (D-11); DEF-23-14A cross-sheet dedupe deferred
+- [Phase ?]: 23-15: library-name canonicalisation is formatting-equality only; blanket map routing renames distinct items
+- [Phase 23]: 23-15: run selectors receive NO mask rects — a false schedule bbox covering Bob's whole roof plan deleted every gas segment; the selectors' own gates are the validated defence
+- [Phase 23]: 23-15: the typical-detail reference is the sheet's coarsest printed callout, not the resolved page scale (still 1.0 ft/in on Bob's A3.0, which inverted the flag)
+- [Phase 23]: 23-15: Crow's rails ship as expected-not-measured flagged blanks — no sheet text names the runs deterministically; binding them is Phase 24 text-anchored labelling, and the phantom 5.8 LF is dead either way
 
 ### 22-04 Decisions
 
@@ -405,7 +410,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-04T05:35:31.027Z
+Last session: 2026-08-04T07:13:24.296Z
 Stopped at: Completed 23-13-PLAN.md
 Resume file: None
 
