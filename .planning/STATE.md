@@ -5,7 +5,7 @@ milestone_name: milestone
 current_phase: 23
 current_phase_name: measurement-engine-completion
 status: in-progress
-stopped_at: Completed 23-13-PLAN.md
+stopped_at: Completed 23-15-PLAN.md — 16 of 17 phase-23 plans done; only 23-16 (record + acceptance harness) remains
 last_updated: "2026-08-04T07:14:15.142Z"
 last_activity: 2026-08-04
 last_activity_desc: "23-13 opened the wall gate honestly: BASIS_BINDERS replaced the _ROOM_FILL_BASES frozenset, wall area binds perimeter × drawing-height × count (every real prototype height comes from its own RCP tag, never the poisoned 15-ft roof callout), one measured region backs at most one line item (Crow's six-items footprint defect defused with every suppression audited), and the multiplier flag fires on exactly ID-412/416/420/422 with human_inputs untouched; suite 1719 -> 1764"
