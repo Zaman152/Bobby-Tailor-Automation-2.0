@@ -42,6 +42,14 @@ from bobbytailor.deterministic.room_tags import (
     UNIT_COUNT_SOURCE_MANIFEST as _UNIT_COUNT_SOURCE_MANIFEST,
 )
 
+# ONE definition of what a unit measures, shared with the aggregator (C3b).
+# ``units`` is pure data with no pipeline imports, so this adds no cycle.
+from bobbytailor.pipeline.units import (
+    basis_class as _basis_class,
+    unit_class as _unit_class,
+    unit_conflict as _unit_conflict,
+)
+
 logger = logging.getLogger(__name__)
 
 # ── Provenance enum (RESEARCH §3 "Keeping vision away from numbers") ─────────
@@ -3086,9 +3094,9 @@ def _fuse_footprint(bundle: dict, components: List[dict]) -> None:
 
 def _suppress_superseded_wall_items(
     components: List[dict],
-    room_fill_names,
+    room_fill_walls,
     rejected: List[dict],
-) -> None:
+) -> List[tuple]:
     """A measured-region wall item SUPERSEDES the same-named thickness estimate.
 
     ``_fuse_wall_classes`` and the wall-area binder both append to the same
@@ -3102,36 +3110,136 @@ def _suppress_superseded_wall_items(
     here is explicit and audited: the thickness-class row lands in the
     rejected list with a reason naming the supersession, following the
     module's existing rejection pattern (:func:`_reject_unknown_id`).
+
+    Args:
+        room_fill_walls: ``{normalised name: [superseding component, ...]}``.
+            The IDENTITY of the superseder matters, not merely its name — a
+            supersession is only valid while the thing that superseded it is
+            still going to be published (C3a).
+
+    Returns:
+        One ``(superseded, superseders, rejection_record)`` triple per
+        suppression, so a later stage can undo any whose superseder does not
+        survive. See :func:`_reinstate_orphaned_supersessions`.
     """
-    if not room_fill_names:
-        return
+    supersessions: List[tuple] = []
+    if not room_fill_walls:
+        return supersessions
     kept: List[dict] = []
     for component in components:
         name_key = _norm_name(component.get("name"))
         cid = str(component.get("candidate_id") or "")
         from_room_fill = component.get("name_source") == "room_fill"
         if (
-            name_key in room_fill_names
+            name_key in room_fill_walls
             and not from_room_fill
             and cid.startswith("WALL-")
         ):
-            rejected.append(
-                {
-                    "candidate_id": cid,
-                    "source": "wall_classes",
-                    "answer": component.get("name"),
-                    "reason": "superseded_by_room_fill",
-                    "quantity": component.get("quantity"),
-                    "unit": component.get("unit"),
-                    "detail": "the same-named wall item is measured from an "
-                              "actual enclosed region on this sheet; the "
-                              "thickness-class estimate is superseded, not "
-                              "summed with it",
-                }
+            record = {
+                "candidate_id": cid,
+                "source": "wall_classes",
+                "answer": component.get("name"),
+                "reason": "superseded_by_room_fill",
+                "quantity": component.get("quantity"),
+                "unit": component.get("unit"),
+                "detail": "the same-named wall item is measured from an "
+                          "actual enclosed region on this sheet; the "
+                          "thickness-class estimate is superseded, not "
+                          "summed with it",
+            }
+            rejected.append(record)
+            supersessions.append(
+                (component, list(room_fill_walls[name_key]), record)
             )
             continue
         kept.append(component)
     components[:] = kept
+    return supersessions
+
+
+def _reinstate_orphaned_supersessions(
+    components: List[dict],
+    supersessions: List[tuple],
+    rejected: List[dict],
+) -> None:
+    """A supersession whose SUPERSEDER dies is not a supersession (C3a).
+
+    Crow shipped the two-stage cascade this exists to break:
+
+      1. ``WALL-TC1 "Tilt Up Wall" 106,992 SF`` (1.3% from golden) was
+         suppressed as ``superseded_by_room_fill`` — correctly, at the time,
+         because ``FILL-2`` was about to publish the same object from an
+         actual enclosed region.
+      2. ``FILL-2 "Tilt Up Wall" 31,104 SF`` was then itself rejected by
+         ``one_area_one_item``, its region having been anchored by
+         "Concrete Pad".
+
+    Both died. Nothing named "Tilt Up Wall" was left to publish, so a symbol
+    COUNT of five tilt-up panels inherited the name and shipped as
+    ``5.0 SF``, ``confidence: high``, ``needs_review: false`` — a confident
+    wrong number, with the right one sitting in the audit trail.
+
+    Step 1 was conditional on step 2's row surviving, and that condition was
+    never re-checked. It is re-checked here.
+
+    Two guards keep the reinstatement from creating the double-count the
+    supersession existed to prevent:
+
+    * the superseder must actually be gone (identity, not name);
+    * NOTHING else of that name may survive — if another row publishes the
+      object, the original stays suppressed, because reinstating it would sum
+      two readings of one thing.
+
+    A reinstated row is FLAGGED. It is being restored after two independent
+    arbitration decisions fired on it, and its route disagreed with the
+    superseder's; an estimator is owed both facts, not just the number.
+    """
+    if not supersessions:
+        return
+    surviving_ids = {id(c) for c in components}
+    surviving_names = {_norm_name(c.get("name")) for c in components}
+
+    for original, superseders, record in supersessions:
+        if any(id(s) in surviving_ids for s in superseders):
+            continue  # the supersession stands — its superseder publishes
+        name_key = _norm_name(original.get("name"))
+        if name_key in surviving_names:
+            # Something else publishes this object. Reinstating would SUM two
+            # readings of one thing — the very failure the supersession
+            # prevents. Leave it rejected.
+            continue
+
+        for i, entry in enumerate(rejected):
+            if entry is record:
+                del rejected[i]
+                break
+
+        others = ", ".join(
+            "%s %s" % (s.get("quantity"), s.get("unit"))
+            for s in superseders
+            if s.get("quantity") is not None
+        )
+        note = (
+            "reinstated: this reading was suppressed in favour of a "
+            "region-measured %r, and that row was then itself rejected — a "
+            "supersession whose superseder dies is not a supersession, so the "
+            "measurement stands rather than leaving the object with no number "
+            "at all%s. Verify which route is right before bidding"
+            % (original.get("name"), (" (the superseding route read %s)" % others)
+               if others else "")
+        )
+        original["reinstated_from"] = "superseded_by_room_fill"
+        original["needs_review"] = True
+        prior = str(original.get("review_reason") or "").strip()
+        original["review_reason"] = "; ".join(p for p in (prior, note) if p)
+        components.append(original)
+        surviving_ids.add(id(original))
+        surviving_names.add(name_key)
+        logger.info(
+            "fuse_sheet: reinstated %r (%s %s) — its superseder was itself "
+            "rejected", original.get("name"), original.get("quantity"),
+            original.get("unit"),
+        )
 
 
 def _arbitrate_one_area_one_item(
@@ -3318,6 +3426,59 @@ def _arbitrate_one_area_one_item(
         components[:] = [c for c in components if id(c) not in suppressed]
 
 
+def _withhold_unit_class_violations(components: List[dict]) -> None:
+    """A number may not publish in a unit of a different measurement class.
+
+    The publication gate for C3b, in the direction fusion owns: the BASIS says
+    what the engine measured, the UNIT comes from whatever object the row was
+    bound to, and nothing was checking that the two agreed. Crow published
+    ``LED Wall Pack 34,214 EA`` — a 31,104 SF wall-area measurement bound to a
+    COUNTED fixture, then multiplied by a waste factor. There is no conversion
+    between "how much" and "how many", so the number means nothing under that
+    unit.
+
+    The quantity is withheld (``None``), never silently converted and never
+    quietly deleted: the row survives, flagged, saying what was measured and
+    what it was bound to. A blank with a reason is honest; a number in the
+    wrong unit is not.
+
+    Fires only where the contradiction is CERTAIN — an unrecognised unit or an
+    unmapped basis is left alone (:func:`units.classes_conflict`).
+    """
+    for component in components:
+        if component.get("quantity") is None:
+            continue
+        basis = component.get("basis")
+        unit = component.get("unit")
+        if not _unit_conflict(basis, unit):
+            continue
+        measured = component.get("quantity")
+        component["quantity"] = None
+        component["unit_class_violation"] = {
+            "basis": str(basis or ""),
+            "unit": str(unit or ""),
+            "withheld_quantity": measured,
+        }
+        component["needs_review"] = True
+        component["confidence"] = "low"
+        note = (
+            "UNIT-CLASS VIOLATION: %s was measured on a %r basis (%s) and this "
+            "row's unit is %r (%s). There is no conversion between those, so "
+            "the number is WITHHELD rather than published in a unit it does "
+            "not mean — this is a BLANK, not a zero. Either the object's unit "
+            "or its measure basis is wrong; fix the binding and re-run"
+            % (measured, str(basis or ""), _basis_class(basis) or "unknown",
+               str(unit or ""), _unit_class(unit) or "unknown")
+        )
+        prior = str(component.get("review_reason") or "").strip()
+        component["review_reason"] = "; ".join(p for p in (prior, note) if p)
+        logger.warning(
+            "fuse_sheet: withheld %r — %s %s measured on basis %r cannot "
+            "publish as %r", component.get("name"), measured,
+            _basis_class(basis), basis, unit,
+        )
+
+
 def fuse_sheet(
     deterministic_bundle: dict,
     vision_labels: dict,
@@ -3465,13 +3626,21 @@ def fuse_sheet(
     # ``fusion_rejected`` with a reason; ``aggregate_takeoff`` SUMS same-named
     # buckets, so this is the only thing standing between the new binder and
     # a wrong number that looks better (R5, T-23-50).
-    room_fill_wall_names = {
-        _norm_name(c.get("name"))
-        for c in components
-        if c.get("name_source") == "room_fill" and c.get("basis") == _WALL_AREA_BASIS
-    }
-    _suppress_superseded_wall_items(components, room_fill_wall_names, rejected)
+    room_fill_walls: Dict[str, List[dict]] = {}
+    for c in components:
+        if c.get("name_source") == "room_fill" and c.get("basis") == _WALL_AREA_BASIS:
+            room_fill_walls.setdefault(_norm_name(c.get("name")), []).append(c)
+    supersessions = _suppress_superseded_wall_items(
+        components, room_fill_walls, rejected
+    )
     _arbitrate_one_area_one_item(components, rejected)
+    # A supersession is conditional on its superseder surviving arbitration,
+    # and until now that condition was never re-checked — the two-stage
+    # cascade that left Crow's tilt-up walls to a 5-panel symbol count (C3a).
+    _reinstate_orphaned_supersessions(components, supersessions, rejected)
+    # LAST: nothing publishes a number in a unit of a different measurement
+    # class, whatever route produced it (C3b).
+    _withhold_unit_class_violations(components)
 
     result: dict = {
         "components": components,

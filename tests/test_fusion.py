@@ -2530,3 +2530,242 @@ def test_crow_emits_at_most_one_guard_rail_row_naming_one_viewport(
         formula = str(c.get("formula") or "")
         # the emit shape names exactly one viewport: "N LF (<title>, open runs @ S ft/in)"
         assert formula.count("open runs @") == 1
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# C3 — the two-stage rejection cascade, and the unit-class publication gate.
+#
+# All numbers below are quoted VERBATIM from the saved paid Crow run
+# output/VisionOnly_P23V2_Crow_20260804_181352/takeoff.json. Nothing here
+# asserts against the golden; the contract under test is structural — that a
+# supersession whose superseder dies is undone, and that no number publishes in
+# a unit of a different measurement class.
+# ═════════════════════════════════════════════════════════════════════════════
+
+from bobbytailor.vision.fusion import (  # noqa: E402
+    _reinstate_orphaned_supersessions,
+    _suppress_superseded_wall_items,
+    _withhold_unit_class_violations,
+)
+
+
+def _crow_cascade_components():
+    """The three rows whose interaction produced Crow's wrong number.
+
+    From the saved run's own ``fusion_rejected`` records:
+
+      {"candidate_id": "WALL-TC1", "source": "wall_classes",
+       "answer": "Tilt Up Wall", "reason": "superseded_by_room_fill",
+       "quantity": 106992.0, "unit": "SF"}
+
+      {"candidate_id": "FILL-2", "source": "arbitration",
+       "answer": "Tilt Up Wall", "reason": "one_area_one_item",
+       "quantity": 31104.0, "unit": "SF",
+       "detail": "... backed by the same measured region (fill:FILL-2) as
+                  'Concrete Pad' ..."}
+    """
+    thickness_class = {
+        "name": "Tilt Up Wall", "quantity": 106992.0, "unit": "SF",
+        "provenance": "geometry", "confidence": "high",
+        "candidate_id": "WALL-TC1", "basis": "wall_area",
+        "needs_review": False, "review_reason": "",
+    }
+    room_fill = {
+        "name": "Tilt Up Wall", "quantity": 31104.0, "unit": "SF",
+        "provenance": "geometry", "confidence": "high",
+        "candidate_id": "FILL-2", "name_source": "room_fill",
+        "basis": "wall_area", "region_ref": "fill:FILL-2",
+        "needs_review": False, "review_reason": "",
+    }
+    anchor = {
+        "name": "Concrete Pad", "quantity": 1716.7, "unit": "SF",
+        "provenance": "geometry", "confidence": "high",
+        "candidate_id": "FILL-2", "name_source": "room_fill",
+        "basis": "floor_area", "region_ref": "fill:FILL-2",
+        "needs_review": False, "review_reason": "",
+    }
+    return thickness_class, room_fill, anchor
+
+
+def _run_the_cascade(components, rejected):
+    """The three stages in the exact order ``fuse_sheet`` runs them."""
+    room_fill_walls = {}
+    for c in components:
+        if c.get("name_source") == "room_fill" and c.get("basis") == "wall_area":
+            room_fill_walls.setdefault(
+                str(c.get("name") or "").strip().lower(), []
+            ).append(c)
+    supersessions = _suppress_superseded_wall_items(
+        components, room_fill_walls, rejected
+    )
+    _arbitrate_one_area_one_item(components, rejected)
+    _reinstate_orphaned_supersessions(components, supersessions, rejected)
+    return supersessions
+
+
+def test_the_saved_crow_cascade_kills_both_rows_without_reinstatement():
+    """The defect itself, reproduced: stage 1 and stage 2 each fire and the
+    object is left with NO row at all — which is what let a 5-panel symbol
+    count inherit the name and publish as `5.0 SF`."""
+    thickness_class, room_fill, anchor = _crow_cascade_components()
+    components = [thickness_class, room_fill, anchor]
+    rejected: list = []
+
+    room_fill_walls = {"tilt up wall": [room_fill]}
+    _suppress_superseded_wall_items(components, room_fill_walls, rejected)
+    _arbitrate_one_area_one_item(components, rejected)
+
+    # Both stages fired, exactly as the saved run records them.
+    reasons = [r["reason"] for r in rejected]
+    assert "superseded_by_room_fill" in reasons
+    assert "one_area_one_item" in reasons
+    # ...and nothing named Tilt Up Wall is left to publish.
+    assert not [c for c in components if c["name"] == "Tilt Up Wall"]
+
+
+def test_a_superseded_candidate_is_reinstated_when_its_superseder_dies():
+    """THE C3a assertion. A supersession whose superseder dies is not a
+    supersession, so the 106,992 SF reading comes back."""
+    thickness_class, room_fill, anchor = _crow_cascade_components()
+    components = [thickness_class, room_fill, anchor]
+    rejected: list = []
+
+    _run_the_cascade(components, rejected)
+
+    rows = [c for c in components if c["name"] == "Tilt Up Wall"]
+    assert len(rows) == 1, "exactly one Tilt Up Wall row publishes"
+    assert rows[0]["quantity"] == pytest.approx(106992.0)
+    assert rows[0] is thickness_class, "the ORIGINAL row, not a rebuilt copy"
+    # The rejection record is withdrawn — the audit trail must not claim a
+    # suppression that was undone.
+    assert not [
+        r for r in rejected if r["reason"] == "superseded_by_room_fill"
+    ]
+    # The superseder's own rejection stands: it really was arbitrated away.
+    assert [r for r in rejected if r["reason"] == "one_area_one_item"]
+
+
+def test_a_reinstated_row_is_flagged_and_says_why():
+    """It is restored after two arbitration decisions fired on it, and its
+    route disagreed with the superseder's by 3.4x. Both facts are owed."""
+    thickness_class, room_fill, anchor = _crow_cascade_components()
+    components = [thickness_class, room_fill, anchor]
+    _run_the_cascade(components, [])
+
+    row = [c for c in components if c["name"] == "Tilt Up Wall"][0]
+    assert row["needs_review"] is True
+    assert row["reinstated_from"] == "superseded_by_room_fill"
+    reason = row["review_reason"]
+    assert "reinstated" in reason
+    assert "superseder dies is not a supersession" in reason
+    assert "31104.0 SF" in reason, "the disagreeing route's number is named"
+
+
+def test_a_supersession_whose_superseder_survives_still_stands():
+    """The guard must not undo a VALID supersession — without a competing
+    anchor on its region, the room-fill row publishes and the thickness-class
+    estimate stays suppressed (no thickness + room-fill double count)."""
+    thickness_class, room_fill, _anchor = _crow_cascade_components()
+    components = [thickness_class, room_fill]
+    rejected: list = []
+
+    _run_the_cascade(components, rejected)
+
+    rows = [c for c in components if c["name"] == "Tilt Up Wall"]
+    assert len(rows) == 1
+    assert rows[0] is room_fill
+    assert rows[0]["quantity"] == pytest.approx(31104.0)
+    assert [r for r in rejected if r["reason"] == "superseded_by_room_fill"]
+    assert "reinstated_from" not in thickness_class
+
+
+def test_reinstatement_never_creates_the_double_count_it_prevented():
+    """If ANY other row publishes the object, the original stays suppressed.
+
+    Reinstating beside a surviving same-named row would sum two readings of
+    one thing — the exact failure the supersession exists to prevent.
+    """
+    thickness_class, room_fill, anchor = _crow_cascade_components()
+    survivor = {
+        "name": "Tilt Up Wall", "quantity": 98000.0, "unit": "SF",
+        "provenance": "geometry", "confidence": "high",
+        "candidate_id": "FACADE-1", "name_source": "elevation_fill",
+        "basis": "wall_area", "region_ref": "facade:FACADE-1",
+    }
+    components = [thickness_class, room_fill, anchor, survivor]
+    rejected: list = []
+
+    _run_the_cascade(components, rejected)
+
+    rows = [c for c in components if c["name"] == "Tilt Up Wall"]
+    assert len(rows) == 1
+    assert rows[0] is survivor
+    assert "reinstated_from" not in thickness_class
+    assert [r for r in rejected if r["reason"] == "superseded_by_room_fill"]
+
+
+# ── C3b: no number publishes in a unit of a different measurement class ──────
+
+
+def test_an_area_measurement_bound_to_a_counted_object_is_withheld():
+    """Crow published `LED Wall Pack 34,214 EA` — a 31,104 SF wall-area
+    measurement bound to a COUNTED fixture, then waste-factored. There is no
+    conversion between "how much" and "how many"."""
+    components = [{
+        "name": "LED Wall Pack", "quantity": 31104.0, "unit": "EA",
+        "basis": "wall_area", "provenance": "geometry",
+        "confidence": "high", "needs_review": False, "review_reason": "",
+    }]
+    _withhold_unit_class_violations(components)
+
+    row = components[0]
+    assert row["quantity"] is None, "a BLANK, never a number in the wrong unit"
+    assert row["needs_review"] is True
+    assert row["confidence"] == "low"
+    assert row["unit_class_violation"]["withheld_quantity"] == pytest.approx(31104.0)
+    assert "UNIT-CLASS VIOLATION" in row["review_reason"]
+    assert "BLANK, not a zero" in row["review_reason"]
+    # The row SURVIVES — withholding a number is not deleting the object.
+    assert len(components) == 1
+
+
+def test_a_matching_basis_and_unit_is_left_completely_alone():
+    """Additive-only: the overwhelmingly common case is untouched."""
+    components = [
+        {"name": "Tilt Up Wall", "quantity": 106992.0, "unit": "SF",
+         "basis": "wall_area", "needs_review": False, "review_reason": ""},
+        {"name": "Guard Rail", "quantity": 420.4, "unit": "LF",
+         "basis": "linear", "needs_review": False, "review_reason": ""},
+        {"name": "Bollard", "quantity": 28, "unit": "EA",
+         "basis": "count", "needs_review": False, "review_reason": ""},
+    ]
+    before = [dict(c) for c in components]
+    _withhold_unit_class_violations(components)
+    assert components == before
+
+
+def test_an_unknown_basis_or_unit_is_never_guessed_into_a_violation():
+    """A wrong guess here would BLANK a good quantity — worse than the defect.
+    The rule fires only where the contradiction is certain."""
+    components = [
+        {"name": "Novel Object", "quantity": 12.0, "unit": "ROLLS",
+         "basis": "wall_area", "needs_review": False, "review_reason": ""},
+        {"name": "Other", "quantity": 12.0, "unit": "EA",
+         "basis": "some_new_basis", "needs_review": False, "review_reason": ""},
+        {"name": "No Basis", "quantity": 12.0, "unit": "SF",
+         "needs_review": False, "review_reason": ""},
+    ]
+    _withhold_unit_class_violations(components)
+    assert [c["quantity"] for c in components] == [12.0, 12.0, 12.0]
+
+
+def test_an_already_withheld_quantity_is_not_re_flagged():
+    """A row the binder already blanked (flag-don't-guess) is left as it was."""
+    components = [{
+        "name": "Tilt Up Wall", "quantity": None, "unit": "EA",
+        "basis": "wall_area", "needs_review": True,
+        "review_reason": "no wall height resolved",
+    }]
+    _withhold_unit_class_violations(components)
+    assert components[0]["review_reason"] == "no wall height resolved"
+    assert "unit_class_violation" not in components[0]

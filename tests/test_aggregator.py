@@ -666,3 +666,86 @@ class TestCompletenessDoesNotContradictItself:
         # Nothing resolved to Lintels, so the gap is stated rather than omitted.
         assert _row(out, "Lintels")["quantity"] is None
         assert _row(out, "Lintels")["provenance"] == "NOT MEASURED"
+
+
+class TestUnitClassIsNotChangedByNaming:
+    """C3b — canonicalising a NAME may not silently reclassify its UNIT.
+
+    Crow published `Tilt Up Wall 5.0 SF`, item_type concrete_slab,
+    formula "count", confidence high, needs_review false. The 5 was a COUNT of
+    tilt-up panel symbols; "Tilt Up Wall" is a library object whose unit is SF,
+    and the library's unit simply overwrote the reading's own. There is no
+    conversion between "how many" and "how much", so the published number meant
+    nothing — while the real 106,992 SF sat in the audit trail.
+    """
+
+    LIBRARY = [
+        {"name": "Tilt Up Wall", "aliases": ["tilt-up concrete panel"],
+         "basis": "wall_area", "unit": "SF", "source": "abbreviation"},
+    ]
+
+    def _panel_count_row(self, unit="EA"):
+        return {
+            "description": "tilt-up concrete panel", "item_type": "concrete_slab",
+            "calculated_quantity": 5.0, "calculated_unit": unit,
+            "formula": "count", "source_sheet": "A-101",
+        }
+
+    def test_a_count_never_publishes_under_an_area_unit(self):
+        out = aggregate_takeoff([self._panel_count_row()], library=self.LIBRARY)
+        row = _row(out, "Tilt Up Wall")
+        assert row["quantity"] is None, "a BLANK, never 5.0 SF"
+        assert row["quantity_fmt"] == "—"
+        assert row["measured"] is False
+        assert row["provenance"] == "NOT MEASURED"
+        assert row["source"] == "unit_class_conflict_unmeasured"
+
+    def test_the_withheld_reading_is_on_the_record_not_deleted(self):
+        """A deletion and a zero read the same to a client."""
+        out = aggregate_takeoff([self._panel_count_row()], library=self.LIBRARY)
+        reasons = " | ".join(_row(out, "Tilt Up Wall")["review_reasons"])
+        assert "BLANK, not a zero" in reasons
+        assert "5.0 EA" in reasons          # what was actually read
+        assert "count" in reasons           # ...and its class
+        assert "area" in reasons            # ...vs the class it would publish in
+
+    def test_a_real_measurement_of_the_same_object_keeps_its_quantity(self):
+        """Where the object WAS measured in the right class, the conflicting
+        reading is dropped from the total and the survivor says so."""
+        items = [
+            {"description": "tilt-up concrete panel wall",
+             "item_type": "concrete_slab", "calculated_quantity": 106992.0,
+             "calculated_unit": "SF", "source_sheet": "A-101"},
+            self._panel_count_row(),
+        ]
+        row = _row(aggregate_takeoff(items, library=self.LIBRARY), "Tilt Up Wall")
+        assert row["quantity"] == pytest.approx(106992.0)
+        assert row["needs_review"] is True
+        reasons = " | ".join(row["review_reasons"])
+        assert "DIFFERENT measurement class" in reasons
+        assert "NOT summed" in reasons
+
+    def test_a_same_class_unit_rename_is_untouched(self):
+        """SQ FT -> SF is a spelling, not a reclassification."""
+        items = [{
+            "description": "tilt-up concrete panel", "item_type": "concrete_slab",
+            "calculated_quantity": 106992.0, "calculated_unit": "sq_ft",
+            "source_sheet": "A-101",
+        }]
+        row = _row(aggregate_takeoff(items, library=self.LIBRARY), "Tilt Up Wall")
+        assert row["quantity"] == pytest.approx(106992.0)
+        assert row["unit"] == "SF"
+
+    def test_an_unrecognised_unit_is_never_guessed_into_a_conflict(self):
+        """A wrong guess would BLANK a good quantity — worse than the defect."""
+        library = [
+            {"name": "Novel Object", "aliases": ["novel thing"],
+             "basis": "area", "unit": "ROLLS", "source": "abbreviation"},
+        ]
+        items = [{
+            "description": "novel thing", "item_type": "component",
+            "calculated_quantity": 9.0, "calculated_unit": "EA",
+            "source_sheet": "A-101",
+        }]
+        row = _row(aggregate_takeoff(items, library=library), "Novel Object")
+        assert row["quantity"] == pytest.approx(9.0)

@@ -128,17 +128,57 @@ def test_resolve_below_cutoff_returns_none():
 # ── Aggregation with manifest ──────────────────────────────────────────────────
 
 def test_aggregate_uses_manifest_name_and_unit_verbatim():
+    """The manifest's name AND unit win over the detected ones.
+
+    The reading is a COUNT, so adopting the manifest's EA is a relabelling of
+    the same measurement class. (The volume case this test used to carry moved
+    to test_a_manifest_unit_may_not_reclassify_the_measurement — see there.)
+    """
     m = _m()
     items = [
-        {"description": "Bollard concrete dia.", "item_type": "concrete_slab",
-         "calculated_quantity": 0.15, "calculated_unit": "CY", "qty_source": "measurement"},
+        {"description": "Bollard concrete dia.", "item_type": "component",
+         "calculated_quantity": 28, "calculated_unit": "each",
+         "qty_source": "measurement"},
     ]
     summary = aggregate_takeoff(items, manifest=m)
     bollards = [r for r in summary if r["item"] == "Bollards"]
     assert bollards, summary
-    # Unit comes from manifest (EA), not the vision-derived CY.
+    # Unit comes from manifest (EA), not the detected "each".
     assert bollards[0]["unit"] == "EA"
     assert bollards[0]["source"] == "manifest"
+    assert bollards[0]["quantity"] == 28
+
+
+def test_a_manifest_unit_may_not_reclassify_the_measurement():
+    """C3b — the manifest renames and re-units; it cannot re-MEASURE.
+
+    This test previously asserted that a 0.15 CY reading (a printed detail
+    dimension pushed through the slab-VOLUME calculator) publishes as a
+    ``Bollards`` row sourced "manifest" — i.e. 0.15 cubic yards of concrete
+    presented as a count of bollards. That is the same defect as Crow's
+    ``Tilt Up Wall 5.0 SF``, one class over: there is no conversion between a
+    volume and a count, so the number means nothing under EA.
+
+    The manifest's naming authority is unchanged — the row still exists, still
+    named Bollards, still in EA. Only the NUMBER is withheld, with its reason.
+    """
+    m = _m()
+    items = [
+        {"description": "Bollard concrete dia.", "item_type": "concrete_slab",
+         "calculated_quantity": 0.15, "calculated_unit": "CY",
+         "qty_source": "measurement"},
+    ]
+    summary = aggregate_takeoff(items, manifest=m)
+    bollards = [r for r in summary if r["item"] == "Bollards"]
+    assert bollards, summary
+    row = bollards[0]
+    assert row["unit"] == "EA"
+    assert row["quantity"] is None, "a BLANK, never 0.15 bollards"
+    assert row["source"] == "unit_class_conflict_unmeasured"
+    assert row["provenance"] == "NOT MEASURED"
+    reasons = " | ".join(row["review_reasons"])
+    assert "BLANK, not a zero" in reasons
+    assert "volume" in reasons and "count" in reasons
 
 
 def test_aggregate_injects_missing_manifest_items_as_needs_review():

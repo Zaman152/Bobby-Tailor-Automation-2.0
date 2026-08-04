@@ -14,6 +14,16 @@ from bobbytailor.pipeline.coverage import (
     ITEM_STANDARD,
 )
 from bobbytailor.pipeline.provenance import provenance_of_row
+# ONE definition of what a unit measures, shared with vision.fusion (C3b).
+from bobbytailor.pipeline.units import (
+    classes_conflict as _classes_conflict,
+    unit_class as _unit_class,
+)
+
+
+def _unit_classes_conflict(original_unit, canonical_unit) -> bool:
+    """True when canonicalisation would move a number across measure classes."""
+    return _classes_conflict(_unit_class(original_unit), _unit_class(canonical_unit))
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +37,15 @@ logger = logging.getLogger(__name__)
 #: the whole point — see :func:`_degenerate_measure`.
 LIBRARY_FALLBACK_UNMEASURED = "library_fallback_unmeasured"
 
+#: A name whose ONLY evidence was a reading in a DIFFERENT measurement class
+#: from the unit the row would publish in — a count named into an area object,
+#: or the reverse. There is no conversion between them, so the object was not
+#: measured in this unit and the row says so (C3b).
+UNIT_CLASS_CONFLICT_UNMEASURED = "unit_class_conflict_unmeasured"
+
 _UNMEASURED_SOURCES = frozenset({
     "manifest_missing", "expected_not_measured", LIBRARY_FALLBACK_UNMEASURED,
+    UNIT_CLASS_CONFLICT_UNMEASURED,
 })
 
 #: Units in which a building quantity is counted, not dimensioned. A value in
@@ -494,6 +511,10 @@ def aggregate_takeoff(
     # they would have published under. Materialised after the row loop so the
     # object still gets a ROW — an explicit blank, never a silent deletion.
     suppressed_library: Dict[str, List[Dict]] = defaultdict(list)
+    # Readings whose unit CLASS changed under canonicalisation (a count named
+    # into an area object, or the reverse). Materialised after the row loop for
+    # the same reason as above: withholding the number must leave a ROW.
+    unit_class_conflicts: Dict[str, List[Dict]] = defaultdict(list)
     for item in calculated_items:
         if item.get("qty_source") == "plan_schedule_legend":
             desc = item.get("description", "")
@@ -613,6 +634,33 @@ def aggregate_takeoff(
                         % (canonical_name, bucket_source or "detected", shadowed_by)
                     )
                 continue
+        # ── Canonicalising a NAME may not silently reclassify its UNIT ───────
+        #
+        # C3b, in the direction the aggregator owns. Naming precedence lets a
+        # library/manifest/learned entry overwrite the row's unit — and Crow
+        # shows why that is not free: a symbol group of FIVE tilt-up panels
+        # (5 EA, a count) resolved to the library object "Tilt Up Wall", whose
+        # unit is SF, and shipped as `Tilt Up Wall 5.0 SF`, item_type
+        # concrete_slab, formula "count", confidence high, needs_review false.
+        # The right answer — 106,992 SF — was in the audit trail.
+        #
+        # There is no conversion between "how many" and "how much", so a
+        # canonicalisation that crosses measurement classes cannot carry the
+        # number with it. The reading is withheld and materialised below as an
+        # explicit BLANK with its reason — never a number in a unit it does
+        # not mean, and never a silent deletion. Only fires when BOTH classes
+        # are known and differ, so a blank or novel unit changes nothing.
+        if _unit_classes_conflict(unit, canonical_unit):
+            unit_class_conflicts[canonical_name].append({
+                "sheet": item.get("source_sheet"),
+                "qty": qty,
+                "unit": (unit or "").upper(),
+                "canonical_unit": (canonical_unit or "").upper(),
+                "description": desc,
+                "formula": item.get("formula_applied") or item.get("formula", ""),
+            })
+            continue
+
         if (canonical_unit or unit or "").lower() in ("ea", "each"):
             qty = float(round(qty))
 
@@ -705,6 +753,52 @@ def aggregate_takeoff(
             "description": "%s (library-named reading suppressed as degenerate,"
                            " not measured on the plans)" % name,
             "formula": "library_fallback_not_measured",
+        })
+
+    # ── Unit-class conflicts become BLANKS, never silence (C3b) ──────────────
+    #
+    # Same contract as the degenerate-reading block above, for the same
+    # reason: dropping the number is only half of it. An object whose only
+    # evidence was a reading in the wrong measurement class must still appear
+    # saying "not measured", or the fix trades a false `5.0 SF` for a deletion
+    # — and a deletion and a zero read the same to a client.
+    for name, conflicts in unit_class_conflicts.items():
+        detail = "; ".join(
+            "%r read %s %s%s and this row publishes in %s — %s vs %s"
+            % (
+                c["description"], c["qty"], c["unit"],
+                (" via formula %r" % c["formula"]) if c["formula"] else "",
+                c["canonical_unit"],
+                _unit_class(c["unit"]) or "unknown",
+                _unit_class(c["canonical_unit"]) or "unknown",
+            )
+            for c in conflicts
+        )
+        if buckets.get(name, {}).get("has_rows"):
+            buckets[name]["needs_review"] = True
+            buckets[name]["review_reasons"].add(
+                "a reading in a DIFFERENT measurement class was NOT summed "
+                "into this quantity (%s)" % detail
+            )
+            continue
+        bucket = buckets[name]
+        bucket["unit"] = conflicts[0]["canonical_unit"]
+        bucket["item_type"] = bucket["item_type"] or "unit_class_conflict"
+        bucket["needs_review"] = True
+        bucket["confidence"] = "low"
+        bucket["source"] = UNIT_CLASS_CONFLICT_UNMEASURED
+        bucket["review_reasons"].add(
+            "the only reading that resolved to this object was measured in a "
+            "DIFFERENT measurement class from the unit it would publish in, "
+            "and there is no conversion between them, so the number is "
+            "WITHHELD — this is a BLANK, not a zero (%s)" % detail
+        )
+        bucket["source_rows"].append({
+            "sheet": None,
+            "qty": None,
+            "description": "%s (reading withheld — measured in a different "
+                           "unit class from this row's unit)" % name,
+            "formula": "unit_class_conflict_not_measured",
         })
 
     # Only enrich with standard line items when a genuine take-off was produced.
