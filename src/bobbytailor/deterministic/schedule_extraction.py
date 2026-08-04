@@ -1009,6 +1009,9 @@ def door_schedule_to_legend(ds: "DoorSchedule") -> Optional[dict]:
     return {
         "name": "Door Schedule (extracted from plans)",
         "table_purpose": "takeoff_legend",
+        # Machine-read off the plans — NOT a human input file, so it must
+        # never publish as HUMAN INPUT (C4): parsed from the door schedule printed on the plans.
+        "legend_origin": "plan_parsed",
         "schedule_type": "door",
         "use_for_takeoff": True,
         "description": (

@@ -1115,6 +1115,11 @@ def _coverage_lines(report: dict) -> list:
         lines.append(f"  MEASURED                    {_n('items_measured'):>5}")
         lines.append(f"  NEEDS REVIEW                {_n('items_needs_review'):>5}")
         lines.append(f"  HUMAN INPUT                 {_n('items_human_input'):>5}")
+        # C4: an app-injected estimating convention is neither measured nor
+        # human-supplied. Only rendered when one exists, so a run without any
+        # renders exactly as before.
+        if _n("items_standard"):
+            lines.append(f"  STANDARD ITEM               {_n('items_standard'):>5}")
         not_measured = _n("items_not_measured")
         marker = "   ← do NOT read these as zero" if not_measured else ""
         lines.append(f"  NOT MEASURED                {not_measured:>5}{marker}")

@@ -348,7 +348,10 @@ class TestQuantityIsOptional:
         assert _row(out, "CMU Wall")["quantity"] == 0.0
         assert _row(out, "Bollards")["quantity"] is None
 
-    def test_every_row_carries_a_provenance_from_the_four_value_vocabulary(self):
+    def test_every_row_carries_a_provenance_from_the_client_vocabulary(self):
+        """C4 added STANDARD ITEM: the app-injected Mobilization convention
+        used to publish as HUMAN INPUT, claiming a human vouched for a number
+        the app made up."""
         items = [
             {"description": "flooring conf 106", "item_type": "flooring",
              "calculated_quantity": 100, "calculated_unit": "sq_ft",
@@ -359,11 +362,15 @@ class TestQuantityIsOptional:
              "review_reason": "no label bound"},
         ]
         out = aggregate_takeoff(items, manifest=_Manifest([_Entry("Bollards")]))
-        allowed = {"MEASURED", "HUMAN INPUT", "NEEDS REVIEW", "NOT MEASURED"}
+        allowed = {
+            "MEASURED", "HUMAN INPUT", "NEEDS REVIEW", "NOT MEASURED",
+            "STANDARD ITEM",
+        }
         assert {r["provenance"] for r in out} <= allowed
         assert all("measured" in r for r in out)
         assert _row(out, "Flooring")["provenance"] == "MEASURED"
         assert _row(out, "unlabeled cluster")["provenance"] == "NEEDS REVIEW"
+        assert _row(out, "Mobilization")["provenance"] == "STANDARD ITEM"
 
     def test_no_row_pairs_a_none_quantity_with_a_measured_provenance(self):
         """The invariant the saved-run assertion checks (plan verification 2)."""
@@ -487,7 +494,14 @@ class TestLegendShadowLeavesATrace:
 
     def test_the_legend_row_is_not_flagged_by_the_trace(self):
         """The legend is authoritative. Recording the suppression must not
-        turn the authoritative row into a review item."""
+        turn the authoritative row into a review item.
+
+        C4 corrected the provenance this asserted. The row carries no
+        ``legend_origin``, so it is a legend the app read off the PLANS — a
+        machine measurement. Asserting HUMAN INPUT here encoded the very
+        conflation that published four machine-parsed door counts as
+        human-vouched on a run with no human input of any kind.
+        """
         items = [
             {"description": "Columns-H-35'", "item_type": "columns",
              "calculated_quantity": 132, "calculated_unit": "ea",
@@ -499,8 +513,105 @@ class TestLegendShadowLeavesATrace:
         row = _row(aggregate_takeoff(items), "Columns-H-35'")
         assert row["quantity"] == 132
         assert row["needs_review"] is False
-        assert row["provenance"] == "HUMAN INPUT"
+        assert row["provenance"] == "MEASURED"
         assert any("suppressed" in r for r in row["review_reasons"])
+
+    def test_a_human_supplied_legend_still_publishes_as_human_input(self):
+        """The other half of the contract: a companion take-off IS human input.
+
+        Same row, same code path — the only difference is the marker the
+        companion-take-off ingest stamps on its legend.
+        """
+        items = [
+            {"description": "Columns-H-35'", "item_type": "columns",
+             "calculated_quantity": 132, "calculated_unit": "ea",
+             "qty_source": "plan_schedule_legend",
+             "legend_origin": "human_input", "source_sheet": "S-101"},
+        ]
+        row = _row(aggregate_takeoff(items), "Columns-H-35'")
+        assert row["quantity"] == 132
+        assert row["provenance"] == "HUMAN INPUT"
+
+
+class TestHumanInputIsEarned:
+    """C4 — HUMAN INPUT means a human handed us the number, in a file.
+
+    Crow's plans-only run — no manifest, no companion take-off, no human input
+    of any kind — published FIVE rows as HUMAN INPUT: four door counts the app
+    itself parsed off the plan's printed door schedule (`Doors - Steel 70`,
+    `Doors - Hollow Metal 29`, `Door Frames - Hollow Metal 29`,
+    `Doors - Aluminum 6`, all `source: plan_schedule_legend`) and its own
+    injected Mobilization convention. Presenting machine-read data as
+    human-vouched inverts the one distinction this vocabulary exists to draw.
+    """
+
+    @staticmethod
+    def _crow_door_rows():
+        """The four door rows verbatim from the saved paid run."""
+        return [
+            {"description": "Doors - Steel (door schedule)", "item_type": "doors",
+             "calculated_quantity": 70, "calculated_unit": "EA",
+             "qty_source": "plan_schedule_legend",
+             "legend_origin": "plan_parsed", "source_sheet": "A-101"},
+            {"description": "Doors - Hollow Metal (door schedule)",
+             "item_type": "doors", "calculated_quantity": 29,
+             "calculated_unit": "EA", "qty_source": "plan_schedule_legend",
+             "legend_origin": "plan_parsed", "source_sheet": "A-101"},
+            {"description": "Door Frames - Hollow Metal (door schedule)",
+             "item_type": "doors", "calculated_quantity": 29,
+             "calculated_unit": "EA", "qty_source": "plan_schedule_legend",
+             "legend_origin": "plan_parsed", "source_sheet": "A-101"},
+            {"description": "Doors - Aluminum (door schedule)",
+             "item_type": "doors", "calculated_quantity": 6,
+             "calculated_unit": "EA", "qty_source": "plan_schedule_legend",
+             "legend_origin": "plan_parsed", "source_sheet": "A-101"},
+        ]
+
+    def test_a_manifest_free_run_reports_zero_human_input_rows(self):
+        """THE C4 assertion. No manifest, no human input file => none, ever."""
+        out = aggregate_takeoff(self._crow_door_rows())
+        human = [r for r in out if r["provenance"] == "HUMAN INPUT"]
+        assert human == [], [r["item"] for r in human]
+
+    def test_the_plan_parsed_door_counts_publish_as_measured(self):
+        """They are not merely 'not human input' — they are machine readings."""
+        out = aggregate_takeoff(self._crow_door_rows())
+        for name in (
+            "Doors - Steel (door schedule)",
+            "Doors - Hollow Metal (door schedule)",
+            "Door Frames - Hollow Metal (door schedule)",
+            "Doors - Aluminum (door schedule)",
+        ):
+            assert _row(out, name)["provenance"] == "MEASURED", name
+
+    def test_an_absent_legend_origin_is_never_treated_as_human_input(self):
+        """Fail-closed: an unmarked legend is plan-parsed, not human-vouched."""
+        out = aggregate_takeoff([
+            {"description": "Doors - Steel (door schedule)", "item_type": "doors",
+             "calculated_quantity": 70, "calculated_unit": "EA",
+             "qty_source": "plan_schedule_legend", "source_sheet": "A-101"},
+        ])
+        assert _row(
+            out, "Doors - Steel (door schedule)"
+        )["provenance"] == "MEASURED"
+
+    def test_mobilization_is_a_standard_item_not_a_human_input(self):
+        """Nobody measured it and nobody supplied it — the app injected it."""
+        out = aggregate_takeoff(self._crow_door_rows())
+        assert _row(out, "Mobilization")["provenance"] == "STANDARD ITEM"
+
+    def test_a_companion_takeoff_legend_is_still_human_input(self):
+        """The fix must not delete the class, only stop it being the default."""
+        rows = self._crow_door_rows()
+        rows[0] = dict(rows[0], legend_origin="human_input")
+        out = aggregate_takeoff(rows)
+        assert _row(
+            out, "Doors - Steel (door schedule)"
+        )["provenance"] == "HUMAN INPUT"
+        # ...and it does not contaminate the sibling rows.
+        assert _row(
+            out, "Doors - Aluminum (door schedule)"
+        )["provenance"] == "MEASURED"
 
 
 class TestCompletenessDoesNotContradictItself:

@@ -79,10 +79,17 @@ _NOT_MEASURED_DISPOSITIONS = (SKIPPED_CLASSIFIER, SKIPPED_NO_SCALE, NOT_APPLICAB
 # read a blank as zero") is the thesis of INV-08.
 # ---------------------------------------------------------------------------
 ITEM_MEASURED = "MEASURED"            # geometry measured it off the drawing
-ITEM_HUMAN_INPUT = "HUMAN INPUT"      # an estimator supplied it
+ITEM_HUMAN_INPUT = "HUMAN INPUT"      # a human supplied it, in a human input file
 ITEM_NEEDS_REVIEW = "NEEDS REVIEW"    # measured but flagged; confirm before use
 ITEM_NOT_MEASURED = "NOT MEASURED"    # no measurement path — do NOT read as zero
 ITEM_NOT_APPLICABLE = "NOT APPLICABLE"  # the drawing set genuinely has none
+
+# An estimating convention the APP injects (1 EA Mobilization) — nobody
+# measured it off a drawing and nobody supplied it. It used to publish as
+# HUMAN INPUT, which claimed a human vouched for a number the app made up
+# (C4). Its own value is the only honest place for it: the quantity is real
+# and publishable, so NOT MEASURED would lie in the other direction.
+ITEM_STANDARD = "STANDARD ITEM"
 
 ITEM_STATUSES = (
     ITEM_MEASURED,
@@ -90,6 +97,7 @@ ITEM_STATUSES = (
     ITEM_NEEDS_REVIEW,
     ITEM_NOT_MEASURED,
     ITEM_NOT_APPLICABLE,
+    ITEM_STANDARD,
 )
 
 
@@ -319,6 +327,7 @@ class CoverageLedger:
         items_needs_review = self._count_items(ITEM_NEEDS_REVIEW)
         items_not_measured = self._count_items(ITEM_NOT_MEASURED)
         items_human_input = self._count_items(ITEM_HUMAN_INPUT)
+        items_standard = self._count_items(ITEM_STANDARD)
         items_total = len(self.items)
 
         pages_pct = (
@@ -346,6 +355,7 @@ class CoverageLedger:
             "items_needs_review": items_needs_review,
             "items_not_measured": items_not_measured,
             "items_human_input": items_human_input,
+            "items_standard": items_standard,
             "coverage_pct_pages": pages_pct,
             "coverage_pct_items": items_pct,
         }

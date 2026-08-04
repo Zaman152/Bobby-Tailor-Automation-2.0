@@ -1041,6 +1041,12 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
     # the estimator already accounted for waste and conversions — so we must pass
     # them through verbatim and never re-apply waste factors or unit formulas.
     authoritative = sched.get("table_purpose") == "takeoff_legend"
+    # WHERE the legend came from, which is a different question from whether
+    # its numbers are authoritative (C4). A door schedule the app read off the
+    # plans is authoritative AND machine-measured; only an estimator's own
+    # take-off, ingested from a human input file, is human-vouched. Absent
+    # marker => plan_parsed: HUMAN INPUT must be EARNED, never defaulted into.
+    legend_origin = str(sched.get("legend_origin") or "plan_parsed")
 
     if not isinstance(rows, list):
         return results
@@ -1115,6 +1121,7 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
                 "waste_factor_applied": 1.0,
                 "formula": f"authoritative plan schedule ({qty_source} {legend_unit})",
                 "qty_source": "plan_schedule_legend",
+                "legend_origin": legend_origin,
                 "source_sheet": sheet_name,
                 "source_location": f"{sched_name}{' row ' + mark if mark else ''}",
                 "source_raw": row_text,

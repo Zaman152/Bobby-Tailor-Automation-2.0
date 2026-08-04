@@ -529,6 +529,9 @@ def rooms_to_legend(rooms: Sequence, fpp: float) -> Optional[dict]:
     return {
         "name": "Room Areas (measured from wall geometry)",
         "table_purpose": "takeoff_legend",
+        # Machine-read off the plans — NOT a human input file, so it must
+        # never publish as HUMAN INPUT (C4): measured from this plan's own wall geometry.
+        "legend_origin": "plan_parsed",
         "schedule_type": "area",
         "use_for_takeoff": True,
         "description": note,

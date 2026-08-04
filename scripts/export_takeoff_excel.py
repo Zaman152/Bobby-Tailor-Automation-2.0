@@ -219,10 +219,11 @@ def build(run_dir: Path, out: Path, golden_pdf: Path = None) -> Path:
     facts += [
         ("", ""),
         ("PROVENANCE", "MEANING"),
-        ("MEASURED", "Geometry measured this off the drawing at the drawing's own printed scale."),
-        ("HUMAN INPUT", "An estimator supplied this (room mix / scale / wall height). Not measured."),
+        ("MEASURED", "Geometry measured this off the drawing at the drawing's own printed scale. A schedule the app read off the plans is a machine measurement and belongs here, not under HUMAN INPUT."),
+        ("HUMAN INPUT", "A human supplied this IN A HUMAN INPUT FILE (an estimator's own companion take-off, a room mix, a scale, a wall height). Never used for anything the app read off the plans."),
         ("NEEDS REVIEW", "Measured but flagged — confirm before bidding."),
         ("NOT MEASURED", "No measurement path for this item yet. Do NOT read a blank as zero."),
+        ("STANDARD ITEM", "An estimating convention this app injects (e.g. Mobilization). Nobody measured it and nobody supplied it — confirm it belongs on this bid."),
     ]
     for k, v in facts:
         ws2.append([k, v])

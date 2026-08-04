@@ -203,6 +203,9 @@ def footprint_to_legend(footprint: Optional["Footprint"], manifest) -> Optional[
     return {
         "name": "Building Footprint (measured from overall dimensions)",
         "table_purpose": "takeoff_legend",
+        # Machine-read off the plans — NOT a human input file, so it must
+        # never publish as HUMAN INPUT (C4): measured from the plan's own printed overall dimensions.
+        "legend_origin": "plan_parsed",
         "schedule_type": "area",
         "use_for_takeoff": True,
         "description": note,

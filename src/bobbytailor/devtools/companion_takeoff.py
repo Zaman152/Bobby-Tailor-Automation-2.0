@@ -302,6 +302,11 @@ def extract_legend_schedules(takeoff_pdf_path: str) -> List[dict]:
     schedules.append({
         "name": "Quantity Takeoff (companion document)",
         "table_purpose": "takeoff_legend",
+        # THE only legend origin that is genuinely human input: an estimator's
+        # own take-off, ingested from a human input file. Every other
+        # takeoff_legend in this codebase is machine-read off the plans and
+        # must never be presented as human-vouched (C4).
+        "legend_origin": "human_input",
         "schedule_type": "other",
         "use_for_takeoff": True,
         "description": "Parsed from companion take-off PDF tables",

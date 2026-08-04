@@ -18,6 +18,8 @@ from bobbytailor.pipeline.coverage import (
     ITEM_NEEDS_REVIEW,
     ITEM_NOT_APPLICABLE,
     ITEM_NOT_MEASURED,
+    ITEM_STANDARD,
+    ITEM_STATUSES,
     MEASURED,
     MEASURED_PARTIAL,
     MEASURED_TRUNCATED,
@@ -53,6 +55,11 @@ def test_item_status_strings_are_the_client_vocabulary_verbatim():
     assert ITEM_NEEDS_REVIEW == "NEEDS REVIEW"
     assert ITEM_NOT_MEASURED == "NOT MEASURED"
     assert ITEM_NOT_APPLICABLE == "NOT APPLICABLE"
+    # C4 added one: an estimating convention the APP injects is neither
+    # measured nor human-supplied, and calling it HUMAN INPUT claimed a human
+    # vouched for a number the app made up.
+    assert ITEM_STANDARD == "STANDARD ITEM"
+    assert len(set(ITEM_STATUSES)) == 6
 
 
 def test_every_sheet_disposition_is_distinct():

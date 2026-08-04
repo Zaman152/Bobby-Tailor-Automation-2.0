@@ -34,8 +34,20 @@ from bobbytailor.pipeline.coverage import (
     ITEM_NOT_MEASURED,
 )
 
-# Row ``source`` values that mean a human (or a stored human correction)
-# supplied the number rather than the geometry engine measuring it.
+# Row ``source`` values that mean a human supplied the number IN A HUMAN INPUT
+# FILE, rather than the app measuring it off the drawing.
+#
+# ``plan_schedule_legend`` is deliberately NOT here and never was: a legend the
+# app parsed off the plans is a machine reading. The aggregator's ``_row_status``
+# is the authority for a legend row and only calls it HUMAN INPUT when the
+# legend's own ``legend_origin`` is ``human_input`` — an estimator's companion
+# take-off, ingested from a human input file (C4).
+#
+# ``learned`` is a NAMING marker (a stored human correction to what an object is
+# CALLED); it is retained here only for pre-23 rows that carry no recorded
+# status, because for those the naming correction is the only human signal on
+# the row. Any row this run produced carries an explicit ``status`` and never
+# reaches this branch.
 _HUMAN_SOURCES = frozenset(
     {"manifest", "human", "learned", "manifest_missing", "human_input", "estimator"}
 )

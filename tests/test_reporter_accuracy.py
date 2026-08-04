@@ -207,6 +207,53 @@ def test_cost_falls_back_to_sheet_sum_when_no_guard_recorded():
     assert data["api_usage"]["project_level_cost_usd"] == 0.0
 
 
+# ── C4: a manifest-free run reports zero HUMAN INPUT rows ───────────────────
+
+
+def test_a_manifest_free_run_reports_zero_human_input_in_coverage():
+    """End-to-end: the door schedule the app parsed off the PLANS.
+
+    Crow's plans-only run reported `items_human_input: 5` with no manifest and
+    no human input file anywhere — four machine-parsed door counts plus the
+    app's own Mobilization convention.
+    """
+    ledger = CoverageLedger(pages_in_source=1)
+    ledger.register_page(0, sheet_name="A-101", disposition=MEASURED)
+    estimates = [
+        {"description": "Doors - Steel (door schedule)", "item_type": "doors",
+         "calculated_quantity": 70, "calculated_unit": "EA",
+         "qty_source": "plan_schedule_legend", "legend_origin": "plan_parsed",
+         "source_sheet": "A-101"},
+        {"description": "Doors - Aluminum (door schedule)", "item_type": "doors",
+         "calculated_quantity": 6, "calculated_unit": "EA",
+         "qty_source": "plan_schedule_legend", "legend_origin": "plan_parsed",
+         "source_sheet": "A-101"},
+    ]
+    extracted = [{
+        "_source_sheet": "A-101.png", "_sheet_name": "A-101", "_page_index": 0,
+        "_tokens_in": 0, "_tokens_out": 0, "_cost_usd": 0.0, "components": [],
+    }]
+    with _isolated_output_dir():
+        report = generate_report(
+            "Plans Only", extracted, estimates, coverage=ledger,
+        )
+        run_dir = Path(report["_files"]["run_folder"])
+        with open(run_dir / "takeoff.json") as f:
+            data = json.load(f)
+
+    assert data["coverage"]["items_human_input"] == 0
+    assert not [
+        r for r in data["takeoff_summary"] if r["provenance"] == "HUMAN INPUT"
+    ]
+    # The door counts are machine readings, not blanks and not human input.
+    doors = [r for r in data["takeoff_summary"] if "Doors" in r["item"]]
+    assert doors and all(r["provenance"] == "MEASURED" for r in doors)
+    # ...and the app's own convention says what it is.
+    mob = [r for r in data["takeoff_summary"] if r["item"] == "Mobilization"]
+    assert mob and mob[0]["provenance"] == "STANDARD ITEM"
+    assert data["coverage"]["items_standard"] == 1
+
+
 # ── C2: a truncated run must never present as complete ──────────────────────
 
 

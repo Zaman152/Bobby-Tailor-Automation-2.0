@@ -11,6 +11,7 @@ from bobbytailor.pipeline.coverage import (
     ITEM_MEASURED,
     ITEM_NEEDS_REVIEW,
     ITEM_NOT_MEASURED,
+    ITEM_STANDARD,
 )
 from bobbytailor.pipeline.provenance import provenance_of_row
 
@@ -385,25 +386,40 @@ def _expected_items_without_a_manifest(learned, library) -> "OrderedDict":
 
 
 def _row_status(bucket: Dict, is_unknown: bool) -> str:
-    """The four-value client status, COMPUTED FROM THE RECORD.
+    """The client status, COMPUTED FROM THE RECORD.
 
     The old exporter inferred it from the value (``float(qty or 0) <= 0 -> NOT
     MEASURED``), which made a building with genuinely no CMU indistinguishable
     from one whose CMU was never measured. Nothing here looks at the number.
+
+    **HUMAN INPUT is EARNED, never defaulted into (C4).** It means one thing: a
+    human handed us this number in a human input file. Crow's plans-only run —
+    no manifest, no companion take-off, no human input of any kind — published
+    five rows as HUMAN INPUT: four door counts the app itself parsed off the
+    plan's printed door schedule, and its own injected Mobilization convention.
+    Presenting machine-read data as human-vouched inverts the one distinction
+    this vocabulary exists to draw, and it inflates apparent trust in exactly
+    the rows a reviewer would otherwise check.
     """
     if is_unknown:
         return ITEM_NOT_MEASURED
     if bucket.get("item_type") == "standard_line_item" and not bucket.get("has_rows"):
-        # A convention (1 EA Mobilization), not something taken off a drawing.
-        return ITEM_HUMAN_INPUT
+        # A convention the APP injects (1 EA Mobilization). Nobody measured it
+        # and nobody supplied it, so it is neither MEASURED nor HUMAN INPUT —
+        # it gets the status that says exactly what it is.
+        return ITEM_STANDARD
     if not bucket.get("has_rows"):
         return ITEM_NOT_MEASURED
     if bucket.get("needs_review"):
         return ITEM_NEEDS_REVIEW
     if bucket.get("source") == "plan_schedule_legend":
-        # The authoritative companion take-off: a human's own quantity, kept
-        # verbatim. The app did not earn this number off the drawing.
-        return ITEM_HUMAN_INPUT
+        # An authoritative legend — but authoritative is not the same question
+        # as human-vouched. Only an estimator's own take-off, ingested from a
+        # human input file, is HUMAN INPUT; a schedule the app read off the
+        # plans is a machine measurement like any other.
+        if bucket.get("legend_origin") == "human_input":
+            return ITEM_HUMAN_INPUT
+        return ITEM_MEASURED
     return ITEM_MEASURED
 
 
@@ -444,6 +460,11 @@ def aggregate_takeoff(
         "confidence": None,
         "review_reasons": set(),
         "source": "",
+        # Where a legend-backed quantity actually came from (C4). Only
+        # "human_input" — an estimator's own take-off, ingested from a human
+        # input file — may publish as HUMAN INPUT; a schedule the app read off
+        # the plans is a machine measurement.
+        "legend_origin": "",
         "auto_verified": True,   # AND of contributing rows; only meaningful with rows
         "has_rows": False,
     })
@@ -507,12 +528,15 @@ def aggregate_takeoff(
 
         is_legend = item.get("qty_source") == "plan_schedule_legend"
         bucket_source = ""
+        bucket_legend_origin = ""
         if is_legend:
             # Trust the plan's own printed schedule: keep its label and unit
             # exactly as printed.
             canonical_name = _clean_legend_label(desc)
             canonical_unit = (unit or "").strip().upper()
             bucket_source = "plan_schedule_legend"
+            # Absent marker => plan_parsed. HUMAN INPUT is earned, not defaulted.
+            bucket_legend_origin = str(item.get("legend_origin") or "plan_parsed")
         else:
             # Manifest takes priority over the hardcoded map: when the user told us
             # what objects exist and what to call them, use that name + unit VERBATIM.
@@ -620,6 +644,10 @@ def aggregate_takeoff(
         bucket["item_type"] = itype
         if bucket_source and not bucket["source"]:
             bucket["source"] = bucket_source
+        # A bucket is human-vouched only if a HUMAN-SOURCED legend row built it.
+        # First-seen wins, exactly like `source`.
+        if bucket_legend_origin and not bucket["legend_origin"]:
+            bucket["legend_origin"] = bucket_legend_origin
         # Roll up uncertainty signals so the summary can highlight shaky rows.
         if item.get("needs_review"):
             bucket["needs_review"] = True
