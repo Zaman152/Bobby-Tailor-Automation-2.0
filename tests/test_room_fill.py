@@ -390,18 +390,28 @@ def test_zero_or_missing_scale_returns_none():
 
 
 def test_the_measured_area_is_checked_against_the_drawings_own_printed_extent():
-    """Moxy ID-412, with the story corrected (D-01 / INV-02).
+    """Moxy ID-412, with the story corrected (D-01; INV-02 §2, §3, §4).
 
     The superseded test here asserted that 458.3 SF was ~2x because the clip had
     reached the neighbouring opposite-hand plan, and pinned a fabricated 420 SF
-    cap to "prove" it. Three probes falsified that: ID-412 is bit-identical
-    across a 240 pt range of clip widths, every counted region sits inside 47%
-    of the clip, and the drawing's OWN printed 17'-0 1/8" x 26'-9 1/8" = 455.2
-    SF matches the fill at a ratio of 1.007. The fill was right; the ~2x came
-    from a room-mix multiplier one layer later.
+    cap to "prove" it. Three probes falsified that:
+
+      * INV-02 §3 — ID-412 is bit-identical across a 240 pt range of clip widths
+        while ID-407 and ID-415 move +17% and +20%, so the two "defective"
+        sheets are the LEAST clip-sensitive of all sixteen, not the most;
+      * INV-02 §2 — every counted region sits inside 47% of the clip, so nothing
+        from a neighbour is inside it;
+      * INV-02 §4 — the drawing's OWN printed 17'-0 1/8" x 26'-9 1/8" = 455.2 SF
+        matches the fill at a ratio of 1.007.
+
+    The fill was right; the ~2x came from a room-mix `unit_count` of 2 one layer
+    later, derived from a golden `Doors-WD 2 EA` that is really a suite's entry
+    door plus its connecting door (INV-02 §4). The corresponding correction to
+    `docs/PIPELINE-GROUND-TRUTH.md` §14.2 landed in plan 23-16.
 
     So the cross-check is against the drawing's own statement of its size, and
-    455.2 vs 458.3 must NOT be flagged.
+    BOTH directions are asserted here: 455.2 vs 458.3 must NOT be flagged, and a
+    fill of roughly twice that bound MUST be.
     """
     r = RoomFillResult(area_sf=458.3, regions=[292.0, 64.0, 63.0],
                        candidate_id="ID-412-RCP")
@@ -411,12 +421,22 @@ def test_the_measured_area_is_checked_against_the_drawings_own_printed_extent():
     assert out.bound_sf == 455.2
     assert out.extent_ratio == pytest.approx(1.007, abs=0.001)
 
+    # ...and the other direction, in the same test, because the check is only
+    # meaningful if it discriminates: a genuine two-plan leak reads ~2.0.
+    leak = cross_check_extent(
+        RoomFillResult(area_sf=916.6, regions=[584.0, 128.0],
+                       candidate_id="ID-412-RCP-LEAK"),
+        455.2,
+    )
+    assert leak.needs_review is True
+    assert leak.extent_ratio == pytest.approx(2.014, abs=0.001)
+
 
 def test_a_fill_of_twice_its_printed_extent_is_flagged_never_halved():
     """The genuine two-plan leak this check exists for — ~2.0, not ~1.0.
 
     458.3 x 2 against the same 455.2 SF printed extent. Halving it would be a
-    guess, so the row is FLAGGED with its measurement intact.
+    guess, so the row is FLAGGED with its measurement intact (INV-02 §4).
     """
     r = RoomFillResult(area_sf=916.6, regions=[584.0, 128.0], candidate_id="LEAK")
     out = cross_check_extent(r, 455.2)
@@ -513,14 +533,24 @@ def test_total_for_units_without_a_count_returns_the_single_unit():
 
 
 def test_an_oversize_region_is_kept_and_flagged_never_dropped():
-    """23-09: the hard drop is gone, and this is why.
+    """23-09: the hard drop is gone, and this is why (INV-02 §5).
 
-    A 1,200 SF region is implausible as ONE guest room and perfectly ordinary
-    as a lobby, a ballroom or a retail floor plate. Dropping it left `enclosed`
-    empty and the engine returned `None` — so every such drawing in the set
-    reported NOTHING, and a drawing that measured nothing is indistinguishable
-    from an item that is genuinely zero. That is the silent zero this phase
-    exists to abolish (INV-02 §5).
+    THE SUPERSEDED TEST, inverted rather than deleted. Its predecessor —
+    `test_max_region_guard_rejects_sheet_scale_regions` — asserted that a room
+    of this size is REJECTED, and the constant it was guarding
+    (`MAX_REGION_SF`, and the `_MAX_UNIT_SF = 900.0` beside it) was a
+    guest-room-shaped number: right for a Moxy guestroom, wrong for every lobby,
+    ballroom and retail floor plate in the world. INV-02 §5 shows what the
+    rejection actually cost — dropping the region left `enclosed` empty and the
+    engine returned `None`, so such a drawing reported NOTHING, and a drawing
+    that measured nothing is indistinguishable from an item that is genuinely
+    zero. That is the silent zero this phase exists to abolish.
+
+    So the contract is inverted: the measurement is RETURNED and FLAGGED, with
+    the reason naming the bound it exceeded. The scale-free replacement for the
+    plausibility judgement itself is `cross_check_extent` (INV-02 §4), a ratio
+    against the drawing's own printed extent — see
+    `test_the_plausibility_bound_is_a_ratio_and_not_a_size_in_square_feet`.
 
     Drawn at 1/8" = 1'-0" so the whole region fits on an 800 pt page and is
     genuinely ENCLOSED; a 60x40-at-quarter fixture overflows the page, so its
