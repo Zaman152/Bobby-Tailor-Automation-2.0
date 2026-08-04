@@ -100,6 +100,7 @@ from bobbytailor.deterministic.scale_solver import (
 )
 from bobbytailor.deterministic.symbols import cluster_symbols
 from bobbytailor.deterministic.tables import extract_schedules
+from bobbytailor.deterministic.text_anchor import anchors_for_candidates
 from bobbytailor.deterministic.viewports import segment_viewports
 from bobbytailor.deterministic.walls import extract_walls, wall_lf_by_class
 
@@ -2639,7 +2640,7 @@ class TakeoffPipeline:
         except Exception as exc:  # noqa: BLE001 — material tags are additive
             logger.debug("material-tag reading failed on %r: %s", sheet_name, exc)
 
-        return {
+        bundle = {
             "symbol_groups": symbols,
             "walls": walls,
             "wall_lf_by_class": wall_lf,
@@ -2672,6 +2673,71 @@ class TakeoffPipeline:
             "_main_plan_region": main_id,
             "_scale_result": scale,
         }
+
+        # Per-candidate text anchors (24-01, V4-DET-01). Computed HERE, before
+        # any vision call, so every symbol group, room and wall thickness class
+        # carries the words the drawing itself printed next to it — or a
+        # recorded absence. A candidate with no anchor is never named from its
+        # shape; plan 24-04 owns what happens to it.
+        #
+        # The masks assembled at the top of this method are MANDATORY, not
+        # optional (threat T-24-02): without them a door-schedule tag column is
+        # indistinguishable from a plan-body callout.
+        #
+        # Additive and fully guarded, exactly like `extract_material_tags`
+        # above: any failure leaves the bundle byte-identical to before this
+        # key existed and the sheet still measures.
+        try:
+            bundle["candidate_anchors"] = anchors_for_candidates(
+                page,
+                self._anchor_candidate_map(bundle),
+                mask_rects=list(table_bboxes) + list(mask_rects),
+            )
+        except Exception as exc:  # noqa: BLE001 — anchors are additive
+            logger.debug("anchor computation failed on %r: %s", sheet_name, exc)
+            bundle["candidate_anchors"] = {}
+
+        return bundle
+
+    @staticmethod
+    def _anchor_candidate_map(bundle: dict) -> dict:
+        """``{candidate_id: bbox_pt}`` for every nameable candidate in *bundle*.
+
+        Built from ``fusion.build_registry`` rather than re-deriving three bbox
+        rules here, so a wall class is named exactly as ``_wall_candidate_id``
+        names it and a room bbox is the same polygon bound fusion will ground
+        against. Viewport regions are excluded: a region is a place on the
+        sheet, not an object anyone names.
+
+        A registry bbox of all zeros means "this class has no segment records",
+        i.e. position UNKNOWN — never position (0, 0). Such a candidate is
+        passed through with an empty bbox so it earns a recorded absence
+        instead of harvesting whatever text sits at the page origin.
+        """
+        wanted = ("symbol_group", "wall_class", "room")
+        out: dict = {}
+        for cid, entry in (build_registry(bundle) or {}).items():
+            if (entry or {}).get("kind") not in wanted:
+                continue
+            bbox = tuple(entry.get("bbox_pt") or ())
+            if len(bbox) != 4 or (
+                bbox[2] - bbox[0] == 0.0 and bbox[3] - bbox[1] == 0.0
+            ):
+                bbox = ()
+            out[str(cid)] = bbox
+
+        # A dict-shaped symbol group carries `bbox_pt` where the dataclass
+        # carries `representative_bbox_pt`; `_sched_field` reads both alike.
+        for group in bundle.get("symbol_groups") or []:
+            cid = _sched_field(group, "candidate_id", "")
+            if not cid or out.get(cid):
+                continue
+            rep = _sched_field(group, "representative_bbox_pt", None)
+            if not rep:
+                rep = _sched_field(group, "bbox_pt", None)
+            if rep:
+                out[str(cid)] = tuple(rep)
+        return out
 
     # There is deliberately NO plausible-single-unit constant here any more
     # (23-11 / V4-MEAS-02). The 900 SF bound that used to live at this line was
