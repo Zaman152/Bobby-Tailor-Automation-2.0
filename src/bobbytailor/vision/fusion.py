@@ -31,7 +31,7 @@ from __future__ import annotations
 import logging
 import math
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 # Unit-count provenance, imported rather than restated so the report row and the
 # resolver that produced the number cannot drift apart (threat T-23-32).
@@ -1522,18 +1522,325 @@ def _fuse_wall_classes(
             )
 
 
+def _item_not_measured(bundle: dict, info: dict) -> None:
+    """The explicit NOT MEASURED row for a basis no drawing answers.
+
+    Substituting another discipline's area would be a guess (a ceiling is
+    taken off the RCP, not off the architectural plan), so the honest outcome
+    is an explicit blank — never a bare ``continue``, which leaves the item
+    with no row at all and its quantity read as a zero (INV-08 §2 row S9).
+    """
+    from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
+        BASIS_PLAN_KIND,
+    )
+    from bobbytailor.pipeline.coverage import (  # noqa: PLC0415
+        ITEM_NOT_MEASURED,
+        ItemCoverage,
+    )
+
+    want_kind = BASIS_PLAN_KIND.get(info["basis"], "?")
+    bundle.setdefault("item_coverage", []).append(
+        ItemCoverage(
+            name=str(info["name"]),
+            unit=str(info["unit"] or "SF"),
+            status=ITEM_NOT_MEASURED,
+            quantity=None,
+            basis=info["basis"],
+            source_sheets=[str(bundle.get("sheet_name") or "")],
+            reason="no %s plan drawing was measured on this sheet for "
+                   "basis %r — measuring it off a different discipline's "
+                   "drawing would be a guess" % (want_kind, info["basis"]),
+            expected_from="vocabulary",
+        )
+    )
+
+
+def _unit_count_for(pick, ctx: dict) -> "Tuple[Optional[int], bool, str, dict]":
+    """``(count, known, source, meta)`` for the pick's unit type.
+
+    A known count with no stated source predates the census wiring (a caller
+    passing a bare room_mix, i.e. the estimator's declaration), so it reports
+    ``manifest``. An unknown count is ``assumed``: the prototype stands for
+    one unit and the row says so.
+    """
+    room_mix = ctx.get("room_mix") or {}
+    room_mix_meta = ctx.get("room_mix_meta") or {}
+    plan_key = _norm_name(pick.plan_name)
+    count = room_mix.get(plan_key)
+    known = count is not None and int(count) > 0
+    meta = room_mix_meta.get(plan_key) or {}
+    source = str(meta.get("source") or "").strip() or (
+        _UNIT_COUNT_SOURCE_MANIFEST if known else _UNIT_COUNT_SOURCE_ASSUMED
+    )
+    if not known:
+        source = _UNIT_COUNT_SOURCE_ASSUMED
+    return (int(count) if known else None), known, source, meta
+
+
+def _bind_enclosed_area(
+    bundle: dict, components: List[dict], info: dict, fills, ctx: dict
+) -> None:
+    """The enclosed-region AREA binder — today's behaviour, exactly.
+
+    The number is geometry: an area flood-filled from the drawing at that
+    drawing's own printed scale; the room mix supplies only the COUNT. A
+    prototype sheet whose unit type is not in the room mix is emitted as the
+    single measured unit and flagged — never silently multiplied by a guessed
+    count, and never dropped.
+    """
+    from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
+        select_fill_for_basis,
+        total_for_units,
+    )
+
+    pick = select_fill_for_basis(fills, info["basis"])
+    if pick is None:
+        _item_not_measured(bundle, info)
+        return
+    count, known_count, count_source, meta = _unit_count_for(pick, ctx)
+    qty = total_for_units(pick.area_sf, count if known_count else None)
+
+    reasons = []
+    if pick.needs_review:
+        reasons.append(pick.review_reason)
+    if not known_count and pick.plan_name:
+        reasons.append(
+            "measured ONE %r unit (%.1f SF); how many exist is not stated in "
+            "the drawing set — supply the room mix to scale it"
+            % (pick.plan_name, pick.area_sf)
+        )
+    if known_count and meta.get("note"):
+        reasons.append(str(meta["note"]))
+    components.append(
+        {
+            "name": info["name"],
+            "quantity": qty,
+            "unit": info["unit"],
+            "provenance": "geometry",
+            "confidence": "medium" if reasons else "high",
+            "candidate_id": pick.candidate_id,
+            "name_source": "room_fill",
+            "basis": info["basis"],
+            # The measured region backing this row — the arbitration key. Two
+            # line items claiming the same region must be a DECLARED sharing,
+            # never an emergent double count (SP-9).
+            "region_ref": "fill:%s" % pick.candidate_id,
+            "formula": (
+                "%.1f SF (%s, enclosed regions @ %.2f ft/in) × %d units "
+                "(unit count source: %s)"
+                % (pick.area_sf, pick.viewport_title or pick.plan_kind,
+                   pick.scale_fpi or 0.0, int(count), count_source)
+                if known_count else
+                "%.1f SF (%s, enclosed regions @ %.2f ft/in)"
+                % (pick.area_sf, pick.viewport_title or pick.plan_kind,
+                   pick.scale_fpi or 0.0)
+            ),
+            "unit_count": count if known_count else None,
+            "unit_count_source": count_source,
+            "needs_review": bool(reasons),
+            "review_reason": "; ".join(r for r in reasons if r),
+        }
+    )
+
+
+#: Height sources the wall binder accepts WITHOUT flagging. Anything else —
+#: "plan" (Moxy's 15 ft roof-plan clearance callout), "default" (the 30 ft
+#: industrial fallback), or nothing at all — flags the row with the source
+#: named, matching how the thickness-class binder treats a default height.
+_TRUSTED_HEIGHT_SOURCES = frozenset({"drawing", "learned"})
+
+
+def _bind_wall_area(
+    bundle: dict, components: List[dict], info: dict, fills, ctx: dict
+) -> None:
+    """The wall-area binder: billable perimeter × drawing height × unit count.
+
+    Flag-don't-guess, three ways:
+
+    * A leaking fill (dominant region over the blind shape threshold) emits a
+      ZERO quantity with the shape failure named — NEVER a silent ``continue``,
+      because a missing row reads as "not required" while a flagged zero reads
+      as "we could not measure this".
+    * No trustworthy height → the row ships with ``quantity=None`` carrying the
+      measured perimeter in its formula, flagged — never a guessed height.
+    * A height whose source is not the drawing's own tag (or a learned value)
+      multiplies but FLAGS with the source named: Moxy's project answer is
+      15 ft from a roof-plan ``CLEAR REQ'D`` callout at source "plan", a ~67%
+      overstatement that would otherwise arrive at confidence high (INV-01 §5).
+
+    The partition convention is board faces, read off the take-off's own
+    markup (:data:`room_fill.PARTITION_CONVENTION`, D-08) and named on the row.
+    """
+    from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
+        select_fill_for_basis,
+        total_for_units,
+        wall_area_for_unit,
+        wall_perimeter_for_unit,
+    )
+
+    pick = select_fill_for_basis(fills, info["basis"])
+    if pick is None:
+        _item_not_measured(bundle, info)
+        return
+    count, known_count, count_source, meta = _unit_count_for(pick, ctx)
+
+    # The fill's own resolved height first (stamped per drawing by the
+    # pipeline), then the sheet-level height fuse_sheet already receives.
+    height = pick.wall_height_ft
+    source = pick.wall_height_source or ""
+    if height is None or float(height) <= 0:
+        height = ctx.get("wall_height_ft")
+        source = str(ctx.get("wall_height_source") or ("default" if height else ""))
+    try:
+        height = float(height) if height is not None else None
+    except (TypeError, ValueError):
+        height = None
+
+    perimeter, perimeter_reason = wall_perimeter_for_unit(pick)
+    drawing = pick.viewport_title or pick.plan_kind
+
+    reasons = []
+    if pick.needs_review:
+        reasons.append(pick.review_reason)
+    if perimeter_reason:
+        reasons.append(perimeter_reason)
+    if not known_count and pick.plan_name:
+        reasons.append(
+            "measured ONE %r unit; how many exist is not stated in the "
+            "drawing set — supply the room mix to scale it" % pick.plan_name
+        )
+    if known_count and meta.get("note"):
+        reasons.append(str(meta["note"]))
+
+    base_fields = {
+        "name": info["name"],
+        "unit": info["unit"],
+        "provenance": "geometry",
+        "candidate_id": pick.candidate_id,
+        "name_source": "room_fill",
+        "basis": _WALL_AREA_BASIS,
+        "region_ref": "fill:%s" % pick.candidate_id,
+        "unit_count": count if known_count else None,
+        "unit_count_source": count_source,
+        "partition_convention": "board_faces",
+    }
+
+    if perimeter <= 0.0:
+        # The shape gate refused: a fabricated linear-foot figure is never
+        # emitted, and neither is silence.
+        component = dict(base_fields)
+        component.update(
+            {
+                "quantity": 0.0,
+                "confidence": "low",
+                "formula": "0.0 LF billable perimeter (%s @ %.2f ft/in) — %s"
+                % (drawing, pick.scale_fpi or 0.0,
+                   perimeter_reason or "no billable perimeter"),
+                "needs_review": True,
+                "review_reason": "; ".join(r for r in reasons if r),
+            }
+        )
+        components.append(component)
+        return
+
+    if height is None or height <= 0:
+        # Flag-don't-guess: the perimeter is measured and recorded; the
+        # quantity is withheld rather than multiplied by an invented height.
+        reasons.append(
+            "no wall height resolved for this drawing — %.1f LF of billable "
+            "perimeter is measured and awaits a height; a guessed height is "
+            "never applied" % perimeter
+        )
+        component = dict(base_fields)
+        component.update(
+            {
+                "quantity": None,
+                "confidence": "low",
+                "formula": "%.1f LF billable perimeter (%s @ %.2f ft/in) × "
+                "UNRESOLVED height" % (perimeter, drawing, pick.scale_fpi or 0.0),
+                "needs_review": True,
+                "review_reason": "; ".join(r for r in reasons if r),
+            }
+        )
+        components.append(component)
+        return
+
+    if source not in _TRUSTED_HEIGHT_SOURCES:
+        reasons.append(
+            "wall height %.2f ft came from source %r, not from the drawing's "
+            "own ceiling tag — verify on sheet before billing"
+            % (height, source or "unknown")
+        )
+
+    base = wall_area_for_unit(perimeter, height)
+    qty = total_for_units(base, count if known_count else None)
+    formula = (
+        "%.1f LF billable perimeter (%s @ %.2f ft/in) × %.2f ft height (%s)"
+        % (perimeter, drawing, pick.scale_fpi or 0.0, height, source or "unknown")
+    )
+    if known_count:
+        formula += " × %d units (unit count source: %s)" % (count, count_source)
+    formula += "; partition convention: board faces"
+
+    component = dict(base_fields)
+    component.update(
+        {
+            "quantity": qty,
+            "confidence": "medium" if reasons else "high",
+            "wall_height_ft": height,
+            "wall_height_source": source,
+            "formula": formula,
+            "needs_review": bool(reasons),
+            "review_reason": "; ".join(r for r in reasons if r),
+        }
+    )
+    components.append(component)
+
+
+# ── The basis-to-binder registry (SP-9, D-03) ────────────────────────────────
+#
+# ONE registry answers every measure basis the enclosed-region engine can bind.
+# Four investigations independently proposed adding a fourth parallel frozenset
+# beside the old room-fill basis gate; the registry is what stops that. A new
+# capability (23-14 elevation areas, 23-15 linear runs) REGISTERS a binder here
+# — it must never add a parallel gate, and one-area-one-item arbitration
+# (fuse_sheet) already covers whatever it emits.
+BASIS_BINDERS: Dict[str, Callable] = {}
+
+
+def register_basis_binder(basis: str, binder: Callable) -> None:
+    """Register *binder* as THE answerer for *basis*.
+
+    A binder's contract is ``binder(bundle, components, info, fills, ctx)``:
+    it appends whatever component(s) answer ``info`` (a wanted vocabulary
+    item) and must follow flag-don't-guess — an unanswerable item is an
+    explicit flagged row or an item-coverage record, never silence.
+    """
+    BASIS_BINDERS[str(basis or "").strip().lower()] = binder
+
+
+register_basis_binder("ceiling_area", _bind_enclosed_area)
+register_basis_binder("roof_area", _bind_enclosed_area)
+register_basis_binder("floor_area", _bind_enclosed_area)
+register_basis_binder(_WALL_AREA_BASIS, _bind_wall_area)
+
+
 def _fuse_room_fills(
     bundle: dict,
     components: List[dict],
     vocab_map: Optional[Dict[str, dict]] = None,
     room_mix: Optional[Dict[str, int]] = None,
     room_mix_meta: Optional[Dict[str, dict]] = None,
+    wall_height_ft: Optional[float] = None,
+    wall_height_source: Optional[str] = None,
 ) -> None:
-    """Measured enclosed-region areas → area line items (prototype × room mix).
+    """Measured enclosed-region geometry → line items, one binder per basis.
 
     The number is geometry: an area flood-filled from the drawing at that
-    drawing's own printed scale. ``room_mix`` supplies only the COUNT — how many
-    of each unit type the building has; it never supplies a quantity.
+    drawing's own printed scale, or a wall area from that fill's billable
+    perimeter × its drawing's own height. ``room_mix`` supplies only the
+    COUNT — how many of each unit type the building has; it never supplies a
+    quantity.
 
     That count is no longer necessarily a human input. ``room_mix_meta`` carries
     ``{name: {"source": ..., "note": ...}}`` from
@@ -1547,18 +1854,10 @@ def _fuse_room_fills(
     abbreviation match — flags the row that USES the number.
 
     Binding is by DISCIPLINE, not size: a ceiling area comes off the Reflected
-    Ceiling Plan, a floor area off the Architectural plan. A prototype sheet
-    whose unit type is not in the room mix is emitted as the single measured unit
-    and flagged — never silently multiplied by a guessed count, and never dropped.
+    Ceiling Plan, a floor or wall area off the Architectural plan. Which binder
+    answers which basis is :data:`BASIS_BINDERS` — the SP-9 registry that
+    replaced the parallel frozenset gates.
     """
-    from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
-        select_fill_for_basis,
-        total_for_units,
-    )
-    from bobbytailor.pipeline.coverage import (  # noqa: PLC0415
-        ITEM_NOT_MEASURED,
-        ItemCoverage,
-    )
 
     def _note(text: str) -> None:
         bundle.setdefault("coverage_notes", []).append(text)
@@ -1571,15 +1870,14 @@ def _fuse_room_fills(
         )
         return
     vocab_map = vocab_map or {}
-    room_mix = room_mix or {}
-    room_mix_meta = room_mix_meta or {}
 
-    # Area objects the vocabulary/manifest asks for, deduped by canonical name.
+    # Objects the vocabulary/manifest asks for whose basis has a registered
+    # binder, deduped by canonical name.
     wanted: Dict[str, dict] = {}
     for info in vocab_map.values():
         basis = str(info.get("basis") or "").strip().lower()
         name = info.get("name")
-        if not name or basis not in _ROOM_FILL_BASES:
+        if not name or basis not in BASIS_BINDERS:
             continue
         wanted.setdefault(str(name).strip().lower(), {"name": name, "basis": basis,
                                                       "unit": info.get("unit") or "SF"})
@@ -1609,90 +1907,14 @@ def _fuse_room_fills(
         )
         return
 
+    ctx = {
+        "room_mix": room_mix or {},
+        "room_mix_meta": room_mix_meta or {},
+        "wall_height_ft": wall_height_ft,
+        "wall_height_source": wall_height_source,
+    }
     for info in wanted.values():
-        pick = select_fill_for_basis(fills, info["basis"])
-        if pick is None:
-            # No drawing of the right DISCIPLINE was measured. Substituting
-            # another discipline's area would be a guess (a ceiling is taken
-            # off the RCP, not off the architectural plan), so the honest
-            # outcome is an explicit NOT MEASURED row — never a bare continue,
-            # which leaves the item with no row at all and its quantity read as
-            # a zero (INV-08 §2 row S9).
-            from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
-                BASIS_PLAN_KIND,
-            )
-            want_kind = BASIS_PLAN_KIND.get(info["basis"], "?")
-            bundle.setdefault("item_coverage", []).append(
-                ItemCoverage(
-                    name=str(info["name"]),
-                    unit=str(info["unit"] or "SF"),
-                    status=ITEM_NOT_MEASURED,
-                    quantity=None,
-                    basis=info["basis"],
-                    source_sheets=[str(bundle.get("sheet_name") or "")],
-                    reason="no %s plan drawing was measured on this sheet for "
-                           "basis %r — measuring it off a different discipline's "
-                           "drawing would be a guess" % (want_kind, info["basis"]),
-                    expected_from="vocabulary",
-                )
-            )
-            continue
-        plan_key = _norm_name(pick.plan_name)
-        count = room_mix.get(plan_key)
-        known_count = count is not None and int(count) > 0
-        qty = total_for_units(pick.area_sf, count if known_count else None)
-
-        meta = room_mix_meta.get(plan_key) or {}
-        # A known count with no stated source predates the census wiring (a
-        # caller passing a bare room_mix, i.e. the estimator's declaration), so
-        # it reports `manifest`. An unknown count is `assumed`: the prototype
-        # stands for one unit and the row says so.
-        count_source = str(meta.get("source") or "").strip() or (
-            _UNIT_COUNT_SOURCE_MANIFEST if known_count else _UNIT_COUNT_SOURCE_ASSUMED
-        )
-        if not known_count:
-            count_source = _UNIT_COUNT_SOURCE_ASSUMED
-
-        reasons = []
-        if pick.needs_review:
-            reasons.append(pick.review_reason)
-        if not known_count and pick.plan_name:
-            reasons.append(
-                "measured ONE %r unit (%.1f SF); how many exist is not stated in "
-                "the drawing set — supply the room mix to scale it"
-                % (pick.plan_name, pick.area_sf)
-            )
-        if known_count and meta.get("note"):
-            reasons.append(str(meta["note"]))
-        components.append(
-            {
-                "name": info["name"],
-                "quantity": qty,
-                "unit": info["unit"],
-                "provenance": "geometry",
-                "confidence": "medium" if reasons else "high",
-                "candidate_id": pick.candidate_id,
-                "name_source": "room_fill",
-                "formula": (
-                    "%.1f SF (%s, enclosed regions @ %.2f ft/in) × %d units "
-                    "(unit count source: %s)"
-                    % (pick.area_sf, pick.viewport_title or pick.plan_kind,
-                       pick.scale_fpi or 0.0, int(count), count_source)
-                    if known_count else
-                    "%.1f SF (%s, enclosed regions @ %.2f ft/in)"
-                    % (pick.area_sf, pick.viewport_title or pick.plan_kind,
-                       pick.scale_fpi or 0.0)
-                ),
-                "unit_count": int(count) if known_count else None,
-                "unit_count_source": count_source,
-                "needs_review": bool(reasons),
-                "review_reason": "; ".join(r for r in reasons if r),
-            }
-        )
-
-
-# Measure bases the enclosed-region engine can answer.
-_ROOM_FILL_BASES = frozenset({"ceiling_area", "roof_area", "floor_area"})
+        BASIS_BINDERS[info["basis"]](bundle, components, info, fills, ctx)
 
 
 def _fuse_project_area_items(
@@ -1738,6 +1960,12 @@ def _fuse_project_area_items(
                 "provenance": "geometry",
                 "confidence": confidence,
                 "basis": basis,
+                # Every one of these rows is backed by the SAME measured
+                # region — the footprint. One-area-one-item arbitration
+                # (fuse_sheet) keeps at most one of them unless the sharing is
+                # DECLARED: on Crow this very loop bound one footprint value
+                # to six line items at once (INV-00 §4).
+                "region_ref": "footprint",
                 "needs_review": needs_review,
                 "review_reason": (
                     "whole-building %s bound to measured footprint" % basis
@@ -2072,6 +2300,9 @@ def _fuse_footprint(bundle: dict, components: List[dict]) -> None:
                 "unit": "SF",
                 "provenance": "text_layer",
                 "confidence": confidence,
+                # The same measured region as every _fuse_project_area_items
+                # row — subject to one-area-one-item arbitration (SP-9).
+                "region_ref": "footprint",
                 "needs_review": needs_review,
                 "review_reason": reason,
             }
@@ -2088,6 +2319,153 @@ def _fuse_footprint(bundle: dict, components: List[dict]) -> None:
                 "review_reason": reason,
             }
         )
+
+
+def _suppress_superseded_wall_items(
+    components: List[dict],
+    room_fill_names,
+    rejected: List[dict],
+) -> None:
+    """A measured-region wall item SUPERSEDES the same-named thickness estimate.
+
+    ``_fuse_wall_classes`` and the wall-area binder both append to the same
+    list, and ``aggregate_takeoff`` SUMS same-named buckets — so without this,
+    turning on the room-fill wall binding produces ``thickness-class SF +
+    room-fill SF``: a wrong number that looks better (INV-01 risk 1, R5).
+
+    Merging by provenance cannot resolve it: both rows carry
+    ``provenance: "geometry"``, so ``merge_with_provenance`` falls through to
+    a confidence-then-first-seen rule and drops one SILENTLY. The suppression
+    here is explicit and audited: the thickness-class row lands in the
+    rejected list with a reason naming the supersession, following the
+    module's existing rejection pattern (:func:`_reject_unknown_id`).
+    """
+    if not room_fill_names:
+        return
+    kept: List[dict] = []
+    for component in components:
+        name_key = _norm_name(component.get("name"))
+        cid = str(component.get("candidate_id") or "")
+        from_room_fill = component.get("name_source") == "room_fill"
+        if (
+            name_key in room_fill_names
+            and not from_room_fill
+            and cid.startswith("WALL-")
+        ):
+            rejected.append(
+                {
+                    "candidate_id": cid,
+                    "source": "wall_classes",
+                    "answer": component.get("name"),
+                    "reason": "superseded_by_room_fill",
+                    "quantity": component.get("quantity"),
+                    "unit": component.get("unit"),
+                    "detail": "the same-named wall item is measured from an "
+                              "actual enclosed region on this sheet; the "
+                              "thickness-class estimate is superseded, not "
+                              "summed with it",
+                }
+            )
+            continue
+        kept.append(component)
+    components[:] = kept
+
+
+def _arbitrate_one_area_one_item(
+    components: List[dict], rejected: List[dict]
+) -> None:
+    """ONE measured region backs AT MOST ONE line item — unless DECLARED.
+
+    Two live defects, one rule (SP-9 / INV-00 §4):
+
+    * On Crow, one measured footprint value was bound to SIX line items at
+      once (Building Footprint / Canopy / Concrete Pad / Exposed Structure /
+      Sealed Concrete / Vapor Barrier, all 397,600 SF). An estimator bidding
+      from that report prices the floor six times.
+    * A quantity measured on a TYPICAL DETAIL must never be summed with the
+      same quantity measured on the main plan (the 23-12 ``is_typical`` flag,
+      inherited here so plan 23-15's binder gets it for free).
+
+    Components carrying the same ``region_ref`` (and unit) are one measured
+    region: the first-emitted row survives, every other lands in the rejected
+    list with a reason naming the survivor. A component marked
+    ``shared_area="declared"`` survives alongside the anchor and is recorded
+    as ``"deliberate"`` — sharing must be a statement, never an emergent sum
+    (a floor finish over a slab genuinely occupies the slab's area).
+
+    Every suppression is auditable; nothing vanishes silently (T-23-54).
+    """
+    suppressed = set()
+
+    # ── A typical-detail row never sums with the main-plan row ──────────────
+    by_name: Dict[str, List[dict]] = {}
+    for component in components:
+        by_name.setdefault(_norm_name(component.get("name")), []).append(component)
+    for group in by_name.values():
+        typical = [c for c in group if c.get("typical_detail")]
+        main = [c for c in group if not c.get("typical_detail")]
+        if typical and main:
+            for component in typical:
+                suppressed.add(id(component))
+                rejected.append(
+                    {
+                        "candidate_id": component.get("candidate_id"),
+                        "source": "arbitration",
+                        "answer": component.get("name"),
+                        "reason": "typical_detail_not_summed",
+                        "quantity": component.get("quantity"),
+                        "unit": component.get("unit"),
+                        "detail": "measured on a typical detail; the same "
+                                  "object is measured on the main plan and "
+                                  "the two must never be summed",
+                    }
+                )
+
+    # ── At most one line item per measured region ───────────────────────────
+    by_region: Dict[tuple, List[dict]] = {}
+    for component in components:
+        if id(component) in suppressed:
+            continue
+        region = component.get("region_ref")
+        if not region:
+            continue
+        key = (str(region), str(component.get("unit") or ""))
+        by_region.setdefault(key, []).append(component)
+    for (region, _unit), group in by_region.items():
+        if len(group) < 2:
+            continue
+        anchor = group[0]
+        shared_names = [str(anchor.get("name"))]
+        for component in group[1:]:
+            if component.get("shared_area"):
+                component["shared_area"] = "deliberate"
+                shared_names.append(str(component.get("name")))
+                continue
+            suppressed.add(id(component))
+            rejected.append(
+                {
+                    "candidate_id": component.get("candidate_id"),
+                    "source": "arbitration",
+                    "answer": component.get("name"),
+                    "reason": "one_area_one_item",
+                    "quantity": component.get("quantity"),
+                    "unit": component.get("unit"),
+                    "detail": "backed by the same measured region (%s) as "
+                              "%r, and the sharing is not declared — a "
+                              "measured region backs at most one line item"
+                              % (region, anchor.get("name")),
+                }
+            )
+        if len(shared_names) > 1:
+            for component in group:
+                if id(component) not in suppressed:
+                    component["shared_area"] = "deliberate"
+                    component["shared_area_with"] = [
+                        n for n in shared_names if n != str(component.get("name"))
+                    ]
+
+    if suppressed:
+        components[:] = [c for c in components if id(c) not in suppressed]
 
 
 def fuse_sheet(
@@ -2206,12 +2584,28 @@ def fuse_sheet(
     )
     _fuse_project_area_items(deterministic_bundle, vocabulary, components)
     _fuse_room_fills(
-        deterministic_bundle, components, vocab_map, room_mix, room_mix_meta
+        deterministic_bundle, components, vocab_map, room_mix, room_mix_meta,
+        wall_height_ft=wall_height_ft, wall_height_source=wall_height_source,
     )
     _fuse_rooms(deterministic_bundle, room_labels, components, rejected)
     _fuse_schedules(deterministic_bundle, components)
     _fuse_material_tags(deterministic_bundle, components, material_tag_ledger)
     _fuse_footprint(deterministic_bundle, components)
+
+    # ── One-area-one-item arbitration (SP-9) — lands WITH the wall binder ────
+    # A wall item measured from an actual enclosed region supersedes the
+    # same-named thickness-class estimate, and a measured region backs at most
+    # one line item unless the sharing is declared. Every suppression is in
+    # ``fusion_rejected`` with a reason; ``aggregate_takeoff`` SUMS same-named
+    # buckets, so this is the only thing standing between the new binder and
+    # a wrong number that looks better (R5, T-23-50).
+    room_fill_wall_names = {
+        _norm_name(c.get("name"))
+        for c in components
+        if c.get("name_source") == "room_fill" and c.get("basis") == _WALL_AREA_BASIS
+    }
+    _suppress_superseded_wall_items(components, room_fill_wall_names, rejected)
+    _arbitrate_one_area_one_item(components, rejected)
 
     result: dict = {
         "components": components,

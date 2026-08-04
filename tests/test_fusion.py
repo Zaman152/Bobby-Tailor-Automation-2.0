@@ -459,8 +459,15 @@ def test_fused_output_feeds_merge_with_provenance():
 
 
 def test_fuse_binds_wall_area_and_floor_roof_from_vocabulary():
-    """The core binding: a wall_area label → LF×height SF; floor/roof-plane
-    vocabulary items → the measured footprint area (Crow 100-1000x gap)."""
+    """The core binding: a wall_area label → LF×height SF; a floor/roof-plane
+    vocabulary item → the measured footprint area (Crow 100-1000x gap).
+
+    REWRITTEN by 23-13 (SP-9): the original asserted that BOTH footprint-bound
+    items survive — the exact one-region-many-items shape that bound one Crow
+    footprint value to SIX line items at once (INV-00 §4). Under one-area-
+    one-item arbitration exactly ONE survives per measured region unless the
+    sharing is declared, and the other is in the rejected list with a reason.
+    """
     bundle = {
         "sheet_name": "A2.1",
         "wall_lf_by_class": {"TC1": 1714.0},
@@ -490,11 +497,23 @@ def test_fuse_binds_wall_area_and_floor_roof_from_vocabulary():
     assert cmu["wall_height_source"] == "plan"
     assert cmu["needs_review"] is False  # plan-sourced height → not flagged
 
-    for name in ("Sealed Concrete", "Exposed Structure"):
-        item = comps[name]
-        assert item["unit"] == "SF"
-        assert item["quantity"] == 397600.0  # the whole footprint, not a sliver
-        assert item["provenance"] == "geometry"
+    # ONE footprint-backed item survives; the other is audited, not summed.
+    survivors = [
+        c for c in result["components"]
+        if c["name"] in ("Sealed Concrete", "Exposed Structure")
+    ]
+    assert len(survivors) == 1
+    assert survivors[0]["unit"] == "SF"
+    assert survivors[0]["quantity"] == 397600.0  # the whole footprint
+    assert survivors[0]["provenance"] == "geometry"
+    dropped = [
+        r for r in result["fusion_rejected"]
+        if r.get("reason") == "one_area_one_item"
+        and r.get("answer") in ("Sealed Concrete", "Exposed Structure")
+    ]
+    assert len(dropped) == 1
+    assert dropped[0]["answer"] != survivors[0]["name"]
+    assert "sharing is not declared" in dropped[0]["detail"]
 
 
 def test_fuse_wall_area_default_height_is_flagged():
@@ -1228,3 +1247,418 @@ def test_no_real_plan_set_produces_a_finish_schedule():
         assert "finish" not in kinds, "%s now yields a finish schedule: %s" % (
             name, kinds,
         )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 23-13 — the basis-to-binder registry (SP-9), the wall-area binder, and
+# one-area-one-item arbitration. All offline, zero API.
+# ═════════════════════════════════════════════════════════════════════════════
+
+from bobbytailor.vision.fusion import (  # noqa: E402
+    BASIS_BINDERS,
+    _arbitrate_one_area_one_item,
+    register_basis_binder,
+)
+
+MOXY_PDF = "uploads/Moxy Knoxville - Addendum A City Comment Revision-Plans.pdf"
+CROW_PLANS = "tests/fixtures/crow_cass/crow_cass_plans.pdf"
+
+
+def _wall_fill(
+    name="KING A",
+    kind="AR",
+    regions=(200.0,),
+    perimeters=(60.0,),
+    ratios=(4.24,),
+    height=9.0,
+    height_source="drawing",
+    **kw,
+):
+    from bobbytailor.deterministic.room_fill import RoomFillResult
+
+    return RoomFillResult(
+        area_sf=round(sum(regions), 1),
+        regions=list(regions),
+        region_perimeters=list(perimeters),
+        region_shape_ratios=list(ratios),
+        perimeter_lf=round(sum(perimeters), 1),
+        candidate_id="FILL-1",
+        scale_fpi=4.0,
+        plan_kind=kind,
+        plan_name=name,
+        viewport_title="%s - %s PLAN" % (name, kind),
+        wall_height_ft=height,
+        wall_height_source=height_source,
+        **kw,
+    )
+
+
+def _gyp_wall_vocab():
+    return [{"name": "Gyp Wall", "measure": "wall_area", "unit": "SF"}]
+
+
+# ── Task 2: the wall-area binder through the registry ────────────────────────
+
+
+def test_a_measured_wall_binds_perimeter_times_height_times_units():
+    """INV-01 §8 case 7: 60 LF × 9 ft (drawing) × 26 units = 14,040 SF,
+    provenance geometry, needs_review False."""
+    bundle = {"room_fills": [_wall_fill()], "sheet_name": "p23"}
+    result = fuse_sheet(
+        bundle, {}, vocabulary=_gyp_wall_vocab(), room_mix={"king a": 26},
+    )
+    rows = [c for c in result["components"] if c["name"] == "Gyp Wall"]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["quantity"] == pytest.approx(14040.0)
+    assert row["provenance"] == "geometry"
+    assert row["needs_review"] is False, row["review_reason"]
+    assert row["wall_height_ft"] == 9.0
+    assert row["wall_height_source"] == "drawing"
+    # The audit trail is readable without re-running anything: perimeter,
+    # drawing, scale, height, height source and unit count are all named.
+    for token in ("60.0 LF", "KING A - AR PLAN", "4.00 ft/in", "9.00 ft",
+                  "drawing", "26 units", "board faces"):
+        assert token in row["formula"], (token, row["formula"])
+
+
+def test_a_default_sourced_height_flags_the_wall_row_with_the_source_named():
+    bundle = {
+        "room_fills": [_wall_fill(height=None, height_source="")],
+        "sheet_name": "p23",
+    }
+    result = fuse_sheet(
+        bundle, {}, vocabulary=_gyp_wall_vocab(), room_mix={"king a": 26},
+        wall_height_ft=30.0, wall_height_source="default",
+    )
+    row = [c for c in result["components"] if c["name"] == "Gyp Wall"][0]
+    assert row["needs_review"] is True
+    assert "default" in row["review_reason"]
+    assert row["quantity"] == pytest.approx(round(60.0 * 30.0, 1) * 26)
+
+
+def test_the_fifteen_foot_plan_height_multiplies_but_flags():
+    """The roof-plan CLEAR REQ'D trap: source 'plan' is not the drawing's own
+    tag, so the row multiplies AND flags — never silently (T-23-51)."""
+    bundle = {
+        "room_fills": [_wall_fill(height=15.0, height_source="plan")],
+        "sheet_name": "p23",
+    }
+    result = fuse_sheet(bundle, {}, vocabulary=_gyp_wall_vocab())
+    row = [c for c in result["components"] if c["name"] == "Gyp Wall"][0]
+    assert row["needs_review"] is True
+    assert "'plan'" in row["review_reason"] and "15.00" in row["review_reason"]
+
+
+def test_a_degenerate_fill_yields_a_flagged_zero_row_that_exists():
+    """All regions above the shape threshold: a missing row reads as 'not
+    required'; a flagged zero reads as 'we could not measure this'."""
+    bundle = {
+        "room_fills": [
+            _wall_fill(regions=(173.5, 11.5), perimeters=(113.6, 24.0),
+                       ratios=(8.62, 9.1)),
+        ],
+        "sheet_name": "p23",
+    }
+    result = fuse_sheet(bundle, {}, vocabulary=_gyp_wall_vocab())
+    rows = [c for c in result["components"] if c["name"] == "Gyp Wall"]
+    assert len(rows) == 1, "the flagged zero MUST appear in the component list"
+    assert rows[0]["quantity"] == 0.0
+    assert rows[0]["needs_review"] is True
+    assert "shape ratio" in rows[0]["review_reason"]
+
+
+def test_no_height_ships_the_perimeter_with_quantity_none_never_a_guess():
+    bundle = {
+        "room_fills": [_wall_fill(height=None, height_source="")],
+        "sheet_name": "p23",
+    }
+    result = fuse_sheet(bundle, {}, vocabulary=_gyp_wall_vocab())
+    row = [c for c in result["components"] if c["name"] == "Gyp Wall"][0]
+    assert row["quantity"] is None
+    assert row["needs_review"] is True
+    assert "60.0" in row["review_reason"] and "guessed height" in row["review_reason"]
+    assert "UNRESOLVED" in row["formula"]
+
+
+def test_registering_a_new_basis_routes_to_the_stub_binder():
+    """A new capability REGISTERS a binder — it never adds a parallel gate."""
+    calls = []
+
+    def stub(bundle, components, info, fills, ctx):
+        calls.append(info["basis"])
+        components.append(
+            {"name": info["name"], "quantity": 1.0, "unit": "SF",
+             "provenance": "geometry", "needs_review": False,
+             "review_reason": ""}
+        )
+
+    register_basis_binder("stub_area", stub)
+    try:
+        bundle = {"room_fills": [_wall_fill()], "sheet_name": "s"}
+        result = fuse_sheet(
+            bundle, {}, vocabulary={"Stub Item": {"basis": "stub_area",
+                                                  "unit": "SF"}},
+        )
+        assert calls == ["stub_area"]
+        assert any(c["name"] == "Stub Item" for c in result["components"])
+    finally:
+        BASIS_BINDERS.pop("stub_area", None)
+
+
+def test_the_enclosed_region_bases_route_to_the_existing_binder():
+    for basis in ("ceiling_area", "roof_area", "floor_area"):
+        assert BASIS_BINDERS[basis].__name__ == "_bind_enclosed_area"
+    assert BASIS_BINDERS["wall_area"].__name__ == "_bind_wall_area"
+
+
+# ── Task 3: one area backs one line item ─────────────────────────────────────
+
+
+def test_a_room_fill_wall_item_supersedes_the_thickness_class_estimate():
+    """INV-01 §8 case 10: both binders offer 'Gyp Wall' on one sheet. Exactly
+    ONE survives; the other is in the rejected list naming the supersession.
+    aggregate_takeoff SUMS same-named buckets, so without this the number is
+    thickness + room-fill — wrong, and better-looking (T-23-50)."""
+    bundle = {
+        "room_fills": [_wall_fill()],
+        "wall_lf_by_class": {"TC1": 305.0},
+        "sheet_name": "p23",
+    }
+    labels = {
+        "wall_class_labels": [
+            {"wall_class_id": "WALL-TC1", "label": "Gyp Wall", "confidence": "high"}
+        ]
+    }
+    result = fuse_sheet(
+        bundle, labels, vocabulary=_gyp_wall_vocab(), room_mix={"king a": 26},
+        wall_height_ft=9.0, wall_height_source="plan",
+    )
+    rows = [c for c in result["components"] if c["name"] == "Gyp Wall"]
+    assert len(rows) == 1, "exactly one Gyp Wall row survives"
+    assert rows[0]["name_source"] == "room_fill", (
+        "the measured enclosed region supersedes the thickness-class estimate"
+    )
+    superseded = [
+        r for r in result["fusion_rejected"]
+        if r.get("reason") == "superseded_by_room_fill"
+    ]
+    assert len(superseded) == 1
+    assert superseded[0]["candidate_id"] == "WALL-TC1"
+    assert superseded[0]["quantity"] == pytest.approx(round(305.0 * 9.0, 1))
+
+
+def test_a_deliberately_shared_area_survives_as_two_items_marked_deliberate():
+    """A floor finish over a slab genuinely occupies the slab's area — but the
+    sharing must be a STATEMENT, recorded, never an emergent sum."""
+    components = [
+        {"name": "Slab on Grade", "quantity": 1000.0, "unit": "SF",
+         "region_ref": "footprint"},
+        {"name": "Floor Finish", "quantity": 1000.0, "unit": "SF",
+         "region_ref": "footprint", "shared_area": "declared"},
+    ]
+    rejected: list = []
+    _arbitrate_one_area_one_item(components, rejected)
+    assert len(components) == 2
+    assert rejected == []
+    finish = [c for c in components if c["name"] == "Floor Finish"][0]
+    assert finish["shared_area"] == "deliberate"
+    slab = [c for c in components if c["name"] == "Slab on Grade"][0]
+    assert slab.get("shared_area") == "deliberate"
+    assert slab.get("shared_area_with") == ["Floor Finish"]
+
+
+def test_an_undeclared_second_item_on_one_region_is_suppressed_with_a_reason():
+    components = [
+        {"name": "Sealed Concrete", "quantity": 1000.0, "unit": "SF",
+         "region_ref": "footprint"},
+        {"name": "Vapor Barrier", "quantity": 1000.0, "unit": "SF",
+         "region_ref": "footprint"},
+    ]
+    rejected: list = []
+    _arbitrate_one_area_one_item(components, rejected)
+    assert [c["name"] for c in components] == ["Sealed Concrete"]
+    assert len(rejected) == 1
+    assert rejected[0]["reason"] == "one_area_one_item"
+    assert rejected[0]["answer"] == "Vapor Barrier"
+    assert "Sealed Concrete" in rejected[0]["detail"]
+
+
+def test_a_typical_detail_run_never_sums_with_the_main_plan_run():
+    """The 23-12 is_typical flag, wired into the same arbitration so plan
+    23-15's binder inherits it."""
+    components = [
+        {"name": "Guard Rail", "quantity": 53.0, "unit": "LF",
+         "typical_detail": True},
+        {"name": "Guard Rail", "quantity": 53.0, "unit": "LF"},
+    ]
+    rejected: list = []
+    _arbitrate_one_area_one_item(components, rejected)
+    assert len(components) == 1
+    assert not components[0].get("typical_detail")
+    assert len(rejected) == 1
+    assert rejected[0]["reason"] == "typical_detail_not_summed"
+
+
+def test_different_regions_and_different_units_are_never_arbitrated():
+    components = [
+        {"name": "Gyp Ceiling", "quantity": 229.4, "unit": "SF",
+         "region_ref": "fill:FILL-6"},
+        {"name": "Gyp Wall", "quantity": 504.9, "unit": "SF",
+         "region_ref": "fill:FILL-1"},
+        {"name": "Building Footprint", "quantity": 397600.0, "unit": "SF",
+         "region_ref": "footprint"},
+        {"name": "Building Perimeter", "quantity": 2972.0, "unit": "LF",
+         "region_ref": "footprint"},
+    ]
+    rejected: list = []
+    _arbitrate_one_area_one_item(components, rejected)
+    assert len(components) == 4 and rejected == []
+
+
+@pytest.mark.skipif(
+    not __import__("os").path.isfile(CROW_PLANS),
+    reason="Crow plans fixture not present",
+)
+def test_on_the_real_crow_bundle_the_footprint_value_backs_one_line_item():
+    """INV-00 §4 item 1 reproduced and defused: the measured footprint value
+    backed SIX line items at once. After arbitration the COUNT of items
+    sharing that value is ONE — no assertion about which name won — and every
+    suppressed name is in the rejected list with a reason."""
+    from bobbytailor.deterministic.footprint_takeoff import (
+        extract_building_footprint,
+    )
+
+    fp = extract_building_footprint(CROW_PLANS)
+    assert fp is not None and fp.area_sf > 0
+    bundle = {"footprint": fp, "wall_lf_by_class": {}, "sheet_name": "crow-p0"}
+    # The six-item shape from the live run: everything roof/floor-shaped
+    # indiscriminately inherited the footprint (Building Footprint via
+    # _fuse_footprint, the rest via the vocabulary binding).
+    vocabulary = {
+        "Canopy": {"basis": "roof_area"},
+        "Concrete Pad": {"basis": "floor_area"},
+        "Exposed Structure": {"basis": "roof_area"},
+        "Sealed Concrete": {"basis": "floor_area"},
+        "Vapor Barrier": {"basis": "floor_area"},
+    }
+    result = fuse_sheet(bundle, {}, vocabulary=vocabulary)
+    value_rows = [
+        c for c in result["components"]
+        if c.get("unit") == "SF" and c.get("quantity") == pytest.approx(fp.area_sf)
+    ]
+    assert len(value_rows) == 1, (
+        "the footprint value must back exactly ONE line item, got: %s"
+        % [c["name"] for c in value_rows]
+    )
+    suppressed = [
+        r for r in result["fusion_rejected"]
+        if r.get("reason") == "one_area_one_item"
+    ]
+    assert len(suppressed) == 5
+    assert all(r.get("detail") for r in suppressed), "every suppression has a reason"
+
+
+# ── The real Moxy bundle, measured once for the whole module ─────────────────
+#
+# Every drawing on the 16 prototype sheets plus the REAL room-mix resolution
+# (in-plan census + manifest cross-check). The poisoned 15 ft project answer is
+# deliberately armed, exactly as in test_room_fill's fixture, so every fusion
+# assertion below runs against the trap rather than against its absence.
+
+
+@pytest.fixture(scope="module")
+def moxy_real_bundles():
+    import os
+
+    if not os.path.exists(MOXY_PDF):
+        pytest.skip("the real Moxy plan set is not present")
+    import fitz
+
+    from bobbytailor.devtools.object_manifest import load_manifest
+    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+    pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    pipe._project_wall_height = 15.0
+    pipe._project_wall_height_source = "plan"
+    manifest = load_manifest("human_inputs/moxy_knoxville.json")
+    doc = fitz.open(MOXY_PDF)
+    try:
+        fills = {
+            pno: pipe._measure_room_fills(doc[pno], [], {}, "p%d" % pno)[0]
+            for pno in range(23, 39)
+        }
+        resolution = pipe._resolve_room_mix(manifest, doc, pdf_path=MOXY_PDF)
+    finally:
+        doc.close()
+    return {
+        "fills": fills,
+        "room_mix": dict(resolution.counts),
+        "room_mix_meta": {
+            name: {
+                "source": resolution.sources.get(name, ""),
+                "note": resolution.name_flags.get(name, ""),
+            }
+            for name in resolution.counts
+        },
+    }
+
+
+def _fuse_moxy_page(moxy_real_bundles, pno, vocabulary):
+    bundle = {
+        "room_fills": moxy_real_bundles["fills"][pno],
+        "sheet_name": "p%d" % pno,
+    }
+    return fuse_sheet(
+        bundle, {}, vocabulary=vocabulary,
+        wall_height_ft=15.0, wall_height_source="plan",
+        room_mix=moxy_real_bundles["room_mix"],
+        room_mix_meta=moxy_real_bundles["room_mix_meta"],
+    )
+
+
+def test_the_existing_ceiling_binding_is_unchanged_on_the_real_moxy_bundle(
+    moxy_real_bundles,
+):
+    """Registry refactor, behaviour preserved: KING A's ceiling still binds
+    229.4 SF x 26 units through the enclosed-area binder."""
+    result = _fuse_moxy_page(
+        moxy_real_bundles, 23,
+        [{"name": "Gyp Ceiling", "measure": "ceiling_area", "unit": "SF"}],
+    )
+    rows = [c for c in result["components"] if c["name"] == "Gyp Ceiling"]
+    assert len(rows) == 1
+    assert rows[0]["quantity"] == pytest.approx(round(229.4 * 26, 1))
+    assert rows[0]["provenance"] == "geometry"
+    assert rows[0]["unit_count"] == 26
+    assert rows[0]["unit_count_source"] == "unit_tag_census"
+
+
+def test_wall_area_finally_binds_on_the_real_moxy_bundle(moxy_real_bundles):
+    """V4-MEAS-01's other half: the wall_area basis reaches a line item.
+
+    KING A's architectural fill LEAKS (shape ratio 8.62, the INV-01
+    signature), so the honest first-run outcome is a flagged zero row — the
+    row EXISTS, names the failure, and never fabricates linear feet."""
+    result = _fuse_moxy_page(moxy_real_bundles, 23, _gyp_wall_vocab())
+    rows = [c for c in result["components"] if c["name"] == "Gyp Wall"]
+    assert len(rows) == 1, "wall_area now binds — the gate is open"
+    row = rows[0]
+    assert row["quantity"] == 0.0
+    assert row["needs_review"] is True
+    assert "shape ratio" in row["review_reason"]
+
+
+def test_a_wall_binds_a_real_quantity_where_the_architectural_fill_is_honest(
+    moxy_real_bundles,
+):
+    """BUNK B (p33): AR shape ratio 4.37 — honest — so the wall row carries a
+    real perimeter x the drawing's own 9 ft, at the drawing's own scale."""
+    result = _fuse_moxy_page(moxy_real_bundles, 33, _gyp_wall_vocab())
+    rows = [c for c in result["components"] if c["name"] == "Gyp Wall"]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["quantity"] is not None and row["quantity"] > 0.0
+    assert row["wall_height_ft"] == 9.0
+    assert row["wall_height_source"] == "drawing"
+    assert "board faces" in row["formula"]
