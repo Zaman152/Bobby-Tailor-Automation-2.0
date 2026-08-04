@@ -1,0 +1,33 @@
+{
+  "project_name": "VisionOnly P23V2_Crow",
+  "run_folder": "VisionOnly_P23V2_Crow_20260804_181352",
+  "generated_at": "2026-08-04T18:13:52.500172",
+  "sheets": [
+    {
+      "sheet": "A-101",
+      "page_id": null,
+      "type": "floor_plan",
+      "image": "screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png",
+      "scale_text": "",
+      "feet_per_inch": 40.0,
+      "scale_confidence": "high",
+      "auto_verified": true,
+      "scale_source": "printed_scale",
+      "page_width_pt": 3024.0,
+      "page_height_pt": 2160.0,
+      "raw": {
+        "footprint_pt2": 3997085.19,
+        "total_linework_pt": 175758.291,
+        "long_run_pt": 146229.709,
+        "width_pt": 2232.36,
+        "height_pt": 1790.52
+      },
+      "measured": {
+        "footprint_sf": 1233668.3,
+        "total_linework_lf": 97643.5,
+        "long_run_lf": 81238.7
+      },
+      "viewports": []
+    }
+  ]
+}

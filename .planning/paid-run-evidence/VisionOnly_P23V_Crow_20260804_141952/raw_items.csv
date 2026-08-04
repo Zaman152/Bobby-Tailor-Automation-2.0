@@ -1,0 +1,185 @@
+category,sheet,sheet_type,page_id,description,value,unit,provenance,location_on_sheet,source_text
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-1,136,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,Bollard,56,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-6,36,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-7,32,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-9,14,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-10,14,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-11,14,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-17,9,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-18,8,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-19,6,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-20,6,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-21,6,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-22,5,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-23,5,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-24,5,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-25,4,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-26,4,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-27,4,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-28,4,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-29,4,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-31,4,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-32,4,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-34,3,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,SYM-35,3,EA,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,Tilt Up Wall,142656.0,SF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,WALL-TC10,33.9,LF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,WALL-TC11,24.7,LF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,tilt-up concrete panel,5.0,LF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,WALL-TC2,1113.5,LF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,WALL-TC3,778.0,LF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,WALL-TC4,415.1,LF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,WALL-TC8,51.7,LF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,Concrete Pad,397600.0,SF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,68 DOORS DOOR DOOR 3 1 2 9 9 9 10 10 10 12 12 9 9 CASS WHITE,396059.1,SF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,4,279.5,SF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,ROOM-3,11.1,SF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,ROOM-4,11.0,SF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,ROOM-5,10.7,SF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,ROOM-6,10.6,SF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,Building Perimeter,2972.0,LF,text_layer,,
+schedule_header,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,Door Schedule (extracted from plans),,door,,,
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,[Door Schedule (extracted from plans)] Doors - Steel (door schedule),70,qty,,,ITEM=Doors-STL | DESCRIPTION=Doors - Steel (door schedule) | QTY=70 | QUANTITY=70 | UNIT=EA
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,[Door Schedule (extracted from plans)] Doors - Hollow Metal (door schedule),29,qty,,,ITEM=Doors-HM | DESCRIPTION=Doors - Hollow Metal (door schedule) | QTY=29 | QUANTITY=29 | UNIT=EA
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,[Door Schedule (extracted from plans)] Doors - Aluminum (door schedule),6,qty,,,ITEM=Doors-AL | DESCRIPTION=Doors - Aluminum (door schedule) | QTY=6 | QUANTITY=6 | UNIT=EA
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png,,,[Door Schedule (extracted from plans)] Door Frames - Hollow Metal (door schedule),29,qty,,,ITEM=Door Frames-HM | DESCRIPTION=Door Frames - Hollow Metal (door schedule) | QTY=29 | QUANTITY=29 | UNIT=EA
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0002.png,,,OVERALL WEST ELEVATION,16177.2,SF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0002.png,,,OVERALL SOUTH ELEVATION,52625.0,SF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0002.png,,,OVERALL EAST ELEVATION,16141.2,SF,geometry,,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0002.png,,,OVERALL NORTH ELEVATION,48534.8,SF,geometry,,
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Steel pipe guardrail outside diameter,1.5,in,,Detail 13 - Enlarged Ramp Plan,"1 1/2"" O.D. STEEL PIPE GUARDRAIL"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Steel pipe guardrail outside diameter,1.5,in,,Detail 12 - Ramp w/ Landing Section,"1 1/2"" O.D. STEEL PIPE GUARDRAIL"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Handrail pipe outside diameter,1.5,in,,Detail 12 - Ramp w/ Landing Section,"1 1/2"" O.D. HANDRAIL"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete curb width,4,in,,Detail 13 - Enlarged Ramp Plan,"4"" - 0"""
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Ramp landing width,5,ft,,Detail 13 - Enlarged Ramp Plan,"5' - 0"""
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Ramp width,5,ft,,Detail 13 - Enlarged Ramp Plan,"5' - 0"""
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Ramp overall length,15,ft,,Detail 13 - Enlarged Ramp Plan,"15' - 0"""
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Finish floor to finish floor height - ramp section,0,in,,Detail 12 - Ramp w/ Landing Section,"0"" - 0"""
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Pipe bollard outside diameter - standard,1.5,in,,Detail 7 - Typ. Bollard,"1 1/2"" O.D. STEEL PIPE GUARDRAIL"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Bollard pipe outside diameter,6,in,,Detail 7 - Typ. Bollard,"6"" CORE DIAMETER"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Bollard concrete fill expansion joint,1,in,,Detail 7 - Typ. Bollard,"1/2"" CAULKED EXPANSION JOINT"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Steel pipe guardrail OD - Ramp Rail Section,1.5,in,,Detail 4 - Ramp Rail Section,"1 1/2"" O.D. STEEL PIPE GUARDRAIL"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Vertical support spacing max,4,ft,,Detail 4 - Ramp Rail Section,"1 1/2"" O.D. VERTICAL SUPPORT 4'-0"" O.C. MAX."
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Chamfer size at ramp rail,0.75,in,,Detail 4 - Ramp Rail Section,"3/4"" CHAMFER"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Guardrail OD - Z-Guard Detail,1.5,in,,Detail 9 - Z-Guard Detail,"1-1/2"" O.D. GUARDRAIL"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Guardrail height above floor,42,in,,Detail 6 - Stair Plan,"42"" MIN. ABOVE"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Guardrail OD - Stair Plan,1.5,in,,Detail 6 - Stair Plan,"1 1/2"" O.D. GUARDRAIL"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Handrail OD - Stair Plan,1.5,in,,Detail 6 - Stair Plan,"1 1/2"" O.D. HANDRAIL"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Quick bolt size,0.5,in,,Detail 9 - Z-Guard Detail,"1/2"" O.D. QUICK BOLT TYP."
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Pipe rail OD - Detail 12,1.5,in,,Detail 12 - Fire Riser/Electrical Panel Protection,"1 1/2"" O.D. PIPE GUARDRAIL"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Pipe handrail OD at concrete support - Detail 12,1.5,in,,Detail 12 - Fire Riser/Electrical Panel Protection,"1 1/2"" O.D. HANDRAIL @ CONC. SLAB"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Vert support pipe OD,1.5,in,,Detail 12 - Fire Riser/Electrical Panel Protection,"1 1/2"" O.D. VERT SUPPORT"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Dia. vert - detail 12,1,in,,Detail 12 - Fire Riser/Electrical Panel Protection,"1"" DIA. VERT."
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Bollard spacing max - Fire Riser/Electrical Panel Protection,4,ft,,Detail 11 - Fire Riser / Electrical Panel Protection,BOLLARD SPACING NOT TO EXCEED 4' O.C.
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Bollard spacing at guard - guard section,4,ft,,Detail 12 - Fire Riser/Electrical Panel Protection,"4' - 0"""
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Steel plate thickness - track guard,0.375,in,,Detail 9 - Z-Guard Detail,STEEL PLATE TRACK GUARD
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Stringer angle size,3.5,in,,Detail 8 - Stair Rail,"2"" X 3"" X 1/4"" ANGLE"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,CMU wall thickness - Section at Pump/Electrical Room,8,in,,Detail 5 - Section @ Pump / Electrical Room,"8"" CMU WALL SEE STRUCTURAL FOR REINFORCING AND GROUTING"
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete slab tapered thickness - dock leveler,12,in,,Detail 1 - Section at Dock Leveler (Future),TAPERED CONCRETE SLAB SEE STRUCTURAL
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Slope at dock leveler section,0.5,in,,Detail 2 - Side Section @ Leveler (Future),"SLOPE 1/2"""
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Truck court slope,2,in,,Detail 1 - Section at Dock Leveler (Future),"2"" - 0"""
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete footing - dock leveler section,0,in,,Detail 1 - Section at Dock Leveler (Future),CONCRETE FOOTING SEE STRUCTURAL
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Precast concrete pipe bollard cap - bollard OD,12,in,,Detail 7 - Typ. Bollard,TOBARO OR EQUAL PRECAST CONCRETE PIPE BOLLARD CAP
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Steel pipe bollard - concrete filled,,ea,,Multiple details - see Detail 7 Typ. Bollard,SEE DETAIL 7/A-401; TOBARO OR EQUAL PRECAST CONCRETE PIPE BOLLARD CAP; FINAL BOLLARD COLOR TO MATCH; SEAL CONCRETE FILLED GALV. STEEL PAINTED SAFETY YELLOW PIPE BOLLARD
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,"1-1/2"" O.D. Steel pipe guardrail",,lf,,"Ramp, Stair, and Guard details","ALL STAIR RAILINGS TO BE GALVANIZED; 1-1/2"" O.D. STEEL PIPE"
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete curb,,lf,,Detail 13 - Enlarged Ramp Plan,SEE STRUCTURAL
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Open metal grate tread - stair,,ea,,"Detail 6 - Stair Plan, Detail 9 - Z-Guard Detail",OPEN METAL GRATE TREAD W/NO OPENINGS IN DIRECTION OF TRAVEL; GREY FORMED OPENINGS IN DIRECTION OF TRAVEL
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Steel plate track guard,,ea,,Detail 9 - Z-Guard Detail,STEEL PLATE TRACK GUARD
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Chamfered top corner of guard,,ea,,Detail 9 - Z-Guard Detail,CHAMFERED TOP CORNER OF GUARD
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Dock leveler - future,,ea,,"Detail 3 - Plan @ Dock Leveler (Future), Detail 2 - Side Section @ Leveler (Future), Detail 1 - Section at Dock Leveler (Future)",VERIFY WITH DOCK EQUIPMENT MANUFACTURER; OVERHEAD SECTIONAL DOOR SEE DOOR SCHEDULE; DOCK BUMPER
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Dock bumper - rubber,,ea,,Detail 1 - Section at Dock Leveler (Future),RUBBER BUMPER
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Steel angle - dock leveler,,ea,,"Detail 1 - Section at Dock Leveler (Future), Detail 2 - Side Section @ Leveler (Future)",STEEL ANGLE SEE STRUCTURAL
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Dock leveler steel angle,,ea,,Detail 3 - Plan @ Dock Leveler (Future),STEEL ANGLE SEE STRUCTURAL
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete retaining wall,,ea,,Detail 4 - Ramp Rail Section,"CONC. RETAINING WALL SEE STRUCT. DWGS; 6"" CONC. SLAB SEE STRUCT. DWGS"
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Preformed expansion joint material,,lf,,Detail 4 - Ramp Rail Section,"1/2"" PREMOLDED EXP. JOINT MATERIAL W/SEALER"
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Fire riser,,ea,,Detail 11 - Fire Riser / Electrical Panel Protection,FIRE RISER
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Electrical panel,,ea,,Detail 11 - Fire Riser / Electrical Panel Protection,ELECTRICAL PANEL
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Armor joint,,lf,,Detail 13 - Enlarged Ramp Plan,ARMOR JOINT
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Vertical pipe support - pump room,,ea,,Detail 8 - Stair Rail,VERTICAL PIPE RAIL SUPPORT
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Metal plate riser / clip angle,,ea,,Detail 10 - Stair Section,MTL. PLATE RISER CLIP ANGLE
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete slab on metal deck,,sf,,Detail 5 - Section @ Pump / Electrical Room,"CONCRETE SLAB ON METAL DECK, SEE STRUCTURAL"
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Formed concrete edge,,lf,,Detail 5 - Section @ Pump / Electrical Room,FORMED CONCRETE EDGE SEE STRUCTURAL
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Fire caulk,,lf,,Detail 5 - Section @ Pump / Electrical Room,FIRE CAULK (UL RA-0898)
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Steel stringer,,ea,,Detail 8 - Stair Rail,"STEEL STRINGER; 2"" X 3"" X 1/4"" ANGLE"
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Paving - concrete slab,,sf,,Detail 10 - Stair Section,PAVING OR CONC. SLAB; NOTE: ALL PIPE WILL BE EXTRA STRONG
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Overhead sectional door,,ea,,Detail 3 - Plan @ Dock Leveler (Future),OVERHEAD SECTIONAL DOOR SEE DOOR SCHEDULE
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete panel,,ea,,Detail 3 - Plan @ Dock Leveler (Future),CONCRETE PANEL SEE STRUCTURAL
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete slab tapered - dock leveler,,ea,,Detail 1 - Section at Dock Leveler (Future),TAPERED CONCRETE SLAB SEE STRUCTURAL
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,"Steel Pipe Bollard - 1-1/2"" O.D.",,ea,,"Detail 13 - Enlarged Ramp Plan, Detail 11 - Fire Riser/Electrical Panel Protection",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,"Steel Pipe Guardrail - 1-1/2"" O.D.",,ea,,"Detail 13 - Enlarged Ramp Plan, Detail 4 - Ramp Rail Section",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Dock Leveler (Future),,ea,,"Details 1, 2, 3 - Dock Leveler sections and plan",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Vertical Pipe Rail Support,,ea,,Detail 8 - Stair Rail,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Open Metal Grate Tread Stair,,ea,,"Details 6, 10 - Stair Plan and Stair Section",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,"1/2"" O.D. Guardrail - Stair",,ea,,Detail 6 - Stair Plan,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Bollard in Truck Court - See Detail 7A-401,,ea,,Detail 6 - Stair Plan,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,S.C.C.P. (Steel Corrugated Concrete Panel),,ea,,Detail 6 - Stair Plan,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,"Expansion Joint - 1/2"" Caulked",,ea,,Detail 7 - Typical Bollard,
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Armour Joint,,ea,,Detail 12 - Ramp w/ Landing Section,
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete fill - bollard,,ea,,,"Concrete filled galvanized steel pipe bollard, sealed, safety yellow paint"
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Galvanized steel pipe,,lf,,,All stair railings to be galvanized; ALL PIPE WILL BE EXTRA STRONG
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Open metal grate tread,,ea,,,"Grey formed openings in direction of travel; no openings larger than 1/2"" in direction of travel"
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Pest paper between concrete pours,,sf,,,Pest paper between concrete pours
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete slab on grade,,sf,,,"Slab on grade; 6"" conc. slab see struct. dwgs"
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete retaining wall,,lf,,,See struct. dwgs
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Preformed expansion joint,,lf,,,"1/2"" premolded exp. joint material w/sealer"
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Rebar,,lf,,,"Rebar; concrete encasement, add reinforcing as req'd"
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,CMU wall,,sf,,,"8"" CMU wall, see structural for reinforcing and grouting"
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Steel stringer angle,,lf,,,"2"" X 3"" X 1/4"" angle; steel stringer"
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Rubber bumper - dock,,ea,,,Rubber bumper at dock leveler
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Tapered concrete slab,,sf,,,Tapered concrete slab see structural; dock leveler opening
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Concrete footing - dock,,ea,,,Concrete footing see structural
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,Steel angle - dock leveler,,ea,,,Steel angle see structural; dock leveler
+schedule_header,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,General Notes - Bollard Installation,NOTE:,notes,,,
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,"[General Notes - Bollard Installation] {'NOTE': 'INSTALL LATCH ON ALL OVERHEAD DOORS ABOVE 48"" A.F.F.'}",,,,,"NOTE=INSTALL LATCH ON ALL OVERHEAD DOORS ABOVE 48"" A.F.F."
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png,detail,,[General Notes - Bollard Installation] {'NOTE': 'PANEL BOLLARD LOCATION TO BE COORDINATED IN FIELD; PROVIDE MINIMUM CLE,,,,,"NOTE=PANEL BOLLARD LOCATION TO BE COORDINATED IN FIELD; PROVIDE MINIMUM CLEARANCE AS REQUIRED BY ELECTRICAL AND FIRE PROTECTION EQUIPMENT; BOLLARD SPACING NOT TO EXCEED 4"" O.C."
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door width - Type P1,3,ft,,"Door elevation diagram, lower left","3'-0"""
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door width - Type P2,4,ft,,"Door elevation diagram, lower left","4'-0"""
+measurement,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door height - flush doors P1/P2/P3,7,ft,,"Door elevation diagram, lower left","7'-0"""
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Flush Single Door - P1,,ea,,"Door & Frame Types elevation, lower left","Personnel door; see door schedule for count, size, fire rating, finish, hardware"
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Flush Single Door - P2,,ea,,"Door & Frame Types elevation, lower left",Personnel door; see door schedule
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Flush Single Door - P3,,ea,,"Door & Frame Types elevation, lower left",Personnel door; see door schedule
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Storefront Single Door - P4,,ea,,"Door & Frame Types elevation, lower left",Storefront; tempered glass; see door schedule
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Double Storefront Door - G4F,,ea,,"Door & Frame Types elevation, lower center",Double storefront; tempered glass; see door schedule
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Overhead Door w/ Vision Panels - OD-1,,ea,,"Door & Frame Types elevation, center",Overhead door with vision panels; see door schedule
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Drive-In Door w/ Vision Panels - OD-2,,ea,,"Door & Frame Types elevation, center-right",Drive-in door with vision panels; see door schedule
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Single Door - # (small single),,ea,,"Door & Frame Types elevation, right",See door schedule
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Overhead Interior Dock Door Frame - #,,ea,,"Door & Frame Types elevation, far right",Overhead interior dock door frame; see door schedule
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb Detail H1 - HM Frame at Exterior/Interior,,ea,,"Door Jambs and Heads detail H1, lower section","S.C.C.P.; 3/4"" chamfer; 1/2"" drip; H.M. frame; door as scheduled"
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb Detail H2 - Metal Door Track,,ea,,"Door Jambs and Heads detail H2, lower section","S.C.C.P.; 1/2"" drip; metal door track; exterior; overhead door; door as scheduled"
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb Detail H3 - CMU Jamb,,ea,,"Door Jambs and Heads detail H3, lower section",C.M.U.; door as scheduled
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb Detail J1 - HM Frame Exterior,,ea,,"Door Jambs and Heads detail J1, lower section","S.C.C.P.; 3/4"" chamfer; door as scheduled; H.M. frame; S.C.C.P."
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb Detail J2 - Overhead Door Track at Slab,,ea,,"Door Jambs and Heads detail J2, lower section","S.C.C.P.; 1/2"" bent plate 10""x2.5""x3"" @ door jamb; U-guard @ door 1""x1.5""x3"" safety yellow; door as scheduled; jamb weatherstripping"
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb Detail J3 - CMU Jamb with Anchor,,ea,,"Door Jambs and Heads detail J3, lower section",C.M.U.; jamb anchor min. 1 per side; door as scheduled
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Type - Flush (P1),,ea,,"Door & Frame Types section, left side",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Type - Flush (P3),,ea,,"Door & Frame Types section, left side",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,"Door Type - Flush (P5, P6)",,ea,,"Door & Frame Types section, left side",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,"Door Type - Storefront (H2, H4)",,ea,,"Door & Frame Types section, center-left",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Type - Double Storefront (GM),,ea,,"Door & Frame Types section, center",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Type - Overhead w/ Vision Panels (OD-1),,ea,,"Door & Frame Types section, center-right",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Type - Drive-In w/ Vision Panels (OD-2),,ea,,"Door & Frame Types section, right of center",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Type - Single (angle detail),,ea,,"Door & Frame Types section, far right area",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Type - Overhead Interior Door Frame (#),,ea,,"Door & Frame Types section, far right",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb & Head Detail H1 - Hollow Metal Frame at Exterior,,ea,,"Door Jambs and Heads section, detail H1",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb & Head Detail H2 - Metal Door Track at Overhead Door,,ea,,"Door Jambs and Heads section, detail H2",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb & Head Detail H3 - CMU Frame at Overhead Door,,ea,,"Door Jambs and Heads section, detail H3",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb Detail J1 - HM Frame at Exterior,,ea,,"Door Jambs and Heads section, detail J1",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb Detail J2 - Overhead Door Jamb,,ea,,"Door Jambs and Heads section, detail J2",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Jamb Detail J3 - CMU Jamb,,ea,,"Door Jambs and Heads section, detail J3",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Door Schedule Entry - Type D1,,ea,,"Door Schedule table, top of sheet",
+component,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,"Door Schedule - All Door Types (D1, D2, P1, P2, P3, P4, P5, P6)",,ea,,"Door Schedule, top center of sheet",
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Hollow Metal Door,,ea,,,"18 GA. exterior hollow metal doors, 16 GA. welded hollow metal frames; one (1) primer coat and two (2) finish coats alkyd enamel"
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Hollow Metal Door - Interior,,ea,,,"16 GA. hollow metal doors, 16 GA. welded hollow metal frames; one (1) primer coat and one (1) finish coat alkyd enamel"
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Overhead/Sectional Door - Manual,,ea,,,"24 gauge actual insulated, sectional, manually operated, vertical lift; two vision panels; 2"" vertical track; 25,000 cycle springs; weatherstripping; closure stop; Z-guards; slide lock above 48"" A.F.F."
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Overhead/Drive-In Door - Motor Operated,,ea,,,"24 gauge actual insulated, sectional, motor operated, drive-in, vertical lift; two vision panels; 2"" vertical track; 25,000 cycle springs; weatherstripping; bollards; slide lock above 48"" A.F.F.; chain hoist"
+material,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,Storefront Door - Aluminum,,ea,,,Aluminum; factory finish; ADA bumper threshold; floor strip; lockset; weatherstripping
+schedule_header,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,DOOR SCHEDULE,DOOR SCHEDULE,door,,,
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,[DOOR SCHEDULE] OD,2A,count,,,"Type=OD | Count=2A | Width=3'-0"" | Height=7'-0"" | Thickness=1-3/4"" | Material=HM | Finish=P1 | Under Cut=NONE | Hardware=HW1 | Frame Material=HM | Frame Finish=P1 | Jamb=H1 | Head=H1 | Comments=NOTE 1"
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,[DOOR SCHEDULE] OD,2B,count,,,"Type=OD | Count=2B | Width=3'-0"" | Height=7'-0"" | Thickness=1-3/4"" | Material=HM | Finish=P1 | Under Cut=NONE | Hardware=HW1 | Frame Material=HM | Frame Finish=P1 | Jamb=H1 | Head=H1 | Comments=NOTE 1"
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,[DOOR SCHEDULE] P1,2A,count,,,"Type=P1 | Count=2A | Width=3'-0"" | Height=7'-0"" | Thickness=1-3/4"" | Material=HM | Finish=P1 | Hardware=HW1 | Frame Material=HM | Frame Finish=P1 | Jamb=H1 | Head=H1 | Comments=NOTE 1"
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,[DOOR SCHEDULE] P2,1,count,,,"Type=P2 | Count=1 | Width=4'-0"" | Height=7'-0"" | Thickness=1-3/4"" | Material=HM | Finish=P1 | Hardware=HW2 | Frame Material=HM | Frame Finish=P1 | Jamb=H1 | Head=H1 | Comments=NOTE 2"
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,[DOOR SCHEDULE] P3,2A NPG,count,,,"Type=P3 | Count=2A NPG | Width=3'-0"" | Height=7'-0"" | Thickness=1-3/4"" | Material=HM | Finish=P1 | Hardware=HW3 | Frame Material=HM | Frame Finish=P1 | Jamb=H1 | Head=H1 | Comments=NOTE 2"
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,[DOOR SCHEDULE] P4,1,count,,,"Type=P4 | Count=1 | Width=3'-6"" | Height=8'-0"" | Thickness=1-3/4"" | Material=AL | Finish=FAC | Hardware=HW4 | Frame Material=AL | Frame Finish=FAC | Jamb=H1 | Head=H1 | Comments=NOTE 3"
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,[DOOR SCHEDULE] G4F,1,count,,,"Type=G4F | Count=1 | Width=6'-0"" | Height=8'-0"" | Thickness=1-3/4"" | Material=AL | Finish=FAC | Hardware=HW4 | Frame Material=AL | Frame Finish=FAC | Jamb=H1 | Head=H1 | Comments=NOTE 3"
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,[DOOR SCHEDULE] OD-1,2A NPG,count,,,Type=OD-1 | Count=2A NPG | Material=HM | Finish=P1 | Frame Material=HM | Frame Finish=P1 | Jamb=H2 | Head=H2 | Comments=NOTE 4
+schedule_row,output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png,schedule,,[DOOR SCHEDULE] OD-2,2,count,,,Type=OD-2 | Count=2 | Material=HM | Finish=P1 | Frame Material=HM | Frame Finish=P1 | Jamb=H2 | Head=H2 | Comments=NOTE 4

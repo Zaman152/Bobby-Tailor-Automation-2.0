@@ -1,0 +1,1051 @@
+{
+  "project_name": "VisionOnly P23V2_Crow",
+  "generated_at": "2026-08-04T18:13:52.498567",
+  "source_pdf": "/var/folders/h6/l790gj257v78f94x9yvv21_c0000gn/T/vision_only_s2p2n2vq/Crow - Cass White Road-Plans.pdf",
+  "summary": {
+    "pages_in_source": 4,
+    "sheets_measured": 4,
+    "sheets_vision_only": 0,
+    "sheets_skipped": 0,
+    "sheets_errored": 0,
+    "sheets_not_applicable": 0,
+    "drawings_measured": 0,
+    "drawings_excluded_off_scale": 4,
+    "drawings_dropped_no_scale": 1,
+    "silent_loss_pages": [],
+    "items_measured": 4,
+    "items_needs_review": 36,
+    "items_not_measured": 34,
+    "items_human_input": 5,
+    "coverage_pct_pages": 100.0,
+    "coverage_pct_items": 5.1
+  },
+  "warnings": [
+    "1 drawing(s) were dropped for having no printed scale of their own \u2014 measuring them at a borrowed scale would be a squared error",
+    "34 expected line item(s) have NO measurement path \u2014 do NOT read their blank quantity as zero",
+    "[A-101] wall-height cross-check: the published 36.00 ft (plan) DISAGREES with the elevation datum ladder's 48.00 ft by 33% \u2014 BOTH are flagged, neither is preferred, and the ladder publishes no height (D-11). Every wall area derived from the published height inherits this uncertainty; a datum ladder measures parapet-to-floor and a plan callout may state clear height, and which one the walls are bid at is an estimator's call, not a silent substitution",
+    "[A-201] elevation cross-check: silhouette sum 133478 SF vs the independent perimeter x datum-height route 2972.0 LF x 48.00 ft = 142656 SF \u2014 agreement within 6.4%. The second route is a cross-check only and publishes no quantity (D-11)"
+  ],
+  "sheets": [
+    {
+      "page_index": 0,
+      "sheet_name": "A-101",
+      "sheet_type": "floor_plan",
+      "type_source": "title_block",
+      "sheet_type_full_text": "floor_plan",
+      "classifier_keyword": "FLOOR PLAN",
+      "classifier_context": "/24/2026 2601014 OVERALL FLOOR PLAN A-101",
+      "classifier_overruled": false,
+      "disposition": "measured_partial",
+      "reason": "1 drawing(s) on this sheet were not measured \u2014 see the per-drawing reasons",
+      "measurable_signal": {
+        "plan_titles": 1,
+        "printed_scales": 5,
+        "viewports": 5,
+        "schedules": 0,
+        "geometry": 1
+      },
+      "drawings": [
+        {
+          "region_id": "R3",
+          "title": "TYPICAL S.C.C.P. JOINT DETAIL",
+          "plan_kind": "",
+          "disposition": "excluded_off_scale",
+          "reason": "its printed scale 0.0093 ft/pt differs from the resolved page scale 0.5556 ft/pt; measuring it at the page scale would be 60x wrong, so it was deliberately excluded \u2014 this is NOT a failed measurement",
+          "printed_scale_fpi": 0.6667,
+          "area_sf": null,
+          "needs_review": false
+        },
+        {
+          "region_id": "R4",
+          "title": "TYPICAL S.C.C.P./ SF DETAIL",
+          "plan_kind": "",
+          "disposition": "excluded_off_scale",
+          "reason": "its printed scale 0.0093 ft/pt differs from the resolved page scale 0.5556 ft/pt; measuring it at the page scale would be 60x wrong, so it was deliberately excluded \u2014 this is NOT a failed measurement",
+          "printed_scale_fpi": 0.6667,
+          "area_sf": null,
+          "needs_review": false
+        },
+        {
+          "region_id": "R5",
+          "title": "TYPICAL S.C.C.P. CORNER DETAIL",
+          "plan_kind": "",
+          "disposition": "excluded_off_scale",
+          "reason": "its printed scale 0.0093 ft/pt differs from the resolved page scale 0.5556 ft/pt; measuring it at the page scale would be 60x wrong, so it was deliberately excluded \u2014 this is NOT a failed measurement",
+          "printed_scale_fpi": 0.6667,
+          "area_sf": null,
+          "needs_review": false
+        },
+        {
+          "region_id": "R6",
+          "title": "TYP. S.C.C.P. MITERED CORNER",
+          "plan_kind": "",
+          "disposition": "excluded_off_scale",
+          "reason": "its printed scale 0.0093 ft/pt differs from the resolved page scale 0.5556 ft/pt; measuring it at the page scale would be 60x wrong, so it was deliberately excluded \u2014 this is NOT a failed measurement",
+          "printed_scale_fpi": 0.6667,
+          "area_sf": null,
+          "needs_review": false
+        },
+        {
+          "region_id": "FILL-1",
+          "title": "OVERALL - AR PLAN",
+          "plan_kind": "AR",
+          "disposition": "skipped_no_scale",
+          "reason": "no printed scale beneath the title \u2014 measuring it at a borrowed scale would be a squared error",
+          "printed_scale_fpi": null,
+          "area_sf": null,
+          "needs_review": false
+        }
+      ],
+      "items_emitted": 42,
+      "cost_usd": 0.176645,
+      "is_silent_loss": false
+    },
+    {
+      "page_index": 1,
+      "sheet_name": "A-201",
+      "sheet_type": "elevation",
+      "type_source": "title_block",
+      "sheet_type_full_text": "elevation",
+      "classifier_keyword": "ELEVATIONS",
+      "classifier_context": "24/2026 2601014 EXTERIOR ELEVATIONS - OPTION 01 A-201",
+      "classifier_overruled": false,
+      "disposition": "measured",
+      "reason": "",
+      "measurable_signal": {
+        "plan_titles": 0,
+        "printed_scales": 4,
+        "viewports": 2,
+        "schedules": 0
+      },
+      "drawings": [],
+      "items_emitted": 4,
+      "cost_usd": 0.0,
+      "is_silent_loss": false
+    },
+    {
+      "page_index": 2,
+      "sheet_name": "A-401",
+      "sheet_type": "detail",
+      "type_source": "title_block",
+      "sheet_type_full_text": "detail",
+      "classifier_keyword": "DETAILS",
+      "classifier_context": "04/24/2026 2601014 MISC. DETAILS A-401",
+      "classifier_overruled": false,
+      "disposition": "measured",
+      "reason": "",
+      "measurable_signal": {
+        "plan_titles": 0,
+        "printed_scales": 13,
+        "viewports": 10,
+        "schedules": 0
+      },
+      "drawings": [],
+      "items_emitted": 13,
+      "cost_usd": 0.0,
+      "is_silent_loss": false
+    },
+    {
+      "page_index": 3,
+      "sheet_name": "A-601",
+      "sheet_type": "detail",
+      "type_source": "title_block",
+      "sheet_type_full_text": "detail",
+      "classifier_keyword": "DETAILS",
+      "classifier_context": "DOOR SCHEDULES, FRAMES & DETAILS A-601",
+      "classifier_overruled": false,
+      "disposition": "measured",
+      "reason": "",
+      "measurable_signal": {
+        "plan_titles": 0,
+        "printed_scales": 2,
+        "viewports": 1,
+        "schedules": 0
+      },
+      "drawings": [],
+      "items_emitted": 0,
+      "cost_usd": 0.0,
+      "is_silent_loss": false
+    }
+  ],
+  "items": [
+    {
+      "name": "4",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 279.5,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched)",
+      "expected_from": "vision"
+    },
+    {
+      "name": "Aluminum Storefront/Curtain Wall",
+      "unit": "SF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "wall_area",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Bollards",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Building Perimeter",
+      "unit": "LF",
+      "status": "NEEDS REVIEW",
+      "quantity": 2972.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched)",
+      "expected_from": "vision"
+    },
+    {
+      "name": "CMU Wall",
+      "unit": "SF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "wall_area",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Canopy",
+      "unit": "SF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "roof_area",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Columns",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Concrete Curb",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "linear",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Concrete Pad",
+      "unit": "SF",
+      "status": "MEASURED",
+      "quantity": 397600.0,
+      "basis": "concrete_slab",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "",
+      "expected_from": "library"
+    },
+    {
+      "name": "Concrete Retaining Wall",
+      "unit": "SF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "wall_area",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Curb & Gutter",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "linear",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Dock Bumper",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 56.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); named by naming library (perimeter_jamb_symbol \u2192 Dock Bumper); vision label unavailable \u2014 verify",
+      "expected_from": "library"
+    },
+    {
+      "name": "Dock Leveler",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Door Frames - Hollow Metal (door schedule)",
+      "unit": "EA",
+      "status": "HUMAN INPUT",
+      "quantity": 29.0,
+      "basis": "doors",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "",
+      "expected_from": "plan_schedule_legend"
+    },
+    {
+      "name": "Door Frames-AL",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Door Frames-HC",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Door Frames-HM",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Door Frames-IM",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Door Frames-SC",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Door Frames-STL",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Doors - Aluminum (door schedule)",
+      "unit": "EA",
+      "status": "HUMAN INPUT",
+      "quantity": 6.0,
+      "basis": "doors",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "",
+      "expected_from": "plan_schedule_legend"
+    },
+    {
+      "name": "Doors - Hollow Metal (door schedule)",
+      "unit": "EA",
+      "status": "HUMAN INPUT",
+      "quantity": 29.0,
+      "basis": "doors",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "",
+      "expected_from": "plan_schedule_legend"
+    },
+    {
+      "name": "Doors - Steel (door schedule)",
+      "unit": "EA",
+      "status": "HUMAN INPUT",
+      "quantity": 70.0,
+      "basis": "doors",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "a separate 'Doors' reading of this item (vision) was suppressed as a duplicate of the authoritative legend row 'Doors' \u2014 it was NOT added to this quantity",
+      "expected_from": "plan_schedule_legend"
+    },
+    {
+      "name": "Doors-HC",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Doors-IM",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Doors-SC",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Doors-STL",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Drive-In Overhead Door",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Exposed Structure",
+      "unit": "SF",
+      "status": "MEASURED",
+      "quantity": 397600.0,
+      "basis": "exposed_structure",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "",
+      "expected_from": "learned"
+    },
+    {
+      "name": "Guard Rail",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "linear",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Gutter",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "linear",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Hand Rail",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "LED Wall Pack",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 34214.0,
+      "basis": "wall_framing",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "this drawing prints no overall dimension pair, so there is no printed extent to cross-check the measured 1717 SF against \u2014 the measurement stands, unverified; 8 annotation-shaped region(s) dropped from the billable perimeter (shape ratio above 8.0): 61.6 SF at ratio 8.65 (67.9 LF); 13.3 SF at ratio 14.39 (52.5 LF); 13.3 SF at ratio 14.39 (52.5 LF); 13.3 SF at ratio 14.39 (52.5 LF); 13.3 SF at ratio 14.39 (52.5 LF); 12.4 SF at ratio 13.93 (49.0 LF); 9.1 SF at ratio 11.92 (36.0 LF); 8.7 SF at ratio 11.54 (34.0 LF); measured ONE 'OVERALL' unit; how many exist is not stated in the drawing set \u2014 supply the room mix to scale it; wall height 36.00 ft came from source 'plan', not from the drawing's own ceiling tag \u2014 verify on sheet before billing",
+      "expected_from": "library"
+    },
+    {
+      "name": "Ladder",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Metal Downspouts",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Metal Stairs",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Mobilization",
+      "unit": "EA",
+      "status": "HUMAN INPUT",
+      "quantity": 1.0,
+      "basis": "standard_line_item",
+      "source_sheets": [],
+      "reason": "",
+      "expected_from": "detected"
+    },
+    {
+      "name": "OVERALL EAST ELEVATION",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 16141.2,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0002.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",
+      "expected_from": "vision"
+    },
+    {
+      "name": "OVERALL NORTH ELEVATION",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 48534.8,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0002.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",
+      "expected_from": "vision"
+    },
+    {
+      "name": "OVERALL SOUTH ELEVATION",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 52625.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0002.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",
+      "expected_from": "vision"
+    },
+    {
+      "name": "OVERALL WEST ELEVATION",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 16177.2,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0002.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",
+      "expected_from": "vision"
+    },
+    {
+      "name": "Overhead Sectional Door",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Pipe Guardrail",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Pre-Engineered Metal Canopy",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "ROOM-3",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 11.1,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing)",
+      "expected_from": "vision"
+    },
+    {
+      "name": "ROOM-4",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 11.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing)",
+      "expected_from": "vision"
+    },
+    {
+      "name": "ROOM-5",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 10.7,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing)",
+      "expected_from": "vision"
+    },
+    {
+      "name": "ROOM-6",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 10.6,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing)",
+      "expected_from": "vision"
+    },
+    {
+      "name": "Ramp",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Roof Hatch",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Roof Insulation",
+      "unit": "SF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "roof_area",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "SYM-1",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 136.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-10",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 14.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-11",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 14.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-17",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 9.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-18",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 8.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-19",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 6.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-20",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 6.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-21",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 6.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-22",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 5.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-23",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 5.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-24",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 5.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-25",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 4.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-26",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 4.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-27",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 4.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-28",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 4.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-29",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 4.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-31",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 4.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-32",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 4.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-34",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 3.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-35",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 3.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-6",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 36.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-7",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 32.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "SYM-9",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 14.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); vision label unknown",
+      "expected_from": "vision"
+    },
+    {
+      "name": "Sealed Concrete",
+      "unit": "SF",
+      "status": "MEASURED",
+      "quantity": 397600.0,
+      "basis": "sealed_concrete",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "",
+      "expected_from": "learned"
+    },
+    {
+      "name": "Stairs",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Tilt Up Wall",
+      "unit": "SF",
+      "status": "MEASURED",
+      "quantity": 5.0,
+      "basis": "concrete_slab",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "",
+      "expected_from": "library"
+    },
+    {
+      "name": "Vapor Barrier",
+      "unit": "SF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "floor_area",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Wall Framing",
+      "unit": "LF",
+      "status": "NEEDS REVIEW",
+      "quantity": 2658.5899999999997,
+      "basis": "wall_framing",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png"
+      ],
+      "reason": "low-confidence count; unlabeled wall thickness class",
+      "expected_from": "vision"
+    }
+  ]
+}

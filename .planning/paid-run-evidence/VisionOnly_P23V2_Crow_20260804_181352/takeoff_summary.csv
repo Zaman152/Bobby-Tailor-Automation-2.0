@@ -1,0 +1,80 @@
+item,quantity,unit,confidence,needs_review,source,review_notes,source_sheets,line_count,provenance
+4,279.5,SF,high,yes,vision,unclassified item (no estimation table matched),output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+Aluminum Storefront/Curtain Wall,,SF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Bollards,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Building Perimeter,"2,972",LF,high,yes,vision,unclassified item (no estimation table matched),output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+CMU Wall,,SF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Canopy,,SF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Columns,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Concrete Curb,,LF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Concrete Pad,"397,600",SF,high,,library,,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,MEASURED
+Concrete Retaining Wall,,SF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Curb & Gutter,,LF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Dock Bumper,56,EA,medium,yes,library,unclassified item (no estimation table matched); named by naming library (perimeter_jamb_symbol → Dock Bumper); vision label unavailable — verify,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+Dock Leveler,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Door Frames - Hollow Metal (door schedule),29,EA,high,,plan_schedule_legend,,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,HUMAN INPUT
+Door Frames-AL,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Door Frames-HC,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Door Frames-HM,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Door Frames-IM,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Door Frames-SC,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Door Frames-STL,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Doors - Aluminum (door schedule),6,EA,high,,plan_schedule_legend,,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,HUMAN INPUT
+Doors - Hollow Metal (door schedule),29,EA,high,,plan_schedule_legend,,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,HUMAN INPUT
+Doors - Steel (door schedule),70,EA,high,,plan_schedule_legend,a separate 'Doors' reading of this item (vision) was suppressed as a duplicate of the authoritative legend row 'Doors' — it was NOT added to this quantity,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,HUMAN INPUT
+Doors-HC,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Doors-IM,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Doors-SC,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Doors-STL,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Drive-In Overhead Door,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Exposed Structure,"397,600",SF,high,,learned,,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,MEASURED
+Guard Rail,,LF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Gutter,,LF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Hand Rail,,LF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+LED Wall Pack,"34,214",EA,medium,yes,library,"this drawing prints no overall dimension pair, so there is no printed extent to cross-check the measured 1717 SF against — the measurement stands, unverified; 8 annotation-shaped region(s) dropped from the billable perimeter (shape ratio above 8.0): 61.6 SF at ratio 8.65 (67.9 LF); 13.3 SF at ratio 14.39 (52.5 LF); 13.3 SF at ratio 14.39 (52.5 LF); 13.3 SF at ratio 14.39 (52.5 LF); 13.3 SF at ratio 14.39 (52.5 LF); 12.4 SF at ratio 13.93 (49.0 LF); 9.1 SF at ratio 11.92 (36.0 LF); 8.7 SF at ratio 11.54 (34.0 LF); measured ONE 'OVERALL' unit; how many exist is not stated in the drawing set — supply the room mix to scale it; wall height 36.00 ft came from source 'plan', not from the drawing's own ceiling tag — verify on sheet before billing",output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+Ladder,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Metal Downspouts,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Metal Stairs,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Mobilization,1,EA,,,vision,,,1,HUMAN INPUT
+OVERALL EAST ELEVATION,"16,141.2",SF,medium,yes,vision,"unclassified item (no estimation table matched); no text-anchored material attribution — no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0002.png,1,NEEDS REVIEW
+OVERALL NORTH ELEVATION,"48,534.8",SF,medium,yes,vision,"unclassified item (no estimation table matched); no text-anchored material attribution — no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0002.png,1,NEEDS REVIEW
+OVERALL SOUTH ELEVATION,"52,625",SF,medium,yes,vision,"unclassified item (no estimation table matched); no text-anchored material attribution — no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0002.png,1,NEEDS REVIEW
+OVERALL WEST ELEVATION,"16,177.2",SF,medium,yes,vision,"unclassified item (no estimation table matched); no text-anchored material attribution — no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0002.png,1,NEEDS REVIEW
+Overhead Sectional Door,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Pipe Guardrail,,LF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Pre-Engineered Metal Canopy,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+ROOM-3,11.1,SF,low,yes,vision,unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing),output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+ROOM-4,11,SF,low,yes,vision,unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing),output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+ROOM-5,10.7,SF,low,yes,vision,unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing),output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+ROOM-6,10.6,SF,low,yes,vision,unclassified item (no estimation table matched); room unlabeled (vision fallback returned nothing),output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+Ramp,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Roof Hatch,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Roof Insulation,,SF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+SYM-1,136,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-10,14,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-11,14,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-17,9,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-18,8,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-19,6,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-20,6,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-21,6,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-22,5,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-23,5,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-24,5,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-25,4,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-26,4,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-27,4,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-28,4,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-29,4,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-31,4,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-32,4,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-34,3,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-35,3,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-6,36,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-7,32,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+SYM-9,14,EA,low,yes,vision,unclassified item (no estimation table matched); vision label unknown,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,NEEDS REVIEW
+Sealed Concrete,"397,600",SF,high,,learned,,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,MEASURED
+Stairs,,EA,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Tilt Up Wall,5,SF,high,,library,,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,1,MEASURED
+Vapor Barrier,,SF,low,yes,expected_not_measured,"expected from the library but never measured on the plans — this is a BLANK, not a zero",,0,NOT MEASURED
+Wall Framing,"2,658.6",LF,low,yes,vision,low-confidence count; unlabeled wall thickness class,output/screenshots/VisionOnly_P23V2_Crow_20260804_180702/page_0001.png,6,NEEDS REVIEW

@@ -1,0 +1,400 @@
+══════════════════════════════════════════════════════════════════════
+QUANTITY TAKEOFF SUMMARY
+══════════════════════════════════════════════════════════════════════
+Project:          VisionOnly P23V Crow
+Generated:        2026-08-04T14:19:52.527441
+Sheets analyzed:  4
+Raw items:        184
+Calculated items: 60
+
+──────────────────────────────────────────────────────────────────────
+API USAGE & COST
+──────────────────────────────────────────────────────────────────────
+Total cost:       $0.3826 USD
+Input tokens:     18,011
+Output tokens:    17,198
+Cost per sheet:   $0.0956 USD
+Budget:           $0.8245 spent of $1.50 cap
+
+──────────────────────────────────────────────────────────────────────
+COVERAGE  (a blank is NOT a zero — an unmeasured item has no number,
+           which is a different fact from a measured zero)
+──────────────────────────────────────────────────────────────────────
+Pages in source PDF:              4
+  measured (geometry):            4
+  vision-only (no geometry):      0
+  skipped by classifier:          0
+  not applicable (cover/idx):     0
+  errored:                        0
+Drawings measured:                                                  0
+Drawings dropped (no printed scale of their own):                   0
+Viewports excluded as off-scale (measuring them would be wrong):    4
+
+!! 31 expected line item(s) have NO measurement path — do NOT read
+   their blank quantity as zero
+!! [A-101] no measurable plan drawing on this sheet — no enclosed-
+   region area was produced, which is NOT the same as measuring zero
+   area
+!! [A-201] elevation cross-check: silhouette sum 133478 SF vs the
+   independent perimeter x datum-height route 2972.0 LF x 48.00 ft =
+   142656 SF — agreement within 6.4%. The second route is a cross-
+   check only and publishes no quantity (D-11)
+
+Expected line items:             77
+  MEASURED                        5
+  NEEDS REVIEW                   36
+  HUMAN INPUT                     5
+  NOT MEASURED                   31   ← do NOT read these as zero
+
+──────────────────────────────────────────────────────────────────────
+SCALE CONFIDENCE
+──────────────────────────────────────────────────────────────────────
+  [output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png] main R1   1" = 40'     conf=high    method=ransac_consensus           (30 dims, 89% share, printed ✓)
+  [output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0002.png] main R2   1" = 24.8355' conf=low     method=ransac_consensus_offladder (1 dims, 100% share, printed ✗)
+
+──────────────────────────────────────────────────────────────────────
+PROVENANCE BREAKDOWN
+──────────────────────────────────────────────────────────────────────
+  geometry              43 items
+  text_layer             1 items
+  Geometry/text-derived quantities: 44/44 (100.0% of provenance-tagged items)
+
+──────────────────────────────────────────────────────────────────────
+LINKED SHEETS & CROSS-REFERENCES
+──────────────────────────────────────────────────────────────────────
+Drawing cross-references: 19 total, 0 resolved
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 13 on A-401 — Enlarged Ramp Plan  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 12 on A-401 — Ramp w/ Landing Section  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 11 on A-401 — Fire Riser / Electrical Panel Protection  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 10 on A-401 — Stair Section  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 9 on A-401 — Z-Guard Detail  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 8 on A-401 — Stair Rail  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 7 on A-401 — Typ. Bollard  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 6 on A-401 — Stair Plan  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 5 on A-401 — Section @ Pump / Electrical Room  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 4 on A-401 — Ramp Rail Section  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 3 on A-401 — Plan @ Dock Leveler (Future)  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 2 on A-401 — Side Section @ Leveler (Future)  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png → detail 1 on A-401 — Section at Dock Leveler (Future)  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png → detail H1 on A-601 — Door Head detail - HM frame exterior/interior  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png → detail H2 on A-601 — Door Head detail - Metal Door Track for overhead doors  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png → detail H3 on A-601 — Door Head detail - CMU construction  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png → detail J1 on A-601 — Door Jamb detail - HM frame at exterior  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png → detail J2 on A-601 — Door Jamb detail - Overhead door track at slab  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png → detail J3 on A-601 — Door Jamb detail - CMU with jamb anchor  [TARGET SHEET NOT FOUND]
+
+──────────────────────────────────────────────────────────────────────
+SHEET-BY-SHEET LOG (source traceability)
+──────────────────────────────────────────────────────────────────────
+  [output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png] type=floor_plan     meas=  0 comp= 40 rooms=  0 mat=  0 conf=?
+  [output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0002.png] type=elevation      meas=  0 comp=  4 rooms=  0 mat=  0 conf=?
+  [output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png] type=detail         meas= 33 comp= 35 rooms=  0 mat= 14 conf=medium
+  [output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png] type=schedule       meas=  3 comp= 32 rooms=  0 mat=  5 conf=medium
+
+──────────────────────────────────────────────────────────────────────
+RAW ITEMS BY CATEGORY
+──────────────────────────────────────────────────────────────────────
+  COMPONENT         111 items
+  SCHEDULE_HEADER     3 items
+  SCHEDULE_ROW       15 items
+  MEASUREMENT        36 items
+  MATERIAL           19 items
+
+──────────────────────────────────────────────────────────────────────
+CALCULATED TAKEOFF BY ESTIMATION TABLE
+──────────────────────────────────────────────────────────────────────
+  NONE               33 items
+  BOLLARD             1 items
+  TILT_UP_WALL        1 items
+  WALL_FRAMING        6 items
+  CONCRETE_SLAB       6 items
+  DOORS               8 items
+  TAKEOFF_LEGEND      4 items
+  FLOORING            1 items
+
+══════════════════════════════════════════════════════════════════════
+PROJECT TAKEOFF SUMMARY (CONSOLIDATED)
+══════════════════════════════════════════════════════════════════════
+  ITEM                                              QTY  UNIT    
+──────────────────────────────────────────────────────────────────────
+  4                                               279.5  SF      
+  Aluminum Storefront                                 —  SF      
+  Bollard                                            56  EA      
+  Bollards                                            —  EA      
+  Building Perimeter                              2,972  LF      
+  CMU Wall                                            —  SF      
+  Canopy                                              —  SF      
+  Columns                                             —  EA      
+  Concrete Curb                                     0.1  LF      
+  Concrete Pad                                  397,600  SF      
+  Concrete Retaining Wall                             —  LF      
+  Curb & Gutter                                       —  LF      
+  Dock Bumper                                         —  EA      
+  Dock Leveler                                        —  EA      
+  Door Frames - Hollow Metal (door schedule)           29  EA      
+  Door Frames-AL                                      —  EA      
+  Door Frames-HC                                      —  EA      
+  Door Frames-HM                                      —  EA      
+  Door Frames-IM                                      —  EA      
+  Door Frames-SC                                      —  EA      
+  Door Frames-STL                                     —  EA      
+  Doors - Aluminum (door schedule)                    6  EA      
+  Doors - Hollow Metal (door schedule)               29  EA      
+  Doors - Steel (door schedule)                      70  EA      
+  Doors-HC                                            —  EA      
+  Doors-IM                                            —  EA      
+  Doors-SC                                            —  EA      
+  Doors-STL                                           —  EA      
+  Exposed Structure                                   —  SF      
+  Glazing                                             —  SF      
+  Guard Rail                                          —  LF      
+  Gutter                                              —  LF      
+  Hand Rail                                           —  LF      
+  LED Wall Pack                                       —  EA      
+  Ladder                                              —  EA      
+  Metal Downspout                                     —  EA      
+  Metal Stair                                         —  EA      
+  Mobilization                                        1  EA      
+  OVERALL EAST ELEVATION                       16,141.2  SF      
+  OVERALL NORTH ELEVATION                      48,534.8  SF      
+  OVERALL SOUTH ELEVATION                        52,625  SF      
+  OVERALL WEST ELEVATION                       16,177.2  SF      
+  Overhead Sectional Door                             —  EA      
+  Pipe Guardrail                                   46.2  LF      
+  Pipe Handrail                                     0.0  LF      
+  ROOM-3                                           11.1  SF      
+  ROOM-4                                             11  SF      
+  ROOM-5                                           10.7  SF      
+  ROOM-6                                           10.6  SF      
+  Ramp                                                —  EA      
+  SYM-1                                             136  EA      
+  SYM-10                                             14  EA      
+  SYM-11                                             14  EA      
+  SYM-17                                              9  EA      
+  SYM-18                                              8  EA      
+  SYM-19                                              6  EA      
+  SYM-20                                              6  EA      
+  SYM-21                                              6  EA      
+  SYM-22                                              5  EA      
+  SYM-23                                              5  EA      
+  SYM-24                                              5  EA      
+  SYM-25                                              4  EA      
+  SYM-26                                              4  EA      
+  SYM-27                                              4  EA      
+  SYM-28                                              4  EA      
+  SYM-29                                              4  EA      
+  SYM-31                                              4  EA      
+  SYM-32                                              4  EA      
+  SYM-34                                              3  EA      
+  SYM-35                                              3  EA      
+  SYM-6                                              36  EA      
+  SYM-7                                              32  EA      
+  SYM-9                                              14  EA      
+  Sealed Concrete                                   0.1  SF      
+  Stairs                                              —  EA      
+  Tilt Up Wall                                  142,661  SF      
+  Wall Framing                                  2,658.6  LF      
+
+──────────────────────────────────────────────────────────────────────
+DETAILED CALCULATED TAKEOFF (with sources)
+──────────────────────────────────────────────────────────────────────
+  136.0 EA      SYM-1                                     [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  56.0 EA      Bollard                                   [table:bollard, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  36.0 EA      SYM-6                                     [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  32.0 EA      SYM-7                                     [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  14.0 EA      SYM-9                                     [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  14.0 EA      SYM-10                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  14.0 EA      SYM-11                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  9.0 EA      SYM-17                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  8.0 EA      SYM-18                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  6.0 EA      SYM-19                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  6.0 EA      SYM-20                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  6.0 EA      SYM-21                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  5.0 EA      SYM-22                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  5.0 EA      SYM-23                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  5.0 EA      SYM-24                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  4.0 EA      SYM-25                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  4.0 EA      SYM-26                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  4.0 EA      SYM-27                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  4.0 EA      SYM-28                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  4.0 EA      SYM-29                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  4.0 EA      SYM-31                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  4.0 EA      SYM-32                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  3.0 EA      SYM-34                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  3.0 EA      SYM-35                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  142656.0 SF      Tilt Up Wall                              [table:tilt_up_wall, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  37.29 LF      WALL-TC10                                 [table:wall_framing, waste:×1.1]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  27.17 LF      WALL-TC11                                 [table:wall_framing, waste:×1.1]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  5.0 LF      tilt-up concrete panel                    [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  1224.85 LF      WALL-TC2                                  [table:wall_framing, waste:×1.1]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  855.8 LF      WALL-TC3                                  [table:wall_framing, waste:×1.1]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  456.61 LF      WALL-TC4                                  [table:wall_framing, waste:×1.1]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  56.87 LF      WALL-TC8                                  [table:wall_framing, waste:×1.1]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  397600.0 SF      Concrete Pad                              [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  396059.1 SF      68 DOORS DOOR DOOR 3 1 2 9 9 9 10 10 10 12 12 9 9 CASS WHITE  [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  279.5 SF      4                                         [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  11.1 SF      ROOM-3                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  11.0 SF      ROOM-4                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  10.7 SF      ROOM-5                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  10.6 SF      ROOM-6                                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  2972.0 LF      Building Perimeter                        [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ 
+  70.0 EA      Doors - Steel (door schedule)             [table:takeoff_legend, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ Door Schedule (extracted from plans)
+  29.0 EA      Doors - Hollow Metal (door schedule)      [table:takeoff_legend, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ Door Schedule (extracted from plans)
+  6.0 EA      Doors - Aluminum (door schedule)          [table:takeoff_legend, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ Door Schedule (extracted from plans)
+  29.0 EA      Door Frames - Hollow Metal (door schedule)  [table:takeoff_legend, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0001.png @ Door Schedule (extracted from plans)
+  16177.2 SF      OVERALL WEST ELEVATION                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0002.png @ 
+  52625.0 SF      OVERALL SOUTH ELEVATION                   [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0002.png @ 
+  16141.2 SF      OVERALL EAST ELEVATION                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0002.png @ 
+  48534.8 SF      OVERALL NORTH ELEVATION                   [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0002.png @ 
+  0.05 cy      Concrete curb width                       [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png @ Detail 13 - Enlarged Ramp Plan
+  0.01 cy      Bollard concrete fill expansion joint     [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png @ Detail 7 - Typ. Bollard
+  46.2 sq_ft   Guardrail height above floor              [table:flooring, waste:×1.1]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png @ Detail 6 - Stair Plan
+  0.02 cy      Pipe handrail OD at concrete support - Detail 12  [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png @ Detail 12 - Fire Riser/Electrical Panel Protection
+  0.15 cy      Concrete slab tapered thickness - dock leveler  [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png @ Detail 1 - Section at Dock Leveler (Future)
+  2.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png @ DOOR SCHEDULE
+  2.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png @ DOOR SCHEDULE
+  2.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png @ DOOR SCHEDULE
+  1.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png @ DOOR SCHEDULE
+  1.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png @ DOOR SCHEDULE
+  1.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png @ DOOR SCHEDULE
+  2.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png @ DOOR SCHEDULE
+
+──────────────────────────────────────────────────────────────────────
+RAW DIMENSIONAL MEASUREMENTS (by sheet)
+──────────────────────────────────────────────────────────────────────
+
+  [output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0003.png]  (33 measurements)
+     1.5 in        Steel pipe guardrail outside diameter
+                @ Detail 13 - Enlarged Ramp Plan
+     1.5 in        Steel pipe guardrail outside diameter
+                @ Detail 12 - Ramp w/ Landing Section
+     1.5 in        Handrail pipe outside diameter
+                @ Detail 12 - Ramp w/ Landing Section
+     4 in        Concrete curb width
+                @ Detail 13 - Enlarged Ramp Plan
+     5 ft        Ramp landing width
+                @ Detail 13 - Enlarged Ramp Plan
+     5 ft        Ramp width
+                @ Detail 13 - Enlarged Ramp Plan
+     15 ft        Ramp overall length
+                @ Detail 13 - Enlarged Ramp Plan
+     0 in        Finish floor to finish floor height - ramp section
+                @ Detail 12 - Ramp w/ Landing Section
+     1.5 in        Pipe bollard outside diameter - standard
+                @ Detail 7 - Typ. Bollard
+     6 in        Bollard pipe outside diameter
+                @ Detail 7 - Typ. Bollard
+     1 in        Bollard concrete fill expansion joint
+                @ Detail 7 - Typ. Bollard
+     1.5 in        Steel pipe guardrail OD - Ramp Rail Section
+                @ Detail 4 - Ramp Rail Section
+     4 ft        Vertical support spacing max
+                @ Detail 4 - Ramp Rail Section
+     0.75 in        Chamfer size at ramp rail
+                @ Detail 4 - Ramp Rail Section
+     1.5 in        Guardrail OD - Z-Guard Detail
+                @ Detail 9 - Z-Guard Detail
+     42 in        Guardrail height above floor
+                @ Detail 6 - Stair Plan
+     1.5 in        Guardrail OD - Stair Plan
+                @ Detail 6 - Stair Plan
+     1.5 in        Handrail OD - Stair Plan
+                @ Detail 6 - Stair Plan
+     0.5 in        Quick bolt size
+                @ Detail 9 - Z-Guard Detail
+     1.5 in        Pipe rail OD - Detail 12
+                @ Detail 12 - Fire Riser/Electrical Panel Protection
+     1.5 in        Pipe handrail OD at concrete support - Detail 12
+                @ Detail 12 - Fire Riser/Electrical Panel Protection
+     1.5 in        Vert support pipe OD
+                @ Detail 12 - Fire Riser/Electrical Panel Protection
+     1 in        Dia. vert - detail 12
+                @ Detail 12 - Fire Riser/Electrical Panel Protection
+     4 ft        Bollard spacing max - Fire Riser/Electrical Panel Protection
+                @ Detail 11 - Fire Riser / Electrical Panel Protection
+     4 ft        Bollard spacing at guard - guard section
+                @ Detail 12 - Fire Riser/Electrical Panel Protection
+     0.375 in        Steel plate thickness - track guard
+                @ Detail 9 - Z-Guard Detail
+     3.5 in        Stringer angle size
+                @ Detail 8 - Stair Rail
+     8 in        CMU wall thickness - Section at Pump/Electrical Room
+                @ Detail 5 - Section @ Pump / Electrical Room
+     12 in        Concrete slab tapered thickness - dock leveler
+                @ Detail 1 - Section at Dock Leveler (Future)
+     0.5 in        Slope at dock leveler section
+                @ Detail 2 - Side Section @ Leveler (Future)
+     2 in        Truck court slope
+                @ Detail 1 - Section at Dock Leveler (Future)
+     0 in        Concrete footing - dock leveler section
+                @ Detail 1 - Section at Dock Leveler (Future)
+     12 in        Precast concrete pipe bollard cap - bollard OD
+                @ Detail 7 - Typ. Bollard
+
+  [output/screenshots/VisionOnly_P23V_Crow_20260804_141143/page_0004.png]  (3 measurements)
+     3 ft        Door width - Type P1
+                @ Door elevation diagram, lower left
+     4 ft        Door width - Type P2
+                @ Door elevation diagram, lower left
+     7 ft        Door height - flush doors P1/P2/P3
+                @ Door elevation diagram, lower left
