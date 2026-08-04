@@ -412,6 +412,186 @@ def test_page_words_survives_an_unreadable_text_layer():
 
 
 # ---------------------------------------------------------------------------
+# The committed Crow baseline — a measurement, not an assumption.
+#
+# PROVENANCE. The population figures quoted here were measured by a ZERO-API
+# deterministic-bundle probe over all four Crow sheets during Phase 24 planning
+# (2026-08-05), and re-measured by this plan's execution:
+#
+#     107 symbol groups across the four sheets
+#      81 carry NO ``contained_texts`` at all
+#      26 carry ``contained_texts`` that are 100% drafting noise
+#       0 carry a ``contained_texts`` that is a genuine object name
+#
+# That is the committed answer to 24-RESEARCH Open Question #4 — *"does the
+# bollard cluster have a text anchor at all?"* — and the answer is **NO**.
+# The consequence is load-bearing and must not be softened: the
+# ``contained_texts`` branch of the anchor ladder contributes NOTHING on the
+# mission's primary plan set, so the nearest-non-masked-word query is not an
+# enhancement to the ladder, it IS the ladder.
+#
+# The tests below assert the SHAPE of that finding on page 0 (the two
+# largest-count clusters carry no contained text), never a count. The
+# largest is SYM-1 at 1.0 x 0.4 ft; the second is SYM-2 at 0.8 x 0.87 ft — the
+# bollard cluster. NEITHER is asserted toward the number in the human take-off
+# and NEITHER is touched: ground truth section 10 proved the larger cluster's
+# instances are collinear dimension ticks (``yspan=0``) and section 11.0 proved
+# ``_dedup_colocated_count`` leaves the bollard cluster unchanged. Both
+# apparent hits are coincidences. Phase 25 owns detection; this phase owns
+# only naming and flagging.
+# ---------------------------------------------------------------------------
+
+CROW_PDF = ROOT / "uploads" / "Crow - Cass White Road-Plans.pdf"
+
+
+def _field(obj, name, default=None):
+    """Read a field from a dataclass-like object or a plain dict."""
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
+
+
+@pytest.fixture(scope="module")
+def crow_page_0():
+    """Page 0's real deterministic bundle. SKIPS when the PDF is absent.
+
+    Follows ``test_four_set_coverage.py:86`` — a check either ASSERTS or SKIPS;
+    none of the checks below may pass for having looked at nothing.
+    """
+    if not CROW_PDF.exists():
+        pytest.skip("fixture PDF %r is not present in uploads/" % CROW_PDF.name)
+    fitz = pytest.importorskip("fitz")
+    from bobbytailor.pipeline.takeoff_pipeline import (  # noqa: PLC0415
+        _MASK_VIEWPORT_KINDS,
+        TakeoffPipeline,
+    )
+
+    doc = fitz.open(str(CROW_PDF))
+    pipeline = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    bundle = pipeline._deterministic_bundle(
+        doc[0], doc, str(CROW_PDF), 0, "crow-p0", "floor_plan"
+    )
+    masks = [
+        b for b in (_field(s, "bbox_pt", None) for s in bundle.get("schedules") or []) if b
+    ]
+    masks += [
+        vp.bbox_pt
+        for vp in bundle.get("viewports") or []
+        if vp.kind in _MASK_VIEWPORT_KINDS
+    ]
+    try:
+        yield doc[0], bundle, pipeline, masks
+    finally:
+        doc.close()
+
+
+def test_the_contained_text_branch_is_empty_on_the_crow_plan_set(crow_page_0):
+    """24-RESEARCH Open Question #4, answered NO and committed.
+
+    The two largest symbol clusters on Crow page 0 — the one the pipeline
+    coincidentally reads as columns, and the bollard cluster — carry no
+    contained text whatsoever. Neither can be named from text inside its own
+    box, so neither can be named at all without the radius query.
+    """
+    _page, bundle, _pipeline, _masks = crow_page_0
+    groups = sorted(
+        bundle.get("symbol_groups") or [],
+        key=lambda g: (-int(_field(g, "count", 0) or 0), str(_field(g, "candidate_id", ""))),
+    )
+    assert len(groups) >= 2, "page 0 must yield at least two symbol clusters"
+    for group in groups[:2]:
+        texts = [
+            t for t in (_field(group, "contained_texts", []) or []) if str(t).strip()
+        ]
+        assert texts == [], (
+            "%s carries contained text %r — the finding this test commits is "
+            "that it carries NONE. Re-measure before editing this assertion."
+            % (_field(group, "candidate_id", "?"), texts)
+        )
+
+
+def test_every_crow_candidate_carries_one_well_formed_anchor_record(crow_page_0, capsys):
+    """Coverage is REPORTED, never required.
+
+    There is deliberately no minimum number of non-None anchors asserted here.
+    A floor would create pressure to widen the radius until the floor is met,
+    and that is the tuning trap 24-RESEARCH pitfall 1 forbids. How many
+    candidates the drawing happens to label is an outcome of the drawing.
+    """
+    _page, bundle, pipeline, _masks = crow_page_0
+    anchors = bundle.get("candidate_anchors")
+    assert isinstance(anchors, dict), "the bundle must emit candidate_anchors"
+    expected = pipeline._anchor_candidate_map(bundle)
+    assert set(anchors) == set(expected), "one record per candidate, no more, no fewer"
+    assert anchors, "page 0 carries candidates, so it must carry anchor records"
+
+    split = {}
+    for cid, rec in sorted(anchors.items()):
+        assert set(rec) == ANCHOR_KEYS, cid
+        assert rec["candidate_id"] == cid
+        assert rec["anchor_kind"] in (None, "contained", "tag", "nearest_word"), cid
+        if rec["anchor_text"] is None:
+            assert rec["anchor_kind"] is None, cid
+            assert rec["anchor_dist_pt"] is None, cid
+            assert rec["anchor_source"] is None, cid
+        else:
+            assert rec["anchor_source"] in ("page_words", "tag_pairing"), cid
+            assert rec["anchor_dist_pt"] >= 0.0, cid
+            assert rec["ambiguity_reason"] == "", cid
+        split[rec["anchor_kind"]] = split.get(rec["anchor_kind"], 0) + 1
+        json.dumps(rec)  # records must survive into takeoff.json unaided
+
+    contested = sum(1 for r in anchors.values() if r["ambiguity_reason"])
+    with capsys.disabled():
+        print(
+            "\n[24-01] Crow page 0 anchor coverage (reported, not required): "
+            "%d candidates, split by kind %r, %d withdrawn as contested"
+            % (len(anchors), split, contested)
+        )
+
+
+def test_anchors_over_the_real_page_are_byte_identical_on_repeat(crow_page_0):
+    """Determinism on a real drawing, not only on a synthetic word list."""
+    page, bundle, pipeline, masks = crow_page_0
+    candidates = pipeline._anchor_candidate_map(bundle)
+    first = anchors_for_candidates(page, candidates, mask_rects=masks)
+    second = anchors_for_candidates(page, candidates, mask_rects=masks)
+    assert first == second
+    assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
+    # And the pipeline's own emitted records are the same computation, so the
+    # bundle key is not a second, drifting implementation.
+    assert first == bundle["candidate_anchors"]
+
+
+def test_a_masked_region_supplies_no_anchor_on_the_real_page(crow_page_0):
+    """T-24-02 on real geometry: nothing inside a mask is ever an anchor."""
+    page, bundle, pipeline, masks = crow_page_0
+    if not masks:
+        pytest.skip("page 0 carries no schedule or title-block mask to test")
+    from bobbytailor.deterministic.tag_pairing import bbox_inside_any  # noqa: PLC0415
+
+    words = page_words(page)
+    inside = {w[4] for w in words if bbox_inside_any(w[:4], masks)}
+    outside = {w[4] for w in words if not bbox_inside_any(w[:4], masks)}
+    mask_only = inside - outside
+    if not mask_only:
+        pytest.skip("page 0's masks cover no text that is unique to them")
+
+    candidates = pipeline._anchor_candidate_map(bundle)
+    anchored = anchors_for_candidates(page, candidates, mask_rects=masks)
+    chosen = {
+        rec["anchor_text"]
+        for rec in anchored.values()
+        if rec["anchor_text"] and rec["anchor_kind"] != "tag"
+    }
+    leaked = chosen & mask_only
+    assert not leaked, (
+        "these anchors exist ONLY inside a schedule table or title block and "
+        "must never have been harvested from the plan body: %r" % sorted(leaked)
+    )
+
+
+# ---------------------------------------------------------------------------
 # The module's own boundaries — grep-self, mirroring the phase-23 gate.
 # ---------------------------------------------------------------------------
 
