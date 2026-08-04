@@ -4,6 +4,25 @@ Out-of-scope discoveries logged during execution. NOT fixed in the plan that fou
 
 ---
 
+## DEF-23-13A — `king (t)` / `bunk (t)` / `ada (ris)` census tags do not match their full unit names
+
+**Found during:** 23-13 Task 4 (room-mix probe on the real Moxy set).
+**Where:** `room_tags.abbreviation_target` — the word-prefix rule (`every word of the census key is
+a prefix of the corresponding word of the target`).
+
+**Evidence (real, zero API):** the in-plan census reads `king (t)` = 3, `bunk (t)` = 1,
+`ada (ris)` = 1 off the unit key plans, and the manifest declares `ACC KING TUB` = 3,
+`ACC BUNK` = 2, `ADA KING RIS` = 1. None of the three tags match their full names under the
+word-prefix rule (`king` is not a prefix of `acc`), so those counts fall back to the manifest
+flagged as "NOT derived from the drawings" — even though the drawings appear to contain them
+(`king (t)` = 3 agrees exactly with `ACC KING TUB` = 3). Consequence today: the 23-13
+multiplier-review flag fires on ID-419 (ACC KING TUB, count 3, manifest-only) although the
+drawings likely confirm the count. Honest but noisier than necessary.
+
+**Why not fixed in 23-13:** matching `(t)`/`(ris)` suffix tags to full names is a NAMING rule
+(abbreviation semantics), which is plan 23-15's scope; loosening the prefix rule ad hoc to quiet
+one flag would risk false matches, the exact failure the unique-match rule exists to prevent.
+
 ## DEF-23-01 — `SCALE: 1-1/2" = 1'-0"` parses as 1/2, not 1 1/2
 
 **Found during:** 23-02 Task 1 (printed-scale parser hardening).
