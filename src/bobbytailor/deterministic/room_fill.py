@@ -48,7 +48,7 @@ import logging
 import math
 import re
 from array import array
-from collections import deque
+from collections import OrderedDict, deque
 from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
@@ -62,6 +62,47 @@ logger = logging.getLogger(__name__)
 # 33% mean error; picking by discipline gives 3.3% (real Moxy prototype sheets).
 PLAN_TITLE_RE = re.compile(
     r"([A-Z0-9 \-/()&']+?)\s*-\s*(AR|RCP|FF|EM|FC)\s+PLAN", re.IGNORECASE
+)
+
+# ── Titles that carry no discipline code ─────────────────────────────────────
+#
+# The pattern above was fitted to one drawing set's house style. Most sets do
+# not print a discipline code at all: a warehouse titles its main drawing
+# "1 OVERALL FLOOR PLAN" and states the discipline in the KIND WORD. Crow's
+# A-101 is exactly that, and matching only the coded form made the sheet report
+# ``plan_titles: 0`` with the main 1"=40' viewport never enumerated — only its
+# four 1½"=1' details were, all correctly excluded as off-scale, leaving
+# "no measurable plan drawing on this sheet" on a sheet that IS the floor plan.
+# This is the mirror image of the Moxy title-block defect: a convention read as
+# a universal.
+#
+# The match is anchored to the WHOLE line, which is what keeps it honest. A
+# general note — "SEE ENLARGED PLANS AND ROOF PLAN." — contains a kind word and
+# "PLAN" but is a sentence, not a drawing title, and cannot pass. A leading
+# viewport/detail number is allowed because that is how these titles are
+# printed.
+_PLAN_KIND_WORD_DISCIPLINE = OrderedDict((
+    ("REFLECTED CEILING", "RCP"),
+    ("CEILING", "RCP"),
+    ("ROOF", "RCP"),
+    ("FINISH", "FF"),
+    ("FLOOR", "AR"),
+    ("SLAB", "AR"),
+    ("FOUNDATION", "AR"),
+    ("DIMENSIONAL", "AR"),
+    ("DIMENSION", "AR"),
+    ("DEMOLITION", "AR"),
+    ("PARTITION", "AR"),
+    ("EQUIPMENT", "AR"),
+    ("SITE", "AR"),
+    ("KEY", "AR"),
+))
+
+PLAN_TITLE_CONVENTION_RE = re.compile(
+    r"^\s*(?:[A-Z]?\d{1,2}[.)]?\s+)?"                 # optional viewport number
+    r"([A-Z0-9 \-/()&'.]*?)\s*"                       # the drawing's own name
+    r"(%s)\s+PLAN\s*$" % "|".join(_PLAN_KIND_WORD_DISCIPLINE),
+    re.IGNORECASE,
 )
 
 # Which drawing discipline measures which measure-basis.
@@ -507,8 +548,30 @@ def _map_rect(page, rect, matrix_attr: str):
         return rect
 
 
+def plan_title_of(text: str) -> Optional[tuple]:
+    """``(plan_name, plan_kind)`` for one title line, or None.
+
+    Two conventions, one meaning. The coded form ("KING SUITE B - RCP PLAN")
+    states its discipline outright; the uncoded form ("1 OVERALL FLOOR PLAN")
+    states it in the kind word and is anchored to the whole line so a sentence
+    that merely mentions a plan cannot pose as a drawing title.
+    """
+    txt = (text or "").strip().upper()
+    if not txt:
+        return None
+    m = PLAN_TITLE_RE.search(txt)
+    if m:
+        return m.group(1).strip(), m.group(2).upper()
+    m = PLAN_TITLE_CONVENTION_RE.match(txt)
+    if m:
+        kind_word = m.group(2).upper()
+        name = m.group(1).strip(" -/&'.") or kind_word
+        return name, _PLAN_KIND_WORD_DISCIPLINE[kind_word]
+    return None
+
+
 def plan_titles(page) -> List[tuple]:
-    """[(plan_name, plan_kind, bbox), ...] for every '<NAME> - <KIND> PLAN' label."""
+    """[(plan_name, plan_kind, bbox), ...] for every drawing-title label."""
     out: List[tuple] = []
     try:
         blocks = page.get_text("dict")["blocks"]
@@ -517,9 +580,9 @@ def plan_titles(page) -> List[tuple]:
     for b in blocks:
         for line in b.get("lines", []):
             txt = "".join(s.get("text", "") for s in line.get("spans", [])).strip()
-            m = PLAN_TITLE_RE.search(txt.upper())
-            if m:
-                out.append((m.group(1).strip(), m.group(2).upper(), tuple(line["bbox"])))
+            hit = plan_title_of(txt)
+            if hit:
+                out.append((hit[0], hit[1], tuple(line["bbox"])))
     return out
 
 

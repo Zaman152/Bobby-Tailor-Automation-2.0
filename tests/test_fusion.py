@@ -1513,6 +1513,41 @@ def test_a_typical_detail_run_never_sums_with_the_main_plan_run():
     assert rejected[0]["reason"] == "typical_detail_not_summed"
 
 
+def test_one_object_measured_on_two_regions_publishes_one_quantity():
+    """Enumerating Crow's main floor plan (D4) gave "Sealed Concrete" a SECOND
+    measurement — a 1,717 SF enclosed sub-region of the same drawing that the
+    footprint already measures whole. Two routes to one quantity are not two
+    quantities, and summing them prices the floor twice."""
+    components = [
+        {"name": "Sealed Concrete", "quantity": 397600.0, "unit": "SF",
+         "region_ref": "footprint"},
+        {"name": "Sealed Concrete", "quantity": 1716.7, "unit": "SF",
+         "region_ref": "fill:FILL-2"},
+    ]
+    rejected: list = []
+    _arbitrate_one_area_one_item(components, rejected)
+    assert [c["quantity"] for c in components] == [397600.0]
+    assert len(rejected) == 1
+    assert rejected[0]["reason"] == "one_object_one_quantity"
+    assert rejected[0]["quantity"] == 1716.7
+    assert "not summed" in rejected[0]["detail"].lower()
+
+
+def test_two_regions_with_no_footprint_row_are_left_alone():
+    """Only the case with a principle behind it is decided. Without a footprint
+    row there is no basis to rank two fills, and a guessed precedence would be
+    worse than a duplicate an estimator can see."""
+    components = [
+        {"name": "Gyp Ceiling", "quantity": 229.4, "unit": "SF",
+         "region_ref": "fill:FILL-6"},
+        {"name": "Gyp Ceiling", "quantity": 504.9, "unit": "SF",
+         "region_ref": "fill:FILL-1"},
+    ]
+    rejected: list = []
+    _arbitrate_one_area_one_item(components, rejected)
+    assert len(components) == 2 and rejected == []
+
+
 def test_different_regions_and_different_units_are_never_arbitrated():
     components = [
         {"name": "Gyp Ceiling", "quantity": 229.4, "unit": "SF",

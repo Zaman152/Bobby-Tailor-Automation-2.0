@@ -415,3 +415,51 @@ arbitration contract was deliberately scoped in 23-13), and suppressing the tilt
 break pinned 23-08/23-13 behaviour. The honest boundary shipped: the second route flags and
 publishes no quantity on the elevation sheet; the cross-sheet dedupe belongs with the aggregator
 (23-15/23-16 or Phase 24 scoring will surface it on the real Crow report).
+
+## DEF-23-R1 — Crow's main floor plan is now ENUMERATED, but its fill is not the building outline
+
+**Found during:** the phase-23 regression fix, defect D4.
+**Where:** `room_fill.plan_titles` / `takeoff_pipeline._measure_room_fills` on Crow A-101.
+
+**What was fixed.** `PLAN_TITLE_RE` matched only the coded house style
+(`"<NAME> - <AR|RCP|FF|EM|FC> PLAN"`) that one drawing set happens to print. Crow titles its main
+drawing `1 OVERALL FLOOR PLAN`, so `plan_titles` returned `[]`, the sheet reported
+`plan_titles: 0` / `drawings_measured: 0`, and only the four 1½"=1'-0" detail viewports were
+enumerated — all correctly excluded as off-scale — leaving the coverage note *"no measurable plan
+drawing on this sheet"* on the sheet that IS the floor plan. `plan_title_of` now reads both
+conventions; the uncoded one is anchored to the whole line so a general note
+(`"...SEE ENLARGED PLANS AND ROOF PLAN."`) cannot pose as a drawing title.
+
+**Evidence, zero API:**
+
+```
+before:  page 0 {'plan_titles': 0, 'printed_scales': 5, 'viewports': 5}
+after:   page 0 {'plan_titles': 1, 'printed_scales': 5, 'viewports': 5}
+```
+
+Exactly one of the two `OVERALL FLOOR PLAN` strings on the sheet has a printed scale beneath it; the
+title-block copy is correctly dropped (`FILL-1 ... skipped_no_scale`).
+
+**What is NOT fixed.** The drawing is now enumerated and measured at its own correct 1"=40' scale,
+but the enclosed-region fill returns **1,716.7 SF**, not the building's 397,600 SF:
+
+```
+FILL-2  OVERALL  AR  area_sf=1716.7  needs_review=True
+  "this drawing prints no overall dimension pair, so there is no printed extent to
+   cross-check the measured 1717 SF against — the measurement stands, unverified"
+```
+
+The flood fill finds an interior enclosed sub-region because the warehouse outline is not a closed
+path in this sheet's vector layer — the same class of problem the footprint extractor solves by a
+different route. Making the fill trace a shell-warehouse envelope is a measurement-engine change,
+not a title-recognition one, and forcing it would be fitting a fill until one number agreed.
+
+**Why this is safe to ship as-is.** The fill is FLAGGED, and it can no longer double-count: the same
+object measured on two regions of one sheet is now arbitrated (`one_object_one_quantity`), so
+`Sealed Concrete` publishes the 397,600 SF footprint figure and the 1,717 SF sub-region lands in
+`fusion_rejected` with a reason. Verified on the real bundle — without that rule the enumeration fix
+alone would have published 399,316.7 SF.
+
+**What comes next:** a plan to measure a shell-warehouse envelope from the plan drawing itself
+(rather than only from the printed overall dimensions), at which point FILL-2 becomes the
+cross-check for the footprint instead of a suppressed sub-region.

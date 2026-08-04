@@ -21,6 +21,8 @@ from bobbytailor.deterministic.room_fill import (
     from_page_space,
     label_mask,
     measure_enclosed_area,
+    plan_title_of,
+    plan_titles as _plan_titles,
     printed_extent_bound,
     resolve_drawing_height,
     select_fill_for_basis,
@@ -280,6 +282,68 @@ def test_the_skip_veto_oracle_cannot_drift_from_the_engine_it_measures(rot):
     doc, page = _sheet_reading_upright(rot)
     assert page_measurable_signal(page)["plan_titles"] == len(_fills(page)[0]) == 1
     doc.close()
+
+
+# ── A drawing title need not carry a discipline CODE ─────────────────────────
+
+
+@pytest.mark.parametrize("text,expected", [
+    # The coded house style the pattern was originally fitted to.
+    ("KING SUITE B - RCP PLAN", ("KING SUITE B", "RCP")),
+    ("QQ A - AR PLAN", ("QQ A", "AR")),
+    # The uncoded convention most sets actually print. Crow's A-101 titles its
+    # main 1"=40' drawing this way, and matching only the coded form reported
+    # plan_titles: 0 on the sheet that IS the floor plan.
+    ("OVERALL FLOOR PLAN", ("OVERALL", "AR")),
+    ("1 OVERALL FLOOR PLAN", ("OVERALL", "AR")),
+    ("LEVEL 1 FLOOR PLAN", ("LEVEL 1", "AR")),
+    ("2. ROOF PLAN", ("ROOF", "RCP")),
+    ("REFLECTED CEILING PLAN", ("REFLECTED CEILING", "RCP")),
+    ("ENLARGED FINISH PLAN", ("ENLARGED", "FF")),
+])
+def test_a_drawing_title_is_read_in_either_convention(text, expected):
+    assert plan_title_of(text) == expected
+
+
+@pytest.mark.parametrize("text", [
+    # Sentences that MENTION a plan are not drawing titles. The uncoded match
+    # is anchored to the whole line for exactly this reason — a general note
+    # carrying a kind word must never enumerate a drawing that does not exist.
+    "YELLOW - SEE ENLARGED PLANS AND ROOF PLAN.",
+    "ROOM - SEE ENLARGED PLANS.",
+    "PLAN REVIEW",
+    "OVERALL FLOOR PLAN SHEET NUMBER:A-101 PROJECT NAME:CASS WHITE ROAD",
+    "TYPICAL S.C.C.P. JOINT DETAIL",
+    "",
+])
+def test_a_sentence_that_mentions_a_plan_is_not_a_drawing_title(text):
+    assert plan_title_of(text) is None
+
+
+@pytest.mark.skipif(
+    not __import__("os").path.isfile("tests/fixtures/crow_cass/crow_cass_plans.pdf"),
+    reason="Crow plans fixture not present",
+)
+def test_crows_main_floor_plan_is_enumerated_as_a_drawing():
+    """The mirror of the Moxy title-block defect, on the real sheet.
+
+    A-101 reported ``plan_titles: 0`` and "no measurable plan drawing on this
+    sheet" while carrying five viewports — only the four 1½"=1'-0" details
+    were enumerated, all correctly excluded as off-scale. The main 1"=40'
+    OVERALL FLOOR PLAN was never seen at all.
+    """
+    from bobbytailor.pipeline.takeoff_pipeline import page_measurable_signal
+
+    doc = fitz.open("tests/fixtures/crow_cass/crow_cass_plans.pdf")
+    try:
+        page = doc[0]
+        titles = [(n, k) for n, k, _tb in _plan_titles(page)]
+        assert ("OVERALL", "AR") in titles
+        # Exactly one of them has a printed scale beneath it — the title-block
+        # copy of the same string is not a drawing and must not be counted.
+        assert page_measurable_signal(page)["plan_titles"] == 1
+    finally:
+        doc.close()
 
 
 def test_the_region_bound_is_threaded_and_defaults_to_the_module_constant():

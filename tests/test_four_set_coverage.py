@@ -58,8 +58,10 @@ PRE_VETO_SKIPS = {
 #                 drawings, so a keyword must not be able to discard them.
 #   crow    == 0  Nothing to recover; page 0 already classifies floor_plan. This
 #                 pins that the veto is NOT a blanket "measure everything".
-#   bobs    == 1  Page 0 is a REAL cover sheet (titles=0, scales=0). A correct
-#                 skip must survive the veto, or the veto is just noise.
+#   bobs    == 1  Page 0 is a REAL cover sheet: a sheet INDEX with no printed
+#                 scale, so its measurable signal is zero (its index entries do
+#                 name plans, on OTHER sheets). A correct skip must survive the
+#                 veto, or the veto is just noise.
 #   chelsea <= 2  The documented Chelsea baseline is 2 (INV-00 §1d). Today's
 #                 title-block routing measures 0. Either passes; an increase
 #                 beyond 2 is the 0.88 regression returning.
@@ -221,11 +223,30 @@ def test_crow_is_completely_unchanged(audits):
 
 
 def test_bobs_real_cover_sheet_stays_skipped(audits):
-    """A correct skip must survive the veto, and be labelled not_applicable."""
+    """A correct skip must survive the veto, and be labelled not_applicable.
+
+    Measurability is asserted through the SCALE-GATED signal, exactly as
+    ``test_moxy_keeps_its_real_cover_and_index_skipped`` does, and for the same
+    reason. Bob's page 0 is a sheet INDEX: it lists "REFLECTED CEILING PLAN",
+    "ROOF PLAN", "DEMOLITION PLAN" and more as entries pointing at drawings on
+    OTHER sheets. Those strings are title CANDIDATES — ``plan_titles`` is a
+    candidate list, and the printed scale beneath a title is what separates a
+    drawing from a mention of one. Moxy's cover has always produced 11 such
+    candidates (``page_measurable_signal``'s own docstring says so); this test
+    used to read zero on Bob's only because the title pattern was blind to the
+    uncoded "<NAME> <KIND> PLAN" convention Bob's index happens to use, and
+    that blindness was the D4 defect — it was also hiding Crow's main floor
+    plan. Asserting the whole measurability surface is zero is STRICTER than
+    asserting the raw candidate count is zero: it covers titles, scales,
+    viewports and schedules together, and it holds whatever house style a set
+    prints.
+    """
     result = _require(audits, "bobs")
     assert result["pages_skipped"] == [0]
     page0 = result["pages"][0]
-    assert page0["titles"] == 0
+    assert sum(page0["measurable_signal"].values()) == 0, (
+        "page 0 has no printed scale, so nothing on it is measurable"
+    )
     assert page0["scales"] == 0
     assert page0["disposition"] == "not_applicable"
     assert page0["classifier_overruled"] is False
@@ -444,7 +465,8 @@ def test_no_page_fraction_was_changed_to_achieve_any_of_this():
 #                 SHEET whose index lists 11 drawing names and carries ZERO
 #                 printed scales. The other 16 are guestroom prototypes.
 #   crow    == 0  nothing to discard; every page classifies to a drawing type.
-#   bobs    == 1  page 0 is a REAL cover sheet (titles=0, scales=0).
+#   bobs    == 1  page 0 is a REAL cover sheet (no printed scale, so zero
+#                 measurable signal).
 #   chelsea <= 2  documented baseline is 2 (INV-00 §1d); measured 0 today.
 #                 An increase beyond 2 is the 0.88 regression returning.
 MAX_CLASSIFIER_DISCARDED = {"moxy": 2, "crow": 0, "bobs": 1, "chelsea": 2}

@@ -3262,6 +3262,58 @@ def _arbitrate_one_area_one_item(
                         n for n in shared_names if n != str(component.get("name"))
                     ]
 
+    # ── One OBJECT, one quantity per sheet ───────────────────────────────────
+    #
+    # The rule above arbitrates WITHIN a region. This one arbitrates ACROSS
+    # them: the same named object measured on two different regions of one
+    # sheet is two ROUTES to one quantity, and summing them prices the object
+    # twice. Crow makes it concrete — once its main floor plan is enumerated as
+    # a drawing, "Sealed Concrete" is measured BOTH as the 397,600 SF building
+    # footprint and as a 1,717 SF enclosed sub-region of that same drawing.
+    #
+    # Only the case with a principle behind it is decided. A whole-building
+    # plane bound to the measured FOOTPRINT outranks a fill-derived measurement
+    # of the same object, because the footprint IS that object's extent:
+    # _fuse_project_area_items exists precisely because these planes "fell back
+    # to ~6 SF room slivers without a footprint binding". Where no footprint row
+    # is involved there is no principle to apply, so nothing is suppressed —
+    # a guessed precedence would be worse than a flagged duplicate.
+    by_object: Dict[tuple, List[dict]] = {}
+    for component in components:
+        if id(component) in suppressed or not component.get("region_ref"):
+            continue
+        key = (_norm_name(component.get("name")), str(component.get("unit") or ""))
+        by_object.setdefault(key, []).append(component)
+    for group in by_object.values():
+        if len(group) < 2:
+            continue
+        anchor = next(
+            (c for c in group if str(c.get("region_ref")) == "footprint"), None
+        )
+        if anchor is None:
+            continue
+        for component in group:
+            if str(component.get("region_ref")) == "footprint":
+                continue
+            suppressed.add(id(component))
+            rejected.append(
+                {
+                    "candidate_id": component.get("candidate_id"),
+                    "source": "arbitration",
+                    "answer": component.get("name"),
+                    "reason": "one_object_one_quantity",
+                    "quantity": component.get("quantity"),
+                    "unit": component.get("unit"),
+                    "detail": "the same object is measured on this sheet as the "
+                              "building footprint (%s %s); this %s reading is a "
+                              "sub-region of that same plane, a second ROUTE to "
+                              "one quantity and not a second quantity, so it is "
+                              "NOT summed"
+                              % (anchor.get("quantity"), anchor.get("unit"),
+                                 component.get("region_ref")),
+                }
+            )
+
     if suppressed:
         components[:] = [c for c in components if id(c) not in suppressed]
 
