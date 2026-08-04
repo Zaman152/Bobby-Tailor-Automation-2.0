@@ -350,6 +350,108 @@ _WALL_AREA_BASIS = "wall_area"
 _FLOOR_ROOF_BASES = frozenset({"floor_area", "roof_area"})
 
 
+# ── Building LAYERS: what makes shared area DECLARED and not merely emergent ──
+#
+# A measured plan region is a plan AREA, and a building stacks several distinct
+# LAYERS through that one area. On a shell warehouse the footprint legitimately
+# backs the structural SLAB, the floor FINISH troweled onto it, and the exposed
+# roof STRUCTURE overhead: three different objects an estimator prices
+# separately and is right to. What is NOT legitimate is an object inheriting
+# the footprint merely because its measure basis happens to be area-shaped —
+# on Crow that handed the same 397,600 SF to Canopy, Vapor Barrier and Building
+# Footprint as well, and an estimator bidding from that report priced the floor
+# six times (INV-00 §4).
+#
+# So the exception INV-00 §4 asked for is layer-shaped: a measured region backs
+# at most ONE line item PER BUILDING LAYER. Naming a layer is the DECLARATION —
+# it is a statement about what the object is, made before any quantity exists,
+# so the sharing can never be emergent. An object that names no layer declares
+# nothing and is suppressed exactly as before.
+#
+# The order below is specific-first and load-bearing: "Sealed Concrete" is a
+# FINISH laid on a slab, not the slab, so the finish patterns are tested before
+# the slab patterns that its "concrete" token would otherwise match.
+_BUILDING_LAYER_PATTERNS = (
+    (
+        "floor_finish",
+        re.compile(
+            r"\b(?:SEALED|POLISHED|STAINED|BURNISHED|DENSIFIED|TROWELED)\s+"
+            r"CONCRETE\b"
+            r"|\bFLOOR\s+(?:FINISH|SEALER|COATING|COVERING)\b"
+            r"|\b(?:EPOXY|RESINOUS|TERRAZZO|CARPET|VCT|LVT)\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "ceiling",
+        re.compile(r"\bCEILING\b|\bACT\b|\bSOFFIT\b", re.IGNORECASE),
+    ),
+    (
+        "roof_structure",
+        re.compile(
+            r"\bEXPOSED\s+(?:STRUCTURE|STRUCTURAL|DECK|ROOF|FRAMING|JOISTS?)\b"
+            r"|\bROOF\s+(?:STRUCTURE|DECK|FRAMING|SHEATHING|MEMBRANE)\b"
+            r"|\bSTRUCTURE\s+ABOVE\b",
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        "slab",
+        re.compile(
+            r"\bSLAB\b|\bCONCRETE\s+(?:PAD|FLOOR)\b|\bFLOOR\s+DECK\b",
+            re.IGNORECASE,
+        ),
+    ),
+)
+
+#: Naming authority, lowest number = most authoritative. A name the plan itself
+#: printed outranks an estimator-standard library term, which in turn outranks a
+#: verbatim learned string — so "Concrete Pad" (a learned verbatim) can never
+#: anchor a region over "Sealed Concrete" merely by being emitted first.
+_NAME_AUTHORITY = {
+    "vision": 0,
+    "plan_schedule_legend": 0,
+    "schedule": 0,
+    "text_layer": 1,
+    "naming_library": 2,
+    "library": 2,
+    "learned": 3,
+}
+
+
+def _building_layer(name) -> Optional[str]:
+    """The distinct building LAYER this object occupies, or None.
+
+    None means the object declares no layer, so it may not share a measured
+    region with anything: a Canopy is a discrete element with its own extent, a
+    Vapor Barrier is part of the slab assembly rather than a layer occupied in
+    its own right, and Building Footprint is the region itself, not a thing
+    built in it. Each of those has to be MEASURED, never inherited.
+    """
+    text = str(name or "").strip()
+    if not text:
+        return None
+    for layer, pattern in _BUILDING_LAYER_PATTERNS:
+        if pattern.search(text):
+            return layer
+    return None
+
+
+def _share_rank(component: dict) -> tuple:
+    """Sort key picking which component ANCHORS a shared measured region.
+
+    Deterministic and name-driven rather than emission-ordered: the old
+    ``group[0]`` anchor meant vocabulary iteration order silently decided which
+    line item an estimator saw.
+    """
+    layer = _building_layer(component.get("name"))
+    authority = _NAME_AUTHORITY.get(
+        str(component.get("name_source") or component.get("source") or "").strip().lower(),
+        4,
+    )
+    return (0 if layer else 1, authority, str(component.get("name") or ""))
+
+
 def _iter_vocabulary(vocabulary):
     """Yield ``(name, basis, unit)`` for each PRIMARY vocabulary object.
 
@@ -3048,11 +3150,20 @@ def _arbitrate_one_area_one_item(
       inherited here so plan 23-15's binder gets it for free).
 
     Components carrying the same ``region_ref`` (and unit) are one measured
-    region: the first-emitted row survives, every other lands in the rejected
-    list with a reason naming the survivor. A component marked
-    ``shared_area="declared"`` survives alongside the anchor and is recorded
-    as ``"deliberate"`` — sharing must be a statement, never an emergent sum
-    (a floor finish over a slab genuinely occupies the slab's area).
+    region. The row with the strongest NAMING AUTHORITY anchors it
+    (:func:`_share_rank` — never emission order, which let vocabulary
+    iteration silently decide what an estimator saw); every suppressed row
+    lands in the rejected list with a reason naming the survivor.
+
+    The exception, and the whole point of the rule: a region backs at most one
+    line item PER BUILDING LAYER. A shell warehouse's footprint genuinely
+    carries the slab, the sealed-concrete finish troweled onto it and the
+    exposed roof structure above — three distinct layers occupying one plan
+    area, which is not the same thing as three copies of one quantity. Naming
+    a layer (:func:`_building_layer`) IS the declaration; a producer may also
+    say so directly with ``shared_area="declared"``. An object that names no
+    layer inherited the region only because its measure basis is area-shaped
+    (Canopy, Vapor Barrier, Building Footprint on Crow) and is suppressed.
 
     Every suppression is auditable; nothing vanishes silently (T-23-54).
     """
@@ -3095,14 +3206,40 @@ def _arbitrate_one_area_one_item(
     for (region, _unit), group in by_region.items():
         if len(group) < 2:
             continue
-        anchor = group[0]
+        # The anchor is chosen by naming authority, not by emission order.
+        ordered = sorted(group, key=_share_rank)
+        anchor = ordered[0]
+        anchor_layer = _building_layer(anchor.get("name"))
+        claimed_layers = {anchor_layer} if anchor_layer else set()
         shared_names = [str(anchor.get("name"))]
-        for component in group[1:]:
-            if component.get("shared_area"):
+        for component in ordered[1:]:
+            layer = _building_layer(component.get("name"))
+            # Declared sharing: a DISTINCT building layer through the same plan
+            # area is a different object, not a duplicate of the anchor. An
+            # explicit ``shared_area="declared"`` from a producer says the same
+            # thing directly and is honoured as-is.
+            if component.get("shared_area") or (layer and layer not in claimed_layers):
+                if layer:
+                    claimed_layers.add(layer)
+                    component["building_layer"] = layer
                 component["shared_area"] = "deliberate"
                 shared_names.append(str(component.get("name")))
                 continue
             suppressed.add(id(component))
+            if layer:
+                why = (
+                    "the %s layer of that region is already taken by %r — one "
+                    "measured region backs at most one line item PER LAYER"
+                    % (layer, anchor.get("name"))
+                )
+            else:
+                why = (
+                    "%r names no distinct building layer, so the sharing is "
+                    "not declared — it inherited this region only because its "
+                    "measure basis is area-shaped, and an inherited quantity "
+                    "is not a measured one"
+                    % (component.get("name"),)
+                )
             rejected.append(
                 {
                     "candidate_id": component.get("candidate_id"),
@@ -3111,12 +3248,12 @@ def _arbitrate_one_area_one_item(
                     "reason": "one_area_one_item",
                     "quantity": component.get("quantity"),
                     "unit": component.get("unit"),
-                    "detail": "backed by the same measured region (%s) as "
-                              "%r, and the sharing is not declared — a "
-                              "measured region backs at most one line item"
-                              % (region, anchor.get("name")),
+                    "detail": "backed by the same measured region (%s) as %r: %s"
+                              % (region, anchor.get("name"), why),
                 }
             )
+        if anchor_layer:
+            anchor["building_layer"] = anchor_layer
         if len(shared_names) > 1:
             for component in group:
                 if id(component) not in suppressed:

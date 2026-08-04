@@ -497,23 +497,31 @@ def test_fuse_binds_wall_area_and_floor_roof_from_vocabulary():
     assert cmu["wall_height_source"] == "plan"
     assert cmu["needs_review"] is False  # plan-sourced height → not flagged
 
-    # ONE footprint-backed item survives; the other is audited, not summed.
+    # Both footprint-backed items survive: the sealed-concrete FINISH and the
+    # exposed roof STRUCTURE are different building layers through one plan
+    # area, not two copies of one quantity. Suppressing one of them was the
+    # regression that took Crow's measured-item accuracy from 75% to 0%.
     survivors = [
         c for c in result["components"]
         if c["name"] in ("Sealed Concrete", "Exposed Structure")
     ]
-    assert len(survivors) == 1
-    assert survivors[0]["unit"] == "SF"
-    assert survivors[0]["quantity"] == 397600.0  # the whole footprint
-    assert survivors[0]["provenance"] == "geometry"
+    assert len(survivors) == 2
+    assert {c["name"] for c in survivors} == {"Sealed Concrete", "Exposed Structure"}
+    assert {c["building_layer"] for c in survivors} == {
+        "floor_finish", "roof_structure"
+    }
+    for survivor in survivors:
+        assert survivor["unit"] == "SF"
+        assert survivor["quantity"] == 397600.0  # the whole footprint
+        assert survivor["provenance"] == "geometry"
+        # The sharing is recorded as deliberate, never emergent.
+        assert survivor["shared_area"] == "deliberate"
     dropped = [
         r for r in result["fusion_rejected"]
         if r.get("reason") == "one_area_one_item"
         and r.get("answer") in ("Sealed Concrete", "Exposed Structure")
     ]
-    assert len(dropped) == 1
-    assert dropped[0]["answer"] != survivors[0]["name"]
-    assert "sharing is not declared" in dropped[0]["detail"]
+    assert dropped == []
 
 
 def test_fuse_wall_area_default_height_is_flagged():
@@ -1525,11 +1533,21 @@ def test_different_regions_and_different_units_are_never_arbitrated():
     not __import__("os").path.isfile(CROW_PLANS),
     reason="Crow plans fixture not present",
 )
-def test_on_the_real_crow_bundle_the_footprint_value_backs_one_line_item():
-    """INV-00 §4 item 1 reproduced and defused: the measured footprint value
-    backed SIX line items at once. After arbitration the COUNT of items
-    sharing that value is ONE — no assertion about which name won — and every
-    suppressed name is in the rejected list with a reason."""
+def test_on_the_real_crow_bundle_the_footprint_backs_one_item_per_layer():
+    """INV-00 §4 item 1 reproduced and defused, with the exception INV-00 asked
+    for actually implemented.
+
+    The measured footprint value backed SIX line items at once. Three of them
+    are distinct building LAYERS through that one plan area (the slab, the
+    sealed-concrete floor finish, the exposed roof structure) and an estimator
+    prices all three. The other three inherited the footprint only because
+    their measure basis is area-shaped — a Canopy has its own extent, a Vapor
+    Barrier is part of the slab assembly, and Building Footprint is the region
+    itself — so they are suppressed with a reason.
+
+    Collapsing all six to ONE was the regression: it deleted two golden items
+    (Sealed Concrete, Exposed Structure) and left a learned verbatim name in
+    their place."""
     from bobbytailor.deterministic.footprint_takeoff import (
         extract_building_footprint,
     )
@@ -1552,16 +1570,25 @@ def test_on_the_real_crow_bundle_the_footprint_value_backs_one_line_item():
         c for c in result["components"]
         if c.get("unit") == "SF" and c.get("quantity") == pytest.approx(fp.area_sf)
     ]
-    assert len(value_rows) == 1, (
-        "the footprint value must back exactly ONE line item, got: %s"
-        % [c["name"] for c in value_rows]
-    )
+    assert {c["name"] for c in value_rows} == {
+        "Concrete Pad", "Sealed Concrete", "Exposed Structure"
+    }, "one line item per building layer, got: %s" % [c["name"] for c in value_rows]
+    # One item PER LAYER — no layer is claimed twice.
+    layers = [c.get("building_layer") for c in value_rows]
+    assert sorted(layers) == ["floor_finish", "roof_structure", "slab"]
+    assert len(layers) == len(set(layers))
+
     suppressed = [
         r for r in result["fusion_rejected"]
         if r.get("reason") == "one_area_one_item"
     ]
-    assert len(suppressed) == 5
+    assert {r["answer"] for r in suppressed} == {
+        "Canopy", "Vapor Barrier", "Building Footprint"
+    }
     assert all(r.get("detail") for r in suppressed), "every suppression has a reason"
+    assert all(
+        "names no distinct building layer" in r["detail"] for r in suppressed
+    )
 
 
 # ── The real Moxy bundle, measured once for the whole module ─────────────────
