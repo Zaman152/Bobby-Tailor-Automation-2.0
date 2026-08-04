@@ -520,8 +520,13 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
         # Classify by description
         item_type = _classify_item(description, std_unit, sheet_type)
 
-        # Detail sheets: dimension callouts are not install counts (RC-6)
-        if sheet_type == "detail" and item_type in ("bollard", "stairs", "columns", "ladder", "lift"):
+        # Detail sheets: dimension callouts are not install counts (RC-6).
+        # Widened (23-15 / INV-06): a dimension annotation on a DETAIL sheet is
+        # a specification, not a run — rails/striping/trench drains included.
+        if sheet_type == "detail" and item_type in (
+            "bollard", "stairs", "columns", "ladder", "lift",
+            "guard_rail", "hand_rail", "striping", "trench_drain",
+        ):
             return None
 
         # Apply formula
@@ -1209,6 +1214,15 @@ def _room_calc(room_name: str, item_type: str, area: float, unit_in: str,
 
 # ─── Formula engine ──────────────────────────────────────────────────────────
 
+# Units that may legitimately enter the length (LF) branch of _apply_formula.
+# A diameter or a height callout in inches is NOT a run length: pushing 1.5 in
+# through the LF branch stamped a pipe O.D. as "1.54 lf" (INV-06 §1.1 — seven
+# phantom rail rows in the saved Crow run, every one a pipe diameter).
+_LENGTH_UNITS = frozenset({"lf", "ft", "feet", "linear feet", "linear foot"})
+# Units that may legitimately enter the area (SF) branch — same shape, same trap.
+_AREA_UNITS = frozenset({"sq_ft", "sf", "sq ft", "square feet", "square foot"})
+
+
 def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[float, str, str]:
     """
     Given an item type + a numeric value, apply the estimation formula.
@@ -1262,6 +1276,11 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
 
     if item_type in ("storm_pipe", "trench_drain", "guard_rail", "hand_rail", "striping",
                       "gas_pipe", "lintel", "duct_lf", "conduit_lf"):
+        if (unit or "").lower().strip() not in _LENGTH_UNITS:
+            # A diameter/height callout (e.g. 1 1/2" pipe O.D.) is NOT a run
+            # length. Return it untouched with no formula; the caller's
+            # no-formula gate drops it from calculations output.
+            return value, unit, "no formula"
         wf = table.get("waste_factor", 1.0)
         return value * wf, "lf", f"{value:.0f} lf × {wf} = {value * wf:.0f} lf"
 
@@ -1274,6 +1293,10 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
     if item_type in ("concrete_pavement", "asphalt", "tilt_up_wall", "exposed_structure",
                       "exterior_soffit", "sealed_concrete", "cmu_wall", "internal_tilt_up_wall",
                       "canopy", "eifs", "cmu_paint"):
+        if (unit or "").lower().strip() not in _AREA_UNITS:
+            # A linear dimension or count is NOT an area — same guard shape
+            # as the length branch above.
+            return value, unit, "no formula"
         wf = table.get("waste_factor", 1.0)
         return value * wf, "sq_ft", f"{value:.0f} sf × {wf} = {value * wf:.0f} sf"
 

@@ -2209,3 +2209,262 @@ def test_crow_publishes_no_perimeter_route_component(crow_elevation_fused):
         assert c["name_source"] == "elevation_fill"
     notes = " ".join(bundle.get("coverage_notes") or [])
     assert "cross-check" in notes and "publishes no quantity" in notes
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 23-15 — the linear binder: basis `linear` finally has a consumer.
+#
+# NO-TUNING CONTRACT: Crow's stamped Guard Rail 420.35 LF / Hand Rail
+# 438.80 LF are a per-instance detail length times an instance multiplier the
+# drawings do not print (~6x / ~21x). NOTHING here asserts against them, and
+# nothing ever may (INV-06 §4 risk 1, D-07). Bob's gas is asserted as a BAND
+# (886.77 ±5%), never an equality.
+# ═════════════════════════════════════════════════════════════════════════════
+
+from bobbytailor.deterministic.open_runs import OpenRun  # noqa: E402
+from bobbytailor.vision.fusion import BASIS_BINDERS  # noqa: E402
+
+
+def _linear_rows(result):
+    return [c for c in result["components"] if c.get("basis") == "linear"]
+
+
+def test_the_linear_basis_routes_through_the_registry_only():
+    """SP-9: `linear` is a BASIS_BINDERS entry — no parallel frozenset."""
+    import bobbytailor.vision.fusion as fusion_mod
+
+    assert "linear" in BASIS_BINDERS
+    assert not hasattr(fusion_mod, "_LINEAR_BASES")
+    assert not hasattr(fusion_mod, "_LINETYPE_BASES")
+
+
+def test_a_linear_run_is_a_groundable_candidate():
+    run = OpenRun(polyline_pt=((0.0, 0.0), (100.0, 0.0)), length_pt=100.0,
+                  candidate_id="LIN-1", scale_fpi=4.0)
+    registry = build_registry({"linear_runs": [run]})
+    assert registry["LIN-1"]["kind"] == "linear_run"
+    assert registry["LIN-1"]["bbox_pt"] == (0.0, 0.0, 100.0, 0.0)
+
+
+def test_a_stair_rail_titled_run_binds_per_instance_and_flagged():
+    """INV-06 §3 item 6: one run titled after a stair rail + a vocabulary
+    declaring a linear basis → exactly one component, provenance geometry,
+    LF, needs_review True, unit_count None. The drawing's own title does the
+    naming ('STAIR RAIL' → Hand Rail through the ONE static map)."""
+    run = OpenRun(polyline_pt=((0.0, 0.0), (378.0, 0.0)), length_pt=378.0,
+                  candidate_id="LIN-1", scale_fpi=2.0,
+                  viewport_title="STAIR RAIL", is_typical=True, paired=True)
+    bundle = {"linear_runs": [run], "fpp": 0.02778, "sheet_name": "A-401"}
+    vocab = [{"name": "Hand Rail", "measure": "linear", "unit": "LF"}]
+    result = fuse_sheet(bundle, {}, vocabulary=vocab)
+    rows = _linear_rows(result)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["name"] == "Hand Rail"
+    assert row["provenance"] == "geometry"
+    assert row["unit"] == "LF"
+    assert row["needs_review"] is True
+    assert row["unit_count"] is None
+    assert row["quantity"] == pytest.approx(10.5, abs=0.1)
+    assert "TYPICAL" in row["review_reason"]
+    assert "not stated" in row["review_reason"]
+
+
+def test_a_typical_run_and_a_main_plan_run_for_one_object_do_not_sum():
+    """Same rail, two drawings: the main-plan (as-built) drawing is billed,
+    the typical detail is NOT added to it, and the row says so."""
+    typical = OpenRun(polyline_pt=((0.0, 0.0), (378.0, 0.0)), length_pt=378.0,
+                      candidate_id="LIN-1", scale_fpi=2.0,
+                      viewport_title="STAIR RAIL", is_typical=True)
+    main = OpenRun(polyline_pt=((0.0, 0.0), (954.0, 0.0)), length_pt=954.0,
+                   candidate_id="LIN-2", scale_fpi=4.0,
+                   viewport_title="HAND RAIL PLAN", is_typical=False)
+    bundle = {"linear_runs": [typical, main], "sheet_name": "A-401"}
+    vocab = [{"name": "Hand Rail", "measure": "linear", "unit": "LF"}]
+    result = fuse_sheet(bundle, {}, vocabulary=vocab)
+    rows = [c for c in _linear_rows(result)
+            if c["name"] == "Hand Rail"]
+    assert len(rows) == 1
+    row = rows[0]
+    main_lf = 954.0 * (4.0 / 72.0)
+    typical_lf = 378.0 * (2.0 / 72.0)
+    assert row["quantity"] == pytest.approx(main_lf, abs=0.1)
+    assert row["quantity"] != pytest.approx(main_lf + typical_lf, abs=0.1)
+    assert not row.get("typical_detail")
+    assert "never summed" in row["review_reason"]
+
+
+def test_two_families_and_two_labels_flag_and_never_assign_a_name():
+    """THE AMBIGUITY GATE (SP-7c): two linetype families + two linear labels
+    → the measured quantities ship flagged with a reason naming BOTH counts,
+    and NEITHER label is assigned. Names are never round-robined."""
+    fam_a = OpenRun(polyline_pt=((0.0, 0.0), (720.0, 0.0)), length_pt=720.0,
+                    candidate_id="LIN-1", scale_fpi=10.667,
+                    mark_signature=(39, 10, 4))
+    fam_b = OpenRun(polyline_pt=((0.0, 50.0), (360.0, 50.0)), length_pt=360.0,
+                    candidate_id="LIN-2", scale_fpi=10.667,
+                    mark_signature=(22, 8, 3))
+    bundle = {
+        "linear_runs": [fam_a, fam_b],
+        "sheet_linear_phrases": [
+            {"name": "Gas Piping", "unit": "LF", "basis": "linear",
+             "source": "sheet_note"},
+            {"name": "Storm Sewer", "unit": "LF", "basis": "linear",
+             "source": "sheet_note"},
+        ],
+        "sheet_name": "A3.0",
+    }
+    result = fuse_sheet(bundle, {}, vocabulary=[
+        {"name": "Gas Piping", "measure": "linear", "unit": "LF"},
+        {"name": "Storm Sewer", "measure": "linear", "unit": "LF"},
+    ])
+    rows = _linear_rows(result)
+    assert len(rows) == 2
+    for row in rows:
+        assert row["needs_review"] is True
+        assert row["name"] not in ("Gas Piping", "Storm Sewer")
+        assert "2 linetype families" in row["review_reason"]
+        assert "2 linear-basis labels" in row["review_reason"]
+        assert "never round-robined" in row["review_reason"]
+
+
+def test_an_shx_comment_annotation_names_the_family_it_overlaps():
+    """INV-04 §5 priority 1: when an AutoCAD SHX comment annot's rectangle
+    overlaps a family mark, that string IS the label — exactly and for free.
+    The glyph itself is never read."""
+    run = OpenRun(polyline_pt=((0.0, 0.0), (720.0, 0.0)), length_pt=720.0,
+                  candidate_id="LIN-1", scale_fpi=10.667,
+                  mark_signature=(39, 10, 4),
+                  mark_stats={"mark_centers": [(15.0, 15.0)]})
+    bundle = {
+        "linear_runs": [run],
+        "shx_labels": [{"rect": (10.0, 10.0, 30.0, 20.0), "text": "GAS"}],
+        "sheet_linear_phrases": [],
+        "sheet_name": "A3.0",
+    }
+    result = fuse_sheet(bundle, {})
+    rows = _linear_rows(result)
+    assert len(rows) == 1
+    assert rows[0]["name"] == "Gas"
+    assert rows[0]["name_source"] == "shx_annot"
+
+
+# ── real-PDF: Bob's gas run + Crow's rails ───────────────────────────────────
+
+
+def _harvested_library(doc):
+    from bobbytailor.deterministic.component_library import (
+        apply_deterministic_basis,
+        harvest_component_library,
+    )
+
+    texts = [doc[i].get_text() for i in range(doc.page_count)]
+    return apply_deterministic_basis(harvest_component_library(texts))
+
+
+@pytest.fixture(scope="module")
+def bobs_roof_linear_fused():
+    """Bob's page 3 (A3.0 ROOF PLAN) bundle + fuse with the harvested
+    library — the gas main's whole path, zero API."""
+    if not os.path.exists(BOBS_PLANS):
+        pytest.skip("the real Bob's plan set is not present")
+    import fitz
+
+    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+    pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    doc = fitz.open(BOBS_PLANS)
+    try:
+        bundle = pipe._deterministic_bundle(
+            doc[3], doc, BOBS_PLANS, 3, "A3.0", "roof_plan"
+        )
+        library = _harvested_library(doc)
+    finally:
+        doc.close()
+    return bundle, fuse_sheet(bundle, {}, vocabulary=library)
+
+
+def test_bobs_gas_run_lands_in_its_band_named_from_the_sheets_own_note(
+    bobs_roof_linear_fused,
+):
+    """The gas main emits ONE component in the 840-935 LF band (886.77 ±5%,
+    a BAND, never an equality), named 'Gas Piping' from the sheet's own
+    general note with no model call anywhere in the path."""
+    bundle, result = bobs_roof_linear_fused
+    assert any(r.mark_signature for r in bundle["linear_runs"]), (
+        "the annotated-linetype selector must fire on Bob's A3.0"
+    )
+    gas = [c for c in _linear_rows(result) if c["name"] == "Gas Piping"]
+    assert len(gas) == 1
+    row = gas[0]
+    assert 840.0 <= row["quantity"] <= 935.0
+    assert row["unit"] == "LF"
+    assert row["provenance"] == "geometry"
+    assert row["name_source"] == "sheet_note"
+
+
+def test_bobs_sheet_note_phrase_is_harvested_onto_the_bundle(
+    bobs_roof_linear_fused,
+):
+    bundle, _result = bobs_roof_linear_fused
+    names = [p["name"] for p in bundle.get("sheet_linear_phrases") or []]
+    assert names == ["Gas Piping"]
+
+
+@pytest.fixture(scope="module")
+def crow_details_linear_fused():
+    """Crow page 2 (A-401 MISC. DETAILS — the sheet the rails live on) as a
+    detail sheet, fused with the harvested library."""
+    if not os.path.exists(CROW_UPLOAD):
+        pytest.skip("the real Crow plan set is not present")
+    import fitz
+
+    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+    pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    doc = fitz.open(CROW_UPLOAD)
+    try:
+        bundle = pipe._deterministic_bundle(
+            doc[2], doc, CROW_UPLOAD, 2, "A-401", "detail"
+        )
+        library = _harvested_library(doc)
+    finally:
+        doc.close()
+    return bundle, fuse_sheet(bundle, {}, vocabulary=library)
+
+
+def test_crow_detail_sheet_bundle_carries_linear_run_candidates(
+    crow_details_linear_fused,
+):
+    """The deterministic bundle for Crow page 2 as a DETAIL sheet contains a
+    non-empty linear-run list — page 2 used to contribute no geometry at all
+    (INV-06 §1.4), and it is the only sheet the rails are on."""
+    bundle, _result = crow_details_linear_fused
+    runs = bundle["linear_runs"]
+    assert runs, "Crow p2 must carry linear-run candidates"
+    # Every run is a groundable candidate in the registry.
+    registry = build_registry(bundle)
+    for run in runs:
+        assert run.candidate_id in registry
+        assert registry[run.candidate_id]["kind"] == "linear_run"
+
+
+def test_crow_emits_at_most_one_guard_rail_row_naming_one_viewport(
+    crow_details_linear_fused,
+):
+    """No double count: at most ONE guard-rail component, and when one
+    exists its formula names exactly one viewport. NOTHING asserts against
+    the stamped 420.35/438.80 totals (the multiplier is not printed)."""
+    import re as _re
+
+    _bundle, result = crow_details_linear_fused
+    guard = [
+        c for c in result["components"]
+        if _re.search(r"guard\s*rail|guardrail", str(c.get("name") or ""),
+                      _re.IGNORECASE)
+    ]
+    assert len(guard) <= 1
+    for c in guard:
+        formula = str(c.get("formula") or "")
+        # the emit shape names exactly one viewport: "N LF (<title>, open runs @ S ft/in)"
+        assert formula.count("open runs @") == 1

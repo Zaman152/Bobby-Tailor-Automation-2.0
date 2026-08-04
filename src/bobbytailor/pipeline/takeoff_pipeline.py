@@ -2512,6 +2512,37 @@ class TakeoffPipeline:
                 )
             )
 
+        # Open linear runs (23-15). UNGATED BY SHEET TYPE — the sheet holding
+        # Crow's rails classifies as a detail, so a plan-type gate would skip
+        # the ONLY sheet they are on. Additive: any failure leaves the list
+        # empty and the sheet behaves as before. The runs land in the
+        # candidate registry so a run is groundable like every other
+        # candidate; basis `linear` finally has a consumer
+        # (fusion BASIS_BINDERS["linear"]).
+        linear_runs: list = []
+        sheet_linear_phrases: list = []
+        shx_labels: list = []
+        try:
+            linear_runs, sheet_linear_phrases, shx_labels = (
+                self._measure_linear_runs(
+                    page, doc, viewports, printed_scales_by_region,
+                    sheet_name, fpp,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 — measurement is additive
+            logger.debug("linear-run measurement failed on %r: %s",
+                         sheet_name, exc)
+            coverage_drops.append(
+                DrawingCoverage(
+                    region_id="page",
+                    title=sheet_name,
+                    disposition=ERRORED,
+                    reason="open linear-run measurement raised %s: %s — every "
+                           "linear run on this sheet is unmeasured, not zero"
+                           % (type(exc).__name__, exc),
+                )
+            )
+
         # Finish/material callouts (INV-05 §2 Key A). The masks the bundle
         # already computed are MANDATORY here — a door-schedule tag column and a
         # legend key look exactly like a plan-body callout (threat T-23-30).
@@ -2538,6 +2569,11 @@ class TakeoffPipeline:
             "rooms": rooms,
             "room_fills": room_fills,
             "elevation_areas": elevation_areas,
+            # Open linear runs (23-15) + the sheet's own naming context for
+            # the linear binder: note phrases and SHX comment annotations.
+            "linear_runs": linear_runs,
+            "sheet_linear_phrases": sheet_linear_phrases,
+            "shx_labels": shx_labels,
             # The most recent trustworthy footprint from ANOTHER sheet — the
             # independent side of the elevation cross-check (D-11: the
             # perimeter x datum-height route FLAGS disagreement; it never
@@ -2617,6 +2653,154 @@ class TakeoffPipeline:
             tx1 + self._FILL_CLIP_SIDE_PT,
             max(0.0, ty0 - 8.0),
         )
+
+    # Cap on linear-run candidates kept per callout clip, longest first. The
+    # chainer legitimately returns every open run >= min_run_ft inside a clip
+    # (Crow p2's STAIR PLAN yields 62), and the candidates exist so a run is
+    # groundable like any other candidate — but an unbounded list bloats the
+    # bundle and the registry on dense sheets. The measurable objects are the
+    # LONG runs; the cap is a bound, not a tuning knob (T-23-46 discipline).
+    _LINEAR_RUNS_PER_CLIP = 40
+
+    def _measure_linear_runs(
+        self,
+        page,
+        doc,
+        viewports: Sequence,
+        printed_scales_by_region: dict,
+        sheet_name: str,
+        resolved_fpp: float,
+    ) -> tuple:
+        """Open linear runs (23-15): rails + annotated linetypes, per drawing.
+
+        Two selectors from plan 23-12, both measured at the scale of the
+        DRAWING that contains them, never a borrowed page scale:
+
+        * :func:`extract_linetype_runs` — whole-page clip (its four gates are
+          the false-positive defence: zero fires across the 76 non-gas pages),
+          each run then resolved to its own drawing's callout scale through
+          :func:`run_scale_fpp`; a run whose drawing prints no scale is
+          flagged and NOT measured.
+        * :func:`extract_rail_runs` — per printed-scale callout, inside the
+          23-11 cell clip (the box above the callout), at that callout's own
+          scale, stamped with the callout title and the typical-detail flag.
+          Never offered unclipped (INV-06 risk 4: unclipped chaining swallowed
+          a hatch field into a 369 LF phantom).
+
+        Also harvests the sheet's own naming context for the linear binder:
+        the sheet-note linear phrases ("ALL GAS PIPING TO BE ...") and any
+        AutoCAD SHX text comment annotations, so naming needs no model call.
+
+        Returns ``(runs, sheet_linear_phrases, shx_labels)``. Never raises
+        past its caller's try/except; additive like the room-fill call site.
+        """
+        from bobbytailor.deterministic.component_library import (  # noqa: PLC0415
+            harvest_from_notes,
+        )
+        from bobbytailor.deterministic.open_runs import (  # noqa: PLC0415
+            extract_linetype_runs,
+            extract_rail_runs,
+            run_scale_fpp,
+        )
+        import fitz  # noqa: PLC0415
+
+        runs: list = []
+        # NO mask rects are passed to the selectors — deliberately. On Bob's
+        # A3.0 a false table detection reports a "schedule" bbox covering the
+        # ENTIRE roof plan, and masking with it deletes every gas segment
+        # (measured: 14 runs -> 0). The selectors' own defences are the ones
+        # 23-12 position-validated WITHOUT masks: the linetype selector's four
+        # gates fire zero times across the 76 non-gas pages, and rail runs are
+        # inert candidates until a name binds them. Masked viewports still
+        # never OWN a run (run_scale_fpp skips them as scale owners).
+
+        # The TYPICAL-DETAIL reference scale: the sheet's coarsest printed
+        # callout (largest feet-per-inch) is the main drawing — a detail is a
+        # BLOW-UP, drawn at a smaller feet-per-inch. The resolved page scale
+        # is NOT a safe reference: on Bob's A3.0 it still reads a detail's
+        # 1.0 ft/in, which would flag the roof plan's own gas run as
+        # "typical" while passing the curb detail as main-plan (measured;
+        # exactly inverted). Falls back to the resolved scale on a sheet
+        # with no printed callouts. The comparison can only ADD flags for a
+        # coarser inset (e.g. a vicinity map), never remove one.
+        scales = extract_printed_scales(page)
+        ref_fpp = 0.0
+        for ps in scales:
+            ref_fpp = max(ref_fpp, float(getattr(ps, "feet_per_point", 0.0) or 0.0))
+        if ref_fpp <= 0:
+            ref_fpp = float(resolved_fpp or 0.0)
+
+        # 1) Annotated linetype runs, each at its own drawing's scale.
+        rect = page.rect
+        page_clip = (0.0, 0.0, max(rect.x1, rect.y1), max(rect.x1, rect.y1))
+        for run in extract_linetype_runs(page, doc, page_clip):
+            fpp_run = run_scale_fpp(
+                page, run, viewports or (), printed_scales_by_region or {}
+            )
+            if fpp_run and ref_fpp > 0:
+                run.is_typical = bool(
+                    abs(fpp_run - ref_fpp) > _SCALE_MATCH_TOL * ref_fpp
+                )
+            runs.append(run)
+
+        # 2) Rail-type runs per callout cell. "Above the callout" is decided
+        # in PAGE space (rotation-aware, like _fill_clip_for_title), then
+        # mapped back to the unrotated space the selector chains in.
+        for ps in scales:
+            fpp_cb = float(getattr(ps, "feet_per_point", 0.0) or 0.0)
+            if fpp_cb <= 0:
+                continue
+            bx0, by0, bx1, by1 = _page_space_box(page, ps.bbox_pt)
+            page_cell = fitz.Rect(
+                bx0 - self._FILL_CLIP_SIDE_PT,
+                max(0.0, by0 - self._FILL_CLIP_UP_PT),
+                bx1 + self._FILL_CLIP_SIDE_PT,
+                max(0.0, by0 - 8.0),
+            )
+            raw_clip = tuple(from_page_space(page, page_cell))
+            rails = extract_rail_runs(
+                page,
+                doc,
+                raw_clip,
+                fpp_cb,
+                viewport_title=getattr(ps, "title", "") or "",
+                page_feet_per_point=(ref_fpp or None),
+            )
+            rails = sorted(rails, key=lambda r: -r.length_pt)
+            runs.extend(rails[: self._LINEAR_RUNS_PER_CLIP])
+
+        # 3) Unique candidate IDs across the whole sheet (each selector call
+        # numbers from 1; the registry needs sheet-unique keys).
+        for i, run in enumerate(runs):
+            run.candidate_id = "LIN-%d" % (i + 1)
+
+        # 4) The sheet's own naming context (no model call anywhere).
+        phrases: list = []
+        try:
+            phrases = [
+                e for e in harvest_from_notes(page.get_text() or "")
+                if e.get("source") == "sheet_note"
+            ]
+        except Exception as exc:  # noqa: BLE001 — naming context is additive
+            logger.debug("linear phrase harvest failed on %r: %s", sheet_name, exc)
+        shx: list = []
+        try:
+            for annot in page.annots() or ():
+                info = getattr(annot, "info", None) or {}
+                if (info.get("title") or "") != "AutoCAD SHX Text":
+                    continue
+                content = (info.get("content") or "").strip()
+                if not content:
+                    continue
+                r = annot.rect
+                shx.append({
+                    "rect": (r.x0, r.y0, r.x1, r.y1),
+                    "text": content,
+                })
+        except Exception as exc:  # noqa: BLE001 — annots are additive
+            logger.debug("SHX annot harvest failed on %r: %s", sheet_name, exc)
+
+        return runs, phrases, shx
 
     def _measure_room_fills(
         self,

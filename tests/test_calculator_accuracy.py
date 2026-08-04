@@ -1,5 +1,20 @@
-"""Phase 16 calculator accuracy guards."""
+"""Phase 16 calculator accuracy guards + 23-15 unit-aware formula guards.
+
+23-15 / INV-06: the LF branch of _apply_formula used to IGNORE its unit
+argument, so a rail's pipe diameter printed in inches on a detail sheet
+became "1.54 lf" — seven such phantom rows in the saved Crow run, reported
+as Guardrail 5.8 LF / Handrail 4.7 LF with needs_review=False. The tests
+below pin the kill: an inch is never silently reported as a linear foot,
+and a detail-sheet spec is never a quantity.
+"""
+import csv
+
 from bobbytailor.pipeline.calculator import (
+    ESTIMATION_TABLES,
+    _apply_formula,
+    _calculate_from_lintel_runs,
+    _calculate_from_measurement,
+    _calculate_from_pipe_runs,
     _calculate_from_schedule,
     _parse_numeric,
     _schedule_is_takeoff,
@@ -112,6 +127,127 @@ def test_storm_pipe_from_pipe_runs():
     }
     est = apply_estimation_tables(extracted)
     assert any(e.get("item_type") == "storm_pipe" for e in est)
+
+
+# ─── 23-15: unit-aware formula branches + widened detail-sheet guard ─────────
+
+# The seven phantom rows of INV-06 §1.1 — every one a pipe O.D. in inches,
+# every one from the A-401 details sheet, reproduced verbatim as fixtures.
+_INV06_PHANTOM_MEASUREMENTS = [
+    {"value": "1.5", "unit": "in", "description": "Steel pipe guardrail outer diameter",
+     "raw_text": '1 1/2" O.D. STEEL PIPE GUARDRAIL'},
+    {"value": "1.125", "unit": "in", "description": "Steel pipe guardrail outer diameter",
+     "raw_text": '1 1/8" O.D. STEEL PIPE GUARDRAIL'},
+    {"value": "1.5", "unit": "in", "description": "Handrail O.D. pipe diameter",
+     "raw_text": '1 1/2" O.D. HANDRAIL'},
+    {"value": "1.5", "unit": "in", "description": "Guardrail O.D. pipe diameter",
+     "raw_text": '1 1/2" O.D. GUARDRAIL'},
+    {"value": "1.5", "unit": "in", "description": "Guardrail O.D. pipe diameter",
+     "raw_text": '1-1/2" O.D. GUARDRAIL'},
+    {"value": "1.5", "unit": "in", "description": "Handrail pipe diameter",
+     "raw_text": '1 1/2" O.D. PIPE GUARDRAIL'},
+    {"value": "1.5", "unit": "in", "description": "Handrail pipe diameter",
+     "raw_text": '1 1/2" O.D. HANDRAIL @ CONC. SLAB'},
+]
+
+
+def test_a_pipe_diameter_in_inches_never_becomes_linear_feet():
+    """INV-06 §3 item 1: today _apply_formula('guard_rail', 1.5, 'in', ...)
+    returns (1.545, 'lf', '2 lf × 1.03 = 2 lf') — the value with the inch
+    unit and the no-formula sentinel is the fix."""
+    qty, unit, formula = _apply_formula("guard_rail", 1.5, "in", "1.5")
+    assert (qty, unit, formula) == (1.5, "in", "no formula")
+    qty, unit, formula = _apply_formula("hand_rail", 1.5, "in", "1.5")
+    assert (qty, unit, formula) == (1.5, "in", "no formula")
+    # The area branch has the same shape: a linear dimension is not an area.
+    qty, unit, formula = _apply_formula("cmu_wall", 8.0, "lf", "8")
+    assert (qty, unit, formula) == (8.0, "lf", "no formula")
+
+
+def test_a_rail_diameter_measurement_produces_no_row():
+    """INV-06 §3 item 1 (second half): the same measurement dict through the
+    measurement calculator returns nothing — on the detail sheet via the
+    widened guard, and on a plan sheet via the unit guard."""
+    m = {"value": "1.5", "unit": "in",
+         "description": "Steel pipe guardrail outer diameter",
+         "raw_text": '1 1/2" O.D. STEEL PIPE GUARDRAIL'}
+    assert _calculate_from_measurement(m, "A-401", "detail") is None
+    assert _calculate_from_measurement(m, "A-101", "floor_plan") is None
+
+
+def test_a_detail_sheet_dimension_is_a_spec_not_a_run():
+    """The widened detail guard covers rails, striping and trench drains —
+    even a length-unit callout on a DETAIL sheet is a specification."""
+    for desc, raw in (
+        ("Guardrail run", "42 LF GUARDRAIL"),
+        ("Handrail run", "42 LF HANDRAIL"),
+        ("Parking striping", "42 LF STRIPING"),
+        ("Trench drain", "42 LF TRENCH DRAIN"),
+    ):
+        m = {"value": "42", "unit": "lf", "description": desc, "raw_text": raw}
+        assert _calculate_from_measurement(m, "A-401", "detail") is None, desc
+
+
+def test_a_rail_length_in_linear_feet_still_gets_its_formula():
+    """Regression: a guard-rail item with a value in LF keeps its normal
+    formula and quantity — the guard is on the unit, not the item type."""
+    wf = ESTIMATION_TABLES["guard_rail"]["waste_factor"]
+    qty, unit, formula = _apply_formula("guard_rail", 50.0, "lf", "50")
+    assert unit == "lf"
+    assert formula != "no formula"
+    assert abs(qty - 50.0 * wf) < 0.01
+
+
+def test_pipe_run_and_lintel_run_calculators_are_unaffected():
+    """Regression: both calculators pass an explicit 'lf' unit, so the new
+    guard never fires on their outputs."""
+    pipe = _calculate_from_pipe_runs(
+        [{"length_lf": 25, "diameter_in": 12, "material": "PVC",
+          "raw_text": "25 LF PVC"}], "C-1")
+    assert len(pipe) == 1
+    wf = ESTIMATION_TABLES["storm_pipe"]["waste_factor"]
+    assert pipe[0]["unit"] == "lf"
+    assert pipe[0]["formula"] != "no formula"
+    assert abs(pipe[0]["quantity"] - round(25 * wf, 2)) < 0.01
+
+    lintel = _calculate_from_lintel_runs([{"total_lf": 179.24}], "S-1")
+    assert len(lintel) == 1
+    wf = ESTIMATION_TABLES["lintel"]["waste_factor"]
+    assert lintel[0]["unit"] == "lf"
+    assert lintel[0]["formula"] != "no formula"
+    assert abs(lintel[0]["quantity"] - round(179.24 * wf, 2)) < 0.01
+
+
+def test_no_rail_row_with_an_inch_raw_unit_survives_to_calculations_csv(tmp_path):
+    """INV-06 §3 item 2, asserted over the run directory this offline test
+    produces: after a re-run of the seven saved phantom measurements through
+    the calculator and the reporter's own CSV writer, filtering the
+    calculations output for rail rows whose raw unit is inches yields
+    NOTHING — on the detail sheet AND on a plan sheet."""
+    from bobbytailor.pipeline.reporter import (
+        _normalize_calculated, _write_calculated_csv,
+    )
+    run_dir = tmp_path / "offline_run"
+    run_dir.mkdir()
+    estimates = []
+    for sheet_type in ("detail", "floor_plan"):
+        extracted = {
+            "_source_sheet": "A-401",
+            "sheet_type": sheet_type,
+            "measurements": list(_INV06_PHANTOM_MEASUREMENTS),
+            "components": [], "rooms": [], "schedules": [], "pipe_runs": [],
+        }
+        estimates.extend(apply_estimation_tables(extracted))
+    out = run_dir / "calculations.csv"
+    _write_calculated_csv(_normalize_calculated(estimates), out)
+    with open(out, newline="") as f:
+        rows = list(csv.DictReader(f))
+    rail_inch_rows = [
+        r for r in rows
+        if "rail" in (r.get("item_type") or "").lower()
+        and (r.get("raw_unit") or "").strip().lower() in ("in", "inches", '"')
+    ]
+    assert rail_inch_rows == []
 
 
 def test_resolve_spec_lookups_enriches():

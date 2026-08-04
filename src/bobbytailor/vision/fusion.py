@@ -483,6 +483,16 @@ def build_registry(deterministic_bundle: dict) -> Dict[str, dict]:
                 "kind": "region",
             }
 
+    # Open linear runs (23-15): every run is groundable like any other
+    # candidate — a vision/label answer naming a run must ground-validate.
+    for run in deterministic_bundle.get("linear_runs") or []:
+        cid = _field(run, "candidate_id", "")
+        if cid:
+            registry[cid] = {
+                "bbox_pt": tuple(_field(run, "bbox_pt", ()) or ()),
+                "kind": "linear_run",
+            }
+
     return registry
 
 
@@ -2084,6 +2094,343 @@ def _bind_wall_area_basis(bundle, components, info, fills, ctx) -> None:
     _fuse_elevation_areas(bundle, components, info, ctx)
 
 
+# ── The linear binder (23-15, SP-7) ──────────────────────────────────────────
+
+_LINEAR_BASIS = "linear"
+
+
+def _linear_title_resolves(title: str, obj: dict) -> bool:
+    """Does a drawing's own title name this linear object?
+
+    Two deterministic steps, no numeric input and no model input:
+
+    1. the library resolver — the object's name or any alias appears as a
+       whole phrase in the title;
+    2. THE one static naming map — ``normalize_item_name`` reads general
+       construction vocabulary ("STAIR RAIL" → "Hand Rail"), and the title
+       resolves when the map lands on the object's canonical form.
+    """
+    if not title:
+        return False
+    entry = {
+        "name": obj.get("name") or "",
+        "aliases": list(obj.get("aliases") or []),
+        "unit": obj.get("unit") or "",
+    }
+    try:
+        from bobbytailor.deterministic.component_library import (  # noqa: PLC0415
+            resolve_library_name,
+        )
+        if resolve_library_name(title, [entry]) is not None:
+            return True
+    except Exception:  # noqa: BLE001 — resolution must never break fusion
+        pass
+    try:
+        from bobbytailor.pipeline.aggregator import (  # noqa: PLC0415
+            canonical_library_name,
+            normalize_item_name,
+        )
+        mapped = _norm_name(normalize_item_name(title, "", "")[0])
+        targets = {
+            _norm_name(entry["name"]),
+            _norm_name(canonical_library_name(entry["name"], "")[0]),
+        }
+        return mapped in targets
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _shx_label_for_family(fam_runs, shx) -> str:
+    """The SHX comment-annot label whose rectangle overlaps a family mark.
+
+    AutoCAD's "capture SHX text as comments" export writes the literal
+    linetype string into a ``Square`` annotation; when its rect overlaps one
+    of the family's mark centres, that string IS the label — exactly and for
+    free (INV-04 §5 priority 1). No overlap, no label; a glyph is NEVER read
+    as text (template matching was tried and failed).
+    """
+    if not shx:
+        return ""
+    centers: List[tuple] = []
+    for r in fam_runs:
+        stats = _field(r, "mark_stats", None) or {}
+        cs = stats.get("mark_centers") or []
+        if cs:
+            centers.extend(tuple(c) for c in cs)
+        else:
+            b = _field(r, "bbox_pt", None)
+            if b:
+                centers.append(((b[0] + b[2]) / 2.0, (b[1] + b[3]) / 2.0))
+    for annot in shx:
+        rect = annot.get("rect") or ()
+        text = (annot.get("text") or "").strip()
+        if len(tuple(rect)) != 4 or not text:
+            continue
+        x0, y0, x1, y1 = rect
+        for cx, cy in centers:
+            if x0 <= cx <= x1 and y0 <= cy <= y1:
+                return text.title()
+    return ""
+
+
+def _emit_linear_component(
+    bundle,
+    components: List[dict],
+    name: str,
+    unit: str,
+    runs,
+    instance_counts,
+    name_source: str,
+    extra_reasons=(),
+) -> None:
+    """ONE line item from the selected runs of ONE linear object.
+
+    Runs are summed PER VIEWPORT (per drawing) and exactly ONE viewport is
+    billed: a main-plan drawing when one exists (as-built, count 1), else
+    the typical detail with the largest measured total. A typical run is
+    NEVER summed with a main-plan run of the same object, and two drawings
+    of one object are never summed with each other — same rail, two
+    drawings (INV-06 §2 step 5). Together with the 23-13 arbitration this
+    is the whole defence against silent inflation.
+
+    The instance-count contract (D-09, 23-CONTEXT resolution 2): when the
+    count is unknown the PER-INSTANCE length ships with ``needs_review``
+    and a reason stating what was measured and what is not stated on the
+    sheet — the item is never withheld, because a withheld item is a
+    silent zero.
+    """
+    by_vp: Dict[str, list] = {}
+    for r in runs:
+        by_vp.setdefault(str(_field(r, "viewport_title", "") or ""), []).append(r)
+    totals: List[dict] = []
+    for title, rs in by_vp.items():
+        lf = 0.0
+        best = None
+        typical = False
+        for r in rs:
+            fpi = float(_field(r, "scale_fpi", 0.0) or 0.0)
+            if fpi <= 0:
+                continue
+            lf += float(_field(r, "length_pt", 0.0) or 0.0) * (fpi / 72.0)
+            typical = typical or bool(_field(r, "is_typical", False))
+            if best is None or (
+                float(_field(r, "length_pt", 0.0) or 0.0)
+                > float(_field(best, "length_pt", 0.0) or 0.0)
+            ):
+                best = r
+        if best is None or lf <= 0:
+            continue
+        totals.append({"title": title, "lf": lf, "typical": typical, "run": best})
+    if not totals:
+        return
+    totals.sort(key=lambda t: (t["typical"], -t["lf"], t["title"]))
+    chosen, others = totals[0], totals[1:]
+
+    per_instance = chosen["lf"]
+    reasons = list(extra_reasons)
+    count = None
+    if instance_counts:
+        raw = instance_counts.get(name)
+        try:
+            count = int(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            count = None
+        if count is not None and count <= 0:
+            count = None
+    quantity = per_instance * count if count else per_instance
+    if count and count > 1:
+        # A count above one is a number the drawing being measured does not
+        # contain (SP-10) — never high-confidence.
+        reasons.append(
+            "multiplied by an instance count of %d that this drawing does "
+            "not contain — verify the count" % count
+        )
+    elif not count and chosen["typical"]:
+        reasons.append(
+            "measured ONE %r run (%.1f LF) on a TYPICAL detail; how many "
+            "exist is not stated on this sheet" % (name, per_instance)
+        )
+    if others:
+        reasons.append(
+            "the same object is also drawn in %d other drawing(s) (%s); "
+            "only %r is billed — two drawings of one object are never summed"
+            % (
+                len(others),
+                ", ".join(sorted((t["title"] or "untitled") for t in others)),
+                chosen["title"] or "untitled",
+            )
+        )
+    best = chosen["run"]
+    scale_fpi = float(_field(best, "scale_fpi", 0.0) or 0.0)
+    component = {
+        "name": name,
+        "quantity": round(float(quantity), 1),
+        "unit": (unit or "LF").upper(),
+        "provenance": "geometry",
+        "confidence": "high" if not reasons else "medium",
+        "candidate_id": str(_field(best, "candidate_id", "") or ""),
+        "name_source": name_source,
+        "basis": _LINEAR_BASIS,
+        "region_ref": "linear:%s"
+                      % (str(_field(best, "candidate_id", "") or "")
+                         or chosen["title"]),
+        "unit_count": count,
+        "formula": "%.1f LF (%s, open runs @ %.2f ft/in)"
+                   % (per_instance, chosen["title"] or "untitled drawing",
+                      scale_fpi),
+        "needs_review": bool(reasons),
+        "review_reason": "; ".join(reasons),
+    }
+    if chosen["typical"]:
+        component["typical_detail"] = True
+    components.append(component)
+
+
+def _fuse_linear_runs(bundle, components, ctx) -> None:
+    """Measured open linear runs → LF line items (23-15, gaps 4 + 6).
+
+    Reached ONLY through ``BASIS_BINDERS["linear"]`` — no parallel frozenset
+    — and guarded to run once per sheet however many linear vocabulary items
+    ask (the 23-14 dispatcher pattern).
+
+    Naming, most-authoritative first, all deterministic (SP-7):
+
+    * the drawing's OWN TITLE resolves to a linear object — the plan's own
+      detail titles do the naming, with no model input and no numeric input;
+    * for annotated-linetype families: an SHX comment annotation whose
+      rectangle overlaps a mark, then the sheet's own note phrase — bound
+      ONLY when exactly one family and exactly one label exist (the
+      ambiguity gate, SP-7c). Otherwise the measured quantity ships flagged
+      with a reason naming both counts. Names are NEVER round-robined and a
+      glyph is never read as text.
+    """
+    if bundle.get("_linear_runs_bound"):
+        return
+    runs = bundle.get("linear_runs") or []
+    if not runs:
+        return
+    bundle["_linear_runs_bound"] = True
+
+    def _note(text: str) -> None:
+        bundle.setdefault("coverage_notes", []).append(text)
+
+    vocab_map = (ctx or {}).get("vocab_map") or {}
+    instance_counts = (ctx or {}).get("room_mix") or {}
+
+    # Linear-basis objects, with their vocabulary aliases folded back in so
+    # a title can resolve through an alias.
+    objects: Dict[str, dict] = {}
+    for alias, info in vocab_map.items():
+        if str(info.get("basis") or "").strip().lower() != _LINEAR_BASIS:
+            continue
+        name = info.get("name")
+        if not name:
+            continue
+        entry = objects.setdefault(
+            _norm_name(name),
+            {"name": name, "unit": info.get("unit") or "LF", "aliases": []},
+        )
+        if alias and _norm_name(alias) != _norm_name(name):
+            entry["aliases"].append(alias)
+
+    measurable = [
+        r for r in runs if float(_field(r, "scale_fpi", 0.0) or 0.0) > 0
+    ]
+    unmeasured = len(runs) - len(measurable)
+    if unmeasured:
+        _note(
+            "%d linear run(s) have no containing drawing scale and were NOT "
+            "measured — flagged, never measured at a borrowed scale"
+            % unmeasured
+        )
+    plain = [r for r in measurable if not _field(r, "mark_signature", None)]
+    signed = [r for r in measurable if _field(r, "mark_signature", None)]
+
+    # ── Path 1: the drawing's own title names its runs ───────────────────────
+    for entry in objects.values():
+        selected = [
+            r for r in plain
+            if _linear_title_resolves(
+                str(_field(r, "viewport_title", "") or ""), entry
+            )
+        ]
+        if not selected:
+            continue
+        _emit_linear_component(
+            bundle, components, entry["name"], entry["unit"], selected,
+            instance_counts, "viewport_title",
+        )
+
+    # ── Path 2: annotated-linetype families (SHX → sheet note → flag) ────────
+    if not signed:
+        return
+    families: Dict[tuple, list] = {}
+    for r in signed:
+        families.setdefault(
+            tuple(_field(r, "mark_signature", ()) or ()), []
+        ).append(r)
+    shx = bundle.get("shx_labels") or []
+    phrases = bundle.get("sheet_linear_phrases") or []
+
+    unnamed: List[tuple] = []
+    for sig, fam_runs in families.items():
+        label = _shx_label_for_family(fam_runs, shx)
+        if label:
+            _emit_linear_component(
+                bundle, components, label, "LF", fam_runs,
+                instance_counts, "shx_annot",
+            )
+        else:
+            unnamed.append((sig, fam_runs))
+
+    if not unnamed:
+        return
+    if len(unnamed) == 1 and len(phrases) == 1:
+        phrase = phrases[0]
+        _emit_linear_component(
+            bundle, components, phrase.get("name") or "Linear Run",
+            phrase.get("unit") or "LF", unnamed[0][1], instance_counts,
+            "sheet_note",
+        )
+        return
+    # THE AMBIGUITY GATE (SP-7c): never round-robin. The measured quantity
+    # ships flagged with a reason naming both counts; the row is named by
+    # the drawing's own title, never by a guessed label.
+    reason = (
+        "%d linetype famil%s and %d linear-basis label%s on this sheet — "
+        "cannot bind a name deterministically; names are never round-robined"
+        % (
+            len(unnamed), "y" if len(unnamed) == 1 else "ies",
+            len(phrases), "" if len(phrases) == 1 else "s",
+        )
+    )
+    for _sig, fam_runs in unnamed:
+        title = next(
+            (
+                str(_field(r, "viewport_title", "") or "")
+                for r in fam_runs
+                if _field(r, "viewport_title", "")
+            ),
+            "",
+        )
+        _emit_linear_component(
+            bundle, components, title or "Unnamed Linear Run", "LF",
+            fam_runs, {}, "flagged", extra_reasons=[reason],
+        )
+
+
+def _bind_linear_basis(bundle, components, info, fills, ctx) -> None:
+    """THE registered ``linear`` binder (SP-9): delegates to
+    :func:`_fuse_linear_runs`, which is guarded to run once per sheet.
+
+    ``info`` and ``fills`` (room fills) are part of the binder contract and
+    deliberately unused — the linear pass is per-sheet and its candidates
+    live on the bundle, not in the fills list.
+    """
+    del info, fills
+    _fuse_linear_runs(bundle, components, ctx)
+
+
 # ── The basis-to-binder registry (SP-9, D-03) ────────────────────────────────
 #
 # ONE registry answers every measure basis the enclosed-region engine can bind.
@@ -2113,6 +2460,11 @@ register_basis_binder("floor_area", _bind_enclosed_area)
 # room-fill perimeter x height AND elevation facade silhouettes (23-14). The
 # elevation binder is reached only through this registry entry.
 register_basis_binder(_WALL_AREA_BASIS, _bind_wall_area_basis)
+# linear (23-15): open runs — rails, annotated linetypes — bind through the
+# same registry. Basis `linear` finally has a consumer (INV-06 §1.2 named
+# this the exact silent-zero shape: the name existed, the unit existed, the
+# measurement step did not exist).
+register_basis_binder(_LINEAR_BASIS, _bind_linear_basis)
 
 
 def _fuse_room_fills(
@@ -2166,6 +2518,9 @@ def _fuse_room_fills(
         "room_mix_meta": room_mix_meta or {},
         "wall_height_ft": wall_height_ft,
         "wall_height_source": wall_height_source,
+        # 23-15: the linear binder reads the full object list from the ctx —
+        # additive; every other binder ignores it.
+        "vocab_map": vocab_map,
     }
 
     if fills:
@@ -2893,6 +3248,22 @@ def fuse_sheet(
         deterministic_bundle, components, vocab_map, room_mix, room_mix_meta,
         wall_height_ft=wall_height_ft, wall_height_source=wall_height_source,
     )
+    # Linear-run binding backstop (23-15) — reached ONLY through
+    # BASIS_BINDERS["linear"]. The room-fill wanted-loop dispatches the same
+    # registry entry when the sheet also has fills; this covers the sheets
+    # that don't (Crow's rails live on a detail sheet with no plan fill).
+    # The binder's once-guard makes the two paths converge.
+    if (
+        deterministic_bundle.get("linear_runs")
+        and not deterministic_bundle.get("_linear_runs_bound")
+    ):
+        linear_binder = BASIS_BINDERS.get(_LINEAR_BASIS)
+        if linear_binder is not None:
+            linear_binder(
+                deterministic_bundle, components,
+                {"name": "", "basis": _LINEAR_BASIS, "unit": "LF"}, [],
+                {"vocab_map": vocab_map, "room_mix": room_mix or {}},
+            )
     _fuse_rooms(deterministic_bundle, room_labels, components, rejected)
     _fuse_schedules(deterministic_bundle, components)
     _fuse_material_tags(deterministic_bundle, components, material_tag_ledger)
