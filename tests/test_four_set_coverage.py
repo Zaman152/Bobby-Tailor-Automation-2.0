@@ -279,12 +279,21 @@ def test_every_source_page_has_exactly_one_ledger_row(audits):
 
 
 def test_every_page_is_accounted_for_in_exactly_one_disposition(audits):
-    """measured / vision-only / skipped / not-applicable / errored sum to the
-    page count — no page falls between two categories."""
+    """measured / budget-truncated / vision-only / skipped / not-applicable /
+    errored sum to the page count — no page falls between two categories.
+
+    ``sheets_budget_truncated`` joined the sum with C2. It is deliberately NOT
+    folded into ``sheets_measured``: a sheet whose remaining passes never ran
+    because the API budget was exhausted did not finish the work it started,
+    and a truncated run must never present as complete. Without this term the
+    accounting invariant would silently lose those pages — the exact shape of
+    the defect the new disposition exists to prevent.
+    """
     for key, result in audits.items():
         s = result["summary"]
         total = (
-            s["sheets_measured"] + s["sheets_vision_only"] + s["sheets_skipped"]
+            s["sheets_measured"] + s.get("sheets_budget_truncated", 0)
+            + s["sheets_vision_only"] + s["sheets_skipped"]
             + s["sheets_not_applicable"] + s["sheets_errored"]
         )
         assert total == result["page_count"], (key, s)

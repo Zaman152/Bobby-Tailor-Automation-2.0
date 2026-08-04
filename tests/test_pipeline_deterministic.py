@@ -459,6 +459,57 @@ def test_budget_exhaustion_mid_run_flags_remaining(tmp_path):
     for sheet in all_extracted:
         assert sheet["_budget"]["cap_usd"] == 10.0
         assert sheet["_budget"]["spent_usd"] == pytest.approx(6.0)
+        # C2: the run STOPPED doing scheduled work. `exhausted` alone cannot
+        # say so — $4.00 of the $10.00 cap is still unspent here, exactly the
+        # shape that let Crow's truncated run present as complete.
+        assert sheet["_budget"]["exhausted"] is False
+        assert sheet["_budget"]["refused_charges"] >= 1
+        assert sheet["_budget"]["truncated"] is True
+
+
+def test_budget_truncation_marks_the_coverage_ledger_not_measured(tmp_path):
+    """C2: a sheet cut short by the cap must not read `measured` in the ledger.
+
+    Crow's A-401 and A-601 skipped their remaining passes on an exhausted
+    budget and BOTH ledger rows said "measured", with the phrase "budget
+    exhausted" appearing zero times in the report. The coverage loss was
+    silent — the class of defect phase 23 abolished everywhere else.
+    """
+    from bobbytailor.pipeline.coverage import (
+        CoverageLedger, MEASURED_TRUNCATED,
+    )
+
+    raster_pdf = _make_raster_pdf(tmp_path)
+    stub = RasterEnsembleStub(
+        [[{"name": "Bollard", "count_estimate": 28, "unit": "ea", "confidence": "high"}]],
+        cost_usd=6.0,  # 2nd charge (12.0) blows the $10 cap
+    )
+    pipeline = TakeoffPipeline(
+        analyzer=stub, settings=RunSettings(ensemble_n=3, budget_usd=10.0)
+    )
+    ledger = CoverageLedger(pages_in_source=1)
+    ledger.register_page(0, sheet_name="R-1")
+    pages = [{
+        "image_path": "r1.png",
+        "sheet_name": "R-1",
+        "sheet_type_hint": "floor_plan",
+        "pdf_path": str(raster_pdf),
+        "page_index": 0,
+    }]
+
+    pipeline.run_project(pages, coverage=ledger)
+
+    row = ledger.sheet(0)
+    assert row.budget_truncated is True
+    assert row.disposition == MEASURED_TRUNCATED
+    assert "budget was exhausted" in row.reason
+
+    summary = ledger.summary()
+    assert summary["sheets_budget_truncated"] == 1
+    assert summary["sheets_measured"] == 0
+    # The run cannot present as complete.
+    assert summary["coverage_pct_pages"] == 0.0
+    assert "budget" in " ".join(ledger.warnings()).lower()
 
 
 # ---------------------------------------------------------------------------

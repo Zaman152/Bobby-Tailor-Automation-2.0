@@ -97,6 +97,7 @@ class BudgetGuard:
             raise ValueError("BudgetGuard: max_usd must be >= 0, got {}".format(max_usd))
         self.max_usd = max_usd
         self._spent = 0.0
+        self._refused = 0
         self._lock = threading.Lock()
 
     @property
@@ -115,6 +116,31 @@ class BudgetGuard:
     def exhausted(self) -> bool:
         """True when no budget remains."""
         return self.remaining <= 0.0
+
+    @property
+    def refused_charges(self) -> int:
+        """How many completed calls this guard REFUSED to accept.
+
+        A refusal is the moment the cap stopped the run doing work. Counting
+        them is what makes truncation provable after the fact.
+        """
+        with self._lock:
+            return self._refused
+
+    @property
+    def truncated(self) -> bool:
+        """True once the cap has actually STOPPED work — not merely run low.
+
+        ``exhausted`` answers a different question: does budget REMAIN? Crow's
+        paid run finished with $0.0012 of its $0.60 cap unspent, so
+        ``exhausted`` was False — while the guard had refused a ~$0.21 charge
+        and two sheets had skipped their remaining passes. The run WAS
+        truncated and the report presented it as complete.
+
+        Any consumer asking "did this run do all the work it set out to do?"
+        must ask THIS, never ``exhausted``.
+        """
+        return self.refused_charges > 0 or self.exhausted
 
     def would_exceed(self, cost_usd: float) -> bool:
         """Before-call reservation check: would *cost_usd* blow the cap?"""
@@ -144,6 +170,10 @@ class BudgetGuard:
             raise ValueError("BudgetGuard.charge: negative cost {}".format(cost))
         with self._lock:
             if self._spent + cost > self.max_usd + 1e-9:
+                # Count the refusal BEFORE raising: this is the only durable
+                # record that the cap stopped work, and every caller of this
+                # method handles the exception by skipping remaining passes.
+                self._refused += 1
                 raise BudgetExceeded(self._spent, self.max_usd, attempted_usd=cost)
             self._spent += cost
             return self._spent

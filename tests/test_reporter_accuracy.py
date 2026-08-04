@@ -21,6 +21,7 @@ from bobbytailor.pipeline.coverage import (
     ItemCoverage,
     CoverageLedger,
     MEASURED,
+    MEASURED_TRUNCATED,
     NOT_APPLICABLE,
     SKIPPED_CLASSIFIER,
     SKIPPED_NO_SCALE,
@@ -204,6 +205,82 @@ def test_cost_falls_back_to_sheet_sum_when_no_guard_recorded():
     assert data["budget"] is None
     assert data["api_usage"]["total_cost_usd"] == 0.25
     assert data["api_usage"]["project_level_cost_usd"] == 0.0
+
+
+# ── C2: a truncated run must never present as complete ──────────────────────
+
+
+def test_budget_truncation_is_loud_in_the_report_and_summary():
+    """The Crow shape: cap not fully spent, `exhausted` False, work stopped.
+
+    Before this fix the string "budget exhausted" appeared ZERO times in the
+    report JSON of a run whose guard had refused a charge and skipped two
+    sheets' remaining passes.
+    """
+    ledger = CoverageLedger(pages_in_source=1)
+    ledger.register_page(
+        0, sheet_name="A-401", disposition=MEASURED_TRUNCATED,
+        budget_truncated=True,
+        reason="the API budget was exhausted part-way through this sheet",
+    )
+    extracted = [{
+        "_source_sheet": "A-401.png",
+        "_sheet_name": "A-401",
+        "_page_index": 0,
+        "_tokens_in": 10, "_tokens_out": 5, "_cost_usd": 0.176645,
+        "_budget": {
+            "cap_usd": 0.6, "spent_usd": 0.598807, "exhausted": False,
+            "refused_charges": 1, "truncated": True,
+        },
+        "components": [],
+    }]
+    with _isolated_output_dir():
+        report = generate_report("Truncated", extracted, [], coverage=ledger)
+        run_dir = Path(report["_files"]["run_folder"])
+        with open(run_dir / "takeoff.json") as f:
+            data = json.load(f)
+        text = (run_dir / "summary.txt").read_text()
+
+    warnings = " ".join(data["coverage_warnings"])
+    assert "BUDGET WAS EXHAUSTED" in warnings
+    assert "LOWER BOUND" in warnings
+    # The run-level escalation LEADS: it invalidates everything after it.
+    assert "BUDGET WAS EXHAUSTED" in data["coverage_warnings"][0]
+
+    assert data["coverage"]["sheets_budget_truncated"] == 1
+    assert data["coverage"]["sheets_measured"] == 0
+    assert data["coverage_ledger"][0]["budget_truncated"] is True
+
+    # ...and a human reading summary.txt cannot miss it.
+    assert "BUDGET EXHAUSTED — THIS RUN IS INCOMPLETE" in text
+    assert "CUT SHORT (budget spent)" in text
+
+
+def test_an_untruncated_run_says_nothing_about_budget_truncation():
+    """Additive-only: a run that finished renders exactly as it did before."""
+    ledger = CoverageLedger(pages_in_source=1)
+    ledger.register_page(0, sheet_name="A-101", disposition=MEASURED)
+    extracted = [{
+        "_source_sheet": "A-101.png", "_sheet_name": "A-101", "_page_index": 0,
+        "_tokens_in": 10, "_tokens_out": 5, "_cost_usd": 0.02,
+        "_budget": {
+            "cap_usd": 10.0, "spent_usd": 0.02, "exhausted": False,
+            "refused_charges": 0, "truncated": False,
+        },
+        "components": [],
+    }]
+    with _isolated_output_dir():
+        report = generate_report("Complete", extracted, [], coverage=ledger)
+        run_dir = Path(report["_files"]["run_folder"])
+        with open(run_dir / "takeoff.json") as f:
+            data = json.load(f)
+        text = (run_dir / "summary.txt").read_text()
+
+    assert data["coverage"]["sheets_budget_truncated"] == 0
+    assert data["coverage"]["sheets_measured"] == 1
+    assert "INCOMPLETE" not in text
+    assert "CUT SHORT" not in text
+    assert not any("BUDGET WAS EXHAUSTED" in w for w in data["coverage_warnings"])
 
 
 def test_pre21_report_renders_without_new_fields():

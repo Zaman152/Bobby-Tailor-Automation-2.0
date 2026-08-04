@@ -233,6 +233,38 @@ def test_budget_guard_refuses_charge_past_cap():
     assert exc.value.attempted_usd == 4.0
 
 
+def test_guard_is_truncated_after_a_refusal_even_with_budget_left():
+    """C2: `exhausted` and `truncated` are DIFFERENT questions.
+
+    Replays Crow's paid run exactly: a $0.60 cap, $0.598807 accepted, then a
+    ~$0.21 charge refused. $0.0012 of cap remains, so `exhausted` is False —
+    and the run had nonetheless stopped doing scheduled work. The report read
+    "complete". `truncated` is the field that tells the truth.
+    """
+    g = BudgetGuard(0.6)
+    g.charge(0.598807)
+    assert g.exhausted is False
+    assert g.truncated is False
+    assert g.refused_charges == 0
+
+    with pytest.raises(BudgetExceeded):
+        g.charge(0.21)
+
+    assert g.spent_usd == 0.598807      # the refusal is not accumulated
+    assert g.exhausted is False          # budget REMAINS — $0.0012 of it
+    assert g.refused_charges == 1
+    assert g.truncated is True           # ...and work was STOPPED anyway
+
+
+def test_guard_with_zero_remaining_is_truncated_without_any_refusal():
+    """A guard spent to the cap is truncated even before it refuses anything."""
+    g = BudgetGuard(1.0)
+    g.charge(1.0)
+    assert g.exhausted is True
+    assert g.refused_charges == 0
+    assert g.truncated is True
+
+
 def test_run_ensemble_budget_exhausted_flags_never_truncates_silently():
     guard = BudgetGuard(10.0)
     calls = []

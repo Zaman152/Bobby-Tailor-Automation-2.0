@@ -206,6 +206,16 @@ def build(run_dir: Path, out: Path, golden_pdf: Path = None) -> Path:
             ("Pages skipped", (coverage.get("sheets_skipped") or 0)
                               + (coverage.get("sheets_not_applicable") or 0)),
         ]
+        # C2: a workbook a client bids from must say when the run stopped early.
+        if coverage.get("sheets_budget_truncated"):
+            facts.append((
+                "RUN INCOMPLETE",
+                "%s page(s) were cut short when the API budget was exhausted — "
+                "their remaining passes never ran. Every quantity here is a "
+                "LOWER BOUND and every blank on those pages is unknown, not "
+                "zero. Raise the budget cap and re-run."
+                % coverage.get("sheets_budget_truncated"),
+            ))
     facts += [
         ("", ""),
         ("PROVENANCE", "MEANING"),

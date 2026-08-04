@@ -38,9 +38,20 @@ SKIPPED_NO_SCALE = "skipped_no_scale"    # fpp <= 0, nothing measurable
 NOT_APPLICABLE = "not_applicable"        # genuine cover/index — no take-off content
 ERRORED = "errored"                      # exception; degraded per-sheet
 
+# The wallet stopped the work, not the drawing. A sheet whose remaining passes
+# were skipped because the run BudgetGuard refused a charge is NOT measured —
+# and it is a different fact from MEASURED_PARTIAL, whose gap is explained by
+# something on the page (an off-scale viewport, a drawing with no printed
+# scale). This gap is explained by the cap, and it closes by raising the cap
+# and re-running. Crow's A-401 and A-601 were truncated exactly this way and
+# both rows read "measured" (C2): a silent coverage loss, the class of defect
+# phase 23 abolished everywhere else.
+MEASURED_TRUNCATED = "measured_budget_truncated"
+
 SHEET_DISPOSITIONS = (
     MEASURED,
     MEASURED_PARTIAL,
+    MEASURED_TRUNCATED,
     VISION_ONLY,
     SKIPPED_CLASSIFIER,
     SKIPPED_NO_SCALE,
@@ -158,6 +169,11 @@ class SheetCoverage:
     drawings: List[DrawingCoverage] = field(default_factory=list)
     items_emitted: int = 0
     cost_usd: float = 0.0
+    # True when this sheet's remaining passes were skipped because the run
+    # BudgetGuard refused a charge. Recorded separately from `disposition` so
+    # the fact survives even where a stronger disposition (ERRORED, a skip)
+    # outranks it.
+    budget_truncated: bool = False
 
     @property
     def is_silent_loss(self) -> bool:
@@ -183,6 +199,7 @@ class SheetCoverage:
             "drawings": [d.to_dict() for d in self.drawings],
             "items_emitted": self.items_emitted,
             "cost_usd": self.cost_usd,
+            "budget_truncated": self.budget_truncated,
             "is_silent_loss": self.is_silent_loss,
         }
 
@@ -288,7 +305,11 @@ class CoverageLedger:
 
     def summary(self) -> Dict[str, Any]:
         """The headline block that goes into ``report["coverage"]`` (INV-08 §3.2)."""
+        # A budget-truncated sheet is deliberately NOT counted as measured: it
+        # did not finish the work it started, and a run that stopped early must
+        # never present as complete (C2).
         measured = self._count_disposition(MEASURED, MEASURED_PARTIAL)
+        budget_truncated = sum(1 for row in self.sheets if row.budget_truncated)
         vision_only = self._count_disposition(VISION_ONLY)
         skipped = self._count_disposition(SKIPPED_CLASSIFIER, SKIPPED_NO_SCALE)
         errored = self._count_disposition(ERRORED)
@@ -312,6 +333,7 @@ class CoverageLedger:
         return {
             "pages_in_source": self.pages_in_source,
             "sheets_measured": measured,
+            "sheets_budget_truncated": budget_truncated,
             "sheets_vision_only": vision_only,
             "sheets_skipped": skipped,
             "sheets_errored": errored,
@@ -372,6 +394,20 @@ class CoverageLedger:
                 "hold scaled plan geometry (pages %s) — the classifier verdict "
                 "was overruled and they ran the deterministic path only (zero API)"
                 % (len(overruled), _compact_ranges([r.page_index for r in overruled]))
+            )
+
+        truncated = [row for row in self.sheets if row.budget_truncated]
+        if truncated:
+            out.append(
+                "%d page(s) stopped mid-measurement because the API budget was "
+                "exhausted (pages %s) — their remaining passes NEVER RAN, so "
+                "every quantity on them is a lower bound and every item absent "
+                "from them is unknown, NOT zero; this run is INCOMPLETE and "
+                "closes only by raising the budget cap and re-running"
+                % (
+                    len(truncated),
+                    _compact_ranges([row.page_index for row in truncated]),
+                )
             )
 
         errored = [row for row in self.sheets if row.disposition == ERRORED]

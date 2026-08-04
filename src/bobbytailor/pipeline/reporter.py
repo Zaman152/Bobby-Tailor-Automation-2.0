@@ -253,7 +253,9 @@ def generate_report(project_name: str,
         # the whole invariant: len(coverage_ledger) == pages_in_source.
         report["coverage_ledger"] = [s.to_dict() for s in report_ledger.sheets]
         report["item_coverage"] = [i.to_dict() for i in report_ledger.items]
-        report["coverage_warnings"] = _coverage_warnings(report_ledger, all_extracted)
+        report["coverage_warnings"] = _coverage_warnings(
+            report_ledger, all_extracted, budget_block,
+        )
         report["pages_in_source"] = report_ledger.pages_in_source
     if source_pdf:
         report["source_pdf"] = str(source_pdf)
@@ -484,9 +486,46 @@ def _coverage_notes(all_extracted: list) -> List[str]:
     return out
 
 
-def _coverage_warnings(ledger: CoverageLedger, all_extracted: list) -> List[str]:
-    """``report["coverage_warnings"]`` — the ledger's escalations plus the notes."""
-    return list(ledger.warnings()) + _coverage_notes(all_extracted)
+def _budget_truncation_warning(budget) -> Optional[str]:
+    """The run-level "this run stopped early" escalation, or None (C2).
+
+    Fires off the BudgetGuard's own accounting rather than off any sheet, so a
+    truncation taken on a PROJECT-level pass — the naming/vocabulary reads,
+    which belong to no sheet and therefore leave no ledger row — is still loud.
+    """
+    if not isinstance(budget, dict):
+        return None
+    if not budget.get("truncated"):
+        return None
+    refused = int(budget.get("refused_charges") or 0)
+    return (
+        "THE API BUDGET WAS EXHAUSTED AND THIS RUN STOPPED EARLY — $%.4f of the "
+        "$%.2f cap was spent and %d further charge(s) were refused, so passes "
+        "that were scheduled never ran. Every quantity below is a LOWER BOUND "
+        "and every item absent from it is unknown, not zero. Do not read this "
+        "take-off as a complete account of the drawing set; raise the cap and "
+        "re-run to close the gap"
+        % (
+            float(budget.get("spent_usd") or 0.0),
+            float(budget.get("cap_usd") or 0.0),
+            refused,
+        )
+    )
+
+
+def _coverage_warnings(
+    ledger: CoverageLedger, all_extracted: list, budget=None
+) -> List[str]:
+    """``report["coverage_warnings"]`` — the ledger's escalations plus the notes.
+
+    A budget truncation leads, because it invalidates the completeness of
+    everything that follows it.
+    """
+    out: List[str] = []
+    truncation = _budget_truncation_warning(budget)
+    if truncation:
+        out.append(truncation)
+    return out + list(ledger.warnings()) + _coverage_notes(all_extracted)
 
 
 def _collect_specification_tables(all_extracted: list) -> List[Dict[str, Any]]:
@@ -1026,6 +1065,18 @@ def _coverage_lines(report: dict) -> list:
         "─" * 70,
         f"Pages in source PDF:          {_n('pages_in_source'):>5}",
         f"  measured (geometry):        {_n('sheets_measured'):>5}",
+    ]
+
+    # Its own line, and only when it happened: a page whose measurement was cut
+    # short by the CAP is not a measured page and is not a skipped one either.
+    truncated_pages = _n("sheets_budget_truncated")
+    if truncated_pages:
+        lines.append(
+            f"  CUT SHORT (budget spent):   {truncated_pages:>5}"
+            "   ← incomplete, not zero"
+        )
+
+    lines += [
         f"  vision-only (no geometry):  {_n('sheets_vision_only'):>5}",
         f"  skipped by classifier:      {_n('sheets_skipped'):>5}",
         f"  not applicable (cover/idx): {_n('sheets_not_applicable'):>5}",
@@ -1192,6 +1243,20 @@ def _write_summary(report: dict, path: Path):
             f"Budget:           ${budget.get('spent_usd', 0):.4f} spent of "
             f"${budget.get('cap_usd', 0):.2f} cap{exhausted}"
         )
+        # C2: `exhausted` asks whether budget REMAINS; `truncated` asks whether
+        # the cap STOPPED work. Crow ended exhausted=False having refused a
+        # charge and skipped two sheets' remaining passes, and summary.txt said
+        # nothing at all. A truncated run must never read as a complete one.
+        if budget.get("truncated"):
+            refused = int(budget.get("refused_charges") or 0)
+            lines.append(
+                "!! BUDGET EXHAUSTED — THIS RUN IS INCOMPLETE: "
+                f"{refused} charge(s) refused; scheduled passes never ran."
+            )
+            lines.append(
+                "   Every quantity below is a LOWER BOUND and every absent item "
+                "is unknown, not zero."
+            )
     lines.append("")
 
     # Between API USAGE and SCALE CONFIDENCE, and empty on a pre-23 report.

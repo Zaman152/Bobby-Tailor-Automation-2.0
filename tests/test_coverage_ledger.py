@@ -20,7 +20,9 @@ from bobbytailor.pipeline.coverage import (
     ITEM_NOT_MEASURED,
     MEASURED,
     MEASURED_PARTIAL,
+    MEASURED_TRUNCATED,
     NOT_APPLICABLE,
+    SHEET_DISPOSITIONS,
     SKIPPED_CLASSIFIER,
     SKIPPED_NO_SCALE,
     VISION_ONLY,
@@ -53,12 +55,21 @@ def test_item_status_strings_are_the_client_vocabulary_verbatim():
     assert ITEM_NOT_APPLICABLE == "NOT APPLICABLE"
 
 
-def test_seven_sheet_dispositions_are_distinct():
+def test_every_sheet_disposition_is_distinct():
+    """C2 widened this from seven to eight.
+
+    ``measured_budget_truncated`` earns its own value because its gap has a
+    different cause and a different remedy from every other: MEASURED_PARTIAL
+    is explained by something on the PAGE (an off-scale viewport, a drawing
+    with no printed scale) and never closes; a budget truncation is explained
+    by the CAP and closes by raising it and re-running.
+    """
     values = [
-        MEASURED, MEASURED_PARTIAL, VISION_ONLY, SKIPPED_CLASSIFIER,
-        SKIPPED_NO_SCALE, NOT_APPLICABLE, ERRORED,
+        MEASURED, MEASURED_PARTIAL, MEASURED_TRUNCATED, VISION_ONLY,
+        SKIPPED_CLASSIFIER, SKIPPED_NO_SCALE, NOT_APPLICABLE, ERRORED,
     ]
-    assert len(set(values)) == 7
+    assert len(set(values)) == 8
+    assert set(values) == set(SHEET_DISPOSITIONS)
 
 
 # ---------------------------------------------------------------------------
@@ -280,6 +291,68 @@ def test_warnings_name_the_pages_and_the_deciding_keyword():
     assert "23-38" in joined
     assert "COVER" in joined
     assert "blank" in joined.lower()
+
+
+# ── C2: a budget-truncated run must never present as complete ───────────────
+#
+# Crow's paid run exhausted its guard mid-run and skipped the remaining passes
+# on A-401 and A-601. Both ledger rows read "measured", the report contained
+# the phrase "budget exhausted" zero times, and coverage_pct_pages read 100%.
+
+
+def _truncated_ledger() -> CoverageLedger:
+    """4 pages; the last two were cut short by the cap (the Crow shape)."""
+    ledger = CoverageLedger(pages_in_source=4)
+    ledger.register_page(0, sheet_name="A-101", disposition=MEASURED_PARTIAL)
+    ledger.register_page(1, sheet_name="A-201", disposition=MEASURED)
+    for i, name in ((2, "A-401"), (3, "A-601")):
+        ledger.register_page(
+            i, sheet_name=name, disposition=MEASURED_TRUNCATED,
+            budget_truncated=True,
+            reason="the API budget was exhausted part-way through this sheet",
+        )
+    return ledger
+
+
+def test_budget_truncated_sheets_are_not_counted_as_measured():
+    summary = _truncated_ledger().summary()
+    assert summary["sheets_budget_truncated"] == 2
+    # The two truncated pages are NOT in the measured count — the run did not
+    # finish the work it started on them.
+    assert summary["sheets_measured"] == 2
+    assert summary["coverage_pct_pages"] == pytest.approx(50.0)
+
+
+def test_budget_truncation_raises_a_loud_warning_naming_the_pages():
+    joined = " ".join(_truncated_ledger().warnings())
+    assert "budget" in joined.lower()
+    assert "2-3" in joined                     # the page range, compacted
+    assert "INCOMPLETE" in joined              # said in words, not inferred
+    assert "not zero" in joined.lower()
+
+
+def test_budget_truncation_survives_a_stronger_disposition():
+    """An ERRORED sheet that was ALSO cut short still reports the truncation.
+
+    `budget_truncated` is a separate field precisely so the fact is not lost
+    when a stronger disposition outranks it.
+    """
+    ledger = CoverageLedger(pages_in_source=1)
+    ledger.register_page(
+        0, disposition=ERRORED, budget_truncated=True, reason="boom",
+    )
+    assert ledger.summary()["sheets_budget_truncated"] == 1
+    assert "budget" in " ".join(ledger.warnings()).lower()
+    assert ledger.sheets[0].to_dict()["budget_truncated"] is True
+
+
+def test_an_untruncated_ledger_says_nothing_about_budget():
+    """Additive-only: a run that finished renders exactly as it did before."""
+    ledger = CoverageLedger(pages_in_source=1)
+    ledger.register_page(0, disposition=MEASURED)
+    assert ledger.summary()["sheets_budget_truncated"] == 0
+    assert "budget" not in " ".join(ledger.warnings()).lower()
+    assert ledger.sheets[0].to_dict()["budget_truncated"] is False
 
 
 def test_summary_is_all_zero_on_an_empty_ledger():

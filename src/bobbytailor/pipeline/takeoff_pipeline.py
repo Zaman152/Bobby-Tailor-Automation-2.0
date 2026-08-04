@@ -53,6 +53,7 @@ from bobbytailor.pipeline.coverage import (
     EXCLUDED_OFF_SCALE,
     MEASURED,
     MEASURED_PARTIAL,
+    MEASURED_TRUNCATED,
     NOT_APPLICABLE,
     SKIPPED_CLASSIFIER,
     SKIPPED_NO_SCALE,
@@ -423,13 +424,27 @@ def _append_reason(existing, reason: str) -> str:
 
 
 def _budget_state(guard) -> dict:
-    """Serializable BudgetGuard state for reports: {cap, spent, exhausted}."""
+    """Serializable BudgetGuard state for reports.
+
+    ``exhausted`` (does budget remain?) is kept verbatim, and ``truncated``
+    (did the cap actually STOP work?) is added beside it — the two differ, and
+    Crow's paid run is the proof: it ended ``exhausted: false`` with $0.0012 of
+    a $0.60 cap unspent, after refusing a charge and skipping the remaining
+    passes on two sheets. ``truncated`` is the field any consumer asking
+    "is this run complete?" must read (C2).
+    """
     if guard is None:
-        return {"cap_usd": None, "spent_usd": 0.0, "exhausted": False}
+        return {
+            "cap_usd": None, "spent_usd": 0.0, "exhausted": False,
+            "refused_charges": 0, "truncated": False,
+        }
+    refused = int(getattr(guard, "refused_charges", 0) or 0)
     return {
         "cap_usd": round(float(guard.max_usd), 4),
         "spent_usd": round(float(guard.spent_usd), 6),
         "exhausted": bool(guard.exhausted),
+        "refused_charges": refused,
+        "truncated": bool(getattr(guard, "truncated", guard.exhausted)),
     }
 
 
@@ -3462,6 +3477,24 @@ class TakeoffPipeline:
                     "%d drawing(s) on this sheet were not measured — see the "
                     "per-drawing reasons" % len(dropped)
                 )
+
+        # ── The wallet stopped this sheet, and the row must say so (C2) ──────
+        #
+        # run_sheet already flags the SHEET DICT `_budget_exhausted` when the
+        # guard refuses mid-pass, but that flag died there: Crow's A-401 and
+        # A-601 skipped their remaining passes and their ledger rows still read
+        # "measured", the report contained the phrase "budget exhausted" zero
+        # times, and the run presented as complete.
+        if extracted.get("_budget_exhausted"):
+            row.budget_truncated = True
+            if row.disposition in (MEASURED, MEASURED_PARTIAL):
+                row.disposition = MEASURED_TRUNCATED
+            row.reason = _append_reason(
+                row.reason,
+                "the API budget was exhausted part-way through this sheet — its "
+                "remaining passes never ran, so what is here is a lower bound "
+                "and what is absent is unknown, not zero",
+            )
 
     def _structured_vision_call(
         self,
