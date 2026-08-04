@@ -98,7 +98,7 @@ def generate_report(project_name: str,
     )
 
     # Aggregate API usage across all sheets
-    total_cost = sum(d.get("_cost_usd", 0) for d in all_extracted)
+    sheet_cost = sum(d.get("_cost_usd", 0) for d in all_extracted)
     total_tokens_in = sum(d.get("_tokens_in", 0) for d in all_extracted)
     total_tokens_out = sum(d.get("_tokens_out", 0) for d in all_extracted)
 
@@ -121,6 +121,42 @@ def generate_report(project_name: str,
             ):
                 budget_block = b
 
+    # ── THE run's cost is the guard's ledger, not the sum of sheet stamps ────
+    #
+    # Summing per-sheet ``_cost_usd`` under-reported Crow's paid run by 3.4x:
+    # $0.1766 published against $0.5988 actually charged to the BudgetGuard.
+    # Two independent leaks, both structural:
+    #
+    #   1. Project-level passes (the naming-convention and object-vocabulary
+    #      reads run ONCE for the whole set, before the per-sheet loop) charge
+    #      the guard and belong to no sheet, so no ``_cost_usd`` stamp can ever
+    #      carry them.
+    #   2. A sheet whose merged dict never inherits the analyzer's usage stamp
+    #      reads $0 despite paid calls (Crow's sheets 2-4).
+    #
+    # The guard is the ONLY complete ledger — it is what actually refused the
+    # last charge — so it is what ``total_cost_usd`` reports. The split is
+    # published rather than fabricated: what a sheet stamped is attributed to
+    # that sheet, and the whole remainder goes to ONE honest ``project_level``
+    # bucket. Nothing is spread across sheets by ratio; an invented per-sheet
+    # split would be a guess presented as accounting.
+    #
+    # Every cost estimate and every budget the user sets is downstream of this
+    # number, so the invariant is pinned by test: reported total == guard spend.
+    guard_spent = (
+        budget_block.get("spent_usd") if isinstance(budget_block, dict) else None
+    )
+    if guard_spent is None:
+        # No guard recorded (pre-21 runs, the scraper path without a budget):
+        # the per-sheet sum is the only ledger there is — unchanged behaviour.
+        total_cost = float(sheet_cost)
+    else:
+        total_cost = float(guard_spent)
+    # Signed on purpose. A negative remainder would mean sheets stamped more
+    # than the guard accepted (a refused charge stamped anyway) — a real
+    # accounting discrepancy that must surface, not be clamped to zero.
+    project_level_cost = round(total_cost - float(sheet_cost), 6)
+
     # Fusion audit trail (21-12/13): rejected vision quantity claims and
     # grounding violations, aggregated per sheet — never silently dropped.
     fusion_rejected: list = []
@@ -140,10 +176,15 @@ def generate_report(project_name: str,
         "total_line_items": len(raw_line_items),
         "total_calculated_items": len(calculated_items),
         "api_usage": {
-            "total_cost_usd": round(total_cost, 4),
+            # Rounded to 6dp, matching the guard's own ledger precision — 4dp
+            # silently shaved sub-tenth-of-a-cent off the equality.
+            "total_cost_usd": round(total_cost, 6),
+            # The split, published rather than fabricated (see above).
+            "sheet_attributed_cost_usd": round(float(sheet_cost), 6),
+            "project_level_cost_usd": project_level_cost,
             "total_tokens_in": total_tokens_in,
             "total_tokens_out": total_tokens_out,
-            "cost_per_sheet": round(total_cost / max(len(all_extracted), 1), 4),
+            "cost_per_sheet": round(total_cost / max(len(all_extracted), 1), 6),
             "models_used": model_counts,
         },
         # 21-13 additive fields (never rename existing keys — 03-02/03-03).
@@ -1126,6 +1167,18 @@ def _write_summary(report: dict, path: Path):
 
     usage = report.get("api_usage", {})
     lines.append(f"Total cost:       ${usage.get('total_cost_usd', 0):.4f} USD")
+    # The attribution split, only when there is something project-level to
+    # attribute. A run whose every dollar landed on a sheet renders as before.
+    project_level = usage.get("project_level_cost_usd")
+    if project_level:
+        lines.append(
+            f"  on sheets:      ${usage.get('sheet_attributed_cost_usd', 0):.4f} USD"
+        )
+        lines.append(
+            f"  project-level:  ${project_level:.4f} USD  "
+            "(charged to the run, stamped on no sheet — the naming/vocabulary "
+            "passes and any sheet that lost its usage stamp)"
+        )
     lines.append(f"Input tokens:     {usage.get('total_tokens_in', 0):,}")
     lines.append(f"Output tokens:    {usage.get('total_tokens_out', 0):,}")
     lines.append(f"Cost per sheet:   ${usage.get('cost_per_sheet', 0):.4f} USD")

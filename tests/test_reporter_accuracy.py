@@ -128,6 +128,84 @@ def test_summary_txt_has_scale_confidence_and_provenance_sections():
         assert "$10.00 cap" in text
 
 
+# ── Cost telemetry: the reported total IS the guard's ledger (C1) ───────────
+#
+# A paid Crow run published api_usage.total_cost_usd = $0.1766 against a
+# BudgetGuard that had actually spent $0.598807 — a 3.4x under-report, because
+# the reporter summed per-sheet ``_cost_usd`` stamps and the project-level
+# naming/vocabulary passes belong to no sheet. Every cost estimate and every
+# budget a user sets is downstream of this number, so the equality is pinned.
+
+def _multi_sheet_extracted(sheet_costs, guard_spent, cap=0.6) -> list:
+    """N sheets stamping *sheet_costs*, all carrying one guard state."""
+    budget = {"cap_usd": cap, "spent_usd": guard_spent, "exhausted": False}
+    return [
+        {
+            "_source_sheet": "page_%04d.png" % (i + 1),
+            "_sheet_name": "A-%d01" % (i + 1),
+            "_tokens_in": 100 if cost else 0,
+            "_tokens_out": 50 if cost else 0,
+            "_cost_usd": cost,
+            "_budget": dict(budget),
+            "components": [],
+        }
+        for i, cost in enumerate(sheet_costs)
+    ]
+
+
+def test_reported_total_cost_equals_budget_guard_spend():
+    """THE invariant: api_usage.total_cost_usd == budget.spent_usd, always.
+
+    Replays the exact Crow shape — sheet 1 stamped $0.176645, sheets 2-4
+    stamped $0, guard spent $0.598807.
+    """
+    extracted = _multi_sheet_extracted([0.176645, 0.0, 0, 0], 0.598807)
+    with _isolated_output_dir():
+        report = generate_report("Cost Ledger", extracted, [])
+        with open(Path(report["_files"]["run_folder"]) / "takeoff.json") as f:
+            data = json.load(f)
+
+    assert data["api_usage"]["total_cost_usd"] == data["budget"]["spent_usd"]
+    assert data["api_usage"]["total_cost_usd"] == 0.598807
+
+
+def test_unattributed_spend_lands_in_one_project_level_bucket():
+    """The remainder is published, not spread across sheets by ratio."""
+    extracted = _multi_sheet_extracted([0.176645, 0.0, 0, 0], 0.598807)
+    with _isolated_output_dir():
+        report = generate_report("Cost Ledger", extracted, [])
+        run_dir = Path(report["_files"]["run_folder"])
+        with open(run_dir / "takeoff.json") as f:
+            data = json.load(f)
+        text = (run_dir / "summary.txt").read_text()
+
+    usage = data["api_usage"]
+    assert usage["sheet_attributed_cost_usd"] == 0.176645
+    assert usage["project_level_cost_usd"] == round(0.598807 - 0.176645, 6)
+    # The split must reconstruct the total exactly — no third, hidden bucket.
+    assert round(
+        usage["sheet_attributed_cost_usd"] + usage["project_level_cost_usd"], 6
+    ) == usage["total_cost_usd"]
+    # ...and a human reading summary.txt sees the same three numbers.
+    assert "Total cost:       $0.5988 USD" in text
+    assert "project-level:  $0.4222 USD" in text
+
+
+def test_cost_falls_back_to_sheet_sum_when_no_guard_recorded():
+    """Pre-21 / scraper runs with no BudgetGuard render exactly as before."""
+    extracted = [{
+        "_source_sheet": "A1", "_tokens_in": 0, "_tokens_out": 0,
+        "_cost_usd": 0.25, "components": [],
+    }]
+    with _isolated_output_dir():
+        report = generate_report("No Guard", extracted, [])
+        with open(Path(report["_files"]["run_folder"]) / "takeoff.json") as f:
+            data = json.load(f)
+    assert data["budget"] is None
+    assert data["api_usage"]["total_cost_usd"] == 0.25
+    assert data["api_usage"]["project_level_cost_usd"] == 0.0
+
+
 def test_pre21_report_renders_without_new_fields():
     """Regression: pre-21 extraction dicts (no measurement_mode /
     scale_confidence / provenance / _budget) must render without KeyError,
