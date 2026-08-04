@@ -1022,12 +1022,29 @@ Plans are listed in EXECUTION order; the wave in each plan's frontmatter is auth
 3. Fusion output uses dependency-ordered schema topology (wall skeleton defined first, rooms expressed as references to it) so geometric gaps are structurally impossible
 4. Ensemble voting is wired onto every remaining identification pass that can flip
 5. A determinism harness runs the same fixture N× and asserts identical line items — regression protection for the whole class of bug
+   - **REFRAMED at planning (2026-08-05), not reduced.** The literal wording is **vacuous** against `tests/replay_analyzer.py`: `ReplayAnalyzer.__call__` is a pure function of a SHA256 over `(model, pass_type, prompt, image_count)`, so running one fixture N× is identical *by construction* and would detect none of the observed defects — a gate that passes for having looked at nothing (the failure `test_phase23_acceptance.py` rule 3 forbids). *Delivered contract:* a **two-variant differential** — geometry held fixed, the model's answers VARIED within schema-legal bounds (run 1's labels vs run 2's), asserting the published `(name, unit, quantity, measure_basis)` set is invariant. Plan 24-09 additionally demonstrates the gate FAILING on a deliberate naming flip, so it is a proven detector rather than a passing test. *Citation:* `24-RESEARCH.md` §8.1–8.2.
 
-**Plans:** 0 plans
+**Planning-time findings that reframe this phase** (both measured FREE from committed artifacts, no API):
+
+- **The geometry layer is already deterministic.** 29 of 43/45 `(quantity, unit)` keys are bit-identical across the two saved paid runs — every `SYM-*` count, the 397,600 SF footprint, all `WALL-TC*` LF, `ROOM-3..6`, the elevations, the perimeter and every door-schedule count. **100% of the observed variance is the function `candidate → (name, basis, unit)`.** This phase stabilises NAMING, not measurement.
+- **Open Question 4 answered NO.** A zero-API deterministic-bundle probe over all four Crow sheets: of 107 symbol groups, **81 carry no contained text at all**, 26 carry text that is entirely drafting noise, and **0 carry a genuine object name**. The 56-EA bollard candidate and the 136-count candidate both have zero contained text. The `contained_texts` naming branch (`fusion.py:1255`) therefore produces a real name *never* on the mission's primary plan set — the nearest-non-masked-word primitive is the whole mechanism, not an enhancement.
+- **Assumption A1 falsified.** The 184→64 `raw_line_items` swing was attributed to the un-ensembled `_run_pass`. The artifacts show run 2 ran at a budget cap **2.5× smaller** (`$0.60` vs `$1.50`), reached **99.8%** of it, and spent **less than half** as much on sheet-level work. Budget, not sampling, is the dominant explanation. Plan 24-08 therefore stands on V4-DET-04's own justification and treats the cost pairing with 24-05 as load-bearing.
+- **Expected direction of the score: DOWN.** When the unnamed-geometry contract lands, ~24 published identifier rows plus the coincidental high-count "column" hit leave the take-off. That is the correct, documented outcome (same precedent as Phase 23's rails) and no plan may state a success criterion as an accuracy percentage.
+
+**Plans:** 10 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 24 to break down)
+- [ ] 24-01-PLAN.md — Deterministic per-candidate text-anchor primitive + bundle wiring (wave 1, V4-DET-01)
+- [ ] 24-02-PLAN.md — Wall-class precedence inversion + disagreement audit + label-invariance differential (wave 1, V4-DET-02)
+- [ ] 24-03-PLAN.md — Canonical name form: plural folding + one naming-authority precedence + expected/measured reconciliation (wave 1)
+- [ ] 24-04-PLAN.md — Unnamed-geometry contract: the three `or cid` leak sites + room name-plausibility gate (wave 2, V4-DET-01)
+- [ ] 24-05-PLAN.md — Per-project vocabulary persistence & reuse (wave 2; resolves OQ-2 per-project scope, funds 24-08)
+- [ ] 24-06-PLAN.md — Ledger surfacing: report key, summary.txt section, Excel sheet + `run_settings` telemetry (wave 3; resolves OQ-1)
+- [ ] 24-07-PLAN.md — Dependency-ordered schema topology + SoM chip carries the anchor + prompt correction (wave 3, V4-DET-03)
+- [ ] 24-08-PLAN.md — Ensemble wire-up for `_run_pass` identification passes + call-site census (wave 4, V4-DET-04)
+- [ ] 24-09-PLAN.md — Determinism harness: two-variant replay fixtures + differential gate (wave 5, V4-DET-05)
+- [ ] 24-10-PLAN.md — The Phase 24 acceptance gate (wave 6, all five requirements)
 
 ### Phase 25: Deterministic Symbol Detection
 
