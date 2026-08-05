@@ -2769,3 +2769,322 @@ def test_an_already_withheld_quantity_is_not_re_flagged():
     _withhold_unit_class_violations(components)
     assert components[0]["review_reason"] == "no wall height resolved"
     assert "unit_class_violation" not in components[0]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 24-02 (V4-DET-02) — wall-class naming precedence: deterministic evidence
+# leads, the stochastic label corroborates or dissents but never renames.
+#
+# The defect this section exists to make impossible: `map_wall_classes_from_
+# library` is a complete zero-API classifier (printed-thickness match + the
+# guard that forbids a masonry object binding the dominant-LF perimeter class)
+# but it used to sit in an `elif` BEHIND the vision label, so identical
+# geometry could publish as CMU on one run and tilt-up on the next.
+# ═══════════════════════════════════════════════════════════════════════════
+
+from bobbytailor.vision.fusion import (  # noqa: E402
+    _CONFIDENCE_ORDER,
+    _NAME_SOURCE_LIBRARY,
+    _NAME_SOURCE_VISION,
+    _NAME_SOURCE_WALL_THICKNESS,
+    _fuse_wall_classes,
+    _squash_wall_name,
+    map_wall_classes_from_library,
+)
+
+#: TC1 = the dominant perimeter class, 12" and thousands of LF.
+#: TC2 = a small interior class, 8" and tens of LF (Crow's pump-room CMU wall).
+_PRECEDENCE_LF = {"TC1": 2972.0, "TC2": 61.0}
+_PRECEDENCE_THICKNESS_IN = {"TC1": 12.0, "TC2": 8.0}
+
+
+def _precedence_bundle(lf=None, thickness_in=None):
+    """One fixed geometry bundle: two wall classes, a measured perimeter.
+
+    `fpp = 1.0` and `thickness_pt` in feet make `_wall_thickness_in_by_class`
+    reproduce `thickness_in` exactly, so the fixture's printed thicknesses and
+    its measured thicknesses are the same numbers by construction.
+    """
+    lf = lf or _PRECEDENCE_LF
+    thickness_in = thickness_in or _PRECEDENCE_THICKNESS_IN
+    return {
+        "fpp": 1.0,
+        "walls": [
+            {
+                "thickness_class": cls,
+                "thickness_pt": thickness_in[cls] / 12.0,
+                "length_pt": lf[cls],
+            }
+            for cls in sorted(lf)
+        ],
+        "wall_lf_by_class": dict(lf),
+        "footprint": {"perimeter_lf": 2972.0, "confidence": "high"},
+    }
+
+
+def _precedence_library():
+    """A tilt-up object and a CMU object, both carrying a printed thickness."""
+    return [
+        {"name": "Tilt Up Wall", "basis": "wall_area",
+         "binding_hint": "exterior_wall", "variant": "exterior",
+         "thickness_in": "12"},
+        {"name": "CMU Wall", "basis": "wall_area",
+         "binding_hint": "masonry_wall", "thickness_in": "8"},
+    ]
+
+
+def _wall_labels(mapping):
+    """`{class: label}` → the `wall_class_labels`-shaped index fusion consumes."""
+    return {
+        "WALL-%s" % cls: {
+            "wall_class_id": "WALL-%s" % cls, "label": label, "confidence": "high",
+        }
+        for cls, label in mapping.items()
+    }
+
+
+def _emit_wall_classes(
+    bundle=None, labels=None, vocabulary=None, wall_height_ft=None,
+    wall_height_source="plan", rejected=None,
+):
+    """Run the wall-class fusion path over one bundle, returning its rows."""
+    bundle = bundle if bundle is not None else _precedence_bundle()
+    vocabulary = _precedence_library() if vocabulary is None else vocabulary
+    components = []
+    _fuse_wall_classes(
+        bundle,
+        labels or {},
+        components,
+        vocab_map={
+            str(o["name"]).strip().lower(): {"basis": o.get("basis")}
+            for o in vocabulary
+        },
+        wall_height_ft=wall_height_ft,
+        wall_height_source=wall_height_source,
+        library_wall_map=map_wall_classes_from_library(
+            bundle["wall_lf_by_class"],
+            {c: t for c, t in _PRECEDENCE_THICKNESS_IN.items()
+             if c in bundle["wall_lf_by_class"]},
+            vocabulary,
+        ),
+        **({"rejected": rejected} if rejected is not None else {})
+    )
+    return {c["candidate_id"]: c for c in components}
+
+
+# ── Behaviour 1: a thickness match outranks a contradicting vision label ─────
+
+
+def test_thickness_outranks_vision():
+    """The documented flip, made structurally impossible.
+
+    Vision is handed the exact inversion the ground truth records — it calls
+    the 12" perimeter class "CMU Wall" and the 8" pump-room class "Tilt Up
+    Wall". Both classes have a confident printed-thickness bind, so both keep
+    the deterministic name.
+    """
+    rows = _emit_wall_classes(
+        labels=_wall_labels({"TC1": "CMU Wall", "TC2": "Tilt Up Wall"})
+    )
+    assert rows["WALL-TC1"]["name"] == "Tilt Up Wall"
+    assert rows["WALL-TC2"]["name"] == "CMU Wall"
+    # The authority that named each row is legible in the artifact.
+    assert rows["WALL-TC1"]["name_source"] == _NAME_SOURCE_WALL_THICKNESS
+    assert rows["WALL-TC2"]["name_source"] == _NAME_SOURCE_WALL_THICKNESS
+    # The dissent is surfaced on the row, not silently swallowed.
+    for row in rows.values():
+        assert row["needs_review"] is True
+        assert "vision read this class as" in row["review_reason"]
+
+
+def test_a_thickness_bind_is_no_longer_reachable_only_through_an_elif():
+    """Before 24-02 a vision label short-circuited the deterministic mapper.
+
+    Asserted as a BRANCH claim, not a value claim: with a label present the
+    emitted name must still be the library's, which can only happen if the
+    thickness branch runs first.
+    """
+    with_label = _emit_wall_classes(
+        labels=_wall_labels({"TC2": "Aluminum Storefront/Curtain Wall"})
+    )
+    without_label = _emit_wall_classes(labels={})
+    assert with_label["WALL-TC2"]["name"] == without_label["WALL-TC2"]["name"]
+    assert with_label["WALL-TC2"]["quantity"] == without_label["WALL-TC2"]["quantity"]
+
+
+# ── Behaviour 2: an agreeing label corroborates ─────────────────────────────
+
+
+def test_an_agreeing_vision_label_corroborates_the_thickness_bind():
+    """Agreement raises confidence and clears the naming-library review reason."""
+    alone = _emit_wall_classes(labels={})["WALL-TC2"]
+    # Same answer, different case and separators — a squash, not a fuzzy match.
+    corroborated = _emit_wall_classes(
+        labels=_wall_labels({"TC2": "cmu-wall"})
+    )["WALL-TC2"]
+
+    assert corroborated["name"] == alone["name"] == "CMU Wall"
+    assert corroborated["quantity"] == alone["quantity"]  # geometry is untouched
+    # Asserted as a RAISE, not as two pinned strings. An uncorroborated
+    # thickness bind emits "low" today because `_min_confidence` treats the
+    # absent vision confidence as low — pre-existing behaviour this plan does
+    # not touch (logged in deferred-items.md). What 24-02 owns is the
+    # DIRECTION: a second independent authority saying the same thing must
+    # move the row up, never down.
+    assert _CONFIDENCE_ORDER[corroborated["confidence"]] > _CONFIDENCE_ORDER[
+        alone["confidence"]
+    ]
+    assert corroborated["confidence"] == "high"
+    assert corroborated["needs_review"] is False
+    assert corroborated["review_reason"] == ""            # cleared
+    assert "naming library" in alone["review_reason"] or alone["review_reason"] == ""
+
+
+def test_the_agreement_check_is_a_squash_and_not_a_fuzzy_matcher():
+    """24-03 owns canonical naming; fusion may only answer 'same or not'."""
+    assert _squash_wall_name("CMU Wall") == _squash_wall_name("cmu-wall")
+    assert _squash_wall_name("Tilt Up Wall") == _squash_wall_name("TILT_UP_WALL")
+    # Plural folding and synonym folding are deliberately NOT done here.
+    assert _squash_wall_name("Metal Downspout") != _squash_wall_name("Metal Downspouts")
+    assert _squash_wall_name("Aluminum Storefront") != _squash_wall_name(
+        "Aluminum Storefront/Curtain Wall"
+    )
+
+
+# ── Behaviour 3: a hint bind is not strong enough to override a reading ─────
+
+
+def test_a_hint_bind_does_not_override_a_vision_label_but_flags_the_row():
+    """A hint bind is a guess about which object fits, not printed evidence."""
+    library = [
+        {"name": "Exterior Tilt Up Wall", "basis": "wall_area",
+         "binding_hint": "exterior_wall", "variant": "exterior"},   # no thickness
+    ]
+    rows = _emit_wall_classes(
+        bundle=_precedence_bundle(lf={"TC1": 2972.0}),
+        vocabulary=library,
+        labels=_wall_labels({"TC1": "Concrete Retaining Wall"}),
+    )
+    row = rows["WALL-TC1"]
+    assert row["name"] == "Concrete Retaining Wall"     # the reading is kept
+    assert row["name_source"] == _NAME_SOURCE_VISION
+    assert row["needs_review"] is True                  # but the row is flagged
+    assert "hint bind" in row["review_reason"]
+
+
+# ── Behaviour 4: a hint bind names the class when vision is silent ──────────
+
+
+def test_a_hint_bind_names_the_class_when_vision_is_silent_and_stays_flagged():
+    library = [
+        {"name": "Exterior Tilt Up Wall", "basis": "wall_area",
+         "binding_hint": "exterior_wall", "variant": "exterior"},   # no thickness
+    ]
+    row = _emit_wall_classes(
+        bundle=_precedence_bundle(lf={"TC1": 2972.0}),
+        vocabulary=library,
+        labels={},
+    )["WALL-TC1"]
+    assert row["name"] == "Exterior Tilt Up Wall"
+    assert row["name_source"] == _NAME_SOURCE_LIBRARY   # the unchanged old string
+    assert row["needs_review"] is True
+    assert "hint bind" in row["review_reason"]
+
+
+# ── Behaviour 5: no bind and no label reaches the unlabeled branch ──────────
+
+
+def test_no_bind_and_no_label_still_reaches_the_unlabeled_branch():
+    """Plan 24-04 owns this branch; 24-02 must leave it exactly as it was."""
+    row = _emit_wall_classes(vocabulary=[], labels={})["WALL-TC1"]
+    assert row["name"] == "WALL-TC1"
+    assert row["unit"] == "LF"
+    assert row["confidence"] == "low"
+    assert row["needs_review"] is True
+    assert row["review_reason"] == "unlabeled wall thickness class"
+    assert "name_source" not in row
+
+
+# ── The masonry / dominant-class guard, re-asserted AFTER the inversion ─────
+
+
+def test_masonry_never_dominant():
+    """T-24-08: a CMU object may not bind the dominant-LF perimeter class.
+
+    Re-asserted at the FUSION level (not just at the mapper) because the
+    inversion changed which branch reaches publication — the guard is only
+    worth anything if it survives on the path that now leads.
+    """
+    # Mapper level: identical thicknesses, so only LF dominance can decide.
+    mapping = map_wall_classes_from_library(
+        {"TC1": 2972.0, "TC2": 61.0},
+        {"TC1": 8.0, "TC2": 8.0},
+        _precedence_library(),
+    )
+    assert mapping["TC2"][0] == "CMU Wall"
+    assert mapping["TC1"][0] != "CMU Wall"
+
+    # Fusion level, with vision actively asking for the forbidden bind.
+    rows = _emit_wall_classes(
+        labels=_wall_labels({"TC1": "CMU Wall", "TC2": "CMU Wall"}),
+        wall_height_ft=36.0,
+    )
+    assert rows["WALL-TC1"]["name"] != "CMU Wall"
+    cmu = [r for r in rows.values() if r["name"] == "CMU Wall"]
+    assert len(cmu) == 1
+    assert cmu[0]["candidate_id"] == "WALL-TC2"
+    # The CMU row is the SMALL interior class, never the perimeter.
+    assert cmu[0]["quantity"] < rows["WALL-TC1"]["quantity"]
+
+
+def test_masonry_never_dominant_when_it_is_the_only_class():
+    """No non-dominant class to bind → the object binds NOTHING, never the
+    perimeter. An absent bind is the honest answer; a giant CMU SF is not."""
+    rows = _emit_wall_classes(
+        bundle=_precedence_bundle(lf={"TC1": 2972.0}),
+        vocabulary=[{"name": "CMU Wall", "basis": "wall_area",
+                     "binding_hint": "masonry_wall", "thickness_in": "12"}],
+        labels=_wall_labels({"TC1": "CMU Wall"}),
+    )
+    # Vision may still name it (no confident bind existed) — but the
+    # deterministic side refused to, and that refusal is what the guard is.
+    assert map_wall_classes_from_library(
+        {"TC1": 2972.0}, {"TC1": 12.0},
+        [{"name": "CMU Wall", "basis": "wall_area",
+          "binding_hint": "masonry_wall", "thickness_in": "12"}],
+    ) == {}
+    assert rows["WALL-TC1"]["name_source"] == _NAME_SOURCE_VISION
+
+
+# ── The mapper's new evidence field ────────────────────────────────────────
+
+
+def test_the_mapper_publishes_the_thickness_that_decided_a_confident_bind():
+    mapping = map_wall_classes_from_library(
+        _PRECEDENCE_LF, _PRECEDENCE_THICKNESS_IN, _precedence_library()
+    )
+    assert mapping["TC2"][2] is True
+    assert mapping["TC2"][3] == 8.0        # the printed thickness that matched
+    # A hint bind has no printed thickness and says so with None, never a 0.
+    hint_only = map_wall_classes_from_library(
+        {"TC1": 2972.0}, {"TC1": 12.0},
+        [{"name": "Exterior Tilt Up Wall", "basis": "wall_area",
+          "binding_hint": "exterior_wall", "variant": "exterior"}],
+    )
+    assert hint_only["TC1"][2] is False
+    assert hint_only["TC1"][3] is None
+
+
+def test_a_pre_24_02_three_tuple_bind_is_tolerated_not_a_crash():
+    """An external caller may still pass the old 3-tuple shape."""
+    components = []
+    _fuse_wall_classes(
+        _precedence_bundle(),
+        {},
+        components,
+        vocab_map={},
+        library_wall_map={"TC2": ("CMU Wall", "wall_area", True)},
+    )
+    row = {c["candidate_id"]: c for c in components}["WALL-TC2"]
+    assert row["name"] == "CMU Wall"
+    assert row["name_source"] == _NAME_SOURCE_WALL_THICKNESS

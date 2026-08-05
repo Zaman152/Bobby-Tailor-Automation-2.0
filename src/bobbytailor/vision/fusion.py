@@ -412,6 +412,34 @@ _BUILDING_LAYER_PATTERNS = (
     ),
 )
 
+# ── name_source vocabulary for wall thickness classes (24-02, V4-DET-02) ─────
+#
+# Three authorities can name a wall thickness class, and a reader of the
+# artifact must be able to tell WHICH one did. The first two strings are the
+# ones fusion has always emitted and keep exactly their old meaning; the third
+# is new and splits the case that used to hide inside "naming_library".
+#
+#: A vision label named the class (no confident deterministic bind existed).
+_NAME_SOURCE_VISION = "vision"
+#: A binding_hint bind named the class — NOT authoritative, always flagged.
+_NAME_SOURCE_LIBRARY = "naming_library"
+#: A printed-thickness match named the class — deterministic and authoritative.
+#: This is the branch V4-DET-02 promoted out of the `elif` fallback.
+_NAME_SOURCE_WALL_THICKNESS = "naming_library_thickness"
+
+#: Case- and separator-insensitive squash, used ONLY to answer "did these two
+#: authorities say the same thing?". Deliberately NOT a fuzzy matcher and
+#: deliberately not plural-folding: `canonical_library_name` is plan 24-03's
+#: to own, and duplicating a second name-folding rule here is how the two
+#: drift apart.
+_WALL_NAME_SQUASH_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _squash_wall_name(name) -> str:
+    """Squash a wall object name for an AGREEMENT check (never for lookup)."""
+    return _WALL_NAME_SQUASH_RE.sub("", str(name or "").strip().lower())
+
+
 #: Naming authority, lowest number = most authoritative. A name the plan itself
 #: printed outranks an estimator-standard library term, which in turn outranks a
 #: verbatim learned string — so "Concrete Pad" (a learned verbatim) can never
@@ -422,6 +450,12 @@ _NAME_AUTHORITY = {
     "schedule": 0,
     "text_layer": 1,
     "naming_library": 2,
+    # A printed-thickness bind (24-02) is a REFINEMENT of "naming_library", not
+    # a new authority: it is registered at the SAME rank so the precedence
+    # inversion cannot silently re-order region-sharing arbitration. Omitting
+    # it would drop the row to the unknown-source default (4) — BELOW
+    # "learned" — which is the opposite of what the inversion means.
+    _NAME_SOURCE_WALL_THICKNESS: 2,
     "library": 2,
     "learned": 3,
 }
@@ -1376,15 +1410,23 @@ def map_wall_classes_from_library(
     lf_by_class: Dict[str, float],
     thickness_by_class: Dict[str, float],
     wall_objects: List[dict],
-) -> Dict[str, Tuple[str, Optional[str], bool]]:
+) -> Dict[str, Tuple[str, Optional[str], bool, Optional[float]]]:
     """Map wall thickness classes to naming-library wall objects.
 
-    Returns ``{class: (object_name, basis, confident)}``. ``confident`` is True
-    only for a printed-thickness match (authoritative); hint-based binds are
-    ``False`` so fusion flags them needs_review. A class that no object claims is
-    absent from the map (it stays on the existing unlabeled needs_review path).
+    Returns ``{class: (object_name, basis, confident, matched_thickness_in)}``.
+    ``confident`` is True only for a printed-thickness match (authoritative);
+    hint-based binds are ``False`` so fusion flags them needs_review. A class
+    that no object claims is absent from the map (it stays on the existing
+    unlabeled needs_review path).
+
+    ``matched_thickness_in`` is the printed thickness (inches) parsed off the
+    library object that produced a confident bind, and ``None`` for a hint
+    bind. It exists so the precedence audit record (24-02) can publish the
+    EVIDENCE that decided a disagreement rather than making a reviewer
+    re-derive it. Consumers that only need the first three fields index the
+    tuple rather than unpacking it.
     """
-    result: Dict[str, Tuple[str, Optional[str], bool]] = {}
+    result: Dict[str, Tuple[str, Optional[str], bool, Optional[float]]] = {}
     if not lf_by_class or not wall_objects:
         return result
     classes = list(lf_by_class.keys())
@@ -1419,7 +1461,12 @@ def map_wall_classes_from_library(
         if best is not None:
             obj_name = str(obj.get("name") or obj.get("canonical_name") or "").strip()
             if obj_name:
-                result[best[1]] = (obj_name, obj.get("basis") or obj.get("measure"), True)
+                result[best[1]] = (
+                    obj_name,
+                    obj.get("basis") or obj.get("measure"),
+                    True,
+                    th,
+                )
                 used_classes.add(best[1])
                 used_objs.add(oi)
 
@@ -1446,7 +1493,9 @@ def map_wall_classes_from_library(
         name = str(obj.get("name") or obj.get("canonical_name") or "").strip()
         if not name or cls in result:
             return
-        result[cls] = (name, obj.get("basis") or obj.get("measure"), False)
+        # A hint bind carries no printed thickness — the 4th slot is None, and
+        # that None is what keeps a hint bind out of the authoritative branch.
+        result[cls] = (name, obj.get("basis") or obj.get("measure"), False, None)
         used_classes.add(cls)
         used_objs.add(obj_idx)
 
@@ -1489,17 +1538,40 @@ def _fuse_wall_classes(
     vocab_map: Optional[Dict[str, dict]] = None,
     wall_height_ft: Optional[float] = None,
     wall_height_source: Optional[str] = None,
-    library_wall_map: Optional[Dict[str, Tuple[str, Optional[str], bool]]] = None,
+    library_wall_map: Optional[
+        Dict[str, Tuple[str, Optional[str], bool, Optional[float]]]
+    ] = None,
 ) -> None:
-    """Wall thickness classes → LF, or SF when the label is a wall_area object.
+    """Wall thickness classes → LF, or SF when the name is a wall_area object.
 
-    LF always comes from geometry. When a wall class's vision label resolves
-    (via the project vocabulary, case/alias-insensitive) to a ``wall_area``
-    object AND a positive wall height is available, the component is emitted as
+    LF always comes from geometry. When a wall class's resolved name maps (via
+    the project vocabulary, case/alias-insensitive) to a ``wall_area`` object
+    AND a positive wall height is available, the component is emitted as
     area = ``round(LF × height, 1)`` SF — the manifest-era wall-area binding,
     now driven by the autonomous vocabulary + resolved height. The height and
     its source are recorded in the formula; a ``default``-sourced height flags
-    the item for review. Any other label (or none) keeps LF exactly as before.
+    the item for review. Any other name (or none) keeps LF exactly as before.
+
+    **Naming precedence (24-02, V4-DET-02) — deterministic evidence leads.**
+
+    ``map_wall_classes_from_library`` is a complete zero-API classifier:
+    printed-thickness match within ``_WALL_THICKNESS_TOL_IN``, plus the
+    location guard that forbids a masonry object from binding the dominant-LF
+    perimeter class. It used to sit in an ``elif`` BEHIND the vision label, so
+    a stochastic reading could rename a class the drawing's own printed
+    thickness had already identified — the same geometry publishing as CMU on
+    one run and tilt-up on the next. The order is now:
+
+    1. a ``confident=True`` printed-thickness bind names the class outright;
+    2. a vision label may CORROBORATE it (raising the emitted confidence and
+       clearing the "named by naming library" review reason) or DISSENT — a
+       dissent never changes the name and is audited, never discarded;
+    3. with no confident bind, a usable vision label names the class exactly as
+       before (a hint bind is not evidence strong enough to override a reading,
+       but the disagreement flags the row);
+    4. a hint bind names the class when vision is silent — still ``confident``
+       ``False``, still flagged;
+    5. neither → the unlabeled ``needs_review`` branch, unchanged.
     """
     vocab_map = vocab_map or {}
     library_wall_map = library_wall_map or {}
@@ -1523,24 +1595,71 @@ def _fuse_wall_classes(
         entry = labels_by_id.get(cid)
         label = (entry or {}).get("label")
 
-        # Resolve the wall object name + basis for this class. A vision label
-        # (via the vocabulary) is primary; when vision gave nothing, the naming
-        # library maps the class by thickness + binding_hint (never a silent
-        # wrong bind — a hint-only match is flagged, an unmapped class stays
-        # unlabeled needs_review below).
+        # Resolve the wall object name + basis for this class. DETERMINISTIC
+        # EVIDENCE IS PRIMARY (see the docstring): a printed-thickness match
+        # outranks a vision label unconditionally, a vision label names the
+        # class only when no confident bind exists, and a hint-only bind is
+        # always flagged. An unmapped, unlabeled class stays on the unlabeled
+        # needs_review path below.
         name = None
         basis = None
         vision_conf = None
         from_vision = False
         confident = False
-        if entry and label and label != _UNKNOWN_LABEL:
+        name_source = None
+        dissent_note = ""
+
+        bind = library_wall_map.get(cls)
+        bind_name = bind[0] if bind else None
+        bind_basis = bind[1] if bind else None
+        bind_confident = bool(bind[2]) if bind else False
+        has_label = bool(entry and label and label != _UNKNOWN_LABEL)
+
+        if bind_confident:
+            # 1. Printed thickness wins outright — the drawing's own number.
+            name, basis, confident = bind_name, bind_basis, True
+            name_source = _NAME_SOURCE_WALL_THICKNESS
+            if has_label:
+                if _squash_wall_name(label) == _squash_wall_name(name):
+                    # 2a. Vision corroborates: a second, independent reading of
+                    #     the same answer. Raise confidence, clear the
+                    #     "named by naming library" review reason.
+                    from_vision = True
+                    vision_conf = entry.get("confidence")
+                else:
+                    # 2b. Vision dissents. The name does NOT move — but two
+                    #     naming authorities disagreed about a material
+                    #     classification, and an estimator is owed that fact in
+                    #     the row as well as in the audit trail.
+                    dissent_note = (
+                        "vision read this class as %r; the printed-thickness "
+                        "match named it %r and outranks the reading (both "
+                        "answers are in the fusion audit trail) — verify"
+                        % (label, name)
+                    )
+        elif has_label:
+            # 3. No confident bind — the vision label names the class, exactly
+            #    as before. A hint bind is not evidence strong enough to
+            #    override a reading, but a disagreeing hint bind flags the row.
             name = label
             basis = (vocab_map.get(str(label).strip().lower()) or {}).get("basis")
             vision_conf = entry.get("confidence")
             from_vision = True
             confident = True
-        elif cls in library_wall_map:
-            name, basis, confident = library_wall_map[cls]
+            name_source = _NAME_SOURCE_VISION
+            if bind_name and _squash_wall_name(bind_name) != _squash_wall_name(label):
+                dissent_note = (
+                    "the naming library's hint bind said %r and vision said "
+                    "%r; the reading was kept because a hint bind is not a "
+                    "thickness match — verify" % (bind_name, label)
+                )
+        elif bind is not None:
+            # 4. Hint bind, vision silent — unchanged, still flagged below.
+            # bind_confident is False here by construction (branch 1 took the
+            # confident case), so this is the hint bind and nothing else.
+            name, basis, confident = bind_name, bind_basis, False
+            name_source = _NAME_SOURCE_LIBRARY
+        # 5. Neither → falls through to the unlabeled else-branch below.
 
         if name is not None:
             if (
@@ -1587,6 +1706,11 @@ def _fuse_wall_classes(
                         "tilt-up wall area needs the building perimeter "
                         "(unavailable) — using class LF; verify"
                     )
+                if dissent_note:
+                    # Two naming authorities disagreed. The name published is
+                    # the one that won on evidence, and the row says so.
+                    needs_review = True
+                    reasons.append(dissent_note)
                 components.append(
                     {
                         "name": name,
@@ -1599,7 +1723,7 @@ def _fuse_wall_classes(
                             vision_conf,
                         ),
                         "candidate_id": cid,
-                        "name_source": "vision" if from_vision else "naming_library",
+                        "name_source": name_source,
                         "formula": "%.1f LF (%s) × %.1f ft height (%s)"
                         % (round(lf_value, 1), lf_basis, height, source),
                         "wall_height_ft": height,
@@ -1609,6 +1733,13 @@ def _fuse_wall_classes(
                     }
                 )
                 continue
+            lf_reasons = []
+            if not from_vision and not confident:
+                lf_reasons.append(
+                    "wall class named by naming library (hint bind) — verify"
+                )
+            if dissent_note:
+                lf_reasons.append(dissent_note)
             components.append(
                 {
                     "name": name,
@@ -1619,12 +1750,9 @@ def _fuse_wall_classes(
                         "high" if from_vision else "medium", vision_conf
                     ),
                     "candidate_id": cid,
-                    "name_source": "vision" if from_vision else "naming_library",
-                    "needs_review": not from_vision and not confident,
-                    "review_reason": (
-                        "" if from_vision or confident
-                        else "wall class named by naming library (hint bind) — verify"
-                    ),
+                    "name_source": name_source,
+                    "needs_review": bool(lf_reasons),
+                    "review_reason": "; ".join(lf_reasons),
                 }
             )
         else:
