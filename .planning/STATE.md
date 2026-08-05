@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 24
 current_phase_name: binding-determinism-text-anchored-labeling
 status: in_progress
-stopped_at: Completed 24-02-PLAN.md (2 of 10 plans, wave 1)
+stopped_at: Completed 24-03-PLAN.md (3 of 10 plans, wave 1)
 last_updated: "2026-08-05T00:00:00.000Z"
 last_activity: 2026-08-05
-last_activity_desc: "24-02 inverted the wall-class naming precedence. map_wall_classes_from_library was already a complete zero-API classifier (printed-thickness match within 1.5 in, plus the guard forbidding a masonry object from binding the dominant-LF perimeter class) but sat in an elif BEHIND the stochastic vision label, so identical geometry could publish as CMU on one run and tilt-up on the next. Deterministic evidence now leads: a thickness match names the class outright, vision may corroborate (raising confidence, clearing the review reason) or dissent (name unmoved, row flagged, one fusion_rejected record carrying BOTH answers plus the printed and measured thicknesses). name_source now distinguishes the three naming authorities and is registered in _NAME_AUTHORITY at the SAME rank as naming_library so the inversion cannot silently re-order region-sharing arbitration. test_wall_class_label_invariance holds one geometry bundle fixed and varies only the model answer across the two saved paid runs, asserting an identical (name, quantity, unit) SET — mutation-checked, since reverting the precedence makes it fail with CMU Wall at 2,196 SF vs 106,992 SF, a 49x swing on identical geometry. Suite 1972 -> 1992 passed, 0 regressions. RESIDUAL, named not hidden: the bind is invariant GIVEN its object list, and that list is re-derived from the API every run (defect F3) — 24-03 folds the name form and 24-05 persists the vocabulary; V4-DET-02 is NOT ticked in REQUIREMENTS.md yet."
+last_activity_desc: "24-03 killed the naming-library variance at its root. _norm_item_key collapsed separators and case but NOT plurals, so `bollard` and `bollards` were two bucket identities and a measured row could stand beside a blank expected row for the same object. _plural_stem is now a pure trailing-suffix rule with no lexicon, no alias table and no distance measure; canonical_library_name compares plural-insensitive STEMS, extended in place. Proven on the recorded names, not invented ones: replaying the saved runs' own item names, the 14:19 run's blank `Bollards` row is SUPPRESSED (its measured row was `Bollard`) — defect F2, closed on real data. Three naming authorities that raced with no arbiter now answer to NAME_AUTHORITY_PRECEDENCE and resolve_published_name, the one function that decides which authority names a row; the legend path routes through it as a verbatim authority so the claim is literally true. Learned names are canonicalised on READ, idempotent, no migration. DEVIATION (Rule 2): the research's `library > learned > vision` is applied to the learned store's AI tier (record_ai_manifest's persisted model answers — the tier the F1 evidence indicts) and NOT to its human tier, because demoting a human's correction below a library that is half LLM-derived vocabulary would break V3-LEARN-02 and contradict the store's own human-wins invariant. Where two names genuinely cannot reconcile (`Dock Bumper` vs `Bollards`) BOTH rows are flagged — never merged, never deleted — with pairing keyed on the measured row's naming AUTHORITY, never on name similarity. 24-02's residual differential did NOT start failing, and that is CORRECT: the storefront pair is a compound rename, not a plural, and folding it would be the defect. Suite 1992 -> 2017 passed, 0 regressions. V4-DET-02 still NOT ticked — 24-05 owes the stable object list. PRIOR: 24-02 inverted the wall-class naming precedence. map_wall_classes_from_library was already a complete zero-API classifier (printed-thickness match within 1.5 in, plus the guard forbidding a masonry object from binding the dominant-LF perimeter class) but sat in an elif BEHIND the stochastic vision label, so identical geometry could publish as CMU on one run and tilt-up on the next. Deterministic evidence now leads: a thickness match names the class outright, vision may corroborate (raising confidence, clearing the review reason) or dissent (name unmoved, row flagged, one fusion_rejected record carrying BOTH answers plus the printed and measured thicknesses). name_source now distinguishes the three naming authorities and is registered in _NAME_AUTHORITY at the SAME rank as naming_library so the inversion cannot silently re-order region-sharing arbitration. test_wall_class_label_invariance holds one geometry bundle fixed and varies only the model answer across the two saved paid runs, asserting an identical (name, quantity, unit) SET — mutation-checked, since reverting the precedence makes it fail with CMU Wall at 2,196 SF vs 106,992 SF, a 49x swing on identical geometry. Suite 1972 -> 1992 passed, 0 regressions. RESIDUAL, named not hidden: the bind is invariant GIVEN its object list, and that list is re-derived from the API every run (defect F3) — 24-03 folds the name form and 24-05 persists the vocabulary; V4-DET-02 is NOT ticked in REQUIREMENTS.md yet."
 progress:
   total_phases: 28
   completed_phases: 20
   total_plans: 131
-  completed_plans: 118
-  percent: 90
+  completed_plans: 119
+  percent: 91
 ---
 
 # Project State
@@ -30,18 +30,33 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 24 (binding-determinism-text-anchored-labeling) — **IN PROGRESS**
-Plan: 2 of 10 complete (wave 1 of 6)
-Status: wave 1 is two-thirds done. 24-01 shipped the phase's one new deterministic primitive —
+Plan: 3 of 10 complete (wave 1 of 6)
+Status: **wave 1 is complete.** 24-01 shipped the phase's one new deterministic primitive —
 every symbol group, room and wall class carries the words the drawing printed nearest to it, or a
 **recorded absence**, computed before any vision call. 24-02 then made the wall-class NAME a
 decision rather than a reading: a printed-thickness match outranks a vision label unconditionally,
 a label may corroborate or dissent but never rename, and every dissent is published in
-`fusion_rejected` with both answers and the thickness evidence that decided it.
-Ready for 24-03 (canonical name form — its landing should make 24-02's residual assertion start
-failing, and that failure is the signal it worked), 24-04 (the unnamed-geometry ledger consumes
-`anchor_text is None`) and 24-07 (the SoM chip consumes the anchor text — and **must** wrap it in
+`fusion_rejected` with both answers and the thickness evidence that decided it. 24-03 closed the
+naming layer's own variance: one object can no longer occupy two rows because of a trailing `s`,
+the three racing naming authorities now answer to one declared arbiter, and a blank expected row
+can no longer stand unexplained beside a measured row that may answer it.
+
+**Read this before 24-05.** 24-02 predicted its residual differential
+(`test_wall_class_label_invariance`'s WALL-TC3 assertion) would start failing when 24-03 landed. It
+did **not**, and that is the correct outcome, not a miss: the residual is `Aluminum Storefront` vs
+`Aluminum Storefront/Curtain Wall`, a compound rename rather than a plural. Folding it would mean
+`canonical_library_name` had become a synonym mapper — the defect the whole phase boundary exists
+to prevent. That assertion is **24-05's** to retire, by stabilising the per-project object list so
+both runs derive the same name in the first place. Do not delete or weaken it before then.
+
+Ready for 24-04 (the unnamed-geometry ledger consumes `anchor_text is None`; note that
+`_HYPOTHESIS_NAME_SOURCES` already excludes `vision`, so removing `SYM-*` rows from the take-off
+changes no 24-03 assertion), 24-05 (per-project vocabulary persistence — must respect
+`learning_vocabulary.source`, since human vs ai is now a live arbitration distinction, and must
+NOT write a migration) and 24-07 (the SoM chip consumes the anchor text — and **must** wrap it in
 `<pdf_text>` delimiters, threat T-24-01).
-Last activity: 2026-08-05 — 24-02 inverted the wall-class naming precedence (see last_activity_desc).
+Last activity: 2026-08-05 — 24-03 folded the canonical name form and declared the one naming-authority
+arbiter (see last_activity_desc).
 
 Progress: [█████████░] 90%
 
@@ -100,6 +115,7 @@ Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans; offline s
 | Phase 23 P16 | ~4h15m | 4 tasks | 7 files |
 | Phase 24 P01 | 3h 20m | 3 tasks | 3 files |
 | Phase 24 P02 | 3h 45m | 3 tasks | 3 files |
+| Phase 24 P03 | 4h 05m | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -109,6 +125,11 @@ Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans; offline s
 
 ### Decisions
 
+- [Phase 24]: 24-03: the learned store is TWO naming authorities, not one — the research's `library > learned > vision` applies to the `source='ai'` tier record_ai_manifest writes (the tier the F1 evidence indicts) and NOT to the `source='human'` tier, because demoting a human's correction below a library that is half LLM-derived vocabulary breaks V3-LEARN-02 and contradicts the store's own human-wins invariant
+- [Phase 24]: 24-03: unknown learned provenance resolves to the HUMAN tier — the store's own schema default, and the rule that an authority is demoted on evidence, never on assumption
+- [Phase 24]: 24-03: `-ses` is deliberately NOT folded as an `-es` plural; `Base`/`Bases` and `Bus`/`Buses` are indistinguishable without a lexicon, so the ambiguous case falls through to the plain `-s` rule. Under-folding is the status quo and is safe; over-folding merges two different objects
+- [Phase 24]: 24-03: a verbatim authority (legend, manifest) routes THROUGH the arbiter but is never canonicalised — rewriting a user's own words is the mangling the legend-verbatim contract exists to prevent
+- [Phase 24]: 24-03: expected-vs-measured cross-referencing keys on the measured row's naming AUTHORITY (a hypothesis can be wrong about which object was measured; a printed label cannot), never on name similarity — and the partner count is always exact, the cap trims the list not the truth
 - [Phase 24]: 24-02: a printed-thickness match outranks a vision label UNCONDITIONALLY; the label may corroborate (raising confidence, clearing the review reason) or dissent, but it may never rename a class the drawing's own printed thickness identified
 - [Phase 24]: 24-02: the new name_source value is registered in _NAME_AUTHORITY at the SAME rank as naming_library — an unregistered string would have fallen to the unknown default (4, below `learned`) and silently made every thickness-bound wall row the least authoritative claimant in region-sharing arbitration
 - [Phase 24]: 24-02: fusion's agreement check is a case/separator squash and deliberately does NOT fold plurals or synonyms — canonical_library_name is 24-03's to own, and a second folding rule in fusion is how the two drift apart
@@ -443,8 +464,8 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-04T23:08:12.114Z
-Stopped at: Completed 24-01-PLAN.md (1 of 10 plans, wave 1)
+Last session: 2026-08-05T00:00:00.000Z
+Stopped at: Completed 24-03-PLAN.md (3 of 10 plans, wave 1 complete)
 Resume file: None
 
 ### Phase 23 decisions so far

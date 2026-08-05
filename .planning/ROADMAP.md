@@ -1031,13 +1031,13 @@ Plans are listed in EXECUTION order; the wave in each plan's frontmatter is auth
 - **Assumption A1 falsified.** The 184→64 `raw_line_items` swing was attributed to the un-ensembled `_run_pass`. The artifacts show run 2 ran at a budget cap **2.5× smaller** (`$0.60` vs `$1.50`), reached **99.8%** of it, and spent **less than half** as much on sheet-level work. Budget, not sampling, is the dominant explanation. Plan 24-08 therefore stands on V4-DET-04's own justification and treats the cost pairing with 24-05 as load-bearing.
 - **Expected direction of the score: DOWN.** When the unnamed-geometry contract lands, ~24 published identifier rows plus the coincidental high-count "column" hit leave the take-off. That is the correct, documented outcome (same precedent as Phase 23's rails) and no plan may state a success criterion as an accuracy percentage.
 
-**Plans:** 2/10 plans executed
+**Plans:** 3/10 plans executed
 
 Plans:
 
 - [x] 24-01-PLAN.md — Deterministic per-candidate text-anchor primitive + bundle wiring (wave 1, V4-DET-01)
 - [x] 24-02-PLAN.md — Wall-class precedence inversion + disagreement audit + label-invariance differential (wave 1, V4-DET-02)
-- [ ] 24-03-PLAN.md — Canonical name form: plural folding + one naming-authority precedence + expected/measured reconciliation (wave 1)
+- [x] 24-03-PLAN.md — Canonical name form: plural folding + one naming-authority precedence + expected/measured reconciliation (wave 1)
 - [ ] 24-04-PLAN.md — Unnamed-geometry contract: the three `or cid` leak sites + room name-plausibility gate (wave 2, V4-DET-01)
 - [ ] 24-05-PLAN.md — Per-project vocabulary persistence & reuse (wave 2; resolves OQ-2 per-project scope, funds 24-08)
 - [ ] 24-06-PLAN.md — Ledger surfacing: report key, summary.txt section, Excel sheet + `run_settings` telemetry (wave 3; resolves OQ-1)
