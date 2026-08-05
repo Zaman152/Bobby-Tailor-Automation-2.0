@@ -77,9 +77,70 @@ def _degenerate_measure(qty, unit) -> bool:
 _MIN_LEARNED_EXPECTATION = 0.5
 
 
+#: Endings that make a trailing ``s`` part of the SINGULAR word rather than a
+#: plural marker. Stripping them would fold `Glass`->`Glas`, `Radius`->`Radiu`,
+#: `Axis`->`Axi` — a rename, not a form fold.
+_NOT_A_PLURAL_ENDINGS = ("ss", "us", "is")
+
+#: Stems that take ``-es`` rather than ``-s`` in the plural (`Box`/`Boxes`,
+#: `Arch`/`Arches`). Deliberately EXCLUDES a stem ending in ``s``: `Base`/`Bases`
+#: and `Bus`/`Buses` are indistinguishable without a lexicon, and this function
+#: has none — so `-ses` falls through to the plain ``s`` rule, which folds
+#: `Bases`->`Base` correctly and merely fails to fold `Buses`->`Bus`. Failing to
+#: fold is the status quo and is safe; folding two different words together is
+#: the defect this whole boundary exists to prevent.
+_ES_PLURAL_STEM_ENDINGS = ("x", "z", "ch", "sh")
+
+#: A stem shorter than this is not a word this function is willing to invent.
+#: `Gas` must not become `Ga`, `Bus` must not become `Bu`.
+_MIN_PLURAL_STEM_LEN = 3
+
+
+def _plural_stem(token: str) -> str:
+    """Reduce ONE squashed alphanumeric token to a plural-insensitive stem.
+
+    A PURE string function: no lexicon, no external data, no similarity
+    measure. The only transformation it can perform is removing a trailing
+    plural suffix from an otherwise character-identical stem, which is a
+    transformation of the same class as the spacing/case folding
+    :func:`canonical_library_name` already performs and is in-boundary under
+    that function's stated contract (24-RESEARCH §4.3, pitfall 5).
+
+    What it deliberately CANNOT do is map one word to a different word. There
+    is no alias table, no edit distance and no stemming lexicon here, because
+    any of those would turn `Dock Bumper` into `Bollards` — a strictly worse
+    defect than the singular/plural split it would appear to fix.
+
+    Degenerate inputs (empty, single character, a stem that would vanish) are
+    returned unchanged rather than collapsed to nothing.
+    """
+    word = token or ""
+    if len(word) <= _MIN_PLURAL_STEM_LEN or not word.endswith("s"):
+        return word
+    if word.endswith("es"):
+        stem = word[:-2]
+        if (len(stem) >= _MIN_PLURAL_STEM_LEN
+                and stem.endswith(_ES_PLURAL_STEM_ENDINGS)):
+            return stem
+    if word.endswith(_NOT_A_PLURAL_ENDINGS):
+        return word
+    stem = word[:-1]
+    return stem if len(stem) >= _MIN_PLURAL_STEM_LEN else word
+
+
 def _norm_item_key(name: str) -> str:
-    """Loose canonical key for 'have we already got a row for this?'."""
-    return re.sub(r"[^a-z0-9]+", " ", str(name or "").lower()).strip()
+    """Loose canonical key for 'have we already got a row for this?'.
+
+    Plural-aware since 24-03. This key IS the bucket identity that decides
+    whether two rows are one item, and collapsing separators and case but not
+    plurals is exactly why a measured `Bollard` row and a blank `Bollards` row
+    stood side by side, unreconciled, in BOTH saved paid runs. Two genuinely
+    different objects still key apart — the fold is per-token and suffix-only.
+    """
+    squashed = re.sub(r"[^a-z0-9]+", " ", str(name or "").lower()).strip()
+    if not squashed:
+        return squashed
+    return " ".join(_plural_stem(tok) for tok in squashed.split())
 
 # Confidence ordering, worst -> best. Used to roll a bucket's confidence up to
 # the lowest (most cautious) confidence among the rows that built it.
@@ -303,14 +364,26 @@ def canonical_library_name(name: str, unit: str = "") -> tuple:
     name, it never renames one item to another (the mangling the
     legend-verbatim comment below warns about). The library's own unit always
     wins when present.
+
+    24-03 widens "the same words" by EXACTLY one form: a trailing plural. The
+    agreement test compares the plural-insensitive STEMS of both sides, so
+    `Bollard` binds ITEM_NAME_MAP's `Bollards` the same way `Guardrail` already
+    bound `Guard Rail`. Nothing else about the contract moves: the function
+    still accepts a map rule only when its canonical name is the same words as
+    the input, now also modulo a trailing plural. A synonym is NOT a plural —
+    `Dock Bumper` still resolves to itself and never to `Dock Leveler` or
+    `Bollards`, and :func:`_plural_stem` is deliberately incapable of mapping
+    one word to a different word (24-RESEARCH pitfall 5).
     """
     hay = (name or "").lower()
     squashed = re.sub(r"[^a-z0-9]+", "", hay)
     if not squashed:
         return name, unit
+    squashed_stem = _plural_stem(squashed)
     for pattern, canon, default_unit in ITEM_NAME_MAP:
         if re.search(pattern, hay, re.IGNORECASE):
-            if re.sub(r"[^a-z0-9]+", "", canon.lower()) == squashed:
+            canon_stem = _plural_stem(re.sub(r"[^a-z0-9]+", "", canon.lower()))
+            if canon_stem == squashed_stem:
                 return canon, (unit or default_unit)
     return name, unit
 

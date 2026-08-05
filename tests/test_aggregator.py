@@ -749,3 +749,117 @@ class TestUnitClassIsNotChangedByNaming:
         }]
         row = _row(aggregate_takeoff(items, library=library), "Novel Object")
         assert row["quantity"] == pytest.approx(9.0)
+
+
+# ---------------------------------------------------------------------------
+# 24-03 Task 1 — the canonical name FORM folds a trailing plural, and NOTHING
+# else.
+#
+# The two saved paid Crow runs published the SAME 56-EA candidate as `Bollard`
+# (source: learned) in one and `Dock Bumper` (source: library) in the other,
+# with a blank `Bollards` row (source: expected_not_measured) sitting beside it
+# in BOTH. A client reading that report sees a measured object next to a blank
+# row for what is plausibly the same object and concludes the bollards were not
+# found — strictly worse than either row alone (24-RESEARCH §4.3.4).
+#
+# `canonical_library_name`'s docstring is explicit that it normalises the FORM
+# of one item's name and NEVER renames one item to another. That boundary is
+# correct and is not being loosened here: a trailing plural is a form
+# transformation of exactly the same class as the spacing/case folding the
+# function already performs. A SYNONYM matcher is a rename, and is how
+# `Dock Bumper` would silently become `Bollards` — a worse defect than the
+# split it would appear to fix (24-RESEARCH pitfall 5). The negative test below
+# is load-bearing and lives on its own so it cannot be quietly deleted
+# alongside a refactor of its neighbours.
+# ---------------------------------------------------------------------------
+
+from bobbytailor.pipeline.aggregator import (  # noqa: E402
+    _norm_item_key,
+    _plural_stem,
+    canonical_library_name,
+)
+
+
+def test_canonical_plural_folding_binds_the_singular_library_spelling():
+    """`Bollard` is the same object as ITEM_NAME_MAP's `Bollards`.
+
+    The map's unit is applied only because the caller supplied none — a caller
+    that states a unit keeps it, exactly as before this change.
+    """
+    assert canonical_library_name("Bollard", "") == ("Bollards", "EA")
+    assert canonical_library_name("Bollard", "LF") == ("Bollards", "LF")
+
+
+def test_canonical_plural_folding_is_idempotent():
+    """Folding twice equals folding once — the plural spelling is a fixed point."""
+    once = canonical_library_name("Bollards", "")
+    assert once == ("Bollards", "EA")
+    assert canonical_library_name(once[0], "") == once
+
+
+def test_canonical_never_renames_dock_bumper_into_bollards():
+    """THE load-bearing negative. A synonym is not a plural.
+
+    `Dock Bumper` matches ITEM_NAME_MAP's ``dock.*bumper`` rule, whose canonical
+    form is `Dock Leveler`. Those are two different objects and the function's
+    own contract forbids the rewrite. If this test ever fails, the folding rule
+    has become a synonym mapper and a genuinely distinct object is disappearing
+    from client reports.
+    """
+    assert canonical_library_name("Dock Bumper", "EA") == ("Dock Bumper", "EA")
+    assert canonical_library_name("Dock Bumper", "EA")[0] != "Bollards"
+    assert canonical_library_name("Dock Bumper", "EA")[0] != "Dock Leveler"
+
+
+def test_canonical_never_renames_a_stem_that_differs_by_more_than_a_plural():
+    """`Metal Stair` is not ITEM_NAME_MAP's `Stairs`; novel vocabulary is verbatim."""
+    assert canonical_library_name("Metal Stair", "EA") == ("Metal Stair", "EA")
+    assert canonical_library_name("Metal Stairs", "EA") == ("Metal Stairs", "EA")
+    assert canonical_library_name("Fiber Cement Panel", "SF") == (
+        "Fiber Cement Panel", "SF")
+    # ...and the pre-existing spacing/case folding is untouched.
+    assert canonical_library_name("Guardrail", "LF") == ("Guard Rail", "LF")
+
+
+def test_canonical_folding_never_collapses_a_name_to_nothing():
+    """A degenerate name is returned verbatim rather than stemmed into nothing."""
+    assert canonical_library_name("S", "EA") == ("S", "EA")
+    assert canonical_library_name("", "EA") == ("", "EA")
+    assert canonical_library_name("  ", "EA") == ("  ", "EA")
+    assert _plural_stem("") == ""
+    assert _plural_stem("s") == "s"
+    assert _plural_stem("as") == "as"
+    assert _plural_stem("gas") == "gas"      # too short to be a plural of "ga"
+
+
+def test_the_plural_stem_is_a_pure_suffix_rule_with_no_lexicon():
+    """Both spellings reduce to ONE stem; a non-plural `s` ending is protected."""
+    assert _plural_stem("bollards") == _plural_stem("bollard")
+    assert _plural_stem("stairs") == _plural_stem("stair")
+    assert _plural_stem("downspouts") == _plural_stem("downspout")
+    assert _plural_stem("boxes") == _plural_stem("box")
+    assert _plural_stem("arches") == _plural_stem("arch")
+    # A singular that merely ENDS in s is not a plural of anything.
+    assert _plural_stem("glass") == "glass"
+    assert _plural_stem("truss") == "truss"
+    assert _plural_stem("radius") == "radius"
+    assert _plural_stem("axis") == "axis"
+    # Two genuinely different words never share a stem.
+    assert _plural_stem("bollard") != _plural_stem("dockbumper")
+
+
+def test_norm_item_key_folds_singular_and_plural_into_one_bucket():
+    """The bucket identity that decides whether two rows are ONE item."""
+    assert _norm_item_key("Bollard") == _norm_item_key("Bollards")
+    assert _norm_item_key("Metal Downspout") == _norm_item_key("Metal Downspouts")
+    assert _norm_item_key("Metal Stair") == _norm_item_key("Metal Stairs")
+    # Case and separator folding still works exactly as before.
+    assert _norm_item_key("guard-rail") == _norm_item_key("Guard Rail")
+
+
+def test_norm_item_key_keeps_two_genuinely_different_objects_apart():
+    """The fold must not become a merge."""
+    assert _norm_item_key("Dock Bumper") != _norm_item_key("Bollards")
+    assert _norm_item_key("Doors-HC") != _norm_item_key("Doors-SC")
+    assert _norm_item_key("CMU Wall") != _norm_item_key("CMU Paint")
+    assert _norm_item_key("Glass") != _norm_item_key("Glas")
