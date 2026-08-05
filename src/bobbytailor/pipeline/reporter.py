@@ -19,6 +19,17 @@ from bobbytailor.pipeline.provenance import provenance_of_row
 
 logger = logging.getLogger(__name__)
 
+#: The ``fuse_sheet`` result key carrying the unnamed-geometry ledger — one
+#: record per candidate the run MEASURED but could not identify (24-04).
+#:
+#: Mirrored by VALUE from :data:`bobbytailor.vision.fusion.UNNAMED_GEOMETRY_KEY`
+#: rather than imported, for the same reason 24-04 mirrors ``text_anchor``'s
+#: anchor-kind string: ``pipeline.reporter`` takes no dependency on
+#: ``bobbytailor.vision`` today, and a report renderer is the wrong place to
+#: start one. The one-line indirection is checked by a test that fails if the
+#: two strings ever diverge, so the mirror cannot rot in silence.
+UNNAMED_GEOMETRY_KEY = "unnamed_geometry"
+
 
 def generate_report(project_name: str,
                     all_extracted: list,
@@ -32,7 +43,8 @@ def generate_report(project_name: str,
                     library=None,
                     *,
                     coverage: Optional[CoverageLedger] = None,
-                    source_pdf: Optional[str] = None) -> dict:
+                    source_pdf: Optional[str] = None,
+                    run_settings: Optional[dict] = None) -> dict:
     """
     Build the final takeoff report.
 
@@ -63,6 +75,16 @@ def generate_report(project_name: str,
                     the ledger-completeness assertion (ledger length == source
                     page count == the PDF's own page count) checkable from the
                     artifact alone. Omitted from the report when not supplied.
+        run_settings: KEYWORD-ONLY, default None. ``RunSettings.to_dict()`` —
+                      the effective ensemble N, budget cap and feature toggles
+                      the run actually used (21-13; both entry points already
+                      construct one). Neither saved paid run records the N that
+                      was in effect, which made 24-RESEARCH Open Question 1
+                      permanently unanswerable for those runs: the environment
+                      is not an artifact, so a setting that lives only there is
+                      a setting nobody can audit afterwards. Omitted from the
+                      report when not supplied, so a pre-24 caller is untouched
+                      — the same contract ``coverage`` documents above.
 
     A blank is NOT a zero. Everything the coverage argument adds exists so the
     report can state what the run did NOT measure; the report has always been a
@@ -168,6 +190,27 @@ def generate_report(project_name: str,
                 entry["sheet"] = sheet
                 fusion_rejected.append(entry)
 
+    # ── The unnamed-geometry ledger (24-06, from 24-04's fuse_sheet key) ─────
+    #
+    # Same loop shape as the rejection list above, and deliberately NOT the same
+    # list. An entry in the rejection list is a vision quantity claim that lost
+    # to a measurement; a `coverage_ledger` row is one page of the source PDF.
+    # An unnamed-geometry record is a THIRD thing — geometry the run measured
+    # and could not name — and folding it into either would hand it to logic
+    # written for a different fact (24-04 key decision).
+    #
+    # The sheet name is attached per record for the same reason it is attached
+    # above: the record is written by `fuse_sheet`, which knows the candidate but
+    # not which sheet it will be reported under.
+    unnamed_geometry: list = []
+    for d in all_extracted:
+        sheet = d.get("_sheet_name") or d.get("_source_sheet") or "unknown"
+        for rec in d.get(UNNAMED_GEOMETRY_KEY) or []:
+            if isinstance(rec, dict):
+                entry = dict(rec)
+                entry["sheet"] = sheet
+                unnamed_geometry.append(entry)
+
     report = {
         "project_name": project_name,
         "folder_id": folder_id,
@@ -259,6 +302,25 @@ def generate_report(project_name: str,
         report["pages_in_source"] = report_ledger.pages_in_source
     if source_pdf:
         report["source_pdf"] = str(source_pdf)
+
+    # ── Unnamed geometry + effective run settings (24-06) ────────────────────
+    # Two ADDITIVE keys, both absent when the run carried nothing to put in them.
+    #
+    # The empty ledger is emitted as an ABSENT key rather than as `[]`. An empty
+    # list would be the better statement — "we identified everything" said out
+    # loud beats silence — but T-23-70's mitigation is an exact top-level key-set
+    # equality assertion for a pre-Phase-23 caller, and a key present with an
+    # empty value is not key-set equality. The parity guarantee is load-bearing
+    # for the two scraper entry points and outranks the nicer phrasing, so the
+    # honest statement is made where it costs nothing: a run that DID carry
+    # unnamed geometry always publishes it, and `summary.txt` says in words what
+    # the list means. Consumers use `.get(..., [])`.
+    if unnamed_geometry:
+        report[UNNAMED_GEOMETRY_KEY] = unnamed_geometry
+    if run_settings:
+        # Copied, never aliased: the report is serialised after the caller may
+        # still be holding (and mutating) its own settings dict.
+        report["run_settings"] = dict(run_settings)
 
     # Scale calibration — per-sheet drawing scale + scale-independent raw geometry
     # so the Results "Scale & Verify" module can recompute measured quantities

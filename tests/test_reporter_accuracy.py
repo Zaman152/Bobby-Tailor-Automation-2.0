@@ -1076,3 +1076,245 @@ def test_an_errored_page_is_reported_as_errored_not_as_zero():
         assert report["coverage"]["sheets_errored"] == 1
         assert any("errored" in w and "not zero" in w
                    for w in report["coverage_warnings"])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 24-06: the unnamed-geometry ledger becomes visible, and the run records the
+#        settings it actually ran under
+#
+# 24-04 stopped a raw candidate ID publishing as a line item and recorded every
+# excluded candidate with its evidence. That record reached no artifact, which
+# is the mirror-image defect of publishing the identifier: a silently-omitted
+# high-count cluster reads to a client as "there are no columns" (INV-08 — a
+# deletion and a zero read identically). These tests pin the surfacing.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _ledger_record(candidate_id, quantity, unit, reason, kind, detail="",
+                   evidence_texts=()):
+    """One unnamed-geometry record, built by the PRODUCER (24-04's fusion
+    helper) rather than hand-written here.
+
+    A hand-written dict would keep passing after fusion changed the record
+    shape, and this whole plan is a renderer of that shape.
+    """
+    from bobbytailor.vision.fusion import unnamed_geometry_record
+
+    return unnamed_geometry_record(
+        candidate_id=candidate_id,
+        quantity=quantity,
+        unit=unit,
+        position=(10.0, 20.0, 30.0, 40.0),
+        evidence_texts=evidence_texts,
+        reason=reason,
+        kind=kind,
+        detail=detail,
+    )
+
+
+def _two_sheets_with_unnamed_geometry() -> list:
+    """Two sheets, each carrying unnamed geometry, shaped as fuse_sheet leaves
+    them (the key travels onto the sheet dict through merge_with_provenance)."""
+    from bobbytailor.vision.fusion import (
+        UNNAMED_GEOMETRY_KEY,
+        UNNAMED_NO_NAME_SOURCE,
+        UNNAMED_ROOM_UNLABELED,
+        UNNAMED_WALL_CLASS_UNLABELED,
+    )
+
+    common = {
+        "_tokens_in": 10, "_tokens_out": 5, "_cost_usd": 0.02,
+        "sheet_type": "floor_plan", "components": [], "measurements": [],
+    }
+    return [
+        dict(common, **{
+            "_source_sheet": "A-101.png",
+            "_sheet_name": "A-101",
+            UNNAMED_GEOMETRY_KEY: [
+                _ledger_record(
+                    "SYM-2", 56, "EA", UNNAMED_NO_NAME_SOURCE, "symbol_group",
+                    detail="56 repeated marks were measured; nothing names them",
+                ),
+                _ledger_record(
+                    "WALL-TC4", 812.5, "LF", UNNAMED_WALL_CLASS_UNLABELED,
+                    "wall_class",
+                ),
+            ],
+        }),
+        dict(common, **{
+            "_source_sheet": "A-102.png",
+            "_sheet_name": "A-102",
+            UNNAMED_GEOMETRY_KEY: [
+                _ledger_record(
+                    "ROOM-3", 279.5, "SF", UNNAMED_ROOM_UNLABELED, "room",
+                ),
+            ],
+        }),
+    ]
+
+
+def test_the_ledger_key_name_is_the_one_fusion_actually_emits():
+    """The reporter mirrors the key by VALUE (it takes no dependency on
+    bobbytailor.vision). This is the test that stops the mirror rotting."""
+    from bobbytailor.vision import fusion
+    from bobbytailor.pipeline import reporter
+
+    assert reporter.UNNAMED_GEOMETRY_KEY == fusion.UNNAMED_GEOMETRY_KEY
+
+
+def test_the_unnamed_geometry_ledger_is_aggregated_with_its_sheet_attribution():
+    """Every record the run wrote reaches the report, and each one says which
+    sheet it came from — fuse_sheet knows the candidate, never the sheet."""
+    with _isolated_output_dir():
+        report = generate_report(
+            "Unnamed Proj", _two_sheets_with_unnamed_geometry(), [],
+        )
+        ledger = report["unnamed_geometry"]
+
+        assert len(ledger) == 3, "no record is dropped in aggregation"
+        assert {r["candidate_id"] for r in ledger} == {
+            "SYM-2", "WALL-TC4", "ROOM-3",
+        }
+        by_id = {r["candidate_id"]: r for r in ledger}
+        assert by_id["SYM-2"]["sheet"] == "A-101"
+        assert by_id["WALL-TC4"]["sheet"] == "A-101"
+        assert by_id["ROOM-3"]["sheet"] == "A-102"
+
+        # The quantity is the whole point of the record — it is what makes the
+        # difference between "we measured these and could not name them" and
+        # "these do not exist" legible.
+        assert by_id["SYM-2"]["quantity"] == 56
+        assert by_id["SYM-2"]["unit"] == "EA"
+        assert by_id["WALL-TC4"]["quantity"] == 812.5
+        assert by_id["ROOM-3"]["quantity"] == 279.5
+        assert all(r["reason"] for r in ledger), "every record names its reason"
+
+
+def test_aggregating_the_ledger_never_mutates_the_sheet_records():
+    """The sheet dicts belong to the pipeline; the reporter reads them."""
+    extracted = _two_sheets_with_unnamed_geometry()
+    with _isolated_output_dir():
+        generate_report("Unnamed Proj", extracted, [])
+    for sheet in extracted:
+        for record in sheet["unnamed_geometry"]:
+            assert "sheet" not in record, (
+                "the sheet attribution belongs to the report's copy"
+            )
+
+
+def test_the_ledger_reaches_takeoff_json_not_only_the_in_memory_report():
+    """23-17's lesson: a record the run holds in memory and no artifact states
+    is a record a client cannot read."""
+    with _isolated_output_dir():
+        report = generate_report(
+            "Unnamed Proj", _two_sheets_with_unnamed_geometry(), [],
+        )
+        with open(Path(report["_files"]["json"])) as f:
+            on_disk = json.load(f)
+    assert len(on_disk["unnamed_geometry"]) == 3
+    assert {r["candidate_id"] for r in on_disk["unnamed_geometry"]} == {
+        "SYM-2", "WALL-TC4", "ROOM-3",
+    }
+
+
+def test_the_ledger_is_its_own_key_and_never_touches_the_rejection_list():
+    """T-24-16 / 24-04's key decision, re-asserted one level up: overloading
+    `fusion_rejected` would hand these records to Phase 23's C3a reinstatement
+    logic, which keys on suppression records."""
+    extracted = _two_sheets_with_unnamed_geometry()
+    extracted[0]["fusion_rejected"] = [{
+        "name": "CMU Wall", "quantity": 17, "unit": "SF",
+        "rejected_by": "geometry", "reason": "vision_quantity_blocked",
+    }]
+    with _isolated_output_dir():
+        report = generate_report("Unnamed Proj", extracted, [])
+
+    assert len(report["fusion_rejected"]) == 1, (
+        "the rejection list carries what it always carried, and nothing else"
+    )
+    assert report["fusion_rejected"][0]["name"] == "CMU Wall"
+    assert not any(
+        r.get("candidate_id") in {"SYM-2", "WALL-TC4", "ROOM-3"}
+        for r in report["fusion_rejected"]
+    )
+    # Nor into the coverage ledger, whose invariant is one row per source page.
+    assert "coverage_ledger" not in report
+
+
+def test_a_run_that_named_everything_is_shaped_exactly_as_it_was_before():
+    """The empty case is the parity case: a report carrying no unnamed geometry
+    must have grown no key at all (T-23-70's exact key-set equality)."""
+    with _isolated_output_dir():
+        report = generate_report("Baseline Proj", _baseline_extracted(), [])
+        assert list(report.keys()) == PRE_23_TOP_LEVEL_KEYS
+        assert "unnamed_geometry" not in report
+        assert "run_settings" not in report
+
+        with open(Path(report["_files"]["json"])) as f:
+            assert "unnamed_geometry" not in json.load(f)
+
+
+def test_an_empty_ledger_on_a_sheet_is_not_an_absent_one_it_is_simply_nothing():
+    """A sheet that published a name for everything it measured writes an empty
+    list. That must not conjure a key that says nothing."""
+    extracted = _baseline_extracted()
+    extracted[0]["unnamed_geometry"] = []
+    with _isolated_output_dir():
+        report = generate_report("Baseline Proj", extracted, [])
+    assert list(report.keys()) == PRE_23_TOP_LEVEL_KEYS
+
+
+def test_the_run_settings_key_records_the_ensemble_the_run_actually_used():
+    """24-RESEARCH Open Question 1: neither saved paid run records the N that
+    was in effect, and the environment is not an artifact. It need never be
+    unanswerable again."""
+    from bobbytailor.pipeline.takeoff_pipeline import RunSettings
+
+    settings = RunSettings(
+        deterministic_enabled=True,
+        ensemble_n=3,
+        learning_enabled=True,
+        budget_usd=10.0,
+        verify_retry_enabled=True,
+        raster_force=False,
+    )
+    with _isolated_output_dir():
+        report = generate_report(
+            "Settings Proj", _baseline_extracted(), [],
+            run_settings=settings.to_dict(),
+        )
+        assert report["run_settings"]["ensemble_n"] == 3
+        assert report["run_settings"]["budget_usd"] == 10.0
+
+        with open(Path(report["_files"]["json"])) as f:
+            on_disk = json.load(f)
+        assert on_disk["run_settings"]["ensemble_n"] == 3, (
+            "the answer must be in the artifact, not only in memory"
+        )
+
+
+def test_the_run_settings_key_is_absent_when_no_caller_supplied_it():
+    """A pre-24 caller is untouched — the same contract `coverage` documents."""
+    with _isolated_output_dir():
+        report = generate_report("Baseline Proj", _baseline_extracted(), [])
+    assert "run_settings" not in report
+
+
+def test_the_report_holds_its_own_copy_of_the_run_settings():
+    settings = {"ensemble_n": 3, "budget_usd": 10.0}
+    with _isolated_output_dir():
+        report = generate_report(
+            "Settings Proj", _baseline_extracted(), [], run_settings=settings,
+        )
+    settings["ensemble_n"] = 99
+    assert report["run_settings"]["ensemble_n"] == 3
+
+
+def test_both_entry_points_hand_the_reporter_their_run_settings():
+    """The 23-17 lesson in one grep: a reporter that CAN record the settings
+    and a pipeline that never hands them over leaves the question exactly as
+    unanswerable as before."""
+    root = Path(__file__).resolve().parents[1]
+    for rel in ("src/bobbytailor/pipeline/pdf_analyzer.py",
+                "src/bobbytailor/scrape/scraper.py"):
+        source = (root / rel).read_text()
+        assert "run_settings=" in source, f"{rel} never passes run_settings"

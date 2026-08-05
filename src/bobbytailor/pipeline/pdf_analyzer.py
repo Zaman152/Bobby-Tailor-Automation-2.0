@@ -544,4 +544,9 @@ def run_pdf_analysis(
         # run would KNOW what it failed to measure and no artifact would say so.
         coverage=ledger,
         source_pdf=pdf_path,
+        # Without this the effective ensemble N and budget cap live only in the
+        # environment, which is not an artifact — exactly why 24-RESEARCH Open
+        # Question 1 ("was N 3 or 1 on the saved runs?") is permanently
+        # unanswerable for the two saved paid runs.
+        run_settings=pipeline.settings.to_dict(),
     )

@@ -1036,6 +1036,9 @@ async def run_project_scrape(project_id: int, project_name: str,
             screenshots_dir=str(screenshots_dir),
             learned=_pipeline.learned_context,
             library=getattr(_pipeline, "_project_vocabulary", None),
+            # The settings this run actually used, recorded in the artifact
+            # rather than left in the environment (24-06).
+            run_settings=_pipeline.settings.to_dict(),
         )
 
         if sheets_failed or sheets_skipped or _cancelled:
@@ -1432,6 +1435,9 @@ async def run_analyze_from_manifest(
         manifest=object_manifest,
         learned=_pipeline.learned_context,
         library=getattr(_pipeline, "_project_vocabulary", None),
+        # The settings this run actually used, recorded in the artifact
+        # rather than left in the environment (24-06).
+        run_settings=_pipeline.settings.to_dict(),
     )
 
     if sheets_failed or sheets_skipped or _cancelled:
