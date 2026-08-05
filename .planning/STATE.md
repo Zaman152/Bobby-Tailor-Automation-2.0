@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 24
 current_phase_name: binding-determinism-text-anchored-labeling
 status: in_progress
-stopped_at: Completed 24-01-PLAN.md (1 of 10 plans, wave 1)
-last_updated: "2026-08-04T23:08:12.121Z"
+stopped_at: Completed 24-02-PLAN.md (2 of 10 plans, wave 1)
+last_updated: "2026-08-05T00:00:00.000Z"
 last_activity: 2026-08-05
-last_activity_desc: "24-01 built the text-anchor primitive: deterministic/text_anchor.py answers 'which printed text is nearest this geometry' (contained word -> SP-6 two-token tag -> nearest single word -> RECORDED ABSENCE), and _deterministic_bundle now emits bundle['candidate_anchors'] for every symbol group, room and wall class BEFORE any vision call. The search radius is expressed in the page's own text heights rather than absolute points — measured free, median word height is 9.56 pt Crow, 9.64 Moxy, 7.56 Chelsea, 26.41 Bob's on an identical 3024x2160 sheet, so one absolute constant would generalise to one set and break another. 24-RESEARCH Open Question #4 is now a committed test: Crow page 0's two largest clusters (SYM-1 1.0x0.4 ft, SYM-2 0.8x0.87 ft, the bollard cluster) carry ZERO contained text, asserted by RANK so no count is ever compared to the human take-off. Suite 1944 -> 1972 passed, 0 regressions."
+last_activity_desc: "24-02 inverted the wall-class naming precedence. map_wall_classes_from_library was already a complete zero-API classifier (printed-thickness match within 1.5 in, plus the guard forbidding a masonry object from binding the dominant-LF perimeter class) but sat in an elif BEHIND the stochastic vision label, so identical geometry could publish as CMU on one run and tilt-up on the next. Deterministic evidence now leads: a thickness match names the class outright, vision may corroborate (raising confidence, clearing the review reason) or dissent (name unmoved, row flagged, one fusion_rejected record carrying BOTH answers plus the printed and measured thicknesses). name_source now distinguishes the three naming authorities and is registered in _NAME_AUTHORITY at the SAME rank as naming_library so the inversion cannot silently re-order region-sharing arbitration. test_wall_class_label_invariance holds one geometry bundle fixed and varies only the model answer across the two saved paid runs, asserting an identical (name, quantity, unit) SET — mutation-checked, since reverting the precedence makes it fail with CMU Wall at 2,196 SF vs 106,992 SF, a 49x swing on identical geometry. Suite 1972 -> 1992 passed, 0 regressions. RESIDUAL, named not hidden: the bind is invariant GIVEN its object list, and that list is re-derived from the API every run (defect F3) — 24-03 folds the name form and 24-05 persists the vocabulary; V4-DET-02 is NOT ticked in REQUIREMENTS.md yet."
 progress:
   total_phases: 28
   completed_phases: 20
   total_plans: 131
-  completed_plans: 117
-  percent: 89
+  completed_plans: 118
+  percent: 90
 ---
 
 # Project State
@@ -30,18 +30,20 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 24 (binding-determinism-text-anchored-labeling) — **IN PROGRESS**
-Plan: 1 of 10 complete (wave 1 of 6)
-Status: 24-01 shipped the phase's one new deterministic primitive. Every symbol group, room and wall
-thickness class in the deterministic bundle now carries an anchor record — the words the drawing
-itself printed nearest to it, or a **recorded absence** — computed before any vision call. Masking is
-mandatory (a door-schedule tag column can never become a plan-body anchor), ties break by document
-order so repeat calls are byte-identical, and a text unit claimed by two candidates is withdrawn from
-BOTH with the contest named (SP-7c `bind_or_flag`); names are never round-robined.
-Ready for 24-04 (the unnamed-geometry ledger consumes `anchor_text is None`) and 24-07 (the SoM chip
-consumes the anchor text — and **must** wrap it in `<pdf_text>` delimiters, threat T-24-01).
-Last activity: 2026-08-05 — 24-01 built the text-anchor primitive (see last_activity_desc).
+Plan: 2 of 10 complete (wave 1 of 6)
+Status: wave 1 is two-thirds done. 24-01 shipped the phase's one new deterministic primitive —
+every symbol group, room and wall class carries the words the drawing printed nearest to it, or a
+**recorded absence**, computed before any vision call. 24-02 then made the wall-class NAME a
+decision rather than a reading: a printed-thickness match outranks a vision label unconditionally,
+a label may corroborate or dissent but never rename, and every dissent is published in
+`fusion_rejected` with both answers and the thickness evidence that decided it.
+Ready for 24-03 (canonical name form — its landing should make 24-02's residual assertion start
+failing, and that failure is the signal it worked), 24-04 (the unnamed-geometry ledger consumes
+`anchor_text is None`) and 24-07 (the SoM chip consumes the anchor text — and **must** wrap it in
+`<pdf_text>` delimiters, threat T-24-01).
+Last activity: 2026-08-05 — 24-02 inverted the wall-class naming precedence (see last_activity_desc).
 
-Progress: [█████████░] 89%
+Progress: [█████████░] 90%
 
 Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans. Carried forward, named not
 dropped: **DEF-23-SP4** (the geometric viewport-bounded clip cell — blocked behind the domain question
@@ -97,6 +99,7 @@ Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans; offline s
 | Phase 23 P15 | 1h45m | 3 tasks | 8 files |
 | Phase 23 P16 | ~4h15m | 4 tasks | 7 files |
 | Phase 24 P01 | 3h 20m | 3 tasks | 3 files |
+| Phase 24 P02 | 3h 45m | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -106,6 +109,11 @@ Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans; offline s
 
 ### Decisions
 
+- [Phase 24]: 24-02: a printed-thickness match outranks a vision label UNCONDITIONALLY; the label may corroborate (raising confidence, clearing the review reason) or dissent, but it may never rename a class the drawing's own printed thickness identified
+- [Phase 24]: 24-02: the new name_source value is registered in _NAME_AUTHORITY at the SAME rank as naming_library — an unregistered string would have fallen to the unknown default (4, below `learned`) and silently made every thickness-bound wall row the least authoritative claimant in region-sharing arbitration
+- [Phase 24]: 24-02: fusion's agreement check is a case/separator squash and deliberately does NOT fold plurals or synonyms — canonical_library_name is 24-03's to own, and a second folding rule in fusion is how the two drift apart
+- [Phase 24]: 24-02: a precedence override carries its OWN fusion_rejected reason key; reusing a C3a suppression key would make the reinstatement pass act on a row that was never suppressed
+- [Phase 24]: 24-02: the determinism differential asserts a SET across two label variants, never a golden wall area — and states its unmatched-class residual explicitly rather than silently excluding it, so the scope of the invariance claim stays honest
 - [Phase 23]: 23-05: a room tag pairs ACROSS the reading axis (name over number), not along it — pair_two_token_tags takes an axis selector; still ONE projection, asserted by source inspection
 - [Phase 23]: 23-05: derive_room_mix takes an explicit pages scope and its whole-document default REFUSES on Moxy — picking unit key plans is sheet classification, which belongs to 23-08
 - [Phase 23]: 23-05: the unit multiplier IS recoverable from the plans — 214 room tags / 214 distinct numbers on Moxy pages 7-8 give QQ A 90 / KING A 26 / K SUITE B 2 / BUNK B 1 (4/4 golden); the docstring and ground-truth corrections are 23-08 and 23-16
