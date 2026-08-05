@@ -2790,6 +2790,7 @@ from bobbytailor.vision.fusion import (  # noqa: E402
     _WALL_LABEL_PRECEDENCE_REASON,
     _fuse_wall_classes,
     _squash_wall_name,
+    _wall_thickness_in_by_class,
     map_wall_classes_from_library,
 )
 
@@ -2864,8 +2865,9 @@ def _emit_wall_classes(
         wall_height_source=wall_height_source,
         library_wall_map=map_wall_classes_from_library(
             bundle["wall_lf_by_class"],
-            {c: t for c, t in _PRECEDENCE_THICKNESS_IN.items()
-             if c in bundle["wall_lf_by_class"]},
+            # Read back off the bundle's own geometry rather than restated, so
+            # the fixture cannot claim a thickness the bundle does not measure.
+            _wall_thickness_in_by_class(bundle),
             vocabulary,
         ),
         **({"rejected": rejected} if rejected is not None else {})
@@ -3191,3 +3193,206 @@ def test_an_absent_audit_list_is_not_a_crash():
         k: v["name"] for k, v in rows_b.items()
     }
     assert len(with_list) == 1 and without_list is None
+
+
+import pathlib  # noqa: E402
+import re  # noqa: E402
+
+# ── The V4-DET-02 determinism differential (free — no PDF, no API) ──────────
+#
+# FIXTURE PROVENANCE. Every object NAME below is read at runtime out of
+# `.planning/paid-run-evidence/`, not typed here, so this test cannot drift
+# into asserting invented behaviour:
+#
+#   * `VisionOnly_P23V_Crow_20260804_141952`  — the 14:19 run  (variant A)
+#   * `VisionOnly_P23V2_Crow_20260804_181352` — the 18:13 run  (variant B)
+#
+# What each part of the fixture is, and where it comes from:
+#
+#   * The NAMES ("CMU Wall", "Tilt Up Wall", and the storefront form) are the
+#     wall-object names those two runs actually published — read from each
+#     run's `takeoff.json`. The storefront name is 24-RESEARCH defect F3, where
+#     the per-run API-derived vocabulary emitted `Aluminum Storefront` on run 1
+#     and `Aluminum Storefront/Curtain Wall` on run 2.
+#   * The ASSIGNMENT — which class each name is attached to — is the flip the
+#     ground truth records for CMU Wall (ROADMAP.md:1021, 24-RESEARCH §3.3):
+#     one wall class publishing as CMU on one run and tilt-up on the next.
+#     Variant B is variant A's assignment inverted, which is exactly that flip
+#     expressed as a `wall_class_labels` payload.
+#   * The GEOMETRY is synthetic and FIXED across both variants. That is the
+#     whole point: hold geometry and library constant, vary only the model's
+#     answer, and require the emitted take-off not to move.
+#
+# What this test may NOT do: assert any wall area or LF against a golden
+# figure. It asserts a SET EQUALITY between two variants. A golden total here
+# would turn a determinism check into an accuracy check and create pressure to
+# tune the class choice toward a number.
+
+_PAID_RUN_EVIDENCE = (
+    pathlib.Path(__file__).resolve().parent.parent
+    / ".planning" / "paid-run-evidence"
+)
+_RUN_A_DIR = "VisionOnly_P23V_Crow_20260804_141952"    # 14:19
+_RUN_B_DIR = "VisionOnly_P23V2_Crow_20260804_181352"   # 18:13
+
+
+def _published_names(run_dir):
+    """Every object name that saved paid run actually published."""
+    data = json.loads((run_dir / "takeoff.json").read_text())
+    return [
+        str(row.get("item") or "")
+        for row in (data.get("takeoff_summary") or [])
+        if row.get("item")
+    ]
+
+
+def _observed_name(names, pattern, run_dir):
+    """One recorded name matching *pattern*, or a skip naming what is missing.
+
+    A check either asserts or skips — it may never pass for having looked at
+    nothing.
+    """
+    hits = [n for n in names if re.search(pattern, n, re.IGNORECASE)]
+    if not hits:
+        pytest.skip(
+            "no object matching %r was published by %s — the fixture cannot be "
+            "built from recorded behaviour" % (pattern, run_dir.name)
+        )
+    return sorted(hits, key=len)[0]
+
+
+def _invariance_labels(cls_to_label):
+    return {
+        "wall_class_labels": [
+            {"wall_class_id": "WALL-%s" % cls, "label": label,
+             "confidence": "high"}
+            for cls, label in sorted(cls_to_label.items())
+        ]
+    }
+
+
+def test_wall_class_label_invariance():
+    """One fixed bundle + two recorded label sets → one identical triple SET.
+
+    This is the V4-DET-02 half of the phase's determinism harness. It makes
+    the CMU/tilt-up flip STRUCTURALLY impossible rather than merely
+    unobserved: the two variants are the two answers the model actually gave,
+    and the take-off may not notice the difference.
+    """
+    if not _PAID_RUN_EVIDENCE.is_dir():
+        pytest.skip(
+            "missing %s — the recorded run evidence this fixture is built "
+            "from is not present" % _PAID_RUN_EVIDENCE
+        )
+    run_a, run_b = _PAID_RUN_EVIDENCE / _RUN_A_DIR, _PAID_RUN_EVIDENCE / _RUN_B_DIR
+    for run in (run_a, run_b):
+        if not (run / "takeoff.json").is_file():
+            pytest.skip("missing %s" % (run / "takeoff.json"))
+
+    names_a, names_b = _published_names(run_a), _published_names(run_b)
+    cmu_a = _observed_name(names_a, r"\bCMU\b", run_a)
+    tilt_a = _observed_name(names_a, r"tilt.?up", run_a)
+    cmu_b = _observed_name(names_b, r"\bCMU\b", run_b)
+    tilt_b = _observed_name(names_b, r"tilt.?up", run_b)
+    # The F3 name-form variance, read rather than asserted into existence.
+    front_a = _observed_name(names_a, r"storefront", run_a)
+    front_b = _observed_name(names_b, r"storefront", run_b)
+
+    # ONE bundle, built once, reused for both variants: TC1 is the 12"
+    # perimeter class, TC2 the 8" pump-room class, TC3 a 4" class NO library
+    # object claims.
+    lf = {"TC1": 2972.0, "TC2": 61.0, "TC3": 210.0}
+    thickness_in = {"TC1": 12.0, "TC2": 8.0, "TC3": 4.0}
+    bundle = _precedence_bundle(lf=lf, thickness_in=thickness_in)
+    library = [
+        {"name": tilt_a, "basis": "wall_area", "binding_hint": "exterior_wall",
+         "variant": "exterior", "thickness_in": "12"},
+        {"name": cmu_a, "basis": "wall_area", "binding_hint": "masonry_wall",
+         "thickness_in": "8"},
+    ]
+
+    # Variant A: the 14:19 run's names. Variant B: the 18:13 run's names, with
+    # the CMU/tilt-up assignment inverted — the documented flip.
+    rows_a = _emit_wall_classes(
+        bundle=bundle, vocabulary=library, wall_height_ft=36.0,
+        labels=_wall_labels({"TC1": tilt_a, "TC2": cmu_a, "TC3": front_a}),
+    )
+    rows_b = _emit_wall_classes(
+        bundle=bundle, vocabulary=library, wall_height_ft=36.0,
+        labels=_wall_labels({"TC1": cmu_b, "TC2": tilt_b, "TC3": front_b}),
+    )
+
+    # Both classes under assertion HAVE a printed-thickness match, so both are
+    # decided deterministically and neither may move.
+    matched = ("WALL-TC1", "WALL-TC2")
+    triples_a = {
+        (rows_a[cid]["name"], rows_a[cid]["quantity"], rows_a[cid]["unit"])
+        for cid in matched
+    }
+    triples_b = {
+        (rows_b[cid]["name"], rows_b[cid]["quantity"], rows_b[cid]["unit"])
+        for cid in matched
+    }
+    assert triples_a == triples_b, (
+        "the same geometry published differently under two schema-legal label "
+        "sets — the flip V4-DET-02 exists to kill:\n  A: %s\n  B: %s"
+        % (sorted(triples_a), sorted(triples_b))
+    )
+    assert len(triples_a) == 2                       # not vacuously equal
+    assert all(name for name, _, _ in triples_a)     # and not two empty names
+    for cid in matched:
+        assert rows_a[cid]["name_source"] == _NAME_SOURCE_WALL_THICKNESS
+
+    # The UNMATCHED class is stated, not silently excluded. TC3 has no printed
+    # thickness any library object claims, so the vision label still names it
+    # and its triple DOES vary between the two runs. That residual is real and
+    # is NOT this plan's to fix: 24-03 folds the name form and 24-05 stabilises
+    # the per-run object list. Asserting it here keeps the scope of the claim
+    # above honest.
+    assert "WALL-TC3" not in {cid for cid in matched}
+    assert rows_a["WALL-TC3"]["name"] == front_a
+    assert rows_b["WALL-TC3"]["name"] == front_b
+    assert rows_a["WALL-TC3"]["name"] != rows_b["WALL-TC3"]["name"], (
+        "the recorded F3 name-form variance vanished from the evidence — this "
+        "test's residual claim would then be asserting nothing"
+    )
+
+
+def test_the_invariance_fixture_skips_rather_than_passes_without_its_evidence(
+    monkeypatch,
+):
+    """A check either asserts or skips; it may never pass for having looked at
+    nothing. Pointed at a nonexistent directory, the differential must SKIP."""
+    # Patched through the function's OWN globals, not by module path: this
+    # file is imported under more than one module name across the suite, and a
+    # patch that lands on the other module object would leave the differential
+    # running against the real directory — the test would then pass while
+    # proving nothing, which is the exact failure it exists to rule out.
+    monkeypatch.setitem(
+        test_wall_class_label_invariance.__globals__,
+        "_PAID_RUN_EVIDENCE",
+        pathlib.Path("/nonexistent/paid-run-evidence"),
+    )
+    # `pytest.skip` raises `Skipped`, which derives from BaseException — NOT
+    # from Exception. Catching `Exception` here would let the skip escape and
+    # this guard would itself report as "skipped": a green tick for having
+    # checked nothing. Name the type.
+    with pytest.raises(pytest.skip.Exception) as excinfo:
+        test_wall_class_label_invariance()
+    assert "paid-run-evidence" in str(excinfo.value)
+
+
+def test_the_two_recorded_runs_really_did_differ_in_the_naming_layer():
+    """Guards the fixture's premise. If the two saved runs ever stopped
+    disagreeing, the differential above would be comparing a label set with
+    itself and would pass for free."""
+    if not _PAID_RUN_EVIDENCE.is_dir():
+        pytest.skip("missing %s" % _PAID_RUN_EVIDENCE)
+    names_a = set(_published_names(_PAID_RUN_EVIDENCE / _RUN_A_DIR))
+    names_b = set(_published_names(_PAID_RUN_EVIDENCE / _RUN_B_DIR))
+    if not names_a or not names_b:
+        pytest.skip("a saved run published no takeoff_summary rows")
+    assert names_a != names_b, (
+        "the two saved paid runs published identical name sets — the F1/F3 "
+        "variance Phase 24 exists to kill is not in this evidence"
+    )
