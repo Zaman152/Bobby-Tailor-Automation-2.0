@@ -1074,3 +1074,156 @@ def test_every_published_naming_source_comes_from_the_one_precedence():
     }
     assert published <= allowed, sorted(published - allowed)
     assert {"library", "plan_schedule_legend", "vision"} <= published
+
+
+# ---------------------------------------------------------------------------
+# 24-03 Task 3 — the measured row and the expected row reconcile, or BOTH are
+# flagged.
+#
+# Both saved paid runs published a measured 56-EA row beside a blank `Bollards`
+# row. A client reading that concludes the bollards were not found, which is
+# strictly worse than either row alone (24-RESEARCH §4.3.4) and is INV-08's rule
+# in a new costume: a blank and a zero read identically to a client, so the
+# information has to move to where it reads correctly rather than be removed.
+#
+# Half of it folding fixes. The other half it must not: `Dock Bumper` and
+# `Bollards` are two different names and merging them is the rename this phase
+# forbids. So neither row is merged and neither is deleted — both are annotated.
+# ---------------------------------------------------------------------------
+
+
+class _LearnedExpectations:
+    """A LearnedContext stand-in that only supplies expected items."""
+
+    def __init__(self, rows):
+        self.expected_items = rows
+
+    def lookup_name(self, raw):
+        return None
+
+
+class TestExpectedAndMeasuredReconcile:
+
+    def test_expected_and_measured_reconcile_a_plural_pair_into_one_row(self):
+        """F3's real pair. `Metal Downspout` measured, `Metal Downspouts`
+        expected — one object, and before 24-03 it filled two rows, one of them
+        blank.
+
+        Pinned here so a future change to `_norm_item_key` cannot silently
+        reopen the split.
+        """
+        library = [{"name": "Metal Downspout", "aliases": ["downspout"],
+                    "basis": "count", "unit": "EA"}]
+        learned = _LearnedExpectations([
+            {"item_name": "Metal Downspouts", "unit": "EA", "basis": "count",
+             "expectation": 0.9},
+        ])
+        items = [{"description": "downspout at grid b", "item_type": "component",
+                  "calculated_quantity": 8.0, "calculated_unit": "EA",
+                  "source_sheet": "A-3"}]
+        out = aggregate_takeoff(items, learned=learned, library=library)
+
+        downspouts = [r for r in out if "ownspout" in r["item"]]
+        assert len(downspouts) == 1, [r["item"] for r in downspouts]
+        assert downspouts[0]["quantity"] == pytest.approx(8.0)
+        assert downspouts[0]["provenance"] == "MEASURED"
+
+    def test_expected_and_measured_reconcile_flags_both_halves_of_a_real_pair(self):
+        """The half folding CANNOT fix: two genuinely different names.
+
+        Two rows in, two rows out — nothing merged, nothing deleted, no name,
+        quantity or unit changed. Each simply says the other exists.
+        """
+        library = [
+            {"name": "Dock Bumper", "aliases": ["bumper post"],
+             "basis": "count", "unit": "EA"},
+            {"name": "Bollards", "basis": "count", "unit": "EA"},
+        ]
+        items = [{"description": "bumper post at dock", "item_type": "component",
+                  "calculated_quantity": 12.0, "calculated_unit": "EA",
+                  "source_sheet": "C-1"}]
+        out = aggregate_takeoff(items, library=library)
+
+        measured = _row(out, "Dock Bumper")
+        blank = _row(out, "Bollards")
+        # Neither row moved.
+        assert measured["quantity"] == pytest.approx(12.0)
+        assert measured["unit"] == "EA"
+        assert blank["quantity"] is None
+        assert blank["provenance"] == "NOT MEASURED"
+        # Each names the other.
+        assert "'Dock Bumper'" in " | ".join(blank["review_reasons"])
+        assert "BLANK, not a zero" in " | ".join(blank["review_reasons"])
+        assert "'Bollards'" in " | ".join(measured["review_reasons"])
+        assert measured["needs_review"] is True
+
+    def test_a_cross_reference_is_never_a_merge_or_a_deletion(self):
+        library = [
+            {"name": "Dock Bumper", "aliases": ["bumper post"],
+             "basis": "count", "unit": "EA"},
+            {"name": "Bollards", "basis": "count", "unit": "EA"},
+        ]
+        items = [{"description": "bumper post at dock", "item_type": "component",
+                  "calculated_quantity": 12.0, "calculated_unit": "EA",
+                  "source_sheet": "C-1"}]
+        names = {r["item"] for r in aggregate_takeoff(items, library=library)}
+        assert {"Dock Bumper", "Bollards"} <= names
+        assert "nothing was renamed or merged" in " | ".join(
+            _row(aggregate_takeoff(items, library=library),
+                 "Bollards")["review_reasons"]
+        )
+
+    def test_a_different_unit_or_basis_is_never_cross_referenced(self):
+        """Conservative and structural. A linear expectation is not answered by
+        a counted measurement, and no name is ever compared to another name."""
+        library = [
+            {"name": "Dock Bumper", "aliases": ["bumper post"],
+             "basis": "count", "unit": "EA"},
+            {"name": "Perimeter Kerb", "basis": "linear", "unit": "LF"},
+            {"name": "Wall Panel Sealant", "basis": "count", "unit": "TUBE"},
+        ]
+        items = [{"description": "bumper post at dock", "item_type": "component",
+                  "calculated_quantity": 12.0, "calculated_unit": "EA",
+                  "source_sheet": "C-1"}]
+        out = aggregate_takeoff(items, library=library)
+        assert not _row(out, "Perimeter Kerb")["review_reasons"] or (
+            "NOT reconciled by name" not in
+            " | ".join(_row(out, "Perimeter Kerb")["review_reasons"])
+        )
+        assert "NOT reconciled by name" not in " | ".join(
+            _row(out, "Wall Panel Sealant")["review_reasons"])
+
+    def test_a_printed_name_is_evidence_and_is_never_cross_referenced(self):
+        """A legend-named row already says what it is. If those had been the
+        bollards, the printed label would say so and the key would match."""
+        library = [{"name": "Bollards", "basis": "count", "unit": "EA"}]
+        items = [{"description": "Dock Bumper (site schedule)",
+                  "item_type": "site", "qty_source": "plan_schedule_legend",
+                  "calculated_quantity": 12.0, "calculated_unit": "EA",
+                  "source_sheet": "C-1"}]
+        out = aggregate_takeoff(items, library=library)
+        legend_row = _row(out, "Dock Bumper (site schedule)")
+        assert "may be answering" not in " | ".join(legend_row["review_reasons"])
+        assert "NOT reconciled by name" not in " | ".join(
+            _row(out, "Bollards")["review_reasons"])
+
+    def test_the_partner_count_is_exact_even_when_the_list_is_capped(self):
+        """The cap trims the LIST, never the truth."""
+        library = [{"name": "Dock Bumper", "aliases": ["bumper post"],
+                    "basis": "count", "unit": "EA"}] + [
+            {"name": "Expected Object %d" % i, "basis": "count", "unit": "EA"}
+            for i in range(6)
+        ]
+        items = [{"description": "bumper post at dock", "item_type": "component",
+                  "calculated_quantity": 12.0, "calculated_unit": "EA",
+                  "source_sheet": "C-1"}]
+        out = aggregate_takeoff(items, library=library)
+        reason = " | ".join(_row(out, "Dock Bumper")["review_reasons"])
+        assert "6 expected item(s)" in reason
+        assert "and 3 more" in reason
+
+    def test_no_measured_row_means_no_cross_reference_at_all(self):
+        library = [{"name": "Bollards", "basis": "count", "unit": "EA"}]
+        out = aggregate_takeoff([], library=library)
+        assert "NOT reconciled by name" not in " | ".join(
+            _row(out, "Bollards")["review_reasons"])

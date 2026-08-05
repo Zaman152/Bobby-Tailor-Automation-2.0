@@ -630,6 +630,131 @@ def _expected_items_without_a_manifest(learned, library) -> "OrderedDict":
     return out
 
 
+# ── A blank expected row never stands unexplained beside a measured one ──────
+#
+# 24-03 Task 3. With the plural-aware `_norm_item_key`, a measured `Bollard` and
+# an expected `Bollards` are ONE bucket and the blank is correctly suppressed.
+# What folding cannot fix is the case the evidence also shows: a measured
+# `Dock Bumper 56 EA` beside a blank `Bollards`. Those are two different names
+# and merging them is exactly the rename this phase forbids — it is how a
+# genuinely distinct object disappears. But leaving them unmarked is the defect
+# 24-RESEARCH §4.3.4 names: the client reads "bollards were not found".
+#
+# So neither row is merged and neither is deleted. BOTH are annotated, and a
+# human closes the loop. Same shape as Phase 23's "a blank is never a zero":
+# move the information to where it reads correctly rather than removing it.
+
+#: How many partner names a cross-reference spells out before falling back to a
+#: count. The count is ALWAYS exact — the cap trims the list, never the truth.
+_CROSS_REFERENCE_NAMES_SHOWN = 3
+
+#: Naming authorities whose answer is a HYPOTHESIS about identity rather than
+#: evidence of it. A legend label and a manifest entry are the drawing's or the
+#: user's own printed words — if one of those had been the bollards, the name
+#: itself would say so and `_norm_item_key` would already have reconciled it. A
+#: `vision` row named from a bare candidate id is unnamed geometry, which is
+#: 24-04's ledger and not a naming question. What remains — a library alias
+#: resolution and a learned-store recall — is precisely the class of answer that
+#: can be confidently wrong about WHICH object was measured.
+_HYPOTHESIS_NAME_SOURCES = frozenset({"library", "learned"})
+
+
+def _library_basis_by_key(library) -> Dict[str, str]:
+    """Measure basis per canonical name key, from the same list expected rows use.
+
+    A measured bucket's ``item_type`` comes from the reading (``component``,
+    ``concrete_slab``) while an expected row's comes from the library's
+    ``basis`` (``count``, ``wall_area``). Comparing those two directly would be
+    comparing two different vocabularies, so the measured row's basis is looked
+    up in the SAME library that produced the expected row — basis against basis.
+    """
+    out: Dict[str, str] = {}
+    for entry in library or []:
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name") or "").strip()
+        basis = str(entry.get("basis") or "").strip()
+        if not name or not basis:
+            continue
+        out.setdefault(_norm_item_key(canonical_library_name(name, "")[0]), basis)
+    return out
+
+
+def _name_list(names: List[str]) -> str:
+    shown = names[:_CROSS_REFERENCE_NAMES_SHOWN]
+    text = ", ".join(repr(n) for n in shown)
+    extra = len(names) - len(shown)
+    return "%s and %d more" % (text, extra) if extra > 0 else text
+
+
+def _cross_reference_unreconciled(
+    buckets: Dict[str, Dict], blanks: List[tuple], measured: List[tuple],
+    library,
+) -> None:
+    """Flag BOTH halves of a pair that could not be reconciled by name.
+
+    Pairing is conservative and STRUCTURAL: same unit, same measure basis, and
+    the measured row's name must be a hypothesis rather than printed evidence.
+    Name similarity is deliberately not consulted — that is the approximate
+    name matcher arriving by another route, and it renames one object into
+    another (24-RESEARCH pitfall 5). The word this sentence avoids spelling is
+    the one the module's own guard grep searches for; a guard that its own
+    prose can trip is a guard nobody trusts.
+
+    Nothing here changes a name, a quantity or a unit. The only effect is a
+    review reason on each side.
+    """
+    if not blanks or not measured:
+        return
+    basis_by_key = _library_basis_by_key(library)
+    candidates = []
+    for name, bucket in measured:
+        if bucket.get("source") not in _HYPOTHESIS_NAME_SOURCES:
+            continue
+        basis = basis_by_key.get(_norm_item_key(name))
+        unit = (bucket.get("unit") or "").strip().upper()
+        if not basis or not unit:
+            continue
+        candidates.append((name, unit, basis))
+    if not candidates:
+        return
+
+    annotated: List[tuple] = []
+    blanks_for_measured: Dict[str, List[str]] = defaultdict(list)
+    for name, info in blanks:
+        unit = (info.get("unit") or "").strip().upper()
+        basis = (info.get("measure") or "").strip()
+        if not unit or not basis:
+            continue
+        answers = sorted(
+            c[0] for c in candidates if c[1] == unit and c[2] == basis
+        )
+        if not answers:
+            continue
+        annotated.append((name, unit, basis, answers))
+        for answer in answers:
+            blanks_for_measured[answer].append(name)
+
+    for name, unit, basis, answers in annotated:
+        buckets[name]["review_reasons"].add(
+            "NOT reconciled by name: %d measured row(s) share this unit (%s) "
+            "and measure basis (%s) and were named by a hypothesis rather than "
+            "by printed evidence — %s. This row is still a BLANK, not a zero, "
+            "and nothing was renamed or merged; a human must decide whether "
+            "any of them is this object"
+            % (len(answers), unit, basis, _name_list(answers))
+        )
+    for name, blank_names in blanks_for_measured.items():
+        buckets[name]["needs_review"] = True
+        buckets[name]["review_reasons"].add(
+            "this row's NAME is a hypothesis, and %d expected item(s) sharing "
+            "its unit and measure basis were never measured — %s. It may be "
+            "answering one of them under a different name; the quantity and "
+            "unit are unchanged and nothing was merged"
+            % (len(blank_names), _name_list(sorted(blank_names)))
+        )
+
+
 def _row_status(bucket: Dict, is_unknown: bool) -> str:
     """The client status, COMPUTED FROM THE RECORD.
 
@@ -1079,13 +1204,24 @@ def aggregate_takeoff(
     # "your building has no lintels" were the same artifact (INV-08 S13).
     expected = _expected_items_without_a_manifest(learned, library)
     if expected:
+        # `_norm_item_key` is plural-aware since 24-03, so a measured `Bollard`
+        # row and an expected `Bollards` item are ONE key here and the blank is
+        # suppressed. That reconciliation is the cheap half; the half folding
+        # cannot do is handled after this loop.
         present = {_norm_item_key(k) for k in buckets}
         present |= {_norm_item_key(n) for n in legend_names}
         present |= {_norm_item_key(n) for n in library_bound}
+        # Snapshot the MEASURED rows before a single blank row is created, so a
+        # blank can never be offered as the answer to another blank.
+        measured_before_blanks = [
+            (n, b) for n, b in buckets.items() if b.get("has_rows")
+        ]
+        unreconciled_blanks: List[tuple] = []
         for name, info in expected.items():
             if _norm_item_key(name) in present:
                 continue
             present.add(_norm_item_key(name))
+            unreconciled_blanks.append((name, info))
             bucket = buckets[name]
             bucket["unit"] = info["unit"]
             bucket["item_type"] = info["measure"] or "expected_object"
@@ -1103,6 +1239,10 @@ def aggregate_takeoff(
                                % (name, info["expected_from"]),
                 "formula": "expected_object_not_measured",
             })
+
+        _cross_reference_unreconciled(
+            buckets, unreconciled_blanks, measured_before_blanks, library,
+        )
 
     result = []
     for name in sorted(buckets.keys()):
