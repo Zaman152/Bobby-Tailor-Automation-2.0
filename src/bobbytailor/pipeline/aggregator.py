@@ -388,6 +388,152 @@ def canonical_library_name(name: str, unit: str = "") -> tuple:
     return name, unit
 
 
+# ── THE naming-authority precedence (24-03) ──────────────────────────────────
+#
+# Three authorities used to reach publication independently, with no arbiter,
+# and the two saved paid runs show the cost: the SAME 56-EA candidate published
+# as `Bollard` (source: learned) in one run and `Dock Bumper` (source: library)
+# in the other. Nothing decided between them; whichever branch happened to fire
+# first named the row. There is now exactly ONE function that decides which
+# authority names a row, and one declared order it obeys.
+
+#: The drawing's own printed schedule/legend. Published VERBATIM.
+NAME_AUTHORITY_LEGEND = "plan_schedule_legend"
+#: The user's own object manifest. Published VERBATIM.
+NAME_AUTHORITY_MANIFEST = "manifest"
+#: A correction a real estimator made on this project, distilled into
+#: ``learning_vocabulary`` with ``source='human'``.
+NAME_AUTHORITY_LEARNED_HUMAN = "learned_human"
+#: The component library harvested off the plans, merged with the project
+#: vocabulary.
+NAME_AUTHORITY_LIBRARY = "library"
+#: A name ``record_ai_manifest`` wrote into ``learning_vocabulary`` with
+#: ``source='ai'`` — a model's own answer, persisted. This is the tier the F1
+#: evidence indicts.
+NAME_AUTHORITY_LEARNED_AI = "learned_ai"
+#: The vision label / static-map reading, kept verbatim.
+NAME_AUTHORITY_VISION = "vision"
+
+#: THE precedence, most authoritative FIRST. Declared once; every publication
+#: path routes through :func:`resolve_published_name`.
+#:
+#: 24-RESEARCH §4.3.2 states the order as ``library > learned > vision``. That
+#: is the order this tuple encodes for the learned store's **AI** tier, which
+#: is the tier the evidence indicts (`record_ai_manifest` writes a model's own
+#: manifest name into the store, and a persisted model answer is still a model
+#: answer). It is NOT applied to the store's **human** tier: `learning_vocabulary`
+#: carries two provenances (`store.py:142`) and the store's own retrieval already
+#: ranks ``source='human'`` above ``source='ai'`` — its documented "human-wins
+#: invariant". Demoting a human correction below a machine-harvested library
+#: would break V3-LEARN-02 ("a correction made once never recurs") and would put
+#: the LLM-derived half of the project vocabulary — the very list defect F3 shows
+#: is re-derived differently every run — above a human's explicit rename.
+NAME_AUTHORITY_PRECEDENCE = (
+    NAME_AUTHORITY_LEGEND,
+    NAME_AUTHORITY_MANIFEST,
+    NAME_AUTHORITY_LEARNED_HUMAN,
+    NAME_AUTHORITY_LIBRARY,
+    NAME_AUTHORITY_LEARNED_AI,
+    NAME_AUTHORITY_VISION,
+)
+
+_NAME_AUTHORITY_RANK = {a: i for i, a in enumerate(NAME_AUTHORITY_PRECEDENCE)}
+
+#: Authorities whose name is published exactly as supplied. A legend label and
+#: a manifest entry are a human's or the drawing's OWN words, and rewriting them
+#: is the mangling the legend-verbatim comment in :func:`aggregate_takeoff`
+#: warns about ("Fiber Cement Panel" SF -> "Electrical Panels" EA).
+_VERBATIM_NAME_AUTHORITIES = frozenset({
+    NAME_AUTHORITY_LEGEND, NAME_AUTHORITY_MANIFEST,
+})
+
+#: The published ``source`` marker per authority. Deliberately the EXISTING
+#: field and the EXISTING strings (T-24-11): a reader can already tell a library
+#: bind from a learned recall from a vision label, and inventing a parallel
+#: provenance channel would leave two that could disagree. Both learned tiers
+#: publish as ``learned`` — the tier is an arbitration input, not a new client
+#: -visible vocabulary.
+_PUBLISHED_SOURCE_BY_AUTHORITY = {
+    NAME_AUTHORITY_LEGEND: "plan_schedule_legend",
+    NAME_AUTHORITY_MANIFEST: "manifest",
+    NAME_AUTHORITY_LEARNED_HUMAN: "learned",
+    NAME_AUTHORITY_LIBRARY: "library",
+    NAME_AUTHORITY_LEARNED_AI: "learned",
+    NAME_AUTHORITY_VISION: "vision",
+}
+
+
+def resolve_published_name(candidates) -> Optional[tuple]:
+    """THE arbiter. Return ``(name, unit, authority)`` for the winning authority.
+
+    *candidates* is an iterable of ``(authority, name, unit)`` triples — every
+    name the row could carry, tagged with where it came from. The highest-ranked
+    authority in :data:`NAME_AUTHORITY_PRECEDENCE` that offered a non-blank name
+    wins; unknown authorities and blank names are ignored. Returns ``None`` when
+    nothing offered a name.
+
+    The winner is routed through :func:`canonical_library_name` exactly once, so
+    the plural fold happens in ONE place — except for the verbatim authorities,
+    whose whole contract is that their words are reproduced untouched.
+
+    The winner's own unit is returned unchanged. This function arbitrates NAMES;
+    a unit that travels with a name is C3b's problem and is checked separately
+    by the caller, which is why the unit :func:`canonical_library_name` would
+    have supplied is deliberately discarded here.
+    """
+    best = None
+    for authority, name, unit in candidates or ():
+        rank = _NAME_AUTHORITY_RANK.get(authority)
+        if rank is None or not str(name or "").strip():
+            continue
+        if best is None or rank < best[0]:
+            best = (rank, authority, name, unit)
+    if best is None:
+        return None
+    _, authority, name, unit = best
+    if authority not in _VERBATIM_NAME_AUTHORITIES:
+        name, _ = canonical_library_name(name, unit)
+    return name, unit, authority
+
+
+def _learned_name_authority(learned, description) -> str:
+    """Which TIER of the learned store produced the name for *description*.
+
+    ``learning_vocabulary`` holds two provenances (``store.py:142``):
+    ``'human'``, a correction distilled from a real estimator's edit, and
+    ``'ai'``, a name :func:`record_ai_manifest` persisted from a model's own
+    manifest. :meth:`LearnedContext.lookup_name` returns only ``(name, unit)``,
+    so the winning row is re-found here the same way ``_vocab_index`` finds it:
+    rows arrive human-first / weight-DESC, so the FIRST row whose normalised
+    ``raw_pattern`` matches is the one that answered.
+
+    Unknown provenance resolves to the HUMAN tier. That is the store's own
+    schema default (``source TEXT NOT NULL DEFAULT 'human'``) and the
+    conservative reading: an authority is demoted on evidence, never on
+    assumption. A caller that supplies no ``vocabulary`` at all (every test
+    double, and any future context object) therefore keeps exactly the
+    precedence it had before this change.
+    """
+    try:
+        key = re.sub(r"\s+", " ", str(description or "").strip()).lower()
+        if not key:
+            return NAME_AUTHORITY_LEARNED_HUMAN
+        for row in getattr(learned, "vocabulary", None) or []:
+            if not isinstance(row, dict):
+                continue
+            if not str(row.get("canonical_name") or "").strip():
+                continue
+            raw = re.sub(r"\s+", " ", str(row.get("raw_pattern") or "").strip()).lower()
+            if raw != key:
+                continue
+            if str(row.get("source") or "").strip().lower() == "ai":
+                return NAME_AUTHORITY_LEARNED_AI
+            return NAME_AUTHORITY_LEARNED_HUMAN
+    except Exception:  # noqa: BLE001 — provenance must never break naming
+        return NAME_AUTHORITY_LEARNED_HUMAN
+    return NAME_AUTHORITY_LEARNED_HUMAN
+
+
 def _resolve_library_name(description: str, library) -> Optional[tuple]:
     """Resolve a raw description to a component-library ``(name, unit)`` via aliases.
 
@@ -444,7 +590,16 @@ def _expected_items_without_a_manifest(learned, library) -> "OrderedDict":
         except (TypeError, ValueError):
             continue
         name = str(row.get("item_name") or "").strip()
-        if not name or _norm_item_key(name) in {_norm_item_key(k) for k in out}:
+        if not name:
+            continue
+        # Canonicalised on READ (24-03, T-24-10). An expected-item placeholder
+        # must carry the SAME canonical form a measured row of the object
+        # would, or a learned `Metal Downspout` spawns a phantom NOT-MEASURED
+        # row beside a measured `Metal Downspouts`. Same rule the library
+        # branch below has applied since SP-7a; the learned branch was simply
+        # never routed through it.
+        name, _ = canonical_library_name(name, str(row.get("unit") or ""))
+        if _norm_item_key(name) in {_norm_item_key(k) for k in out}:
             continue
         out[name] = {
             "unit": str(row.get("unit") or "").strip(),
@@ -625,10 +780,16 @@ def aggregate_takeoff(
         bucket_legend_origin = ""
         if is_legend:
             # Trust the plan's own printed schedule: keep its label and unit
-            # exactly as printed.
-            canonical_name = _clean_legend_label(desc)
-            canonical_unit = (unit or "").strip().upper()
-            bucket_source = "plan_schedule_legend"
+            # exactly as printed. Routed through the arbiter like every other
+            # path — as a VERBATIM authority, so this is behaviourally the same
+            # assignment it always was, and "exactly one function decides which
+            # authority names a row" stays literally true.
+            canonical_name, canonical_unit, authority = resolve_published_name([
+                (NAME_AUTHORITY_LEGEND, _clean_legend_label(desc),
+                 (unit or "").strip().upper()),
+            ]) or (_clean_legend_label(desc), (unit or "").strip().upper(),
+                   NAME_AUTHORITY_LEGEND)
+            bucket_source = _PUBLISHED_SOURCE_BY_AUTHORITY[authority]
             # Absent marker => plan_parsed. HUMAN INPUT is earned, not defaulted.
             bucket_legend_origin = str(item.get("legend_origin") or "plan_parsed")
         else:
@@ -646,39 +807,54 @@ def aggregate_takeoff(
                 # Track the canonical form too — the expected-item guard below
                 # compares against canonicalised names (SP-7a).
                 library_bound.add(canonical_library_name(lib_hit[0], "")[0])
+            # ── ONE arbiter, not three racing branches (24-03) ────────────
+            #
+            # Every name this row could carry is offered to the arbiter with
+            # the authority it came from, and NAME_AUTHORITY_PRECEDENCE decides.
+            # Before this, the learned branch and the library branch each
+            # reached publication on their own and the vision label was a third
+            # — which is how one 56-EA candidate published under two different
+            # names across two runs of the same drawing.
+            name_candidates = []
             if entry is not None:
-                canonical_name = entry.name
-                canonical_unit = (entry.unit or unit or "").strip().upper()
-                bucket_source = "manifest"
-            else:
-                # Learned corrections take precedence over the library; both
-                # precede the static map. normalize_item_name already checks
-                # learned first, so consult learned explicitly to know whether
-                # the name came from a human correction.
-                learned_hit = None
-                if learned is not None:
-                    try:
-                        learned_hit = learned.lookup_name(desc)
-                    except Exception:  # noqa: BLE001
-                        learned_hit = None
-                if learned_hit is not None:
-                    canonical_name, canonical_unit = normalize_item_name(
-                        desc, itype, unit, learned=learned,
-                    )
-                    bucket_source = "learned"
-                else:
-                    if lib_hit is not None:
-                        # SP-7a: the library name goes through the SAME
-                        # canonicalisation as every other naming path.
-                        canonical_name, _ = canonical_library_name(
-                            lib_hit[0], lib_hit[1])
-                        canonical_unit = (lib_hit[1] or unit or "").strip().upper()
-                        bucket_source = "library"
-                    else:
-                        canonical_name, canonical_unit = normalize_item_name(
-                            desc, itype, unit, learned=learned,
-                        )
-                        bucket_source = "vision"
+                name_candidates.append((
+                    NAME_AUTHORITY_MANIFEST, entry.name,
+                    (entry.unit or unit or "").strip().upper(),
+                ))
+            learned_hit = None
+            if learned is not None:
+                try:
+                    learned_hit = learned.lookup_name(desc)
+                except Exception:  # noqa: BLE001
+                    learned_hit = None
+            if learned_hit is not None:
+                # Canonicalised on READ, never migrated (T-24-10). Rows already
+                # in `learning_vocabulary` were written by the un-canonicalised
+                # path and may hold either spelling of one name; folding them
+                # here is idempotent and needs no destructive SQL. 24-05 owns
+                # the store and will not write one either.
+                learned_name, learned_unit = normalize_item_name(
+                    desc, itype, unit, learned=learned,
+                )
+                name_candidates.append((
+                    _learned_name_authority(learned, desc),
+                    learned_name, learned_unit,
+                ))
+            if lib_hit is not None:
+                name_candidates.append((
+                    NAME_AUTHORITY_LIBRARY, lib_hit[0],
+                    (lib_hit[1] or unit or "").strip().upper(),
+                ))
+            # The static-map reading is always available and always last.
+            vision_name, vision_unit = normalize_item_name(desc, itype, unit)
+            name_candidates.append((
+                NAME_AUTHORITY_VISION, vision_name, vision_unit,
+            ))
+
+            canonical_name, canonical_unit, authority = resolve_published_name(
+                name_candidates
+            ) or (vision_name, vision_unit, NAME_AUTHORITY_VISION)
+            bucket_source = _PUBLISHED_SOURCE_BY_AUTHORITY[authority]
             # Suppress non-legend duplicates of any legend-backed item. Matches exact
             # canonical names and base-vs-spec variants (e.g. vision "Columns" when
             # the legend reports "Columns-H-35'") so the authoritative legend isn't

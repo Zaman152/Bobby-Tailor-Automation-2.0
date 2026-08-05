@@ -863,3 +863,214 @@ def test_norm_item_key_keeps_two_genuinely_different_objects_apart():
     assert _norm_item_key("Doors-HC") != _norm_item_key("Doors-SC")
     assert _norm_item_key("CMU Wall") != _norm_item_key("CMU Paint")
     assert _norm_item_key("Glass") != _norm_item_key("Glas")
+
+
+# ---------------------------------------------------------------------------
+# 24-03 Task 2 — ONE naming-authority precedence, enforced at ONE site.
+#
+# `_expected_items_without_a_manifest`'s docstring already PROMISED "a
+# deterministic order (learned first, then library)". The evidence falsifies the
+# promise, but not the way the docstring assumes: the ORDER was fixed and the
+# defect was that nothing arbitrated at all. The learned branch and the library
+# branch each reached publication on their own, and the vision label was a
+# third, so whichever branch happened to fire named the row — `Bollard`
+# (learned) in the 14:19 run, `Dock Bumper` (library) in the 18:13 run, over
+# bit-identical geometry.
+#
+# 24-RESEARCH §4.3.2 states the order as `library > learned > vision`. That is
+# what NAME_AUTHORITY_PRECEDENCE encodes for the learned store's **AI** tier —
+# the tier `record_ai_manifest` writes, and the tier the F1 evidence indicts. It
+# is deliberately NOT applied to the store's **human** tier; see the constant's
+# own docstring and the two tests below that pin both halves.
+# ---------------------------------------------------------------------------
+
+from bobbytailor.pipeline.aggregator import (  # noqa: E402
+    NAME_AUTHORITY_LEARNED_AI,
+    NAME_AUTHORITY_LEARNED_HUMAN,
+    NAME_AUTHORITY_LEGEND,
+    NAME_AUTHORITY_LIBRARY,
+    NAME_AUTHORITY_MANIFEST,
+    NAME_AUTHORITY_PRECEDENCE,
+    NAME_AUTHORITY_VISION,
+    _PUBLISHED_SOURCE_BY_AUTHORITY,
+    resolve_published_name,
+)
+
+
+class _StubLearnedStore:
+    """A `LearnedContext` stand-in that carries vocabulary PROVENANCE.
+
+    The real `learning_vocabulary` rows carry `source` ('human' | 'ai',
+    store.py:142) and `LearnedContext.vocabulary` exposes them; `lookup_name`
+    does not, which is why the aggregator re-finds the winning row.
+    """
+
+    expected_items = []
+
+    def __init__(self, mapping, source="human"):
+        self._m = {k.strip().lower(): v for k, v in mapping.items()}
+        self.vocabulary = [
+            {"raw_pattern": k, "canonical_name": v[0], "unit": v[1],
+             "source": source, "weight": 1.0}
+            for k, v in self._m.items()
+        ]
+
+    def lookup_name(self, raw):
+        return self._m.get(str(raw or "").strip().lower())
+
+
+_BUMPER_DESC = "bumper post at dock"
+_BUMPER_LIBRARY = [{"name": "Dock Bumper", "aliases": ["bumper post"],
+                    "basis": "count", "unit": "EA"}]
+
+
+def _bumper_items():
+    return [{"description": _BUMPER_DESC, "item_type": "component",
+             "calculated_quantity": 12.0, "calculated_unit": "EA",
+             "source_sheet": "C-1"}]
+
+
+def test_naming_authority_precedence():
+    """All three racing authorities offer a name; the library answer wins."""
+    winner = resolve_published_name([
+        (NAME_AUTHORITY_VISION, "bollard", "EA"),
+        (NAME_AUTHORITY_LEARNED_AI, "Bollard", "EA"),
+        (NAME_AUTHORITY_LIBRARY, "Bollards", "EA"),
+    ])
+    assert winner == ("Bollards", "EA", NAME_AUTHORITY_LIBRARY)
+    # ...and the answer does not depend on the order the candidates arrive in,
+    # which is the whole point of having an arbiter rather than a branch race.
+    assert resolve_published_name([
+        (NAME_AUTHORITY_LIBRARY, "Bollards", "EA"),
+        (NAME_AUTHORITY_VISION, "bollard", "EA"),
+        (NAME_AUTHORITY_LEARNED_AI, "Bollard", "EA"),
+    ]) == winner
+
+
+def test_naming_authority_precedence_is_one_declared_total_order():
+    """One constant, no duplicates, and every authority has a source marker."""
+    assert len(set(NAME_AUTHORITY_PRECEDENCE)) == len(NAME_AUTHORITY_PRECEDENCE)
+    assert set(_PUBLISHED_SOURCE_BY_AUTHORITY) == set(NAME_AUTHORITY_PRECEDENCE)
+    order = list(NAME_AUTHORITY_PRECEDENCE)
+    # The order 24-RESEARCH §4.3.2 asks for, over the tier it indicts.
+    assert order.index(NAME_AUTHORITY_LIBRARY) < order.index(NAME_AUTHORITY_LEARNED_AI)
+    assert order.index(NAME_AUTHORITY_LEARNED_AI) < order.index(NAME_AUTHORITY_VISION)
+    # ...and the human tier the store's own retrieval already ranks first.
+    assert order.index(NAME_AUTHORITY_LEARNED_HUMAN) < order.index(NAME_AUTHORITY_LIBRARY)
+
+
+def test_resolve_published_name_ignores_blanks_and_unknown_authorities():
+    assert resolve_published_name([]) is None
+    assert resolve_published_name([(NAME_AUTHORITY_LIBRARY, "  ", "EA")]) is None
+    assert resolve_published_name([("some_future_authority", "X", "EA")]) is None
+    # A blank higher authority does not veto a real lower one.
+    assert resolve_published_name([
+        (NAME_AUTHORITY_MANIFEST, "", "EA"),
+        (NAME_AUTHORITY_VISION, "Bollards", "EA"),
+    ]) == ("Bollards", "EA", NAME_AUTHORITY_VISION)
+
+
+def test_an_ai_recorded_learned_name_is_outranked_by_the_library():
+    """The F1 case, decided. `record_ai_manifest` persists a MODEL's answer."""
+    learned = _StubLearnedStore({_BUMPER_DESC: ("Bollard", "EA")}, source="ai")
+    out = aggregate_takeoff(_bumper_items(), learned=learned,
+                            library=_BUMPER_LIBRARY)
+    row = _row(out, "Dock Bumper")
+    assert row["source"] == "library"
+    assert not [r for r in out if r["item"] == "Bollard"]
+
+
+def test_a_human_correction_still_outranks_the_library():
+    """V3-LEARN-02: a correction made once never recurs.
+
+    Demoting a human's explicit rename below a machine-harvested library — half
+    of which is the LLM project vocabulary that defect F3 shows is re-derived
+    differently every run — would make the estimator re-type the same
+    correction forever. The store's own retrieval already ranks
+    `source='human'` above `source='ai'`; this keeps the aggregator agreeing
+    with it.
+    """
+    learned = _StubLearnedStore({_BUMPER_DESC: ("Bollard", "EA")}, source="human")
+    out = aggregate_takeoff(_bumper_items(), learned=learned,
+                            library=_BUMPER_LIBRARY)
+    assert not [r for r in out if r["item"] == "Dock Bumper"]
+    assert _row(out, "Bollards")["source"] == "learned"
+
+
+def test_a_learned_name_is_canonicalised_on_read_and_the_store_is_not_migrated():
+    """T-24-10. Rows written by the un-canonicalised path hold either spelling.
+
+    Folding them at READ time is idempotent and needs no migration, so no
+    destructive SQL is written against a store this module does not own.
+    """
+    learned = _StubLearnedStore({_BUMPER_DESC: ("Bollard", "EA")}, source="human")
+    before = [dict(r) for r in learned.vocabulary]
+    out = aggregate_takeoff(_bumper_items(), learned=learned)
+    # The split spelling went IN; the folded canonical form came OUT...
+    assert _row(out, "Bollards")["quantity"] == pytest.approx(12.0)
+    # ...and the store still holds exactly what it held before.
+    assert learned.vocabulary == before
+    assert learned.vocabulary[0]["canonical_name"] == "Bollard"
+
+
+def test_an_unknown_learned_provenance_keeps_the_precedence_it_always_had():
+    """The store's schema default is 'human'; demotion is on evidence only."""
+
+    class _NoProvenance:
+        expected_items = []
+
+        def lookup_name(self, raw):
+            return ("Bollard", "EA") if str(raw).strip().lower() == _BUMPER_DESC \
+                else None
+
+    out = aggregate_takeoff(_bumper_items(), learned=_NoProvenance(),
+                            library=_BUMPER_LIBRARY)
+    assert _row(out, "Bollards")["source"] == "learned"
+
+
+def test_a_manifest_name_is_never_canonicalised():
+    """A verbatim authority's words are reproduced, not corrected.
+
+    The user typed `Bollard`; rewriting it to ITEM_NAME_MAP's `Bollards` would
+    be the app editing a human's own vocabulary, which is exactly the mangling
+    the legend-verbatim contract exists to prevent.
+    """
+    items = [{"description": "bollard at entrance", "item_type": "site",
+              "calculated_quantity": 4.0, "calculated_unit": "EA",
+              "source_sheet": "C-1"}]
+    out = aggregate_takeoff(items, manifest=_Manifest([_Entry("Bollard")]))
+    assert _row(out, "Bollard")["source"] == "manifest"
+    assert not [r for r in out if r["item"] == "Bollards"]
+
+
+def test_a_legend_label_is_never_canonicalised():
+    items = [{"description": "Bollard (site schedule)", "item_type": "site",
+              "qty_source": "plan_schedule_legend", "calculated_quantity": 4.0,
+              "calculated_unit": "EA", "source_sheet": "C-1"}]
+    out = aggregate_takeoff(items)
+    assert _row(out, "Bollard (site schedule)")["source"] == "plan_schedule_legend"
+
+
+def test_every_published_naming_source_comes_from_the_one_precedence():
+    """No publication path may invent a naming marker of its own.
+
+    Structural, not illustrative: whatever `source` a row carries, it is either
+    a marker THE arbiter assigned or one of the documented not-measured states.
+    """
+    learned = _StubLearnedStore({_BUMPER_DESC: ("Bollard", "EA")}, source="ai")
+    items = _bumper_items() + [
+        {"description": "Doors - Steel (door schedule)", "item_type": "doors",
+         "qty_source": "plan_schedule_legend", "calculated_quantity": 6.0,
+         "calculated_unit": "EA", "source_sheet": "A-6"},
+        {"description": "flooring open office", "item_type": "flooring",
+         "calculated_quantity": 900.0, "calculated_unit": "SF",
+         "source_sheet": "A-1"},
+    ]
+    out = aggregate_takeoff(items, learned=learned, library=_BUMPER_LIBRARY)
+    published = {r["source"] for r in out if r["source"]}
+    allowed = set(_PUBLISHED_SOURCE_BY_AUTHORITY.values()) | {
+        "manifest_missing", "expected_not_measured",
+        "library_fallback_unmeasured", "unit_class_conflict_unmeasured",
+    }
+    assert published <= allowed, sorted(published - allowed)
+    assert {"library", "plan_schedule_legend", "vision"} <= published
