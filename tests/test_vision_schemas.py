@@ -13,11 +13,17 @@ Pins the semantic-only vision contract:
 No API calls anywhere — the anthropic client is stubbed.
 """
 import json
+import pathlib
 
 import fitz
 import pytest
 from PIL import Image
 
+from bobbytailor.pipeline import takeoff_pipeline
+from bobbytailor.pipeline.takeoff_pipeline import (
+    _build_anchor_hint,
+)
+from bobbytailor.vision import prompts
 from bobbytailor.vision.schemas import (
     UNKNOWN_LABEL,
     legend_structuring_schema,
@@ -30,6 +36,10 @@ from bobbytailor.vision.schemas import (
 from bobbytailor.vision.overlay import (
     MAX_IMAGES_PER_REQUEST,
     MAX_MARKERS_PER_IMAGE,
+    _CHIP_MAX_ANCHOR_CHARS,
+    _anchor_text_for,
+    _chip_box,
+    _marker_label,
     build_crop_gallery,
     render_overlay,
 )
@@ -223,6 +233,316 @@ def test_build_crop_gallery_25_groups_respects_20_image_budget(arch_page):
     assert images[0].info.get("is_legend") is True
     covered = [cid for img in images[1:] for cid in img.info["gallery_ids"]]
     assert covered == ["SYM-%d" % (i + 1) for i in range(25)]
+
+
+# ── 4b. The anchor-bearing Set-of-Mark chip (24-07, V4-DET-01) ───────────────
+#
+# The marker chip used to carry ONLY the candidate ID, which is precisely the
+# symbol-conveyed condition the evidence base measures at 0.03-0.39 accuracy
+# against 0.65-0.92 for text-anchored classes. These pin that the chip now
+# carries the drawing's own printed callout, that a candidate with a RECORDED
+# ABSENCE still renders exactly the bare-ID chip it always did, and that the
+# request never contains a candidate the drawing does not name.
+
+
+def _anchor(cid, text, kind="nearest_word"):
+    """A 24-01 anchor record; ``text=None`` is the RECORDED ABSENCE."""
+    return {
+        "candidate_id": cid,
+        "anchor_text": text,
+        "anchor_kind": None if text is None else kind,
+        "anchor_dist_pt": None if text is None else 4.0,
+        "anchor_source": None if text is None else "page_words",
+        "ambiguity_reason": "",
+    }
+
+
+def test_anchor_chip_carries_the_candidate_id_and_its_anchor_text():
+    """The one edit V4-DET-01 rests on: the chip gives the model text to READ."""
+    assert _marker_label("SYM-1", "BOLLARD") == "SYM-1 BOLLARD"
+    assert _marker_label("WALL-TC1", "CMU") == "WALL-TC1 CMU"
+
+
+def test_anchor_chip_without_an_anchor_is_the_bare_id_with_no_placeholder():
+    """A recorded absence renders today's chip — no placeholder, no separator."""
+    assert _marker_label("SYM-1", "") == "SYM-1"
+    assert _marker_label("SYM-1") == "SYM-1"
+    # And a recorded absence resolves to "" rather than to the string "None".
+    assert _anchor_text_for({"SYM-1": _anchor("SYM-1", None)}, "SYM-1") == ""
+    # As does a candidate the map does not mention at all.
+    assert _anchor_text_for({"SYM-2": _anchor("SYM-2", "GATE")}, "SYM-1") == ""
+    assert _anchor_text_for(None, "SYM-1") == ""
+
+
+def test_anchor_chip_reads_the_24_01_record_or_a_bare_string():
+    """Callers may hand `bundle['candidate_anchors']` straight through."""
+    assert _anchor_text_for({"SYM-1": _anchor("SYM-1", "BOLLARD")}, "SYM-1") == "BOLLARD"
+    assert _anchor_text_for({"SYM-1": "BOLLARD"}, "SYM-1") == "BOLLARD"
+    # The chip is measured and drawn as ONE line, so whitespace is collapsed.
+    assert _anchor_text_for({"W1": _anchor("W1", "CMU\n WALL")}, "W1") == "CMU WALL"
+
+
+def test_anchor_chip_text_is_bounded_so_a_chip_cannot_outgrow_the_sheet():
+    """A pathological harvest is bounded on the CHIP; the hint keeps it whole."""
+    long_text = "X" * 200
+    chip = _anchor_text_for({"SYM-1": _anchor("SYM-1", long_text)}, "SYM-1")
+    assert len(chip) <= _CHIP_MAX_ANCHOR_CHARS
+    # A genuine two-token material tag (Moxy prints 166 of them) is untouched.
+    assert _anchor_text_for({"SYM-1": _anchor("SYM-1", "WC 01")}, "SYM-1") == "WC 01"
+
+
+def test_the_chip_box_is_placed_exactly_as_before_when_it_already_fits():
+    """Positional non-regression: the clamp is a NO-OP for a chip that fits."""
+    # Room above the box → chip sits directly above it, left edges aligned.
+    assert _chip_box(100, 200, 40, 16, (1568, 1120)) == (100, 184, 140, 200)
+    # No room above → chip sits inside the box (the pre-existing top rule).
+    assert _chip_box(100, 8, 40, 16, (1568, 1120)) == (100, 8, 140, 24)
+    # No image size supplied → identical placement, no clamp at all.
+    assert _chip_box(100, 200, 40, 16, None) == (100, 184, 140, 200)
+
+
+def test_the_chip_box_is_clamped_inside_the_right_edge():
+    """T-24-32: a longer anchor label slides left rather than off the sheet."""
+    box = _chip_box(1540, 200, 120, 16, (1568, 1120))
+    assert box[2] <= 1568, box
+    assert box[0] == 1568 - 120
+    # A chip wider than the whole image pins at 0 rather than going negative.
+    assert _chip_box(1540, 200, 9000, 16, (1568, 1120))[0] == 0
+
+
+def test_render_overlay_with_a_recorded_absence_is_byte_identical(arch_page):
+    """Every existing caller is unaffected: no anchor argument, same raster."""
+    candidates = {"R1": (100, 100, 900, 700), "W1": (200, 1200, 2400, 1260)}
+    plain = render_overlay(arch_page, candidates)
+    absences = render_overlay(
+        arch_page, candidates,
+        anchors={"R1": _anchor("R1", None), "W1": _anchor("W1", None)},
+    )
+    assert plain.tobytes() == absences.tobytes()
+    assert plain.info["overlay_ids"] == absences.info["overlay_ids"]
+    assert plain.info["marker_boxes_px"] == absences.info["marker_boxes_px"]
+
+
+def test_render_overlay_with_an_anchor_actually_changes_the_raster(arch_page):
+    """The anchor reaches the pixels the model reads, not just a variable."""
+    candidates = {"R1": (100, 100, 900, 700)}
+    plain = render_overlay(arch_page, candidates)
+    anchored = render_overlay(
+        arch_page, candidates, anchors={"R1": _anchor("R1", "OFFICE")}
+    )
+    assert plain.tobytes() != anchored.tobytes()
+    # The grounding metadata is untouched by the longer chip.
+    assert plain.info["marker_boxes_px"] == anchored.info["marker_boxes_px"]
+    assert plain.info["zoom"] == anchored.info["zoom"]
+
+
+def test_the_marker_budget_and_partition_survive_anchor_text(arch_page):
+    """Longer chips must not perturb the 40-marker budget or the partition."""
+    candidates = {
+        "SYM-%d" % i: (50 + 12 * i, 50, 80 + 12 * i, 90) for i in range(45)
+    }
+    anchors = {cid: _anchor(cid, "DOCK BUMPER TYP") for cid in candidates}
+    images = render_overlay(arch_page, candidates, anchors=anchors)
+    assert isinstance(images, list)
+    assert len(images) == 2
+    subsets = [set(img.info["overlay_ids"]) for img in images]
+    assert len(subsets[0]) == MAX_MARKERS_PER_IMAGE
+    assert subsets[0].isdisjoint(subsets[1])
+    assert subsets[0] | subsets[1] == set(candidates.keys())
+
+
+# ── 4c. The anchor table in the user hint (T-24-27) ──────────────────────────
+
+
+def test_the_anchor_hint_is_wrapped_in_the_pdf_text_delimiters():
+    """Drawing-derived text entering a prompt MUST be delimiter-wrapped."""
+    hint = _build_anchor_hint(
+        {"SYM-1": "BOLLARD", "SYM-2": "LADDER"}, ["SYM-1", "SYM-2"]
+    )
+    assert prompts.PDF_TEXT_OPEN in hint
+    assert prompts.PDF_TEXT_CLOSE in hint
+    # Every anchor string sits INSIDE the delimiters, never outside them.
+    body = hint.split(prompts.PDF_TEXT_OPEN, 1)[1].split(prompts.PDF_TEXT_CLOSE, 1)[0]
+    assert "SYM-1: BOLLARD" in body
+    assert "SYM-2: LADDER" in body
+    assert "BOLLARD" not in hint.split(prompts.PDF_TEXT_OPEN, 1)[0]
+
+
+def test_the_anchor_hint_carries_the_full_text_the_chip_had_to_bound():
+    """The chip bounds a long harvest; the hint is its lossless delivery."""
+    long_text = "SOUTH ELEVATION DOCK BUMPER ASSEMBLY TYPICAL"
+    hint = _build_anchor_hint({"SYM-1": long_text}, ["SYM-1"])
+    assert long_text in hint
+
+
+def test_the_anchor_hint_is_empty_when_no_listed_candidate_is_anchored():
+    """No anchors → no table, and therefore no empty delimiter block."""
+    assert _build_anchor_hint({}, ["SYM-1"]) == ""
+    assert _build_anchor_hint({"SYM-9": "GATE"}, ["SYM-1", "SYM-2"]) == ""
+
+
+def test_the_anchor_selector_drops_a_recorded_absence_and_keeps_real_text():
+    """`anchor_text is None` is an absence, never the string 'None'."""
+    bundle = {
+        "candidate_anchors": {
+            "SYM-1": _anchor("SYM-1", "BOLLARD"),
+            "SYM-2": _anchor("SYM-2", None),
+            "SYM-3": _anchor("SYM-3", "   "),
+        }
+    }
+    assert takeoff_pipeline._anchor_texts(bundle) == {"SYM-1": "BOLLARD"}
+    assert takeoff_pipeline._anchor_texts({}) == {}
+
+
+def test_a_recorded_absence_and_an_absent_record_are_not_the_same_thing():
+    """INV-08: the drawing printing nothing is not the same as never asking."""
+    bundle = {
+        "candidate_anchors": {
+            "SYM-1": _anchor("SYM-1", "BOLLARD"),
+            "SYM-2": _anchor("SYM-2", None),
+            "SYM-3": _anchor("SYM-3", "   "),
+        }
+    }
+    # Interrogated and nothing printed → a recorded absence.
+    assert takeoff_pipeline._anchor_absences(bundle) == {"SYM-2", "SYM-3"}
+    # Never interrogated → NOT an absence, however unanchored it looks.
+    assert "SYM-9" not in takeoff_pipeline._anchor_absences(bundle)
+    # A bundle whose anchor computation failed records no absence at all.
+    assert takeoff_pipeline._anchor_absences({}) == set()
+    assert takeoff_pipeline._anchor_absences({"candidate_anchors": {}}) == set()
+
+
+# ── 4d. The symbol pass never asks about a candidate the drawing does not name
+
+
+class _SchemaRecordingAnalyzer:
+    """Records every structured request; answers nothing (labels are additive)."""
+
+    def __init__(self):
+        self.calls = []
+
+    def __call__(
+        self,
+        screenshot_path,
+        sheet_name="",
+        pass_type="measure",
+        model_override=None,
+        sheet_type=None,
+        user_hint=None,
+        output_schema=None,
+        images=None,
+    ):
+        self.calls.append(
+            {
+                "pass_type": pass_type,
+                "output_schema": output_schema,
+                "user_hint": user_hint,
+                "images": images,
+            }
+        )
+        return {
+            "_cost_usd": 0.0,
+            "_tokens_in": 0,
+            "_tokens_out": 0,
+            "_model_used": "stub",
+        }
+
+    def symbol_call(self):
+        for call in self.calls:
+            if call["pass_type"] == "symbol_gallery":
+                return call
+        return None
+
+
+_CROW_PDF = (
+    pathlib.Path(__file__).parent / "fixtures" / "crow_cass" / "crow_cass_plans.pdf"
+)
+
+
+def _run_crow_symbol_pass(monkeypatch, anchor_override):
+    """Run Crow page 0's vector flow with a controlled anchor map."""
+    from bobbytailor.pipeline.takeoff_pipeline import RunSettings, TakeoffPipeline
+
+    original = TakeoffPipeline._deterministic_bundle
+
+    def patched(self, *args, **kwargs):
+        bundle = original(self, *args, **kwargs)
+        bundle["candidate_anchors"] = anchor_override(bundle)
+        return bundle
+
+    monkeypatch.setattr(TakeoffPipeline, "_deterministic_bundle", patched)
+    analyzer = _SchemaRecordingAnalyzer()
+    pipeline = TakeoffPipeline(analyzer=analyzer, settings=RunSettings())
+    pipeline._project_vocab_labels = ["Column", "Bollard", "Ladder", "Door"]
+    pipeline.run_sheet(
+        image_path="A-101.png",
+        sheet_name="A-101",
+        sheet_type="floor_plan",
+        pdf_path=str(_CROW_PDF),
+        page_index=0,
+    )
+    return analyzer
+
+
+@pytest.mark.skipif(not _CROW_PDF.exists(), reason="Crow fixture PDF not available")
+def test_the_symbol_pass_asks_only_about_candidates_the_drawing_names(monkeypatch):
+    """An unanchored cluster is ABSENT from the request, not asked and dropped."""
+    kept = {}
+
+    def only_two_anchored(bundle):
+        ids = [
+            str(g.candidate_id if hasattr(g, "candidate_id") else g["candidate_id"])
+            for g in bundle.get("symbol_groups") or []
+        ]
+        assert len(ids) > 2, "Crow page 0 must offer more clusters than we anchor"
+        kept["anchored"] = ids[:2]
+        kept["unanchored"] = ids[2:]
+        anchors = {cid: _anchor(cid, None) for cid in ids}
+        for cid in kept["anchored"]:
+            anchors[cid] = _anchor(cid, "BOLLARD")
+        return anchors
+
+    analyzer = _run_crow_symbol_pass(monkeypatch, only_two_anchored)
+    call = analyzer.symbol_call()
+    assert call is not None, "the symbol pass must still run for anchored clusters"
+    enum = call["output_schema"]["properties"]["matches"]["items"]["properties"][
+        "symbol_id"
+    ]["enum"]
+    assert set(enum) == set(kept["anchored"])
+    for cid in kept["unanchored"]:
+        assert cid not in enum
+    # The count hint names only the clusters actually asked about.
+    assert kept["unanchored"][0] + "×" not in (call["user_hint"] or "")
+    # And the anchor table rode along, inside the delimiters.
+    assert prompts.PDF_TEXT_OPEN in call["user_hint"]
+    assert kept["anchored"][0] + ": BOLLARD" in call["user_hint"]
+
+
+@pytest.mark.skipif(not _CROW_PDF.exists(), reason="Crow fixture PDF not available")
+def test_the_symbol_pass_is_skipped_rather_than_sent_with_no_candidates(monkeypatch):
+    """`_require_candidates` raises on an empty enum by design — never issue one."""
+    analyzer = _run_crow_symbol_pass(
+        monkeypatch,
+        lambda bundle: {
+            str(g.candidate_id if hasattr(g, "candidate_id") else g["candidate_id"]):
+            _anchor("x", None)
+            for g in bundle.get("symbol_groups") or []
+        },
+    )
+    assert analyzer.symbol_call() is None
+    assert [c["pass_type"] for c in analyzer.calls].count("symbol_gallery") == 0
+
+
+@pytest.mark.skipif(not _CROW_PDF.exists(), reason="Crow fixture PDF not available")
+def test_an_absent_anchor_map_is_not_read_as_every_candidate_unanchored(monkeypatch):
+    """INV-08: a failed anchor computation must not silently empty the pass."""
+    analyzer = _run_crow_symbol_pass(monkeypatch, lambda bundle: {})
+    call = analyzer.symbol_call()
+    assert call is not None, (
+        "an absent anchor map means the computation did not run — reading it as "
+        "'no candidate is anchored' turns an infrastructure failure into a "
+        "silently empty pass"
+    )
 
 
 # ── 5. analyze_drawing structured-output path (client stubbed, no API) ───────

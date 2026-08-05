@@ -58,6 +58,86 @@ _DEFAULT_PALETTE: Tuple[str, ...] = (
 
 _CHIP_TEXT = "#ffffff"
 
+# The chip is a VISUAL affordance, and a chip wider than the sheet is no
+# affordance at all. The anchor forms 24-01 can produce are a contained word, a
+# two-token material tag ("WC 01", "PT 04" — the longest measured across the
+# four plan sets) or one nearest word, so 24 characters sits far above any
+# genuine anchor and only ever bounds an accidental harvest. Nothing is lost by
+# it: the per-candidate anchor table threaded into the user hint carries the
+# FULL text, and that table — not the chip — is the authoritative delivery.
+_CHIP_MAX_ANCHOR_CHARS = 24
+
+
+def _anchor_text_for(anchors, candidate_id: str) -> str:
+    """The anchor text to print on *candidate_id*'s chip, or ``""`` for none.
+
+    Accepts either the 24-01 anchor RECORD (``{"anchor_text": ...}``, the shape
+    ``bundle["candidate_anchors"]`` carries) or a bare string, so a caller may
+    hand the bundle key straight through without unpacking it.
+
+    ``anchor_text is None`` is 24-01's RECORDED ABSENCE and returns ``""`` —
+    the chip then shows the bare ID, never a placeholder. Whitespace is
+    collapsed because the chip is measured and drawn as a single line.
+    """
+    if not anchors:
+        return ""
+    try:
+        record = anchors.get(candidate_id)
+    except AttributeError:
+        return ""
+    if record is None:
+        return ""
+    text = record.get("anchor_text") if isinstance(record, dict) else record
+    if text is None:
+        return ""
+    collapsed = " ".join(str(text).split())
+    if len(collapsed) > _CHIP_MAX_ANCHOR_CHARS:
+        collapsed = collapsed[:_CHIP_MAX_ANCHOR_CHARS - 1] + "…"
+    return collapsed
+
+
+def _marker_label(candidate_id: str, anchor_text: str = "") -> str:
+    """The chip's text: the ID, plus the drawing's own nearest words when known.
+
+    This is the single highest-leverage string in the vision request (V4-DET-01):
+    a marker carrying only an ID asks the model to RECOGNISE a shape, whereas a
+    marker carrying the plan's own printed callout asks it to READ a label.
+
+    With no anchor the label is the bare ID — no placeholder, no dangling
+    separator — so an unanchored candidate renders exactly as it always has.
+    """
+    if not anchor_text:
+        return candidate_id
+    return "{} {}".format(candidate_id, anchor_text)
+
+
+def _chip_box(
+    x0: int,
+    y0: int,
+    chip_w: int,
+    chip_h: int,
+    image_size: Optional[Tuple[int, int]] = None,
+) -> Tuple[int, int, int, int]:
+    """Place the label chip at the marker's top-left, clamped into the image.
+
+    The chip sits just above the box when there is room and inside it when
+    there is not (the pre-existing top-edge rule). Anchor-bearing labels are
+    wider than a bare ID, so the same treatment is applied to the right edge
+    (T-24-32): a chip that would run past the image is slid left until it fits.
+
+    The clamp is a NO-OP for any chip that already fits, so a render whose
+    chips all fit is byte-identical to the render before anchors existed.
+    """
+    chip_y0 = y0 - chip_h
+    if chip_y0 < 0:  # no room above — place inside the box
+        chip_y0 = y0
+    chip_x0 = x0
+    if image_size is not None:
+        max_x0 = int(image_size[0]) - chip_w
+        if chip_x0 > max_x0:
+            chip_x0 = max(0, max_x0)
+    return (chip_x0, chip_y0, chip_x0 + chip_w, chip_y0 + chip_h)
+
 
 def _candidate_kind(candidate_id: str) -> str:
     """Kind prefix of a candidate ID: leading non-digit chars, dashes stripped.
@@ -101,23 +181,26 @@ def _draw_marker(
     bbox_px: Tuple[int, int, int, int],
     color: str,
     font: "ImageFont.ImageFont",
+    anchor_text: str = "",
+    image_size: Optional[Tuple[int, int]] = None,
 ) -> None:
-    """Draw one Set-of-Mark marker: outline box + ID label chip."""
+    """Draw one Set-of-Mark marker: outline box + ID (+ anchor text) label chip.
+
+    *anchor_text* is the drawing's own nearest printed words for this candidate
+    (24-01). Empty string — the default, and what a recorded absence resolves
+    to — draws exactly the bare-ID chip this function has always drawn.
+    """
     x0, y0, x1, y1 = bbox_px
     draw.rectangle((x0, y0, x1, y1), outline=color, width=3)
 
     # Label chip anchored at the box's top-left corner (outside when room).
-    label = candidate_id
+    label = _marker_label(candidate_id, anchor_text)
     tb = draw.textbbox((0, 0), label, font=font)
     tw, th = tb[2] - tb[0], tb[3] - tb[1]
     pad = 3
-    chip_x0 = x0
-    chip_y0 = y0 - (th + 2 * pad)
-    if chip_y0 < 0:  # no room above — place inside the box
-        chip_y0 = y0
-    chip = (chip_x0, chip_y0, chip_x0 + tw + 2 * pad, chip_y0 + th + 2 * pad)
+    chip = _chip_box(x0, y0, tw + 2 * pad, th + 2 * pad, image_size)
     draw.rectangle(chip, fill=color)
-    draw.text((chip_x0 + pad, chip_y0 + pad - tb[1]), label, fill=_CHIP_TEXT, font=font)
+    draw.text((chip[0] + pad, chip[1] + pad - tb[1]), label, fill=_CHIP_TEXT, font=font)
 
 
 def _render_one_overlay(
@@ -126,6 +209,7 @@ def _render_one_overlay(
     kind_colors: Optional[Dict[str, str]],
     palette_index: Dict[str, str],
     zoom: float,
+    anchors: Optional[Dict[str, object]] = None,
 ) -> Image.Image:
     """Render a single overlay image for *candidates* at *zoom*."""
     img = _rasterize_page(page, zoom)
@@ -142,7 +226,11 @@ def _render_one_overlay(
             int(round(y1 * zoom)),
         )
         color = _kind_color(_candidate_kind(cid), kind_colors, palette_index)
-        _draw_marker(draw, cid, bbox_px, color, font)
+        _draw_marker(
+            draw, cid, bbox_px, color, font,
+            anchor_text=_anchor_text_for(anchors, cid),
+            image_size=img.size,
+        )
         marker_boxes_px[cid] = bbox_px
 
     img.info["overlay_ids"] = list(candidates.keys())
@@ -156,6 +244,7 @@ def render_overlay(
     candidates: Dict[str, tuple],
     kind_colors: Optional[Dict[str, str]] = None,
     target_px: int = 1568,
+    anchors: Optional[Dict[str, object]] = None,
 ) -> Union[Image.Image, List[Image.Image]]:
     """Render a Set-of-Mark annotated overlay of *page* (handoff pattern 1).
 
@@ -163,6 +252,12 @@ def render_overlay(
     label chip drawn on the page raster. Wall classes / regions / symbol
     kinds are color-coded via *kind_colors* (kind = ID prefix, e.g. ``"W"``
     for ``"W1"``); unmapped kinds cycle a default palette.
+
+    When *anchors* is supplied, each chip also carries the drawing's own
+    nearest printed words for that candidate (24-01, V4-DET-01), turning a
+    symbol-conveyed decision into a text-anchored one — the model READS a
+    label instead of RECOGNISING a shape. A candidate with a recorded
+    absence, or one missing from the map, keeps the bare-ID chip.
 
     Marker budget: at most :data:`MAX_MARKERS_PER_IMAGE` (40) markers per
     image. Larger candidate sets are partitioned (insertion order) into
@@ -178,6 +273,9 @@ def render_overlay(
         target_px:   Long-edge render target in pixels (default 1568, the
                      model's standard downscale resolution; capped at the
                      8000px API limit).
+        anchors:     Optional mapping of candidate ID → 24-01 anchor record
+                     (or bare anchor string). Omitted / ``None`` renders the
+                     bare-ID chips this function has always rendered.
 
     Returns:
         A single ``PIL.Image`` when ``len(candidates) <= 40``; otherwise a
@@ -196,7 +294,9 @@ def render_overlay(
 
     ids = list(candidates.keys())
     if len(ids) <= MAX_MARKERS_PER_IMAGE:
-        return _render_one_overlay(page, candidates, kind_colors, palette_index, zoom)
+        return _render_one_overlay(
+            page, candidates, kind_colors, palette_index, zoom, anchors
+        )
 
     # Partition branch: >40 markers → split into chunks of ≤40, disjoint
     # subsets covering the full candidate set, one overlay image each.
@@ -204,7 +304,9 @@ def render_overlay(
     for start in range(0, len(ids), MAX_MARKERS_PER_IMAGE):
         chunk_ids = ids[start:start + MAX_MARKERS_PER_IMAGE]
         chunk = {cid: candidates[cid] for cid in chunk_ids}
-        images.append(_render_one_overlay(page, chunk, kind_colors, palette_index, zoom))
+        images.append(
+            _render_one_overlay(page, chunk, kind_colors, palette_index, zoom, anchors)
+        )
     logger.info(
         "render_overlay: %d candidates split into %d images (<=%d markers each)",
         len(ids), len(images), MAX_MARKERS_PER_IMAGE,

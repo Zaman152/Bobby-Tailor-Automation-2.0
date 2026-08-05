@@ -166,6 +166,11 @@ from bobbytailor.vision.schemas import (
     semantic_labeling_schema,
     symbol_gallery_schema,
 )
+# Delimiter wrapper for untrusted drawing text (T-24-27). The per-candidate
+# anchor table threaded into the symbol hint is drawing-derived text and MUST
+# pass through this before it enters a prompt; prompts.py declares the contract
+# the model relies on.
+from bobbytailor.vision.prompts import wrap_pdf_text
 from bobbytailor.vision.object_vocabulary import (
     build_project_vocabulary,
     extract_naming_conventions,
@@ -183,11 +188,11 @@ logger = logging.getLogger(__name__)
 # `takeoff_pipeline._build_crop_gallery` in tests).
 
 
-def _render_overlay(page, candidates, kind_colors=None):
+def _render_overlay(page, candidates, kind_colors=None, anchors=None):
     """Lazy wrapper for overlay.render_overlay (circular-import avoidance)."""
     from bobbytailor.vision.overlay import render_overlay
 
-    return render_overlay(page, candidates, kind_colors=kind_colors)
+    return render_overlay(page, candidates, kind_colors=kind_colors, anchors=anchors)
 
 
 def _build_crop_gallery(page, symbol_groups, legend_crop_rect=None):
@@ -805,6 +810,81 @@ def _build_symbol_count_hint(symbols) -> str:
         "repeating on a regular structural grid is columns; a symbol repeating "
         "along the building perimeter is bollards; etc.). Answer 'unknown' "
         "only if genuinely unidentifiable."
+    )
+
+
+def _anchor_texts(bundle) -> dict:
+    """``{candidate_id: anchor_text}`` for every candidate the drawing NAMES.
+
+    Reads ``bundle["candidate_anchors"]`` (24-01) and keeps only the records
+    carrying real text. ``anchor_text is None`` is the RECORDED ABSENCE of an
+    anchor and is dropped here — the absence is not a placeholder to fill in
+    from the candidate's shape.
+
+    Returns ``{}`` both when nothing is anchored and when no anchor map exists.
+    Those two cases are NOT the same and must never be told apart from this
+    map — use :func:`_anchor_absences` for that (INV-08).
+    """
+    anchors = (bundle or {}).get("candidate_anchors") or {}
+    texts = {}
+    for cid, record in anchors.items():
+        text = record.get("anchor_text") if isinstance(record, dict) else record
+        if text is None:
+            continue
+        text = " ".join(str(text).split())
+        if text:
+            texts[str(cid)] = text
+    return texts
+
+
+def _anchor_absences(bundle) -> set:
+    """The candidate IDs whose anchor is a RECORDED ABSENCE (24-01).
+
+    The drawing was interrogated for these candidates and printed nothing
+    beside them, so nothing names them and the model must not be asked to.
+
+    This is deliberately NOT "every ID missing from the text map". A candidate
+    with NO record was never interrogated — an absent record is not a recorded
+    zero (INV-08, the same rule 24-04's orphan-room branch applies to a
+    bounding-wall reference that is present-and-empty versus simply absent).
+    A bundle whose anchor computation failed carries no records at all, and
+    that failure must not silently empty a whole vision pass.
+    """
+    anchors = (bundle or {}).get("candidate_anchors") or {}
+    absent = set()
+    for cid, record in anchors.items():
+        text = record.get("anchor_text") if isinstance(record, dict) else record
+        if text is None or not str(text).strip():
+            absent.add(str(cid))
+    return absent
+
+
+def _build_anchor_hint(anchor_texts: dict, candidate_ids) -> str:
+    """The per-candidate anchor table, delimiter-wrapped, for the user hint.
+
+    The chip on the Set-of-Mark render carries the same text, but the render is
+    downscaled to the model's 1568px standard and a few characters of drafting
+    text can be hard to read at that scale. The table is the anchor's
+    survivable delivery: it says, in text the model cannot mis-read, which
+    words the drawing itself printed beside each marked candidate.
+
+    The table is drawing-derived UNTRUSTED text, so it is wrapped in the
+    ``<pdf_text>`` delimiters (T-24-27). Every semantic prompt declares that
+    delimited content is data and never an instruction.
+
+    Returns ``""`` when no listed candidate carries an anchor.
+    """
+    pairs = [
+        (cid, anchor_texts[cid]) for cid in candidate_ids if anchor_texts.get(cid)
+    ]
+    if not pairs:
+        return ""
+    table = "\n".join("{}: {}".format(cid, text) for cid, text in pairs)
+    return (
+        "The drawing prints these words next to each marked candidate — this "
+        "is the plan's own callout for it and is your primary evidence for "
+        "identifying it:\n"
+        + wrap_pdf_text(table)
     )
 
 
@@ -3830,6 +3910,13 @@ class TakeoffPipeline:
         passes_run = ["deterministic"]
         budget_exhausted = False
 
+        # The words the drawing itself printed beside each candidate (24-01).
+        # They ride on the marker chips and, for the symbol pass, in the hint.
+        # `anchor_absences` is the separate, structural question of which
+        # candidates the drawing was asked about and printed NOTHING for.
+        anchor_texts = _anchor_texts(bundle)
+        anchor_absences = _anchor_absences(bundle)
+
         region_ids = [
             vp.region_id for vp in viewports if vp.kind not in _MASK_VIEWPORT_KINDS
         ]
@@ -3844,7 +3931,7 @@ class TakeoffPipeline:
                         candidates[vp.region_id] = vp.bbox_pt
                 for cid in wall_ids:
                     candidates[cid] = registry[cid]["bbox_pt"]
-                overlay = _render_overlay(page, candidates)
+                overlay = _render_overlay(page, candidates, anchors=anchor_texts)
                 images = overlay if isinstance(overlay, list) else [overlay]
                 schema = semantic_labeling_schema(region_ids, wall_ids)
                 res = self._voted_structured_vision_call(
@@ -3878,7 +3965,23 @@ class TakeoffPipeline:
                     # is exactly why the old gallery pass returned "unknown"
                     # for everything and Crow's 724 counted symbols never
                     # became named line items.
+                    #
+                    # And ask ONLY about clusters the drawing itself names
+                    # (V4-DET-01). A cluster with no text anchor has nothing to
+                    # read, so asking about it is asking the model to name a
+                    # shape — the 0.03-0.39 condition. It is excluded from the
+                    # request entirely rather than asked and then discarded:
+                    # not asking is cheaper and it cannot flip. Those clusters
+                    # flow to 24-04's unnamed-geometry ledger, which already
+                    # carries their counts.
+                    #
+                    # The restriction fires on a RECORDED ABSENCE only. A
+                    # candidate with no anchor record at all was never
+                    # interrogated, and reading that as "nothing names it"
+                    # would turn a failed anchor computation into a silently
+                    # empty pass (INV-08).
                     sym_candidates = {}
+                    unanchored: list = []
                     for group in symbols:
                         cid = _sched_field(group, "candidate_id", "")
                         if not cid:
@@ -3886,24 +3989,54 @@ class TakeoffPipeline:
                         rep = _sched_field(group, "representative_bbox_pt", None)
                         if rep is None:
                             rep = _sched_field(group, "bbox_pt", None)
-                        if rep:
-                            sym_candidates[cid] = rep
+                        if not rep:
+                            continue
+                        if cid in anchor_absences:
+                            unanchored.append(cid)
+                            continue
+                        sym_candidates[cid] = rep
+                    if unanchored:
+                        logger.info(
+                            "run_sheet: %r — %d symbol group(s) carry no text "
+                            "anchor and are not presented to the model; they "
+                            "stay flagged unlabeled (%s)",
+                            sheet_name, len(unanchored),
+                            ", ".join(unanchored[:10]),
+                        )
                     if sym_candidates:
-                        overlay = _render_overlay(page, sym_candidates)
+                        overlay = _render_overlay(
+                            page, sym_candidates, anchors=anchor_texts
+                        )
                         images = overlay if isinstance(overlay, list) else [overlay]
                         symbol_ids = list(sym_candidates.keys())
                         schema = symbol_gallery_schema(symbol_ids, legend_labels)
-                        count_hint = _build_symbol_count_hint(symbols)
+                        asked = [
+                            g for g in symbols
+                            if _sched_field(g, "candidate_id", "") in sym_candidates
+                        ]
+                        user_hint = _join_hints(
+                            _build_symbol_count_hint(asked),
+                            _build_anchor_hint(anchor_texts, symbol_ids),
+                        ) or ""
                         res = self._voted_structured_vision_call(
                             image_path, sheet_name, "symbol_gallery",
                             resolved_type, schema, images[:20], guard,
-                            user_hint=count_hint,
+                            user_hint=user_hint,
                             vote_key="matches",
                         )
                         passes_run.append("symbol_gallery")
                         if res and not res.get("error"):
                             vision_results.append(res)
                             vision_labels["matches"] = res.get("matches")
+                    else:
+                        # Same path the empty-legend short circuit takes below:
+                        # never issue a request with an empty candidate set —
+                        # `_require_candidates` raises on one by design.
+                        logger.info(
+                            "run_sheet: %r — no symbol group carries a text "
+                            "anchor; %d symbol group(s) stay flagged unlabeled",
+                            sheet_name, len(symbols),
+                        )
                 except BudgetExceeded:
                     budget_exhausted = True
                 except Exception as exc:  # noqa: BLE001
