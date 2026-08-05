@@ -133,6 +133,30 @@ from bobbytailor.learning.retrieval import (  # noqa: F401 (re-exported for patc
 # patch `takeoff_pipeline.record_ai_manifest` and so the Opus naming manifest
 # ACCUMULATES into learning_vocabulary (source='ai') for reuse on future runs.
 from bobbytailor.learning.store import record_ai_manifest  # noqa: F401
+# 24-05 (V4-DET-02/04, defect F3): the per-project vocabulary SNAPSHOT — a
+# repeat run reuses the object list the first run derived instead of paying the
+# API to re-invent it. Module-level imports so tests can patch
+# `takeoff_pipeline.load_project_vocabulary` / `.save_project_vocabulary`
+# (patchability convention, 20-00) — a deferred import inside the method would
+# break that seam.
+from bobbytailor.learning.store import (  # noqa: F401 (re-exported for patching)
+    VOCAB_KIND_NAMING_CONVENTIONS,
+    VOCAB_KIND_PROJECT,
+    load_project_vocabulary,
+    save_project_vocabulary,
+)
+
+# 24-03's naming arbiter, imported so a snapshot written by the earlier
+# UN-canonicalised path is folded on READ. `_norm_item_key` is private to the
+# aggregator and is imported deliberately rather than re-implemented: it IS the
+# bucket identity that decides whether two rows are one item, and a second
+# copy of that rule here is exactly how two folding rules drift apart (the
+# mistake 24-02 and 24-03 both explicitly refused to make).
+from bobbytailor.pipeline.aggregator import (
+    NAME_AUTHORITY_LIBRARY,
+    _norm_item_key,
+    resolve_published_name,
+)
 
 # Verify-retry arbitration (21-14): module-level import so tests can patch
 # `takeoff_pipeline.retry_flagged_items` (patchability convention, 20-00).
@@ -677,6 +701,77 @@ def _dedupe_labels(labels: List[str], cap: int = _MAX_LEGEND_LABELS) -> List[str
         if len(out) >= cap:
             break
     return out
+
+
+def _canonicalise_persisted_vocabulary(objects: list) -> list:
+    """Fold a persisted vocabulary snapshot's names on READ (24-05, A4).
+
+    A snapshot written before 24-03 landed can hold BOTH spellings of one
+    object — the `Metal Downspout` / `Metal Downspouts` split defect F2
+    produced. Promoting that split to authority would make the persistence
+    change worse than the defect it fixes: the split would stop being a
+    per-run accident and become a permanent property of the project.
+
+    So every stored name is routed through 24-03's arbiter
+    (:func:`resolve_published_name`, at the ``library`` authority, which is
+    what a project vocabulary IS) and entries that then share a
+    :func:`_norm_item_key` bucket collapse to one. This is idempotent, so
+    NO migration is written against the store — running it twice yields the
+    same list, and 24-RESEARCH §13 forbids a destructive migration outright.
+
+    The loser's own spelling survives as an ALIAS rather than being deleted:
+    it is a real label the plan may print, and the alias list is what the
+    symbol gallery matches against. Nothing is lost, one name is published.
+
+    Order is preserved and first-seen wins, so the fold is a pure function of
+    the stored list — which is itself written once and read verbatim.
+    """
+    folded: list = []
+    by_key: Dict[str, dict] = {}
+    for obj in objects or []:
+        if not isinstance(obj, dict):
+            continue
+        entry = dict(obj)
+        # The two derivations use different name keys (`canonical_name` from
+        # the naming-convention pass, `name` from the vocabulary pass); fold
+        # whichever this object actually carries rather than inventing a third.
+        field = None
+        for candidate in ("canonical_name", "name"):
+            if str(entry.get(candidate) or "").strip():
+                field = candidate
+                break
+        if field is None:
+            continue
+        raw = str(entry[field]).strip()
+        resolved = resolve_published_name(
+            [(NAME_AUTHORITY_LIBRARY, raw, str(entry.get("unit") or ""))]
+        )
+        canon = resolved[0] if resolved else raw
+        entry[field] = canon
+
+        key = _norm_item_key(canon)
+        winner = by_key.get(key)
+        if winner is None:
+            by_key[key] = entry
+            folded.append(entry)
+            continue
+
+        aliases = [
+            a for a in (winner.get("aliases") or [])
+            if isinstance(a, str) and a.strip()
+        ]
+        held = {a.strip().lower() for a in aliases}
+        held.add(str(winner.get(field) or winner.get("canonical_name")
+                     or winner.get("name") or "").strip().lower())
+        for extra in [raw] + [
+            a for a in (entry.get("aliases") or []) if isinstance(a, str)
+        ]:
+            text = str(extra or "").strip()
+            if text and text.lower() not in held:
+                held.add(text.lower())
+                aliases.append(text)
+        winner["aliases"] = aliases
+    return folded
 
 
 def _build_symbol_count_hint(symbols) -> str:
@@ -4289,11 +4384,76 @@ class TakeoffPipeline:
                 )
         return None
 
+    def _load_persisted_vocabulary(
+        self, project_key: Optional[str], kind: str
+    ) -> list:
+        """THIS project's stored vocabulary snapshot, canonicalised — or ``[]``.
+
+        Best-effort in the module's established style: a missing key, learning
+        disabled, an unreadable store or an un-foldable payload all return
+        ``[]``, and ``[]`` means "derive fresh". A persisted vocabulary is an
+        optimisation and a determinism aid; it may never break a run.
+        """
+        if not project_key or not getattr(
+            self._settings, "learning_enabled", True
+        ):
+            return []
+        try:
+            stored = load_project_vocabulary(project_key, kind)
+        except Exception as exc:  # noqa: BLE001 — additive, never break a run
+            logger.warning(
+                "_load_persisted_vocabulary: %s snapshot for %r unreadable "
+                "(%s) — deriving fresh", kind, project_key, exc,
+            )
+            return []
+        if not stored:
+            return []
+        try:
+            return _canonicalise_persisted_vocabulary(stored)
+        except Exception as exc:  # noqa: BLE001 — the fold is additive too
+            logger.warning(
+                "_load_persisted_vocabulary: canonicalising the %s snapshot "
+                "for %r failed (%s) — using it unfolded",
+                kind, project_key, exc,
+            )
+            return [obj for obj in stored if isinstance(obj, dict)]
+
+    def _save_persisted_vocabulary(
+        self, project_key: Optional[str], objects: list, kind: str
+    ) -> int:
+        """Store the just-derived vocabulary so the NEXT run reuses it.
+
+        Saves the POST-VOTE list, never a single sample: the vote is what makes
+        the list stable, and persisting one stochastic sample would freeze the
+        noise instead of the answer. Best-effort — a store failure costs the
+        next run its saving and nothing else.
+        """
+        if not project_key or not objects or not getattr(
+            self._settings, "learning_enabled", True
+        ):
+            return 0
+        try:
+            n = save_project_vocabulary(project_key, objects, kind=kind)
+        except Exception as exc:  # noqa: BLE001 — additive, never break a run
+            logger.warning(
+                "_save_persisted_vocabulary: storing the %s snapshot for %r "
+                "failed (%s) — the next run re-derives", kind, project_key, exc,
+            )
+            return 0
+        if n:
+            logger.info(
+                "run_project: persisted the %s snapshot for %r → %d object "
+                "type(s); the next run reuses it instead of calling the API",
+                kind, project_key, n,
+            )
+        return n
+
     def _build_project_vocabulary(
         self,
         image_path: str,
         plan_text: str,
         guard: Optional[BudgetGuard],
+        project_key: Optional[str] = None,
     ) -> list:
         """Build the project vocabulary ONCE (budget-charged, best-effort).
 
@@ -4309,7 +4469,28 @@ class TakeoffPipeline:
         "unknown" run can no longer drop a real object (Exposed Structure,
         Columns, ...) that every other run names. ``n <= 1`` (or a single paid
         sample) is exactly today's single-shot behaviour.
+
+        PERSISTED FIRST (24-05, defect F3). When this project already has a
+        stored snapshot, it is loaded, canonicalised and returned, and the
+        sampling loop below is skipped ENTIRELY — no API call at all. That is
+        the point: ``map_wall_classes_from_library``'s object list came from
+        this method, so re-deriving it every run made a deterministic wall
+        classifier non-deterministic (run 1 said `Metal Downspout`, run 2 said
+        `Metal Downspouts`). A first run derives as before and saves the voted
+        result. Every failure degrades to exactly today's behaviour.
         """
+        persisted = self._load_persisted_vocabulary(project_key, VOCAB_KIND_PROJECT)
+        if persisted:
+            self._project_vocabulary = persisted
+            self._project_vocab_labels = vocabulary_labels(persisted)
+            logger.info(
+                "run_project: project vocabulary REUSED from %r's persisted "
+                "snapshot → %d object type(s), %d candidate label(s); no "
+                "project-level vocabulary API call made",
+                project_key, len(persisted), len(self._project_vocab_labels),
+            )
+            return self._project_vocabulary
+
         try:
             n = int(ensemble_settings()["n"])
         except Exception:  # noqa: BLE001 — config stubbed → single-shot
@@ -4345,6 +4526,10 @@ class TakeoffPipeline:
                 objects = samples[0] if samples else []
         self._project_vocabulary = objects or []
         self._project_vocab_labels = vocabulary_labels(self._project_vocabulary)
+        # Save the POST-VOTE list so the next run reuses this exact object set.
+        self._save_persisted_vocabulary(
+            project_key, self._project_vocabulary, VOCAB_KIND_PROJECT
+        )
         if self._project_vocab_labels:
             logger.info(
                 "run_project: project vocabulary → %d object type(s), %d candidate label(s)",
@@ -4357,6 +4542,7 @@ class TakeoffPipeline:
         image_path: str,
         naming_text: str,
         guard: Optional[BudgetGuard],
+        project_key: Optional[str] = None,
     ) -> list:
         """Build THIS plan's naming-convention library ONCE (voted, best-effort).
 
@@ -4368,7 +4554,25 @@ class TakeoffPipeline:
         convention objects (``canonical_name`` / ``aliases`` / ``basis`` /
         ``binding_hint`` / ``variant`` / ``thickness_in`` / ``height_ft``); any
         failure returns ``[]`` (additive-only — never breaks a run).
+
+        PERSISTED FIRST (24-05, defect F3). This is the LIVE project-level API
+        pass — the one the saved evidence charges $0.422 of a $0.599 run for,
+        70% of it. A repeat run over the same project loads the stored
+        snapshot, canonicalises it and skips the sampling loop entirely, which
+        both removes that spend and stops the naming library changing
+        underneath the deterministic wall classifier between runs.
         """
+        persisted = self._load_persisted_vocabulary(
+            project_key, VOCAB_KIND_NAMING_CONVENTIONS
+        )
+        if persisted:
+            logger.info(
+                "run_project: naming conventions REUSED from %r's persisted "
+                "snapshot → %d object type(s); no naming-convention API call "
+                "made", project_key, len(persisted),
+            )
+            return persisted
+
         try:
             n = int(ensemble_settings()["n"])
         except Exception:  # noqa: BLE001 — config stubbed → single-shot
@@ -4395,12 +4599,18 @@ class TakeoffPipeline:
                 break
 
         if len(samples) <= 1:
-            return samples[0] if samples else []
-        try:
-            return majority_keep_conventions(samples)
-        except Exception as exc:  # noqa: BLE001 — additive, never break a run
-            logger.warning("_build_naming_conventions: vote failed: %s", exc)
-            return samples[0] if samples else []
+            conventions = samples[0] if samples else []
+        else:
+            try:
+                conventions = majority_keep_conventions(samples)
+            except Exception as exc:  # noqa: BLE001 — additive, never break a run
+                logger.warning("_build_naming_conventions: vote failed: %s", exc)
+                conventions = samples[0] if samples else []
+        # Save the POST-VOTE list so the next run reuses this exact object set.
+        self._save_persisted_vocabulary(
+            project_key, conventions, VOCAB_KIND_NAMING_CONVENTIONS
+        )
+        return conventions
 
     def run_project(
         self,
@@ -4569,7 +4779,8 @@ class TakeoffPipeline:
             vocab_page = self._select_vocabulary_page(pages)
             if vocab_page is not None:
                 naming_conventions = self._build_naming_conventions(
-                    vocab_page["image_path"], naming_text, self._run_budget
+                    vocab_page["image_path"], naming_text, self._run_budget,
+                    project_key=project_key,
                 ) or []
 
         # Merge: deterministic entries are AUTHORITATIVE for names/aliases; the
