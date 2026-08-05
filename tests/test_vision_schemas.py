@@ -99,6 +99,12 @@ def _assert_no_numeric_types(node):
 _VECTOR_BUILDERS = [
     pytest.param(lambda: semantic_labeling_schema(["R1", "R2"], ["W1", "W2"]),
                  id="semantic_labeling"),
+    pytest.param(
+        lambda: semantic_labeling_schema(
+            ["R1", "R2"], ["W1", "W2"], ["ROOM-1", "ROOM-2"]
+        ),
+        id="semantic_labeling_with_rooms",
+    ),
     pytest.param(lambda: symbol_gallery_schema(["SYM-1", "SYM-2"], ["Bollard", "Column"]),
                  id="symbol_gallery"),
     pytest.param(legend_structuring_schema, id="legend_structuring"),
@@ -128,11 +134,137 @@ def test_vector_schema_rejects_numeric_property_types(builder):
 
 def test_semantic_labeling_enums_equal_candidate_lists():
     schema = semantic_labeling_schema(["R1", "R2", "R3"], ["W1", "W2"])
-    assert schema["properties"]["main_plan_region"]["enum"] == ["R1", "R2", "R3"]
-    item = schema["properties"]["wall_class_labels"]["items"]
+    region_item = schema["properties"]["regions"]["items"]
+    assert region_item["properties"]["region_id"]["enum"] == ["R1", "R2", "R3"]
+    item = schema["properties"]["wall_classes"]["items"]
     assert item["properties"]["wall_class_id"]["enum"] == ["W1", "W2"]
     # Acceptance criterion literal: serialized form carries the exact enum.
     assert '"enum": ["R1", "R2", "R3"]' in json.dumps(schema)
+
+
+# ── 1b. Dependency-ordered schema topology (24-07, V4-DET-03) ────────────────
+#
+# The flat predecessor made an unbounded sliver EXPRESSIBLE — rooms carried no
+# relationship to the walls enclosing them, and both saved paid runs published
+# four rooms at ~10-11 SF each on a 397,600 SF warehouse. Ordering the levels
+# makes that gap unexpressible rather than merely flagged.
+
+
+def test_dependency_ordered_levels_precede_every_reference_to_them():
+    """Wall skeleton first, regions second, rooms citing only what is above."""
+    schema = semantic_labeling_schema(
+        ["R1", "R2"], ["W1", "W2"], ["ROOM-1", "ROOM-2"]
+    )
+    order = list(schema["properties"].keys())
+    assert order.index("wall_classes") < order.index("regions")
+    assert order.index("regions") < order.index("rooms")
+    # `required` declares the same order — it is the generation order the
+    # model follows, so the two must not disagree.
+    assert schema["required"] == order
+
+    room = schema["properties"]["rooms"]["items"]["properties"]
+    # Every ID a room names is an enum of a level DEFINED ABOVE IT, never a
+    # free string: a reference to something undefined is unexpressible.
+    assert room["region_id"]["enum"] == ["R1", "R2"]
+    assert room["bounding_wall_ids"]["items"]["enum"] == ["W1", "W2"]
+    assert room["room_id"]["enum"] == ["ROOM-1", "ROOM-2"]
+    assert "type" not in room["region_id"]
+    assert "type" not in room["room_id"]
+
+
+def test_dependency_ordered_a_room_may_cite_no_bounding_wall():
+    """The model is never FORCED to invent a reference it cannot make."""
+    schema = semantic_labeling_schema(["R1"], ["W1"], ["ROOM-1"])
+    item = schema["properties"]["rooms"]["items"]
+    # The GA contract puts every property in `required` ...
+    assert "bounding_wall_ids" in item["required"]
+    # ... so omittability is expressed as an ALLOWED EMPTY LIST, and nothing
+    # in the schema forbids one (no minItems, no required entry count).
+    wall_ref = item["properties"]["bounding_wall_ids"]
+    assert wall_ref["type"] == "array"
+    assert "minItems" not in wall_ref
+    # That present-and-empty citation is exactly what fusion's orphan-room
+    # branch reads, under exactly this key.
+    from bobbytailor.vision.fusion import ROOM_WALL_REFERENCE_FIELD
+
+    assert ROOM_WALL_REFERENCE_FIELD in item["properties"]
+
+
+def test_dependency_ordered_rooms_are_absent_rather_than_empty_enum():
+    """No room candidates → no rooms level. An enum can never be empty."""
+    for schema in (
+        semantic_labeling_schema(["R1"], ["W1"]),
+        semantic_labeling_schema(["R1"], ["W1"], []),
+        semantic_labeling_schema(["R1"], ["W1"], None),
+    ):
+        assert "rooms" not in schema["properties"]
+        assert "rooms" not in schema["required"]
+        _assert_strict_objects(schema)
+
+
+def test_dependency_ordered_still_guards_every_id_list():
+    """`_require_candidates` keeps an invalid enum grammatically impossible."""
+    with pytest.raises(ValueError):
+        semantic_labeling_schema([], ["W1"], ["ROOM-1"])
+    with pytest.raises(ValueError):
+        semantic_labeling_schema(["R1"], [], ["ROOM-1"])
+    with pytest.raises(ValueError):
+        semantic_labeling_schema(["R1"], ["W1"], ["ROOM-1", "ROOM-1"])
+
+
+def test_no_numeric_fields_anywhere_on_any_vector_path_builder():
+    """The ban is structural: walked over EVERY vector builder in the module.
+
+    Discovered by module introspection rather than by naming builders one by
+    one, so a schema added later cannot slip in uncovered — which is precisely
+    how a quantity field would arrive.
+    """
+    import inspect
+
+    from bobbytailor.vision import schemas as schemas_module
+
+    # Sample arguments for the builders that take candidate lists; anything
+    # taking arguments we cannot supply would silently skip, so that is an
+    # explicit failure rather than a quiet pass.
+    sample_args = {
+        "semantic_labeling_schema": (["R1", "R2"], ["W1", "W2"], ["ROOM-1"]),
+        "symbol_gallery_schema": (["SYM-1"], ["Bollard"]),
+        "verify_retry_schema": (["ladder", "stair"],),
+    }
+    builders = [
+        (name, fn)
+        for name, fn in vars(schemas_module).items()
+        if inspect.isfunction(fn)
+        and name.endswith("_schema")
+        and not name.startswith("_")
+        and name != "raster_extraction_schema"  # the one flagged raster path
+    ]
+    assert len(builders) >= 5, [n for n, _ in builders]
+
+    for name, builder in builders:
+        args = sample_args.get(name, ())
+        if not args and inspect.signature(builder).parameters:
+            required = [
+                p for p in inspect.signature(builder).parameters.values()
+                if p.default is inspect.Parameter.empty
+            ]
+            assert not required, (
+                "%s takes arguments this test cannot supply, so it would be "
+                "silently skipped — add it to sample_args" % name
+            )
+        schema = builder(*args)
+        _assert_no_numeric_types(schema)
+        serialized = json.dumps(schema)
+        # The whole serialized form, not just typed nodes: a numeric field
+        # smuggled in as a description or a constraint is still a numeric field.
+        assert "integer" not in serialized, name
+        assert "number" not in serialized, name
+
+
+def test_the_raster_path_remains_the_one_schema_permitted_a_number():
+    """A positive control: the ban above is a real constraint, not vacuous."""
+    serialized = json.dumps(raster_extraction_schema())
+    assert "integer" in serialized
 
 
 def test_symbol_gallery_enums_candidates_plus_unknown():
@@ -543,6 +675,130 @@ def test_an_absent_anchor_map_is_not_read_as_every_candidate_unanchored(monkeypa
         "'no candidate is anchored' turns an infrastructure failure into a "
         "silently empty pass"
     )
+
+
+# ── 4e. The dependency-ordered answer reaches its existing consumers ─────────
+#
+# The SCHEMA topology changed; the internal label contract deliberately did
+# not. fusion, the reporter and the merged result keep reading the keys they
+# always read, so the change stops at one adapter in `_run_sheet_vector`.
+
+
+def test_the_main_plan_answer_survives_the_regions_level():
+    """One claim answers; nothing claiming, or two claiming, answers nothing."""
+    pick = takeoff_pipeline._main_region_from_answer
+    assert pick([
+        {"region_id": "R1", "is_main_plan": False, "confidence": "high"},
+        {"region_id": "R2", "is_main_plan": True, "confidence": "high"},
+    ]) == "R2"
+    # Nothing claims it → no answer, rather than the first region by default.
+    assert pick([{"region_id": "R1", "is_main_plan": False}]) is None
+    # TWO claim it → a contest, and picking one would be guessing which of two
+    # disagreeing answers to trust. The deterministic selection still stands.
+    assert pick([
+        {"region_id": "R1", "is_main_plan": True},
+        {"region_id": "R2", "is_main_plan": True},
+    ]) is None
+    assert pick(None) is None
+    assert pick([]) is None
+
+
+def test_the_room_wall_citation_lands_on_the_record_fusion_reads():
+    """V4-DET-03: the field 24-04's orphan-room branch already reads."""
+    from bobbytailor.vision.fusion import ROOM_WALL_REFERENCE_FIELD
+
+    rooms = [
+        {"candidate_id": "ROOM-1", "polygon_wkt": "", "area_pt2": 10.0},
+        {"candidate_id": "ROOM-2", "polygon_wkt": "", "area_pt2": 20.0},
+        {"candidate_id": "ROOM-3", "polygon_wkt": "", "area_pt2": 30.0},
+    ]
+    applied = takeoff_pipeline._apply_room_wall_references(
+        rooms,
+        [
+            {"room_id": "ROOM-1", ROOM_WALL_REFERENCE_FIELD: ["W1", "W2"]},
+            # Answered, and cited NOTHING — the room saying it cannot name the
+            # walls enclosing it. This is what gets ledgered, not published.
+            {"room_id": "ROOM-2", ROOM_WALL_REFERENCE_FIELD: []},
+            # Answered WITHOUT the key at all — never asked, so never judged.
+            {"room_id": "ROOM-3", "label": "OFFICE"},
+        ],
+    )
+    assert applied == 2
+    assert rooms[0][ROOM_WALL_REFERENCE_FIELD] == ["W1", "W2"]
+    assert rooms[1][ROOM_WALL_REFERENCE_FIELD] == []
+    assert ROOM_WALL_REFERENCE_FIELD not in rooms[2], (
+        "an answer omitting the citation must leave the field ABSENT — writing "
+        "an empty list would manufacture the citation failure the branch exists "
+        "to detect (INV-08)"
+    )
+
+
+def test_the_room_wall_citation_writes_to_a_dataclass_record_too():
+    """Bundle rooms are RoomPolygon dataclasses on the real path, not dicts."""
+    from bobbytailor.deterministic.rooms import RoomPolygon
+    from bobbytailor.vision.fusion import ROOM_WALL_REFERENCE_FIELD
+
+    room = RoomPolygon(
+        polygon_wkt="", area_pt2=10.0, label="", label_source="none",
+        candidate_id="ROOM-1", confidence="medium",
+    )
+    applied = takeoff_pipeline._apply_room_wall_references(
+        [room], [{"room_id": "ROOM-1", ROOM_WALL_REFERENCE_FIELD: ["W1"]}]
+    )
+    assert applied == 1
+    assert getattr(room, ROOM_WALL_REFERENCE_FIELD) == ["W1"]
+
+
+def test_the_request_never_asks_about_a_marker_it_did_not_send(arch_page):
+    """The image budget can truncate the partition; the enum must follow it."""
+    candidates = {
+        "SYM-%d" % i: (50 + 12 * i, 50, 80 + 12 * i, 90) for i in range(45)
+    }
+    images = render_overlay(arch_page, candidates)
+    assert isinstance(images, list) and len(images) == 2
+    # Everything drawn across the whole partition is askable ...
+    assert takeoff_pipeline._ids_shown_on(images) == set(candidates)
+    # ... but a truncated batch narrows the askable set to what it carries.
+    first_only = takeoff_pipeline._ids_shown_on(images[:1])
+    assert first_only == set(images[0].info["overlay_ids"])
+    assert first_only < set(candidates)
+    assert takeoff_pipeline._ids_shown_on([]) == set()
+
+
+@pytest.mark.skipif(not _CROW_PDF.exists(), reason="Crow fixture PDF not available")
+def test_the_semantic_pass_sends_the_dependency_ordered_schema(monkeypatch):
+    """End to end on a real sheet: ordering, rooms, and zero numeric fields."""
+    analyzer = _run_crow_symbol_pass(monkeypatch, lambda bundle: {})
+    semantic = next(
+        (c for c in analyzer.calls if c["pass_type"] == "semantic"), None
+    )
+    assert semantic is not None, "the semantic pass must still run"
+    schema = semantic["output_schema"]
+    order = list(schema["properties"].keys())
+    assert order.index("wall_classes") < order.index("regions")
+    if "rooms" in order:
+        assert order.index("regions") < order.index("rooms")
+        room = schema["properties"]["rooms"]["items"]["properties"]
+        walls = schema["properties"]["wall_classes"]["items"]["properties"]
+        # Every wall a room may cite is one the same request defined above it.
+        assert set(room["bounding_wall_ids"]["items"]["enum"]) == set(
+            walls["wall_class_id"]["enum"]
+        )
+    # Every ID asked about was actually MARKED on an image that was sent.
+    shown = takeoff_pipeline._ids_shown_on(semantic["images"])
+    for level, id_key in (
+        ("wall_classes", "wall_class_id"),
+        ("regions", "region_id"),
+        ("rooms", "room_id"),
+    ):
+        if level not in schema["properties"]:
+            continue
+        enum = schema["properties"][level]["items"]["properties"][id_key]["enum"]
+        assert set(enum) <= shown, (level, set(enum) - shown)
+    # And the whole real-sheet request still carries no numeric field.
+    serialized = json.dumps(schema)
+    assert "integer" not in serialized
+    assert "number" not in serialized
 
 
 # ── 5. analyze_drawing structured-output path (client stubbed, no API) ───────

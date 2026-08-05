@@ -80,14 +80,15 @@ class CannedSemanticAnalyzer:
             "_model_used": "canned-model",
         }
         if pass_type == "semantic":
+            # Answers in the dependency-ordered grammar (24-07, V4-DET-03):
+            # wall skeleton first, regions second, rooms citing both.
             props = output_schema["properties"]
-            regions = props["main_plan_region"]["enum"]
-            wall_ids = props["wall_class_labels"]["items"]["properties"][
+            regions = props["regions"]["items"]["properties"]["region_id"]["enum"]
+            wall_ids = props["wall_classes"]["items"]["properties"][
                 "wall_class_id"
             ]["enum"]
             answer = {
-                "main_plan_region": regions[0],
-                "wall_class_labels": [
+                "wall_classes": [
                     {
                         "wall_class_id": wid,
                         "label": "Wall Class %s" % wid,
@@ -95,8 +96,28 @@ class CannedSemanticAnalyzer:
                     }
                     for wid in wall_ids
                 ],
+                "regions": [
+                    {
+                        "region_id": rid,
+                        "is_main_plan": rid == regions[0],
+                        "confidence": "high",
+                    }
+                    for rid in regions
+                ],
                 "confidence": "high",
             }
+            if "rooms" in props:
+                room_ids = props["rooms"]["items"]["properties"]["room_id"]["enum"]
+                answer["rooms"] = [
+                    {
+                        "room_id": rid,
+                        "region_id": regions[0],
+                        "bounding_wall_ids": list(wall_ids),
+                        "label": "",
+                        "confidence": "medium",
+                    }
+                    for rid in room_ids
+                ]
             answer.update(meta)
             return answer
         if pass_type == "symbol_gallery":

@@ -9,6 +9,11 @@ Design contract (21-RESEARCH.md §3, normative):
 - ID fields are ``enum`` lists built from the ACTUAL candidate set, so an
   answer outside the candidate set is grammatically impossible — the
   strongest possible grounding.
+- **Dependency-ordered topology** (24-07, V4-DET-03): where one entity
+  references another, the referenced level is declared FIRST and the
+  referencing level cites it by enum. A reference to something undefined is
+  then unexpressible rather than merely flagged. See
+  :func:`semantic_labeling_schema`.
 - **No numeric fields on vector-sheet schemas.** Vision NEVER produces a
   number on the vector path; quantities come from geometry / the text
   layer. The ONLY schema permitted ``"type": "integer"`` / ``"type":
@@ -20,7 +25,7 @@ Design contract (21-RESEARCH.md §3, normative):
 Every builder returns a fresh dict (safe to mutate / serialize per call).
 """
 
-from typing import List
+from typing import List, Optional
 
 CONFIDENCE_ENUM = ["high", "medium", "low"]
 
@@ -49,18 +54,56 @@ def _confidence_property() -> dict:
     return {"enum": list(CONFIDENCE_ENUM)}
 
 
-def semantic_labeling_schema(region_ids: List[str], wall_class_ids: List[str]) -> dict:
+def semantic_labeling_schema(
+    region_ids: List[str],
+    wall_class_ids: List[str],
+    room_ids: Optional[List[str]] = None,
+) -> dict:
     """Schema for the annotated-overlay semantic pass (handoff pattern 1).
 
-    The model identifies the main floor-plan region and labels each wall
-    class per the sheet's wall legend. Region and wall-class answers are
-    enums of the actual candidate IDs.
+    **Dependency-ordered topology** (V4-DET-03, FloorplanVLM's technique). The
+    levels are declared skeleton-first, so each one can only reference IDs
+    already defined above it:
+
+    1. ``wall_classes`` — the wall skeleton. Nothing precedes it, so it
+       references nothing.
+    2. ``regions`` — where the sheet's drawings sit, and which one is the main
+       plan. References nothing above it either.
+    3. ``rooms`` — each room cites the region it sits in and the wall classes
+       bounding it. Every ID it names is an enum drawn from a list defined
+       above, so a room referencing something that does not exist is
+       grammatically impossible.
+
+    The flat predecessor made an unbounded sliver EXPRESSIBLE: rooms carried no
+    relationship to the walls enclosing them, and both saved paid runs published
+    four room candidates at roughly 10-11 SF each on a 397,600 SF warehouse.
+    Ordering the levels makes that topological gap unexpressible rather than
+    merely flagged.
+
+    **A room may cite NO bounding wall.** ``bounding_wall_ids`` is a required
+    property — the GA contract lists every property in ``required`` — whose
+    value may be the EMPTY LIST. That empty list is how a room says "I cannot
+    cite the walls bounding me", so the model is never forced to invent a
+    reference to satisfy the grammar. Fusion's orphan-room branch reads exactly
+    that present-and-empty case and ledgers the room instead of publishing it;
+    an ABSENT field is a different thing entirely and is never read as an
+    absent wall (``fusion.UNNAMED_ROOM_NO_WALL_REFERENCE``, INV-08).
+
+    **Zero numeric properties**, like every vector-path schema. The ordering
+    adds STRUCTURE, not numbers: no room area, no wall length, no count "for
+    consistency checking". Quantities come from geometry; vision supplies
+    semantics only.
 
     Args:
         region_ids:     Viewport/region candidate IDs drawn on the overlay
                         (e.g. ``["R1", "R2", "R3"]``).
         wall_class_ids: Wall-thickness-class candidate IDs (color-coded on
                         the overlay, e.g. ``["W1", "W2"]``).
+        room_ids:       Room-polygon candidate IDs drawn on the overlay. When
+                        empty or omitted the ``rooms`` level is absent from the
+                        schema entirely — an enum cannot be empty, and the
+                        absence of the level is the absence of room candidates,
+                        never a room with no ID.
 
     Returns:
         JSON schema dict (vector path — no numeric properties).
@@ -69,29 +112,82 @@ def semantic_labeling_schema(region_ids: List[str], wall_class_ids: List[str]) -
     wall_class_ids = _require_candidates(
         "semantic_labeling_schema.wall_class_ids", wall_class_ids
     )
+
+    # Level 1 — the skeleton. Declared first so rooms can cite it.
+    properties = {
+        "wall_classes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["wall_class_id", "label", "confidence"],
+                "properties": {
+                    "wall_class_id": {"enum": list(wall_class_ids)},
+                    # Free-text semantic label from the wall legend
+                    # (e.g. "CMU", "tilt-up") — a name, never a quantity.
+                    "label": {"type": "string"},
+                    "confidence": _confidence_property(),
+                },
+            },
+        },
+        # Level 2 — where the drawings sit. `is_main_plan` is a flag, not a
+        # measurement; the deterministic main-plan selection remains the
+        # measurement authority and this is its semantic cross-check.
+        "regions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["region_id", "is_main_plan", "confidence"],
+                "properties": {
+                    "region_id": {"enum": list(region_ids)},
+                    "is_main_plan": {"type": "boolean"},
+                    "confidence": _confidence_property(),
+                },
+            },
+        },
+    }
+
+    # Level 3 — rooms, expressed as REFERENCES to the two levels above.
+    if room_ids:
+        room_ids = _require_candidates("semantic_labeling_schema.room_ids", room_ids)
+        properties["rooms"] = {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "room_id",
+                    "region_id",
+                    "bounding_wall_ids",
+                    "label",
+                    "confidence",
+                ],
+                "properties": {
+                    "room_id": {"enum": list(room_ids)},
+                    # The region this room sits in — an already-defined ID.
+                    "region_id": {"enum": list(region_ids)},
+                    # The walls enclosing it — already-defined IDs. An EMPTY
+                    # list is the room saying it cannot cite one, which is
+                    # always available and is never a forced invention.
+                    "bounding_wall_ids": {
+                        "type": "array",
+                        "items": {"enum": list(wall_class_ids)},
+                    },
+                    # The room's name as the drawing prints it — a name, never
+                    # an area.
+                    "label": {"type": "string"},
+                    "confidence": _confidence_property(),
+                },
+            },
+        }
+
+    properties["confidence"] = _confidence_property()
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["main_plan_region", "wall_class_labels", "confidence"],
-        "properties": {
-            "main_plan_region": {"enum": list(region_ids)},
-            "wall_class_labels": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": ["wall_class_id", "label", "confidence"],
-                    "properties": {
-                        "wall_class_id": {"enum": list(wall_class_ids)},
-                        # Free-text semantic label from the wall legend
-                        # (e.g. "CMU", "tilt-up") — a name, never a number.
-                        "label": {"type": "string"},
-                        "confidence": _confidence_property(),
-                    },
-                },
-            },
-            "confidence": _confidence_property(),
-        },
+        "required": list(properties.keys()),
+        "properties": properties,
     }
 
 

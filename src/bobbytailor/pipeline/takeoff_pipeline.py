@@ -116,6 +116,10 @@ from bobbytailor.vision.ensemble import (
 )
 from bobbytailor.vision.fusion import (
     MaterialTagLedger,
+    # The room record field carrying its bounding-wall citation (V4-DET-03).
+    # Imported rather than re-spelled: fusion's orphan-room branch reads this
+    # exact key, and a second copy of the name here is how one name becomes two.
+    ROOM_WALL_REFERENCE_FIELD,
     build_registry,
     fuse_sheet,
     merge_with_provenance,
@@ -886,6 +890,78 @@ def _build_anchor_hint(anchor_texts: dict, candidate_ids) -> str:
         "identifying it:\n"
         + wrap_pdf_text(table)
     )
+
+
+def _ids_shown_on(images) -> set:
+    """The candidate IDs actually drawn on the images being sent.
+
+    ``render_overlay`` partitions a large candidate set into several images and
+    the request carries at most 20 of them, so the set MARKED can be a strict
+    subset of the set proposed. Building the schema's enums from anything wider
+    would ask the model about candidates whose markers it never received —
+    the same defect, in a different costume, that asking about an unanchored
+    cluster is.
+    """
+    shown = set()
+    for img in images or []:
+        for cid in (getattr(img, "info", None) or {}).get("overlay_ids") or []:
+            shown.add(str(cid))
+    return shown
+
+
+def _main_region_from_answer(regions) -> Optional[str]:
+    """The region the model flagged as the main plan, or ``None``.
+
+    ``None`` when nothing claims it AND when more than one thing does: two
+    claims are a contest, and picking the first would be guessing which of two
+    disagreeing answers to trust. The deterministic main-plan selection is the
+    measurement authority in either case; this answer is its cross-check.
+    """
+    claims = [
+        r.get("region_id")
+        for r in regions or []
+        if isinstance(r, dict) and r.get("is_main_plan") and r.get("region_id")
+    ]
+    return claims[0] if len(claims) == 1 else None
+
+
+def _apply_room_wall_references(rooms, answers) -> int:
+    """Write each answered room's bounding-wall citation onto its bundle record.
+
+    This is the field fusion's orphan-room branch reads (V4-DET-03): a room
+    citing NO bounding wall is ledgered rather than published, because a face
+    that cannot say which walls enclose it is a polygon, not a room.
+
+    Only an answer that actually CARRIES the key writes anything. An answer
+    that omits it leaves the record's field absent, and fusion reads an absent
+    field as "not asked" rather than as "no walls" (INV-08) — writing an empty
+    list for a room nobody answered about would manufacture the very citation
+    failure the branch exists to detect.
+
+    Returns the number of records populated.
+    """
+    by_id = {}
+    for room in rooms or []:
+        cid = _sched_field(room, "candidate_id", "")
+        if cid:
+            by_id[str(cid)] = room
+
+    applied = 0
+    for answer in answers or []:
+        if not isinstance(answer, dict) or ROOM_WALL_REFERENCE_FIELD not in answer:
+            continue
+        room = by_id.get(str(answer.get("room_id") or ""))
+        if room is None:
+            continue
+        refs = [
+            str(w) for w in (answer.get(ROOM_WALL_REFERENCE_FIELD) or []) if str(w)
+        ]
+        if isinstance(room, dict):
+            room[ROOM_WALL_REFERENCE_FIELD] = refs
+        else:
+            setattr(room, ROOM_WALL_REFERENCE_FIELD, refs)
+        applied += 1
+    return applied
 
 
 def _legend_crop_rect(viewports, schedules):
@@ -3923,6 +3999,15 @@ class TakeoffPipeline:
         wall_ids = sorted(
             cid for cid, meta in registry.items() if meta.get("kind") == "wall_class"
         )
+        # Room candidates complete the dependency-ordered topology (V4-DET-03):
+        # the schema asks each room which walls bound it, so the rooms must be
+        # MARKED or the model is being asked about geometry it never saw. A
+        # registry bbox of all zeros is position UNKNOWN, never position (0,0),
+        # so such a room is not marked and not asked about (24-01's rule).
+        room_ids = sorted(
+            cid for cid, meta in registry.items()
+            if meta.get("kind") == "room" and any(meta.get("bbox_pt") or ())
+        )
         if region_ids and wall_ids:
             try:
                 candidates = {}
@@ -3931,19 +4016,46 @@ class TakeoffPipeline:
                         candidates[vp.region_id] = vp.bbox_pt
                 for cid in wall_ids:
                     candidates[cid] = registry[cid]["bbox_pt"]
+                for cid in room_ids:
+                    candidates[cid] = registry[cid]["bbox_pt"]
                 overlay = _render_overlay(page, candidates, anchors=anchor_texts)
                 images = overlay if isinstance(overlay, list) else [overlay]
-                schema = semantic_labeling_schema(region_ids, wall_ids)
+                images = images[:20]
+                # Ask only about what was actually marked on the images sent.
+                shown = _ids_shown_on(images)
+                sent_regions = [c for c in region_ids if c in shown]
+                sent_walls = [c for c in wall_ids if c in shown]
+                sent_rooms = [c for c in room_ids if c in shown]
+                if not (sent_regions and sent_walls):
+                    raise ValueError(
+                        "semantic pass: the request's image budget carries no "
+                        "region or no wall-class marker"
+                    )
+                schema = semantic_labeling_schema(
+                    sent_regions, sent_walls, sent_rooms
+                )
                 res = self._voted_structured_vision_call(
                     image_path, sheet_name, "semantic", resolved_type,
-                    schema, images[:20], guard,
-                    vote_key="wall_class_labels",
+                    schema, images, guard,
+                    vote_key="wall_classes",
                 )
                 passes_run.append("semantic")
                 if res and not res.get("error"):
                     vision_results.append(res)
-                    vision_labels["main_plan_region"] = res.get("main_plan_region")
-                    vision_labels["wall_class_labels"] = res.get("wall_class_labels")
+                    # Adapter: the SCHEMA is dependency-ordered, the internal
+                    # label contract is unchanged. fusion, the reporter and the
+                    # merged result keep reading exactly the keys they always
+                    # read, so the topology change stops at this boundary.
+                    vision_labels["main_plan_region"] = _main_region_from_answer(
+                        res.get("regions")
+                    )
+                    vision_labels["wall_class_labels"] = res.get("wall_classes")
+                    vision_labels["room_labels"] = res.get("rooms")
+                    # The bounding-wall citation lands on the room records
+                    # fusion reads (V4-DET-03); a room citing none is ledgered.
+                    _apply_room_wall_references(
+                        bundle.get("rooms") or [], res.get("rooms")
+                    )
             except BudgetExceeded:
                 budget_exhausted = True
             except Exception as exc:  # noqa: BLE001 — labels are additive
@@ -4008,11 +4120,20 @@ class TakeoffPipeline:
                             page, sym_candidates, anchors=anchor_texts
                         )
                         images = overlay if isinstance(overlay, list) else [overlay]
-                        symbol_ids = list(sym_candidates.keys())
+                        images = images[:20]
+                        # Ask only about clusters actually marked on the images
+                        # sent — the request budget can truncate the partition.
+                        shown = _ids_shown_on(images)
+                        symbol_ids = [c for c in sym_candidates if c in shown]
+                        if not symbol_ids:
+                            raise ValueError(
+                                "symbol pass: the request's image budget "
+                                "carries no symbol marker"
+                            )
                         schema = symbol_gallery_schema(symbol_ids, legend_labels)
                         asked = [
                             g for g in symbols
-                            if _sched_field(g, "candidate_id", "") in sym_candidates
+                            if _sched_field(g, "candidate_id", "") in set(symbol_ids)
                         ]
                         user_hint = _join_hints(
                             _build_symbol_count_hint(asked),
@@ -4020,7 +4141,7 @@ class TakeoffPipeline:
                         ) or ""
                         res = self._voted_structured_vision_call(
                             image_path, sheet_name, "symbol_gallery",
-                            resolved_type, schema, images[:20], guard,
+                            resolved_type, schema, images, guard,
                             user_hint=user_hint,
                             vote_key="matches",
                         )
