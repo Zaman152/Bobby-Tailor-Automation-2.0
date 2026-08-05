@@ -651,6 +651,184 @@ def _reject_unknown_id(candidate_id, source: str, answer, rejected: List[dict]) 
     )
 
 
+# ── The unnamed-geometry ledger (24-04, V4-DET-01) ───────────────────────────
+#
+# **A raw candidate ID is never a line item.** ``SYM-1``, ``ROOM-3`` and
+# ``WALL-TC4`` are OUR internal handles for a piece of measured geometry. Until
+# this section existed, three loci did ``name = <label> or <candidate_id>`` and
+# those handles flowed unmodified into ``calculated_takeoff[].description`` and
+# ``takeoff_summary[].item`` — an internal identifier reaching an external
+# deliverable as the name of a thing the client is being asked to price.
+#
+# The measured Crow page-0 evidence this section was built against (free probe,
+# zero API, 2026-08-05): of 45 published components, **41 were named with their
+# own candidate ID** — including ``SYM-1`` at 136 EA and ``SYM-2`` at 56 EA —
+# plus one room line item named ``4`` (a gridline bubble digit) at 279.5 SF and
+# one named by a 19-token text harvest at 396,059.1 SF.
+#
+# **This is a RELOCATION, not a deletion.** The mirror-image defect — dropping
+# the rows so no identifier appears, and silently losing hundreds of counted
+# symbols — is 24-RESEARCH pitfall 3 and threat T-24-14, and it is the strictly
+# worse outcome: an identifier in a report is embarrassing, a vanished quantity
+# is wrong. Every candidate the gate excludes MUST arrive here carrying its
+# measured quantity, its unit, its position and the named reason naming failed.
+#
+# **Its own key, deliberately.** These records do NOT go in the sheet's vision-
+# answer audit list: Phase 23's C3a reinstatement logic keys on the suppression
+# records in that list and would act on these. Nor in ``coverage_ledger``, whose
+# invariant is one row per source page. A measured-but-unidentified candidate is
+# a THIRD thing — not a coverage gap and not a suppression.
+
+#: The top-level ``fuse_sheet`` result key carrying the unnamed-geometry ledger.
+UNNAMED_GEOMETRY_KEY = "unnamed_geometry"
+
+# ── The three admissible naming sources ──────────────────────────────────────
+#
+# A candidate may be published as a line item only when its name came from one
+# of these. Never from the candidate ID, and never from a bare shape.
+
+#: The drawing's own printed text, harvested by ``text_anchor`` (24-01) — masked,
+#: contest-aware, and a recorded ABSENCE when there is none.
+NAME_SOURCE_TEXT_ANCHOR = "text_anchor"
+#: The cluster's OWN contained text, used only when no anchor record exists for
+#: this candidate at all (a hand-built bundle, or a sheet whose anchor pass
+#: failed). Still the drawing's printed text — never the ID, never the shape.
+NAME_SOURCE_CONTAINED_TEXT = "contained_text"
+#: A deterministic library / thickness bind (``naming_library``,
+#: ``naming_library_thickness``) — see ``_NAME_SOURCE_*`` above.
+#: A schedule row named the item. The string is the one ``_fuse_schedules``
+#: already emits, not a synonym for it — a declared set whose entries nothing
+#: produces is a set nobody can check.
+NAME_SOURCE_SCHEDULE_ROW = "schedule_table"
+#: The candidate's own identifier. Never publishable — this is the leak itself.
+NAME_SOURCE_CANDIDATE_ID = "candidate_id"
+
+#: ``text_anchor.KIND_TAG`` — an SP-6 paired two-token tag. Imported by VALUE
+#: rather than by name so this module keeps taking no dependency on
+#: ``vision -> deterministic.text_anchor``; the one-line indirection is checked
+#: by a test that fails if the two strings ever diverge.
+_ANCHOR_KIND_PAIRED_TAG = "tag"
+
+#: Every source from which a published line item may take its name.
+#:
+#: ``deterministic_geometry`` is here by the letter of 24-04's task-1 behaviour
+#: contract ("a symbol group with ... no deterministic geometry name ... produces
+#: NO component"), which preserves that branch. It is the one entry that names
+#: from geometry rather than from text, it is already unconditionally
+#: ``needs_review=True``, and it is measured to fire **zero** times across Crow
+#: pages 0 and 1. Recorded here as a declared set entry rather than left
+#: implicit, so removing it is one line and one decision, not an archaeology.
+NAME_WORTHY_SOURCES = frozenset(
+    {
+        NAME_SOURCE_TEXT_ANCHOR,
+        NAME_SOURCE_CONTAINED_TEXT,
+        _NAME_SOURCE_VISION,
+        _NAME_SOURCE_LIBRARY,
+        _NAME_SOURCE_WALL_THICKNESS,
+        NAME_SOURCE_SCHEDULE_ROW,
+        "deterministic_geometry",
+    }
+)
+
+# ── Stable machine reasons ───────────────────────────────────────────────────
+#
+# Each is a machine key; ``unnamed_geometry_record`` carries a human-readable
+# ``detail`` beside it, exactly as the C3a arbitration records do.
+
+#: A symbol group with no vision label, no library bind, no deterministic
+#: geometry name and no text anchor.
+UNNAMED_NO_NAME_SOURCE = "no_name_source"
+#: A wall thickness class neither a bind nor a label named.
+UNNAMED_WALL_CLASS_UNLABELED = "wall_class_unlabeled"
+#: A room candidate carrying no label at all.
+UNNAMED_ROOM_UNLABELED = "room_unlabeled"
+#: The only text on offer is entirely drafting noise — a gridline bubble digit,
+#: a dimension string, a sheet id. ONE key for both paths: it is the same rule,
+#: and the record's ``kind`` already says whether it fired on a symbol group or
+#: on a room. Two keys for one rule is two vocabularies for one idea.
+UNNAMED_LABEL_IS_DRAFTING_NOISE = "label_is_drafting_noise"
+#: A room label whose token count exceeds what a room name can structurally be.
+UNNAMED_ROOM_LABEL_TOKEN_RUN = "room_label_token_run"
+#: A room candidate drawn inside a masked schedule / title-block / legend region.
+UNNAMED_ROOM_LABEL_MASKED_ORIGIN = "room_label_from_masked_region"
+#: A room that cannot cite a bounding wall reference (V4-DET-03).
+UNNAMED_ROOM_NO_WALL_REFERENCE = "room_without_wall_reference"
+
+
+def is_name_worthy(name, source) -> bool:
+    """True when *name* may be published as a line item, given where it came from.
+
+    The source is an EXPLICIT argument and is never inferred by string-matching
+    the name against the candidate ID. Inference would pass a candidate whose
+    genuine anchor text happens to look like an identifier — Moxy prints
+    ``WC 01`` and ``PT 04`` as real material tags (24-01 measured 166 of them),
+    and a rule that rejected a name for *resembling* an ID would throw exactly
+    those away while still admitting any ID that happened not to match.
+
+    A blank name is never worthy however impeccable its source: an empty string
+    published as a line item reads as an unnamed row, which is the defect this
+    gate exists to close in a different costume.
+    """
+    if not str(name or "").strip():
+        return False
+    return str(source or "") in NAME_WORTHY_SOURCES
+
+
+def unnamed_geometry_record(
+    candidate_id,
+    quantity,
+    unit: str,
+    position,
+    evidence_texts,
+    reason: str,
+    kind: str,
+    detail: str = "",
+) -> dict:
+    """One measured-but-unidentified candidate, with everything a reviewer needs.
+
+    Field naming mirrors :func:`_reject_unknown_id` (``candidate_id`` /
+    ``reason``) and the C3a arbitration records (``detail``) so a reader moving
+    between the two audit lists is not learning a second vocabulary.
+
+    ``quantity`` is the whole point of the record and is preserved verbatim,
+    including ``None`` — which is INV-08's recorded absence of a measurement (no
+    scale bound), NOT a zero. ``evidence_texts`` may legitimately be empty: 81
+    of Crow's 107 symbol groups carry no contained text at all, and an empty
+    list is that finding, not a gap.
+    """
+    try:
+        pos = tuple(round(float(v), 3) for v in tuple(position)[:4]) if position else None
+    except (TypeError, ValueError):
+        pos = None
+    return {
+        "candidate_id": str(candidate_id or ""),
+        "kind": str(kind or ""),
+        "quantity": quantity,
+        "unit": str(unit or ""),
+        "position_pt": pos,
+        "evidence_texts": [str(t) for t in (evidence_texts or []) if str(t).strip()],
+        "reason": str(reason or ""),
+        "detail": str(detail or ""),
+    }
+
+
+def _anchor_for(bundle: dict, candidate_id: str) -> Optional[dict]:
+    """This candidate's 24-01 anchor record, or ``None`` when none was computed.
+
+    The distinction the callers depend on: a record that EXISTS with
+    ``anchor_text is None`` is a *recorded absence* — the anchor pass looked,
+    with masking and contest withdrawal applied, and found nothing. A record
+    that does not exist at all means the anchor pass never covered this
+    candidate (a hand-built bundle, or a sheet whose guarded anchor computation
+    failed), which is a different statement and must not be read as an absence.
+    """
+    anchors = bundle.get("candidate_anchors")
+    if not isinstance(anchors, dict):
+        return None
+    rec = anchors.get(candidate_id)
+    return rec if isinstance(rec, dict) else None
+
+
 def _grounded_labels(
     entries,
     id_key: str,
@@ -1121,6 +1299,11 @@ _DIMENSION_TOKEN_RE = re.compile(r"^\d{1,4}'?\s*-?\s*\d{0,2}\"?$")
 _SHEET_ID_RE = re.compile(r"^[A-Z]{1,3}-?\d{1,4}[A-Z]?$")
 # A single gridline bubble label: "1", "12", "H", "G".
 _GRID_LABEL_RE = re.compile(r"^[A-Z0-9]{1,3}$")
+# A two-sided SIZE CALLOUT written as one token: "14'-0\"x16'-0\"", "8'x10'".
+# Structural, not a fitted string: both sides of the separator must themselves
+# be feet-inch dimensions, so a product name like "6x6 Post" is untouched (its
+# second token is a word, and a cluster is noise only when EVERY token is).
+_SIZE_CALLOUT_SPLIT_RE = re.compile(r"\s*[xX×]\s*")
 
 
 def _is_noise_token(tok: str) -> bool:
@@ -1141,6 +1324,11 @@ def _is_noise_token(tok: str) -> bool:
         return True  # sheet reference id
     if _GRID_LABEL_RE.match(up):
         return True  # single gridline bubble label
+    parts = _SIZE_CALLOUT_SPLIT_RE.split(t)
+    if len(parts) > 1 and all(
+        p and _DIMENSION_TOKEN_RE.match(p) for p in parts
+    ):
+        return True  # a size callout ("14'-0\"x16'-0\"") — an opening, not an object
     return False
 
 
@@ -1166,12 +1354,20 @@ def _fuse_symbol_groups(
     labels_by_id: Dict[str, dict],
     components: List[dict],
     library_bindings: Optional[Dict[str, Tuple[str, str]]] = None,
+    unnamed: Optional[List[dict]] = None,
 ) -> None:
     """Symbol groups → EA components; count is ALWAYS the deterministic size.
 
     ``library_bindings`` maps ``candidate_id -> (object_name, hint)`` for
     clusters the naming library binds by ``binding_hint`` (columns / bollards);
     it fills an unlabeled cluster BEFORE the conservative geometry fallback.
+
+    ``unnamed`` is the sheet's unnamed-geometry ledger. A cluster no admissible
+    source names emits NO component and exactly one record here, carrying its
+    count. Omitting the list keeps the count from being published under a raw
+    candidate ID either way — the record is simply not retained, so a
+    single-purpose caller does not have to invent a list (the same convention
+    ``_fuse_wall_classes``' audit argument follows).
     """
     library_bindings = library_bindings or {}
     for group in bundle.get("symbol_groups") or []:
@@ -1184,7 +1380,10 @@ def _fuse_symbol_groups(
         entry = labels_by_id.get(cid)
         label = (entry or {}).get("label")
 
-        if entry and label and label != _UNKNOWN_LABEL:
+        # A vision answer that echoes our own handle for the candidate is not a
+        # label — it is the identifier arriving by a second route. It falls
+        # through to the naming ladder below rather than publishing (T-24-13).
+        if entry and label and label != _UNKNOWN_LABEL and str(label).strip() != cid:
             qty = _dedup_colocated_count(group, count) if _is_bollard_name(label) else count
             # Flag-don't-guess (§10): a columns/bollards label on a COLLINEAR
             # cluster is a coincidence — a dimension-tick strip whose count
@@ -1283,24 +1482,130 @@ def _fuse_symbol_groups(
             )
             continue
 
-        # A genuine unknown cluster → the deterministic count is STILL emitted
-        # (flag-don't-guess, never dropped), named by contained text or the
-        # candidate ID so distinct unknown groups stay distinguishable.
-        name = " / ".join(t for t in texts if t) or cid
-        components.append(
-            {
-                "name": name,
-                "quantity": count,
-                "unit": "EA",
-                "provenance": "geometry",
-                "confidence": "low",
-                "candidate_id": cid,
-                "needs_review": True,
-                "review_reason": (
-                    "vision label unknown" if entry else "no vision label for symbol group"
-                ),
-            }
-        )
+        # A genuine unknown cluster. The count is deterministic and is never
+        # lost — but the NAME must come from one of the three admissible
+        # sources (24-04). The last one left is the drawing's own printed text.
+        #
+        # The 24-01 anchor record is consulted FIRST, because it is the answer
+        # computed with masking and contested-unit withdrawal applied: a word
+        # inside a schedule table or a title block can never be an anchor, and a
+        # word that is the nearest text for two candidates anchors neither. Only
+        # when NO anchor record exists for this candidate at all does the
+        # cluster's own ``contained_texts`` stand in — a record that exists and
+        # says ``anchor_text is None`` is a recorded absence and wins.
+        #
+        # **Harvesting an anchor and PUBLISHING it are different decisions.**
+        # 24-01 deliberately harvests unfiltered — its own docstring reserves
+        # the publishability question for this plan — because the drafting-noise
+        # predicate returns True for ``B-1`` and ``P1``, precisely the printed
+        # tags an anchor exists to find. But a *loose nearest word* is not a
+        # printed tag: measured on Crow page 0, the unfiltered anchor branch
+        # publishes EA line items named ``12``, ``DWG``, ``1/A-112`` and
+        # ``14'-0"x16'-0"`` — a gridline bubble, a drafting abbreviation, a
+        # detail reference and a door size, none of them objects.
+        #
+        # The split is by anchor KIND, which 24-01 already records, so genuine
+        # tags survive by evidence rather than by luck: an SP-6 paired two-token
+        # tag (``WC 01``, ``PT 04`` — 24-01 measured 166 on Moxy) is an
+        # identifier the drawing itself formed by pairing, and it publishes. A
+        # loose word must clear the drafting-noise predicate first.
+        anchor = _anchor_for(bundle, cid)
+        name = ""
+        name_source = ""
+        anchor_kind = ""
+        anchor_fields: Dict[str, object] = {}
+        if anchor is not None:
+            anchor_text = anchor.get("anchor_text")
+            if anchor_text:
+                name = str(anchor_text)
+                name_source = NAME_SOURCE_TEXT_ANCHOR
+                anchor_kind = str(anchor.get("anchor_kind") or "")
+                anchor_fields = {
+                    "anchor_text": name,
+                    "anchor_kind": anchor.get("anchor_kind"),
+                    "anchor_dist_pt": anchor.get("anchor_dist_pt"),
+                    "anchor_source": anchor.get("anchor_source"),
+                }
+        elif texts:
+            name = " / ".join(str(t) for t in texts if t)
+            name_source = NAME_SOURCE_CONTAINED_TEXT
+
+        if (
+            name
+            and anchor_kind != _ANCHOR_KIND_PAIRED_TAG
+            and _is_noise_cluster([name])
+        ):
+            if unnamed is not None:
+                unnamed.append(
+                    unnamed_geometry_record(
+                        candidate_id=cid,
+                        quantity=count,
+                        unit="EA",
+                        position=_field(group, "representative_bbox_pt", ()) or (),
+                        evidence_texts=[name] + [str(t) for t in texts if t],
+                        reason=UNNAMED_LABEL_IS_DRAFTING_NOISE,
+                        kind="symbol_group",
+                        detail=(
+                            "%d repeated marks were measured; the only text "
+                            "identifying them is %r, which is drafting noise "
+                            "(a gridline bubble, a dimension string, a sheet or "
+                            "detail reference) and not the name of an object"
+                            % (count, name)
+                        ),
+                    )
+                )
+            continue
+
+        if not is_name_worthy(name, name_source):
+            # Nothing the drawing printed identifies this geometry. It is
+            # measured, it is real, and it is unidentified — so it goes to the
+            # ledger with its count, NOT to the take-off under our own handle
+            # for it (T-24-13). Deleting it instead would be T-24-14.
+            if unnamed is not None:
+                unnamed.append(
+                    unnamed_geometry_record(
+                        candidate_id=cid,
+                        quantity=count,
+                        unit="EA",
+                        position=_field(group, "representative_bbox_pt", ()) or (),
+                        evidence_texts=texts,
+                        reason=UNNAMED_NO_NAME_SOURCE,
+                        kind="symbol_group",
+                        detail=(
+                            "%d repeated marks were measured, but no vision "
+                            "label, no naming-library bind, no deterministic "
+                            "geometry name and no text anchor identifies them; "
+                            "%s"
+                            % (
+                                count,
+                                "the anchor pass recorded no plan text within "
+                                "reach"
+                                if anchor is not None
+                                else "no text anchor was computed for this "
+                                "candidate and the cluster contains no text",
+                            )
+                        ),
+                    )
+                )
+            continue
+
+        component = {
+            "name": name,
+            "quantity": count,
+            "unit": "EA",
+            "provenance": "geometry",
+            "confidence": "low",
+            "candidate_id": cid,
+            "name_source": name_source,
+            "needs_review": True,
+            "review_reason": (
+                "named from the drawing's own text (%s); no vision label, "
+                "library bind or deterministic geometry name — verify"
+                % name_source
+            ),
+        }
+        component.update(anchor_fields)
+        components.append(component)
 
 
 # ── Naming-library-driven wall-class → wall-object mapping ───────────────────
@@ -1597,6 +1902,7 @@ def _fuse_wall_classes(
         Dict[str, Tuple[str, Optional[str], bool, Optional[float]]]
     ] = None,
     rejected: Optional[List[dict]] = None,
+    unnamed: Optional[List[dict]] = None,
 ) -> None:
     """Wall thickness classes → LF, or SF when the name is a wall_area object.
 
@@ -1637,10 +1943,18 @@ def _fuse_wall_classes(
             make (Phase 23 C3a precedent). Omitting it keeps the behaviour
             identical minus the audit record, so a single-purpose caller does
             not have to invent a list.
+        unnamed: The sheet's unnamed-geometry ledger (24-04). A class neither a
+            bind nor a label named emits NO component and one record here
+            carrying its LF. Omitting the list keeps the class out of the
+            take-off either way — the record is simply not retained.
     """
     vocab_map = vocab_map or {}
     library_wall_map = library_wall_map or {}
     lf_by_class = bundle.get("wall_lf_by_class") or {}
+    # Where each class's linework sits, so an unnamed-geometry record can say
+    # WHERE the LF it carries was measured. Reuses the registry's own rule
+    # rather than a second bbox derivation.
+    wall_boxes = _walls_bbox_by_class(bundle.get("walls") or [])
     # The class's own LF-weighted mean thickness, so the audit record can show
     # the reviewer WHY the deterministic side won without re-deriving it.
     thickness_by_class = _wall_thickness_in_by_class(bundle)
@@ -1835,18 +2149,30 @@ def _fuse_wall_classes(
                 }
             )
         else:
-            components.append(
-                {
-                    "name": cid,
-                    "quantity": round(float(lf), 1),
-                    "unit": "LF",
-                    "provenance": "geometry",
-                    "confidence": "low",
-                    "candidate_id": cid,
-                    "needs_review": True,
-                    "review_reason": "unlabeled wall thickness class",
-                }
-            )
+            # Neither a printed-thickness bind nor a vision label named this
+            # class (24-02's inverted precedence means this branch is reached
+            # only when BOTH are absent). Publishing it as ``WALL-TC4`` put our
+            # own handle for a piece of linework into the client's take-off as
+            # the name of a thing to price. The LF is measured and is preserved
+            # in the ledger; only the identity is unknown (24-04, T-24-13).
+            if unnamed is not None:
+                unnamed.append(
+                    unnamed_geometry_record(
+                        candidate_id=cid,
+                        quantity=round(float(lf), 1),
+                        unit="LF",
+                        position=wall_boxes.get(cid) or (),
+                        evidence_texts=(),
+                        reason=UNNAMED_WALL_CLASS_UNLABELED,
+                        kind="wall_class",
+                        detail=(
+                            "%.1f LF of wall linework was measured in this "
+                            "thickness class, but no printed-thickness match "
+                            "and no vision label identifies what the wall is"
+                            % round(float(lf), 1)
+                        ),
+                    )
+                )
 
 
 def _item_not_measured(bundle: dict, info: dict, reason: str = "") -> None:
@@ -3749,8 +4075,11 @@ def fuse_sheet(
     Returns:
         Extraction dict mirroring the analyze_drawing result shape:
         ``components`` (every one with ``provenance``/``needs_review``),
-        ``fusion_rejected`` audit list, ``main_plan_region`` (when validly
-        answered) and the standard underscore metadata fields.
+        ``fusion_rejected`` audit list, :data:`UNNAMED_GEOMETRY_KEY` — every
+        candidate measured but not identified, carrying its quantity, unit,
+        position, contained text and the named reason naming failed (24-04) —
+        ``main_plan_region`` (when validly answered) and the standard
+        underscore metadata fields.
     """
     vision_labels = vision_labels or {}
     if registry is None:
@@ -3758,6 +4087,10 @@ def fuse_sheet(
 
     components: List[dict] = []
     rejected: List[dict] = []
+    # The unnamed-geometry ledger (24-04). Its own list and its own result key:
+    # these records are neither vision-answer rejections nor coverage gaps, and
+    # folding them into either list would make an existing consumer act on them.
+    unnamed: List[dict] = []
 
     symbol_labels = _grounded_labels(
         vision_labels.get("matches"), "symbol_id", "matches", registry, rejected
@@ -3789,7 +4122,8 @@ def fuse_sheet(
     )
 
     _fuse_symbol_groups(
-        deterministic_bundle, symbol_labels, components, library_bindings
+        deterministic_bundle, symbol_labels, components, library_bindings,
+        unnamed=unnamed,
     )
     _fuse_wall_classes(
         deterministic_bundle,
@@ -3802,6 +4136,7 @@ def fuse_sheet(
         # The sheet's ONE audit list — a precedence override is appended to the
         # same trail as every other fusion rejection, never a second list.
         rejected=rejected,
+        unnamed=unnamed,
     )
     _fuse_project_area_items(deterministic_bundle, vocabulary, components)
     _fuse_room_fills(
@@ -3855,6 +4190,10 @@ def fuse_sheet(
     result: dict = {
         "components": components,
         "fusion_rejected": rejected,
+        # Measured-but-unidentified candidates (24-04). An ADDITIVE top-level
+        # key, following the module's existing convention: nothing above is
+        # renamed, and a consumer that does not know about it is unaffected.
+        UNNAMED_GEOMETRY_KEY: unnamed,
         "_pass_type": "fusion",
         "_source_sheet": deterministic_bundle.get("sheet_name", ""),
         "_tokens_in": vision_labels.get("_tokens_in", 0),
@@ -3876,5 +4215,13 @@ def fuse_sheet(
             result["_source_sheet"],
             len(rejected),
             ", ".join(sorted({str(r.get("reason")) for r in rejected})),
+        )
+    if unnamed:
+        logger.info(
+            "fuse_sheet[%s]: %d measured candidate(s) unidentified — ledgered, "
+            "not published (%s)",
+            result["_source_sheet"],
+            len(unnamed),
+            ", ".join(sorted({str(u.get("reason")) for u in unnamed})),
         )
     return result

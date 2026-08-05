@@ -92,8 +92,16 @@ def test_unknown_symbol_label_never_emits_the_sentinel_as_a_named_item():
 
     names = [c["name"] for c in fused["components"]]
     assert "unknown" not in [n.lower() for n in names]
-    sym = [c for c in fused["components"] if c.get("candidate_id") == "SYM-9"][0]
-    assert sym["needs_review"] is True
+    # Plan 24-04: nor is the candidate ID emitted as a substitute name. The
+    # group carries no text of its own and no anchor, so nothing the drawing
+    # printed identifies it — it is ledgered, and the assertion above is not
+    # left vacuously true by the row having vanished.
+    assert [c for c in fused["components"] if c.get("candidate_id") == "SYM-9"] == []
+    led = [r for r in fused["unnamed_geometry"] if r["candidate_id"] == "SYM-9"]
+    assert len(led) == 1
+    assert led[0]["quantity"] == 5                   # the deterministic count
+    assert led[0]["unit"] == "EA"
+    assert "unknown" not in str(led[0]["evidence_texts"]).lower()
 
 
 # ---------------------------------------------------------------------------

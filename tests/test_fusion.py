@@ -331,13 +331,24 @@ def test_fuse_symbol_quantity_equals_group_count_exactly():
     assert col["needs_review"] is False
 
 
-def test_fuse_unknown_label_keeps_deterministic_count_flagged():
-    by_id = _by_candidate(_fused())
-    unknown = by_id["SYM-2"]
-    assert unknown["quantity"] == 28  # deterministic count preserved
-    assert unknown["needs_review"] is True
-    assert unknown["provenance"] == "geometry"
-    assert unknown["confidence"] == "low"
+def test_fuse_unknown_label_keeps_deterministic_count_in_the_ledger():
+    """The deterministic count is still preserved — 24-04 moved WHERE.
+
+    This test used to assert that ``SYM-2`` published as a component named
+    ``SYM-2``.  Plan 24-04 abolished that: a raw candidate ID is never a line
+    item.  The half that must NOT change is the count, so both halves are
+    asserted here together — nothing published under our own handle for it, and
+    nothing lost (T-24-13 with T-24-14).
+    """
+    result = _fused()
+    by_id = _by_candidate(result)
+    assert "SYM-2" not in by_id                       # never a line item
+    led = [r for r in result["unnamed_geometry"] if r["candidate_id"] == "SYM-2"]
+    assert len(led) == 1
+    assert led[0]["quantity"] == 28                   # deterministic count preserved
+    assert led[0]["unit"] == "EA"
+    assert led[0]["kind"] == "symbol_group"
+    assert led[0]["reason"] == "no_name_source"
 
 
 def test_fuse_out_of_registry_id_rejected():
@@ -358,10 +369,16 @@ def test_fuse_wall_classes_labeled_and_unlabeled():
     assert cmu["quantity"] == 2204.4  # LF from geometry, never from vision
     assert cmu["unit"] == "LF"
     assert cmu["provenance"] == "geometry"
-    unlabeled = by_id["WALL-TC2"]
-    assert unlabeled["name"] == "WALL-TC2"  # class id as name
-    assert unlabeled["quantity"] == 310.0
-    assert unlabeled["needs_review"] is True
+    # The unlabeled class used to publish as a line item named "WALL-TC2".
+    # 24-04: it is ledgered with its LF instead — measured, unidentified, and
+    # never a row the client is asked to price under our own handle for it.
+    result = _fused()
+    assert "WALL-TC2" not in _by_candidate(result)
+    led = [r for r in result["unnamed_geometry"] if r["candidate_id"] == "WALL-TC2"]
+    assert len(led) == 1
+    assert led[0]["quantity"] == 310.0                # the LF is not lost
+    assert led[0]["unit"] == "LF"
+    assert led[0]["reason"] == "wall_class_unlabeled"
 
 
 def test_fuse_rooms_vision_fallback_only_for_unlabeled():
@@ -2847,7 +2864,7 @@ def _wall_labels(mapping):
 
 def _emit_wall_classes(
     bundle=None, labels=None, vocabulary=None, wall_height_ft=None,
-    wall_height_source="plan", rejected=None,
+    wall_height_source="plan", rejected=None, unnamed=None,
 ):
     """Run the wall-class fusion path over one bundle, returning its rows."""
     bundle = bundle if bundle is not None else _precedence_bundle()
@@ -2870,7 +2887,8 @@ def _emit_wall_classes(
             _wall_thickness_in_by_class(bundle),
             vocabulary,
         ),
-        **({"rejected": rejected} if rejected is not None else {})
+        **({"rejected": rejected} if rejected is not None else {}),
+        **({"unnamed": unnamed} if unnamed is not None else {}),
     )
     return {c["candidate_id"]: c for c in components}
 
@@ -2997,15 +3015,25 @@ def test_a_hint_bind_names_the_class_when_vision_is_silent_and_stays_flagged():
 # ── Behaviour 5: no bind and no label reaches the unlabeled branch ──────────
 
 
-def test_no_bind_and_no_label_still_reaches_the_unlabeled_branch():
-    """Plan 24-04 owns this branch; 24-02 must leave it exactly as it was."""
-    row = _emit_wall_classes(vocabulary=[], labels={})["WALL-TC1"]
-    assert row["name"] == "WALL-TC1"
-    assert row["unit"] == "LF"
-    assert row["confidence"] == "low"
-    assert row["needs_review"] is True
-    assert row["review_reason"] == "unlabeled wall thickness class"
-    assert "name_source" not in row
+def test_no_bind_and_no_label_reaches_the_unnamed_geometry_ledger():
+    """24-02 left this branch exactly as it was and handed it to 24-04, which
+    replaced the ``"name": cid`` emit with a ledger record.
+
+    The branch is still REACHED — that is 24-02's claim and it is unchanged —
+    and the LF it carries is still measured.  What changed is that the class no
+    longer publishes as a line item named ``WALL-TC1``.
+    """
+    unnamed = []
+    rows = _emit_wall_classes(vocabulary=[], labels={}, unnamed=unnamed)
+    assert "WALL-TC1" not in rows                     # not a line item
+    recs = [r for r in unnamed if r["candidate_id"] == "WALL-TC1"]
+    assert len(recs) == 1                             # but reached, and recorded
+    rec = recs[0]
+    assert rec["kind"] == "wall_class"
+    assert rec["unit"] == "LF"
+    assert rec["quantity"] > 0                        # the measured LF survives
+    assert rec["reason"] == "wall_class_unlabeled"
+    assert "no printed-thickness match" in rec["detail"]
 
 
 # ── The masonry / dominant-class guard, re-asserted AFTER the inversion ─────
@@ -3396,3 +3424,435 @@ def test_the_two_recorded_runs_really_did_differ_in_the_naming_layer():
         "the two saved paid runs published identical name sets — the F1/F3 "
         "variance Phase 24 exists to kill is not in this evidence"
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 24-04 — THE UNNAMED-GEOMETRY CONTRACT: a raw candidate ID is never a line item
+#
+# Three loci did ``name = <label> or <candidate_id>`` and the handle flowed
+# unmodified into ``calculated_takeoff[].description`` and
+# ``takeoff_summary[].item``.  Measured on the real Crow page 0 before this
+# landed: **41 of 45 published components were named with their own candidate
+# ID** — ``SYM-1`` at 136 EA, ``SYM-2`` at 56 EA, thirteen ``WALL-TC*`` classes
+# — beside one room named ``4`` and one named by a 19-token text harvest.
+#
+# The contract has TWO halves and every test below asserts both, because
+# satisfying either alone is a defect: publishing an identifier is T-24-13, and
+# deleting the row instead of relocating it is T-24-14, which is worse.
+# ═══════════════════════════════════════════════════════════════════════════
+
+from bobbytailor.vision.fusion import (  # noqa: E402
+    NAME_WORTHY_SOURCES,
+    UNNAMED_GEOMETRY_KEY,
+    UNNAMED_NO_NAME_SOURCE,
+    UNNAMED_WALL_CLASS_UNLABELED,
+    is_name_worthy,
+    unnamed_geometry_record,
+)
+
+
+def _ledger(result):
+    return result.get(UNNAMED_GEOMETRY_KEY) or []
+
+
+def _anchor(cid, text, kind="nearest_word", dist=12.0, source="page_words"):
+    """A 24-01 anchor record.  ``text=None`` is the RECORDED ABSENCE."""
+    return {
+        "candidate_id": cid,
+        "anchor_text": text,
+        "anchor_kind": None if text is None else kind,
+        "anchor_dist_pt": None if text is None else dist,
+        "anchor_source": None if text is None else source,
+        "ambiguity_reason": "",
+    }
+
+
+# ── The record and the gate ──────────────────────────────────────────────────
+
+
+def test_unnamed_geometry_key_is_its_own_key_not_an_overload():
+    """Phase 23's C3a reinstatement keys on the suppression records in
+    ``fusion_rejected``; a coverage ledger's invariant is one row per source
+    page.  A measured-but-unidentified candidate is a THIRD thing (T-24-16)."""
+    assert UNNAMED_GEOMETRY_KEY == "unnamed_geometry"
+    assert UNNAMED_GEOMETRY_KEY not in {"fusion_rejected", "coverage_ledger"}
+    result = fuse_sheet({"sheet_name": "S1"}, {})
+    assert UNNAMED_GEOMETRY_KEY in result
+    assert result[UNNAMED_GEOMETRY_KEY] == []
+    assert result["fusion_rejected"] == []
+
+
+def test_unnamed_geometry_record_carries_the_whole_evidence():
+    rec = unnamed_geometry_record(
+        candidate_id="SYM-9",
+        quantity=14,
+        unit="EA",
+        position=(10.0, 20.0, 30.0, 40.0),
+        evidence_texts=["", "  ", "P1"],
+        reason=UNNAMED_NO_NAME_SOURCE,
+        kind="symbol_group",
+        detail="nothing identifies these marks",
+    )
+    assert rec["candidate_id"] == "SYM-9"
+    assert rec["kind"] == "symbol_group"
+    assert rec["quantity"] == 14
+    assert rec["unit"] == "EA"
+    assert rec["position_pt"] == (10.0, 20.0, 30.0, 40.0)
+    assert rec["evidence_texts"] == ["P1"]          # blanks are not evidence
+    assert rec["reason"] == UNNAMED_NO_NAME_SOURCE  # stable machine key
+    assert rec["detail"]                            # human-readable, beside it
+    # The vocabulary a reader already knows from `_reject_unknown_id`.
+    assert {"candidate_id", "reason"} <= set(rec)
+    json.dumps(rec)                                 # survives into takeoff.json
+
+
+def test_unnamed_geometry_record_keeps_a_none_quantity_as_an_absence():
+    """INV-08: a blank is never a zero.  A room with no scale bound has no
+    measured SF, and the ledger must say so rather than record 0."""
+    rec = unnamed_geometry_record(
+        "ROOM-3", None, "SF", None, (), UNNAMED_NO_NAME_SOURCE, "room"
+    )
+    assert rec["quantity"] is None
+    assert rec["position_pt"] is None
+
+
+def test_is_name_worthy_takes_the_source_explicitly_never_by_resemblance():
+    """Inferring the source by matching the name against the candidate ID
+    would throw away Moxy's genuine ``WC 01`` / ``PT 04`` material tags (24-01
+    measured 166 of them) while still admitting any ID that did not match."""
+    assert is_name_worthy("Bollards", "text_anchor") is True
+    assert is_name_worthy("Bollards", "candidate_id") is False
+    # A name that LOOKS like an identifier but came from the drawing's own text
+    # is publishable; the same string from the ID route is not.
+    assert is_name_worthy("B-1", "text_anchor") is True
+    assert is_name_worthy("SYM-1", "text_anchor") is True
+    assert is_name_worthy("SYM-1", "candidate_id") is False
+    # A blank is never worthy however impeccable its source.
+    assert is_name_worthy("", "text_anchor") is False
+    assert is_name_worthy("   ", "naming_library") is False
+    assert is_name_worthy(None, "text_anchor") is False
+
+
+def test_the_name_worthy_sources_are_a_closed_declared_set():
+    """Exactly the admissible naming routes — text the drawing printed, a
+    deterministic library / thickness bind, or a schedule row.  If a new
+    publication path appears, it must be declared here or its rows cannot
+    publish, which is the intended alarm."""
+    assert NAME_WORTHY_SOURCES == frozenset(
+        {
+            "text_anchor",
+            "contained_text",
+            "vision",
+            "naming_library",
+            "naming_library_thickness",
+            "schedule_table",
+            "deterministic_geometry",
+        }
+    )
+    assert "candidate_id" not in NAME_WORTHY_SOURCES
+
+
+# ── Symbol groups: the :1255 leak site ───────────────────────────────────────
+
+
+def test_unnamed_geometry_symbol_group_with_no_name_source_is_ledgered():
+    """No vision label, no library bind, no deterministic geometry name and a
+    RECORDED ABSENCE of a text anchor → no component, exactly one record."""
+    group = _sym_group("SYM-9", 14, _grid(7, 2), texts=[])
+    bundle = {
+        "symbol_groups": [group],
+        "sheet_name": "S1",
+        "candidate_anchors": {"SYM-9": _anchor("SYM-9", None)},
+    }
+    result = fuse_sheet(bundle, {"matches": []})
+
+    assert result["components"] == []               # nothing published
+    led = _ledger(result)
+    assert len(led) == 1                            # and exactly one record
+    rec = led[0]
+    assert rec["candidate_id"] == "SYM-9"
+    assert rec["kind"] == "symbol_group"
+    assert rec["quantity"] == 14                    # THE COUNT IS NOT LOST
+    assert rec["unit"] == "EA"
+    assert rec["position_pt"] is not None
+    assert rec["evidence_texts"] == []              # 81 of Crow's 107 groups
+    assert rec["reason"] == UNNAMED_NO_NAME_SOURCE
+    assert rec["detail"]
+
+
+def test_unnamed_geometry_symbol_group_with_a_text_anchor_is_named_and_published():
+    """The other half: an anchored candidate publishes, named from the words
+    the drawing itself printed beside it, with the anchor kept on the row so
+    the naming is traceable."""
+    group = _sym_group("SYM-9", 14, _grid(7, 2), texts=[])
+    bundle = {
+        "symbol_groups": [group],
+        "sheet_name": "S1",
+        "candidate_anchors": {
+            "SYM-9": _anchor("SYM-9", "DOCK BUMPER", kind="contained", dist=0.0)
+        },
+    }
+    result = fuse_sheet(bundle, {"matches": []})
+
+    assert _ledger(result) == []
+    comp = result["components"][0]
+    assert comp["name"] == "DOCK BUMPER"
+    assert comp["quantity"] == 14
+    assert comp["candidate_id"] == "SYM-9"
+    assert comp["name_source"] == "text_anchor"
+    assert comp["anchor_kind"] == "contained"
+    assert comp["anchor_dist_pt"] == 0.0
+    assert comp["anchor_source"] == "page_words"
+    assert comp["needs_review"] is True             # no model confirmed it
+
+
+def test_unnamed_geometry_a_recorded_absence_outranks_the_clusters_own_text():
+    """An anchor record that EXISTS and says ``anchor_text is None`` is the
+    masked, contest-aware answer: the text sat in a schedule table, or it was
+    the nearest text for two candidates and anchored neither.  It wins over a
+    raw contained-text harvest."""
+    group = _sym_group("SYM-9", 14, _grid(7, 2), texts=["PUMP"])
+    bundle = {
+        "symbol_groups": [group],
+        "sheet_name": "S1",
+        "candidate_anchors": {"SYM-9": _anchor("SYM-9", None)},
+    }
+    result = fuse_sheet(bundle, {"matches": []})
+    assert result["components"] == []
+    assert _ledger(result)[0]["evidence_texts"] == ["PUMP"]   # kept as evidence
+
+
+def test_unnamed_geometry_no_anchor_record_at_all_falls_back_to_contained_text():
+    """A bundle whose anchor pass never covered this candidate is a different
+    statement from a recorded absence.  The cluster's own printed text then
+    stands in — still the drawing's text, never the ID and never the shape."""
+    group = _sym_group("SYM-9", 4, _grid(2, 2), texts=["PUMP"])
+    result = fuse_sheet({"symbol_groups": [group], "sheet_name": "S1"}, {"matches": []})
+    comp = result["components"][0]
+    assert comp["name"] == "PUMP"
+    assert comp["name_source"] == "contained_text"
+    assert _ledger(result) == []
+
+
+def test_unnamed_geometry_a_vision_answer_echoing_the_candidate_id_is_not_a_name():
+    """The identifier arriving by a second route is still the identifier."""
+    group = _sym_group("SYM-9", 14, _grid(7, 2), texts=[])
+    bundle = {
+        "symbol_groups": [group],
+        "sheet_name": "S1",
+        "candidate_anchors": {"SYM-9": _anchor("SYM-9", None)},
+    }
+    result = fuse_sheet(
+        bundle, {"matches": [{"symbol_id": "SYM-9", "label": "SYM-9"}]}
+    )
+    assert result["components"] == []
+    assert len(_ledger(result)) == 1
+
+
+def test_unnamed_geometry_a_pure_noise_cluster_is_still_dropped_not_ledgered():
+    """A cluster of gridline bubbles was never an object, so it is not
+    unidentified geometry — it is not geometry anyone measures.  The existing
+    drop stays exactly as it was."""
+    noise = _sym_group("SYM-1", 6, _grid(3, 2), texts=["1", "2", "3", "4"])
+    result = fuse_sheet({"symbol_groups": [noise], "sheet_name": "S1"}, {"matches": []})
+    assert result["components"] == []
+    assert _ledger(result) == []
+
+
+def test_unnamed_geometry_a_library_bind_still_publishes():
+    group = _sym_group("SYM-1", 132, _grid(12, 11))
+    bundle = {
+        "symbol_groups": [group],
+        "sheet_name": "S1",
+        "candidate_anchors": {"SYM-1": _anchor("SYM-1", None)},
+    }
+    vocabulary = [
+        {"name": "Columns", "binding_hint": "structural_grid_symbol", "basis": "count"}
+    ]
+    result = fuse_sheet(bundle, {"matches": []}, vocabulary=vocabulary)
+    assert [c["name"] for c in result["components"]] == ["Columns"]
+    assert _ledger(result) == []
+
+
+def test_unnamed_geometry_a_schedule_row_still_publishes():
+    """A schedule row is one of the three admissible naming sources, and its
+    rows are unaffected by the gate."""
+    bundle = {
+        "sheet_name": "S1",
+        "schedules": [
+            {
+                "kind": "door",
+                "confidence": "high",
+                "rows": [{"TYPE": "Hollow Metal Door", "QTY": "12", "UNIT": "EA"}],
+            }
+        ],
+    }
+    result = fuse_sheet(bundle, {})
+    names = [c["name"] for c in result["components"]]
+    assert "Hollow Metal Door" in names
+    assert _ledger(result) == []
+
+
+# ── Wall thickness classes: the :1633 leak site ──────────────────────────────
+
+
+def test_unnamed_geometry_unlabeled_wall_class_is_ledgered_with_its_lf():
+    """24-02's inverted precedence means this branch is reached only when
+    NEITHER a printed-thickness bind NOR a vision label exists."""
+    bundle = {
+        "sheet_name": "S1",
+        "wall_lf_by_class": {"TC4": 412.5},
+        "walls": [
+            {
+                "thickness_class": "TC4",
+                "thickness_pt": 1.2,
+                "length_pt": 300.0,
+                "centerline_pt": [(100.0, 200.0), (400.0, 200.0)],
+            }
+        ],
+        "fpp": 0.5,
+    }
+    result = fuse_sheet(bundle, {})
+    assert [c for c in result["components"] if c["candidate_id"] == "WALL-TC4"] == []
+    led = [r for r in _ledger(result) if r["candidate_id"] == "WALL-TC4"]
+    assert len(led) == 1
+    rec = led[0]
+    assert rec["kind"] == "wall_class"
+    assert rec["quantity"] == 412.5                 # THE LF IS NOT LOST
+    assert rec["unit"] == "LF"
+    assert rec["position_pt"] == (100.0, 200.0, 400.0, 200.0)
+    assert rec["reason"] == UNNAMED_WALL_CLASS_UNLABELED
+
+
+def test_unnamed_geometry_a_labeled_wall_class_still_publishes():
+    bundle = {
+        "sheet_name": "S1",
+        "wall_lf_by_class": {"TC4": 412.5},
+        "walls": [
+            {
+                "thickness_class": "TC4",
+                "thickness_pt": 1.2,
+                "length_pt": 300.0,
+                "centerline_pt": [(100.0, 200.0), (400.0, 200.0)],
+            }
+        ],
+        "fpp": 0.5,
+    }
+    labels = {
+        "wall_class_labels": [
+            {"wall_class_id": "WALL-TC4", "label": "CMU Wall", "confidence": "high"}
+        ]
+    }
+    result = fuse_sheet(bundle, labels)
+    rows = [c for c in result["components"] if c["candidate_id"] == "WALL-TC4"]
+    assert [r["name"] for r in rows] == ["CMU Wall"]
+    assert _ledger(result) == []
+
+
+# ── The invariant the whole plan exists for ──────────────────────────────────
+
+
+def test_unnamed_geometry_the_rejection_audit_list_is_untouched(monkeypatch):
+    """T-24-16: the C3a reinstatement logic keys on the suppression records in
+    the vision-answer audit list.  This gate must add NOTHING to it."""
+    bundle = {
+        "symbol_groups": [_sym_group("SYM-9", 14, _grid(7, 2))],
+        "wall_lf_by_class": {"TC4": 412.5},
+        "walls": [
+            {
+                "thickness_class": "TC4",
+                "thickness_pt": 1.2,
+                "length_pt": 300.0,
+                "centerline_pt": [(100.0, 200.0), (400.0, 200.0)],
+            }
+        ],
+        "sheet_name": "S1",
+        "fpp": 0.5,
+        "candidate_anchors": {"SYM-9": _anchor("SYM-9", None)},
+    }
+    result = fuse_sheet(bundle, {})
+    assert len(_ledger(result)) == 2                # both candidates ledgered
+    assert result["fusion_rejected"] == []          # and NOTHING was rejected
+
+
+# ── Harvesting an anchor and PUBLISHING it are different decisions ───────────
+#
+# 24-01 harvests unfiltered on purpose and its own docstring reserves the
+# publishability question for this plan.  Measured on the real Crow page 0, the
+# unfiltered anchor branch published EA line items named `12`, `DWG`,
+# `1/A-112` and `14'-0"x16'-0"` — a gridline bubble, a drafting abbreviation, a
+# detail reference and a door size.  The must-have is explicit: a drafting-noise
+# token is not a name, on the SYMBOL path as well as the room path.
+
+
+def test_name_plausibility_a_drafting_noise_anchor_never_names_a_symbol_group():
+    for noise_text in ("12", "DWG", "1/A-112", "14'-0\"x16'-0\"", "A-101", "TYP"):
+        group = _sym_group("SYM-9", 14, _grid(7, 2), texts=[])
+        bundle = {
+            "symbol_groups": [group],
+            "sheet_name": "S1",
+            "candidate_anchors": {
+                "SYM-9": _anchor("SYM-9", noise_text, kind="nearest_word")
+            },
+        }
+        result = fuse_sheet(bundle, {"matches": []})
+        assert result["components"] == [], "published a line item named %r" % noise_text
+        rec = _ledger(result)[0]
+        assert rec["reason"] == "label_is_drafting_noise"
+        assert rec["quantity"] == 14                  # the count still survives
+        assert noise_text in rec["evidence_texts"]    # and so does the evidence
+
+
+def test_name_plausibility_a_paired_two_token_tag_still_names_a_symbol_group():
+    """The rule that must NOT fire.  An SP-6 paired tag is an identifier the
+    drawing itself formed by pairing two tokens — Moxy prints 166 of them
+    (`WC 01`, `PT 04`, `WD 01`).  They survive by anchor KIND, on evidence,
+    not by luck: every one of these is drafting noise to the token predicate.
+    """
+    for tag in ("WC 01", "PT 04", "WD 01"):
+        group = _sym_group("SYM-9", 14, _grid(7, 2), texts=[])
+        bundle = {
+            "symbol_groups": [group],
+            "sheet_name": "S1",
+            "candidate_anchors": {
+                "SYM-9": _anchor("SYM-9", tag, kind="tag", source="tag_pairing")
+            },
+        }
+        result = fuse_sheet(bundle, {"matches": []})
+        assert [c["name"] for c in result["components"]] == [tag]
+        assert _ledger(result) == []
+
+
+def test_name_plausibility_a_real_word_anchor_still_names_a_symbol_group():
+    group = _sym_group("SYM-9", 14, _grid(7, 2), texts=[])
+    bundle = {
+        "symbol_groups": [group],
+        "sheet_name": "S1",
+        "candidate_anchors": {"SYM-9": _anchor("SYM-9", "DOCK BUMPER")},
+    }
+    result = fuse_sheet(bundle, {"matches": []})
+    assert [c["name"] for c in result["components"]] == ["DOCK BUMPER"]
+
+
+def test_the_paired_tag_anchor_kind_string_has_not_drifted():
+    """The gate above splits on ``anchor_kind == "tag"``.  If ``text_anchor``
+    ever renames that rung, this gate would silently start rejecting every
+    genuine printed tag, so the two strings are pinned together."""
+    from bobbytailor.deterministic.text_anchor import KIND_TAG
+    from bobbytailor.vision.fusion import _ANCHOR_KIND_PAIRED_TAG
+
+    assert _ANCHOR_KIND_PAIRED_TAG == KIND_TAG
+
+
+def test_a_size_callout_is_drafting_noise_but_a_product_name_is_not():
+    """Structural, not a fitted string: BOTH sides of the separator must be
+    feet-inch dimensions.  A cluster is noise only when EVERY token is, so a
+    real product name survives."""
+    from bobbytailor.vision.fusion import _is_noise_cluster, _is_noise_token
+
+    assert _is_noise_token("14'-0\"x16'-0\"") is True
+    assert _is_noise_token("8'x10'") is True
+    assert _is_noise_token("6x6") is True
+    assert _is_noise_token("Bollard") is False
+    assert _is_noise_cluster(["6x6", "POST"]) is False      # a real object
+    assert _is_noise_cluster(["14'-0\"x16'-0\""]) is True   # an opening size

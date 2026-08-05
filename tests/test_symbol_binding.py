@@ -123,15 +123,17 @@ def test_unlabeled_non_grid_group_surfaces_flagged_with_its_count():
 
     # It must NOT be named "Columns" (weak signal stays unnamed).
     assert _row_for(summary, "Columns") is None
-    # Its count of 40 must still be present as a flagged EA row (never dropped).
-    flagged = [r for r in summary if float(r.get("quantity") or 0) == 40.0]
-    assert flagged, "unlabeled symbol group of 40 was silently dropped"
-    assert any(r.get("needs_review") for r in flagged)
-    assert any((r.get("unit") or "").upper() == "EA" for r in flagged)
-    # And the fused component kept its deterministic count, flagged for review.
-    comp = next(c for c in fused["components"] if c.get("candidate_id") == "SYM-9")
-    assert comp["quantity"] == 40 and comp["unit"] == "EA"
-    assert comp["needs_review"] is True
+    # Nor may it be named "SYM-9". Plan 24-04: a raw candidate ID is never a
+    # line item, so the flagged EA row this test used to look for in the
+    # take-off is now a record in the unnamed-geometry ledger.
+    assert [c for c in fused["components"] if c.get("candidate_id") == "SYM-9"] == []
+    assert _row_for(summary, "SYM-9") is None
+    # The half that must NOT change: the count of 40 is never dropped.
+    led = [r for r in fused["unnamed_geometry"] if r["candidate_id"] == "SYM-9"]
+    assert led, "unlabeled symbol group of 40 was silently dropped"
+    assert led[0]["quantity"] == 40 and led[0]["unit"] == "EA"
+    assert led[0]["kind"] == "symbol_group"
+    assert led[0]["reason"] == "no_name_source"
 
 
 # ── Deterministic grid fallback: conservative ────────────────────────────────

@@ -394,8 +394,15 @@ def test_wall_binding_through_fusion_sf_with_plan_height():
     assert cmu["quantity"] == round(63.0 * 36.0, 1)
 
 
-def test_ambiguous_wall_class_stays_needs_review():
-    # A third thickness class no library object claims → unlabeled needs_review.
+def test_ambiguous_wall_class_is_ledgered_never_silently_bound():
+    """A third thickness class no library object claims.
+
+    It used to publish as a flagged line item named ``WALL-TC3``.  Plan 24-04
+    abolished that — a raw candidate ID is never a line item — so it is
+    ledgered instead.  The claim this test has always made survives intact and
+    is what is asserted: the class is NEVER given a silent wrong SF bind, and
+    its measured LF is never lost.
+    """
     bundle = _wall_bundle()
     bundle["walls"].append(
         {"thickness_class": "TC3", "thickness_pt": 2.0, "length_pt": 300.0}
@@ -405,9 +412,12 @@ def test_ambiguous_wall_class_stays_needs_review():
         bundle_extra=bundle, vocabulary=_wall_library(),
         wall_height_ft=36.0, wall_height_source="plan",
     )
-    tc3 = next(c for c in fused["components"] if c.get("candidate_id") == "WALL-TC3")
-    assert tc3["needs_review"] is True
-    assert tc3["unit"] == "LF"                       # never a silent wrong SF bind
+    published = [c for c in fused["components"] if c.get("candidate_id") == "WALL-TC3"]
+    assert published == []                           # never an identifier line item
+    led = [r for r in fused["unnamed_geometry"] if r["candidate_id"] == "WALL-TC3"]
+    assert len(led) == 1
+    assert led[0]["unit"] == "LF"                    # never a silent wrong SF bind
+    assert led[0]["quantity"] == 300.0               # and the LF is not lost
 
 
 # ── 6b. tilt-up = perimeter × height; CMU = small interior class × height ─────
@@ -516,14 +526,24 @@ def test_two_unnamed_clusters_stay_distinct_flagged_rows():
          "instance_bboxes_pt": [(50.0, 50.0, 56.0, 56.0)],
          "contained_texts": [], "confidence": "medium"},
     ]
-    # No vision labels, no naming library → both stay unnamed but DISTINCT.
-    summary, _ = _summary_from(symbol_groups=groups, vocabulary=None)
-    qtys = sorted(float(r["quantity"]) for r in summary if r.get("quantity"))
-    assert 40.0 in qtys and 12.0 in qtys
-    # They must NOT collapse into one "Component" bucket summing 52.
+    # No vision labels, no naming library → neither can be named at all.
+    #
+    # This test's claim has always been that two unidentified clusters stay
+    # DISTINCT rather than collapsing into one "Component" blob summing 52.
+    # Plan 24-04 kept the claim and moved where it holds: neither cluster
+    # publishes as a line item named with its own candidate ID, and both keep
+    # their own count in the unnamed-geometry ledger.
+    summary, fused = _summary_from(symbol_groups=groups, vocabulary=None)
+    published = {c.get("candidate_id") for c in fused["components"]}
+    assert "SYM-1" not in published and "SYM-2" not in published
+    # They must NOT collapse into one "Component" bucket summing 52 — not in
+    # the take-off, and not in the ledger either.
     assert _row(summary, "Component") is None
-    flagged = [r for r in summary if r.get("needs_review")]
-    assert len(flagged) >= 2
+    led = {r["candidate_id"]: r for r in fused["unnamed_geometry"]}
+    assert set(led) == {"SYM-1", "SYM-2"}            # two records, still distinct
+    assert led["SYM-1"]["quantity"] == 40            # each keeps its OWN count
+    assert led["SYM-2"]["quantity"] == 12
+    assert all(r["unit"] == "EA" for r in led.values())
 
 
 def test_normalize_item_name_generic_component_uses_description():
