@@ -2669,6 +2669,16 @@ class TakeoffPipeline:
             # with a named reason. No existing key is renamed or removed.
             "excluded_viewports": excluded_viewports,
             "coverage_drops": coverage_drops,
+            # The schedule-table / title-block / legend rectangles this sheet
+            # already computed, PUBLISHED on the bundle (24-04). Three readers
+            # above consume them and every one of them had to be handed the
+            # list explicitly; fusion cannot be, because it never sees the page.
+            # Without them the room gate's masked-origin rule (T-24-15) would be
+            # a mitigation that never runs. Same list, same computation — this
+            # is a publication, not a second derivation.
+            "mask_rects": [tuple(b) for b in table_bboxes] + [
+                tuple(m) for m in mask_rects
+            ],
             "_viewports_with_scales": viewports_with_scales,
             "_main_plan_region": main_id,
             "_scale_result": scale,

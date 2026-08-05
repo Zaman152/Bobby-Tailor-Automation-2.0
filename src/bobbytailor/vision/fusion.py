@@ -42,6 +42,12 @@ from bobbytailor.deterministic.room_tags import (
     UNIT_COUNT_SOURCE_MANIFEST as _UNIT_COUNT_SOURCE_MANIFEST,
 )
 
+# The ONE containment rule for "is this drawn inside a masked schedule / title
+# block / legend?", shared with every other plan-body reader (INV-05 risk 3).
+# ``tag_pairing`` is pure at module scope — no PyMuPDF, no pipeline — so this
+# adds no import weight and no cycle, exactly as ``room_tags`` above.
+from bobbytailor.deterministic.tag_pairing import bbox_inside_any
+
 # ONE definition of what a unit measures, shared with the aggregator (C3b).
 # ``units`` is pure data with no pipeline imports, so this adds no cycle.
 from bobbytailor.pipeline.units import (
@@ -753,6 +759,42 @@ UNNAMED_ROOM_LABEL_TOKEN_RUN = "room_label_token_run"
 UNNAMED_ROOM_LABEL_MASKED_ORIGIN = "room_label_from_masked_region"
 #: A room that cannot cite a bounding wall reference (V4-DET-03).
 UNNAMED_ROOM_NO_WALL_REFERENCE = "room_without_wall_reference"
+
+# ── The room name-plausibility bound, chosen from what a room NAME can BE ────
+#
+# A room label is harvested by point-in-polygon: every word whose centre falls
+# inside the face, joined in reading order. A big face swallows whatever the
+# draughtsman drew across it, so the harvest is only a name when it is
+# structurally shaped like one.
+#
+# Measured FREE, zero API, this session, over the drawings' own printed room
+# tags (``room_tags.extract_room_tags``, masked) across three plan sets:
+#
+#     Moxy     271 tags   token counts {1: 84, 2: 175, 3: 12}
+#     Chelsea  119 tags   token counts {1: 6, 2: 113}
+#     Bob's     34 tags   token counts {1: 34}
+#     ───────────────────────────────────────────────────────
+#     424 genuine printed room names; the LONGEST is 3 tokens
+#     ("K SUITE C", "K SUITE B", "K SUITE A") — 100% sit at <= 3.
+#
+# And over the actual polygon-label harvest on nine real sheets (Crow p0-p3,
+# Moxy p4/p5/p23, Chelsea p0/p1): {0 tokens: 300, 1: 25, 2: 1, 19: 1}. Every
+# genuine harvest is <= 2 tokens; the single 19-token outlier is Crow page 0's
+# ROOM-1, a face spanning 1,283,231 pt-squared that swallowed a door count, a
+# run of gridline digits and the street name off the title block.
+#
+# So the bound is: the longest printed room name a drawing set contains (3),
+# plus its room number (1), plus two tokens of slack. **It was NOT chosen by
+# running Crow and lowering it until the 19-token label disappeared** — that is
+# 24-RESEARCH pitfall 1 and threat T-24-17. It sits 3x above the longest
+# genuine harvest and 3.2x below the accident, so it is nowhere near doing
+# delicate work, and it is validated by the printed names above rather than by
+# any accuracy figure.
+_ROOM_LABEL_MAX_TOKENS = 6
+
+#: The room record field that will carry its bounding-wall reference (V4-DET-03).
+#: Plan 24-07 populates it; the branch that reads it is live now.
+ROOM_WALL_REFERENCE_FIELD = "bounding_wall_ids"
 
 
 def is_name_worthy(name, source) -> bool:
@@ -3278,19 +3320,108 @@ def _fuse_project_area_items(
         )
 
 
+def _room_name_failure(
+    label: str, room_bbox, mask_rects, wall_reference
+) -> Optional[Tuple[str, str]]:
+    """``(reason, detail)`` when *label* may not name this room, else ``None``.
+
+    **Every rule runs for BOTH ``label_source`` values.** The single-digit room
+    name measured on Crow page 0 arrived via ``text_in_polygon``, not via
+    vision, so a gate that only guarded the vision fallback would miss the
+    actual defect entirely.
+    """
+    text = str(label or "").strip()
+
+    # 0. No label at all. Nothing for the rules below to judge — the room was
+    #    measured and simply never identified.
+    if not text:
+        return (
+            UNNAMED_ROOM_UNLABELED,
+            "the face carries no text and no vision label named it, so what "
+            "the enclosed area IS was never established",
+        )
+
+    # 1. Drafting noise. The EXISTING predicate, applied on a path that never
+    #    had one: `_is_noise_cluster` already returns True for a bare digit and
+    #    for a gridline bubble label. No second predicate is written here.
+    if _is_noise_cluster([text]):
+        return (
+            UNNAMED_LABEL_IS_DRAFTING_NOISE,
+            "the only text inside the face is %r — a gridline bubble, a room "
+            "number, a dimension string or a sheet reference. A room NUMBER is "
+            "not a room NAME: it says where the room is, never what it is"
+            % text,
+        )
+
+    # 2. Token run. A label longer than a room name can structurally be is a
+    #    harvest accident: a face large enough to swallow a title block, a note
+    #    block or a row of gridline digits.
+    tokens = text.split()
+    if len(tokens) > _ROOM_LABEL_MAX_TOKENS:
+        return (
+            UNNAMED_ROOM_LABEL_TOKEN_RUN,
+            "the face contains a %d-token run of text (%r), and the longest "
+            "genuine printed room name measured across this project's plan "
+            "sets is 3 tokens. A run this long is everything the face happened "
+            "to enclose, not a name" % (len(tokens), text[:60]),
+        )
+
+    # 3. Masked origin. A face drawn INSIDE a schedule table, a title block or
+    #    a legend is not a plan-body room at all, so nothing printed in it is a
+    #    plan-body room name (INV-05 risk 3, T-24-15).
+    #
+    #    Containment, matching `bbox_inside_any`'s own deliberate choice: a mask
+    #    that merely clips a face must not delete it. The converse case — a face
+    #    so large it SWALLOWS a mask — is not claimed here, because this module
+    #    never sees the page and so cannot say which of the harvested words came
+    #    from inside the mask. That case is what rule 2 catches, and it is what
+    #    catches Crow's ROOM-1.
+    if mask_rects and room_bbox and bbox_inside_any(room_bbox, mask_rects):
+        return (
+            UNNAMED_ROOM_LABEL_MASKED_ORIGIN,
+            "the face lies inside a masked schedule / title-block / legend "
+            "region, so %r is table or title text rather than a plan-body room "
+            "name" % text,
+        )
+
+    # 4. Orphan room (V4-DET-03). A room that cannot cite the walls bounding it
+    #    is a polygon, not a room.
+    #
+    #    The branch reads the reference and fires when it is PRESENT AND EMPTY —
+    #    an explicit "no bounding wall could be cited". A field that is ABSENT
+    #    is not judged, because absence of a record is not absence of a wall:
+    #    `rooms.py` builds every face FROM wall centrelines, so the walls exist
+    #    and merely go unrecorded until plan 24-07 populates the field. Reading
+    #    an absent field as a zero is precisely what INV-08 forbids.
+    if wall_reference is not None and not wall_reference:
+        return (
+            UNNAMED_ROOM_NO_WALL_REFERENCE,
+            "the face cites no bounding wall, so the enclosed area cannot be "
+            "attributed to a room the drawing draws (V4-DET-03)",
+        )
+
+    return None
+
+
 def _fuse_rooms(
     bundle: dict,
     labels_by_id: Dict[str, dict],
     components: List[dict],
     rejected: List[dict],
+    unnamed: Optional[List[dict]] = None,
 ) -> None:
     """Rooms → SF components; SF from the polygon regardless of label source.
 
     Vision labels apply ONLY to rooms with ``label_source == 'none'`` — a
     deterministic text-in-polygon binding is never overridden; a vision
-    attempt to relabel a text-bound room is audited in ``fusion_rejected``.
+    attempt to relabel a text-bound room is audited in the rejection list.
+
+    A room whose label is not a plausible room name emits NO component and one
+    unnamed-geometry record carrying its measured SF (24-04). The SF is never
+    lost — the room was measured, only unidentified.
     """
     fpp = float(bundle.get("fpp") or 0.0)
+    mask_rects = bundle.get("mask_rects") or ()
     for room in bundle.get("rooms") or []:
         cid = _field(room, "candidate_id", "")
         if not cid:
@@ -3327,16 +3458,45 @@ def _fuse_rooms(
                 }
             )
 
-        unlabeled = not label
-        needs_review = no_scale or unlabeled
+        # A vision answer echoing our own handle for the candidate is the
+        # identifier arriving by a second route, not a name.
+        if str(label).strip() == cid:
+            label = ""
+
+        room_bbox = _polygon_bbox(_field(room, "polygon_wkt", "") or "")
+        failure = _room_name_failure(
+            label,
+            room_bbox if any(room_bbox) else None,
+            mask_rects,
+            _field(room, ROOM_WALL_REFERENCE_FIELD, None),
+        )
+        if failure is not None:
+            reason, detail = failure
+            if unnamed is not None:
+                unnamed.append(
+                    unnamed_geometry_record(
+                        candidate_id=cid,
+                        # The SF is the whole point: the room WAS measured.
+                        # `None` when no scale was bound is INV-08's recorded
+                        # absence of a measurement, never a zero.
+                        quantity=quantity,
+                        unit="SF",
+                        position=room_bbox if any(room_bbox) else None,
+                        evidence_texts=[label] if label else [],
+                        reason=reason,
+                        kind="room",
+                        detail=detail,
+                    )
+                )
+            continue
+
+        needs_review = no_scale
         reasons = []
         if no_scale:
             reasons.append("no scale bound (fpp missing)")
-        if unlabeled:
-            reasons.append("room unlabeled (vision fallback returned nothing)")
         components.append(
             {
-                "name": label or cid,
+                "name": label,
                 "quantity": quantity,
                 "unit": "SF",
                 "provenance": "geometry",
@@ -4159,7 +4319,9 @@ def fuse_sheet(
                 {"name": "", "basis": _LINEAR_BASIS, "unit": "LF"}, [],
                 {"vocab_map": vocab_map, "room_mix": room_mix or {}},
             )
-    _fuse_rooms(deterministic_bundle, room_labels, components, rejected)
+    _fuse_rooms(
+        deterministic_bundle, room_labels, components, rejected, unnamed=unnamed
+    )
     _fuse_schedules(deterministic_bundle, components)
     _fuse_material_tags(deterministic_bundle, components, material_tag_ledger)
     _fuse_footprint(deterministic_bundle, components)

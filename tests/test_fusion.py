@@ -345,7 +345,13 @@ def test_fuse_unknown_label_keeps_deterministic_count_in_the_ledger():
     assert "SYM-2" not in by_id                       # never a line item
     led = [r for r in result["unnamed_geometry"] if r["candidate_id"] == "SYM-2"]
     assert len(led) == 1
-    assert led[0]["quantity"] == 28                   # deterministic count preserved
+    # Read off the fixture rather than restated as a literal: the claim is that
+    # the ledger carries the DETERMINISTIC count, whatever it is. A literal here
+    # would also read as a pin toward a golden figure, which this phase forbids.
+    expected = next(
+        g["count"] for g in _bundle()["symbol_groups"] if g["candidate_id"] == "SYM-2"
+    )
+    assert led[0]["quantity"] == expected             # deterministic count preserved
     assert led[0]["unit"] == "EA"
     assert led[0]["kind"] == "symbol_group"
     assert led[0]["reason"] == "no_name_source"
@@ -3856,3 +3862,222 @@ def test_a_size_callout_is_drafting_noise_but_a_product_name_is_not():
     assert _is_noise_token("Bollard") is False
     assert _is_noise_cluster(["6x6", "POST"]) is False      # a real object
     assert _is_noise_cluster(["14'-0\"x16'-0\""]) is True   # an opening size
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 24-04 task 2 — THE ROOM NAME-PLAUSIBILITY GATE
+#
+# `_fuse_rooms` had no noise gate at all, on either label path.  Every rule
+# below runs for BOTH `label_source` values, because the single-digit room name
+# measured on Crow page 0 arrived via `text_in_polygon`, NOT via vision — a gate
+# that only guarded the vision fallback would have missed the actual defect.
+#
+# The two measured Crow targets are asserted BY SHAPE (a bare digit is refused,
+# a long token run is refused), never by asserting the resulting SF equals a
+# golden figure.  Tuning a bound until a number matches is threat T-24-17.
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _room(cid, label, source, area=1000.0, wkt=None, **extra):
+    room = {
+        "candidate_id": cid,
+        "label": label,
+        "label_source": source,
+        "area_pt2": area,
+        "confidence": "high",
+        "polygon_wkt": wkt or "POLYGON ((0 0, 100 0, 100 100, 0 100, 0 0))",
+    }
+    room.update(extra)
+    return room
+
+
+def _room_result(rooms, labels=None, mask_rects=None, fpp=0.5):
+    bundle = {"rooms": rooms, "sheet_name": "S1", "fpp": fpp}
+    if mask_rects is not None:
+        bundle["mask_rects"] = mask_rects
+    return fuse_sheet(bundle, labels or {})
+
+
+def test_name_plausibility_a_bare_digit_never_names_a_room_from_either_source():
+    """Crow page 0 ROOM-2: label ``4``, ``label_source`` ``text_in_polygon``,
+    area 905.4 pt-squared.  It published as a line item named with a single
+    digit.  A gridline bubble is not a room.
+
+    Asserted by SHAPE — the digit is refused and the SF survives — never by
+    asserting the resulting square footage equals a golden figure.
+    """
+    for source in ("text_in_polygon", "vision", "none"):
+        rooms = [_room("ROOM-2", "4", source, area=905.4)]
+        labels = (
+            {"room_labels": [{"room_id": "ROOM-2", "label": "4"}]}
+            if source == "vision"
+            else {}
+        )
+        result = _room_result(rooms, labels)
+        assert result["components"] == [], "a bare digit named a room (%s)" % source
+        rec = _ledger(result)[0]
+        assert rec["candidate_id"] == "ROOM-2"
+        assert rec["kind"] == "room"
+        assert rec["unit"] == "SF"
+        assert rec["quantity"] > 0                    # THE SF IS NOT LOST
+        assert rec["reason"] == "label_is_drafting_noise"
+        assert rec["evidence_texts"] == ["4"]         # the rejected text is kept
+
+
+def test_name_plausibility_a_room_number_is_not_a_room_name():
+    """Crow page 1 publishes rooms named ``101`` and ``102``.  A room NUMBER
+    says WHERE a room is; it never says WHAT it is."""
+    result = _room_result([_room("ROOM-9", "101", "text_in_polygon")])
+    assert result["components"] == []
+    assert _ledger(result)[0]["reason"] == "label_is_drafting_noise"
+
+
+def test_name_plausibility_a_genuine_word_still_names_a_room():
+    """The rule that must NOT fire.  If this ever fails, the gate has become a
+    filter that empties the take-off rather than one that tells the truth."""
+    result = _room_result([_room("ROOM-1", "WAREHOUSE", "text_in_polygon")])
+    comp = result["components"][0]
+    assert comp["name"] == "WAREHOUSE"
+    assert comp["quantity"] > 0
+    assert comp["label_source"] == "text_in_polygon"
+    assert _ledger(result) == []
+
+
+def test_name_plausibility_a_real_multi_token_room_name_still_publishes():
+    """Measured: 424 genuine printed room tags across three plan sets, the
+    longest 3 tokens (``K SUITE C``).  Every one must survive the bound."""
+    for name in ("K SUITE C", "KING SUITE B", "UNIT C2", "MECHANICAL ROOM 214"):
+        result = _room_result([_room("ROOM-1", name, "text_in_polygon")])
+        assert [c["name"] for c in result["components"]] == [name]
+
+
+def test_name_plausibility_an_implausible_token_run_never_names_a_room():
+    """Crow page 0 ROOM-1: a face spanning 1,283,231 pt-squared swallowed a
+    door count, a run of gridline digits and the street name off the title
+    block, and published as a line item under all nineteen tokens."""
+    harvest = "68 DOORS DOOR DOOR 3 1 2 9 9 9 10 10 10 12 12 9 9 CASS WHITE"
+    assert len(harvest.split()) > 12                  # the shape, not the SF
+    result = _room_result(
+        [_room("ROOM-1", harvest, "text_in_polygon", area=1283231.5)]
+    )
+    assert result["components"] == []
+    rec = _ledger(result)[0]
+    assert rec["reason"] == "room_label_token_run"
+    assert rec["quantity"] > 0                        # THE SF IS NOT LOST
+    assert "19-token" in rec["detail"]
+
+
+def test_the_token_bound_was_validated_against_real_room_names():
+    """The bound is 3 (the longest printed room name this project's four plan
+    sets contain) + 1 (its room number) + 2 tokens of slack.
+
+    It was NOT chosen by running Crow and lowering it until the 19-token label
+    disappeared (24-RESEARCH pitfall 1, T-24-17).  It sits three times above
+    the longest genuine harvest measured on nine real sheets (2 tokens) and
+    more than three times below the accident (19), so it is nowhere near doing
+    delicate work.
+    """
+    from bobbytailor.vision.fusion import _ROOM_LABEL_MAX_TOKENS
+
+    assert _ROOM_LABEL_MAX_TOKENS == 6
+    assert _ROOM_LABEL_MAX_TOKENS > 3                 # the longest printed name
+    assert _ROOM_LABEL_MAX_TOKENS < 19                # the measured accident
+
+
+def test_name_plausibility_a_masked_origin_room_is_never_named_from_its_text():
+    """A face drawn inside a schedule table or a title block is not a
+    plan-body room, so its text is not a plan-body room name (T-24-15)."""
+    schedule = (0.0, 0.0, 500.0, 500.0)
+    rooms = [
+        _room(
+            "ROOM-7", "STORAGE", "text_in_polygon",
+            wkt="POLYGON ((100 100, 200 100, 200 200, 100 200, 100 100))",
+        )
+    ]
+    result = _room_result(rooms, mask_rects=[schedule])
+    assert result["components"] == []
+    rec = _ledger(result)[0]
+    assert rec["reason"] == "room_label_from_masked_region"
+    assert rec["quantity"] > 0
+
+    # The same room OUTSIDE the mask publishes exactly as before — the rule is
+    # positional, so it cannot be quietly rejecting everything.
+    outside = _room_result(rooms, mask_rects=[(2000.0, 2000.0, 2500.0, 2500.0)])
+    assert [c["name"] for c in outside["components"]] == ["STORAGE"]
+
+
+def test_name_plausibility_an_unlabeled_room_is_ledgered_with_its_sf():
+    result = _room_result([_room("ROOM-3", "", "none", area=35.9)])
+    assert result["components"] == []
+    rec = _ledger(result)[0]
+    assert rec["reason"] == "room_unlabeled"
+    assert rec["unit"] == "SF"
+    assert rec["quantity"] > 0
+    assert rec["evidence_texts"] == []
+
+
+def test_name_plausibility_a_room_with_no_scale_keeps_a_none_quantity():
+    """INV-08: a blank is never a zero.  With no scale bound there is no
+    measured SF, and the ledger says so rather than recording 0."""
+    result = _room_result([_room("ROOM-3", "", "none")], fpp=0.0)
+    rec = _ledger(result)[0]
+    assert rec["quantity"] is None
+
+
+def test_name_plausibility_a_vision_answer_echoing_the_room_id_is_not_a_name():
+    result = _room_result(
+        [_room("ROOM-4", "", "none")],
+        {"room_labels": [{"room_id": "ROOM-4", "label": "ROOM-4"}]},
+    )
+    assert result["components"] == []
+    assert _ledger(result)[0]["reason"] == "room_unlabeled"
+
+
+# ── The orphan-room branch (V4-DET-03) ───────────────────────────────────────
+
+
+def test_orphan_room_with_an_empty_wall_reference_is_ledgered_never_published():
+    """The reference is constructed EXPLICITLY here rather than depending on
+    plan 24-07 having landed, so the branch is live and tested now."""
+    from bobbytailor.vision.fusion import ROOM_WALL_REFERENCE_FIELD
+
+    rooms = [
+        _room(
+            "ROOM-8", "STORAGE", "text_in_polygon",
+            **{ROOM_WALL_REFERENCE_FIELD: []},
+        )
+    ]
+    result = _room_result(rooms)
+    assert result["components"] == []
+    rec = _ledger(result)[0]
+    assert rec["reason"] == "room_without_wall_reference"
+    assert rec["quantity"] > 0                        # the SF is still measured
+
+
+def test_orphan_room_with_a_populated_wall_reference_publishes():
+    from bobbytailor.vision.fusion import ROOM_WALL_REFERENCE_FIELD
+
+    rooms = [
+        _room(
+            "ROOM-8", "STORAGE", "text_in_polygon",
+            **{ROOM_WALL_REFERENCE_FIELD: ["WALL-TC1", "WALL-TC2"]},
+        )
+    ]
+    result = _room_result(rooms)
+    assert [c["name"] for c in result["components"]] == ["STORAGE"]
+    assert _ledger(result) == []
+
+
+def test_orphan_room_an_absent_wall_reference_is_not_read_as_an_absent_wall():
+    """INV-08 applied to plan 24-07's handoff.  `rooms.py` builds every face
+    FROM wall centrelines, so the bounding walls exist and merely go unrecorded
+    until 24-07 populates the field.  Reading the absent field as "no walls"
+    would assert something false about geometry that was never recorded — and
+    would silently stop every room on every plan set from publishing.
+    """
+    from bobbytailor.vision.fusion import ROOM_WALL_REFERENCE_FIELD
+
+    room = _room("ROOM-8", "STORAGE", "text_in_polygon")
+    assert ROOM_WALL_REFERENCE_FIELD not in room       # the state until 24-07
+    result = _room_result([room])
+    assert [c["name"] for c in result["components"]] == ["STORAGE"]
