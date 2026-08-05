@@ -1164,16 +1164,17 @@ def test_the_ledger_key_name_is_the_one_fusion_actually_emits():
 def test_the_unnamed_geometry_ledger_is_aggregated_with_its_sheet_attribution():
     """Every record the run wrote reaches the report, and each one says which
     sheet it came from — fuse_sheet knows the candidate, never the sheet."""
+    extracted = _two_sheets_with_unnamed_geometry()
+    source = {
+        r["candidate_id"]: r
+        for sheet in extracted for r in sheet["unnamed_geometry"]
+    }
     with _isolated_output_dir():
-        report = generate_report(
-            "Unnamed Proj", _two_sheets_with_unnamed_geometry(), [],
-        )
+        report = generate_report("Unnamed Proj", extracted, [])
         ledger = report["unnamed_geometry"]
 
-        assert len(ledger) == 3, "no record is dropped in aggregation"
-        assert {r["candidate_id"] for r in ledger} == {
-            "SYM-2", "WALL-TC4", "ROOM-3",
-        }
+        assert len(ledger) == len(source), "no record is dropped in aggregation"
+        assert {r["candidate_id"] for r in ledger} == set(source)
         by_id = {r["candidate_id"]: r for r in ledger}
         assert by_id["SYM-2"]["sheet"] == "A-101"
         assert by_id["WALL-TC4"]["sheet"] == "A-101"
@@ -1181,11 +1182,13 @@ def test_the_unnamed_geometry_ledger_is_aggregated_with_its_sheet_attribution():
 
         # The quantity is the whole point of the record — it is what makes the
         # difference between "we measured these and could not name them" and
-        # "these do not exist" legible.
-        assert by_id["SYM-2"]["quantity"] == 56
-        assert by_id["SYM-2"]["unit"] == "EA"
-        assert by_id["WALL-TC4"]["quantity"] == 812.5
-        assert by_id["ROOM-3"]["quantity"] == 279.5
+        # "these do not exist" legible. Compared against the record the producer
+        # wrote, never against a restated literal: a count in this project is
+        # only ever carried through, never adjusted toward anything.
+        for cid, record in by_id.items():
+            assert record["quantity"] == source[cid]["quantity"]
+            assert record["unit"] == source[cid]["unit"]
+            assert record["reason"] == source[cid]["reason"]
         assert all(r["reason"] for r in ledger), "every record names its reason"
 
 
@@ -1343,21 +1346,26 @@ def test_the_summary_renders_the_unnamed_geometry_section_when_there_is():
 def test_the_unnamed_section_breaks_down_by_kind_with_its_measured_quantity():
     """A reader must be able to tell 'we measured 56 of these and could not name
     them' from 'these do not exist'."""
+    extracted = _two_sheets_with_unnamed_geometry()
+    source = {
+        r["candidate_id"]: r
+        for sheet in extracted for r in sheet["unnamed_geometry"]
+    }
     with _isolated_output_dir():
-        report = generate_report(
-            "Unnamed Proj", _two_sheets_with_unnamed_geometry(), [],
-        )
+        report = generate_report("Unnamed Proj", extracted, [])
         text = Path(report["_files"]["summary_txt"]).read_text()
 
     section = text.split("UNIDENTIFIED GEOMETRY")[1].split("SCALE CONFIDENCE")[0]
     assert "symbol group" in section
     assert "wall thickness class" in section
     assert "room" in section
-    # A count of 56 repeated marks is 56 things — `56.0 EA` would read like a
-    # measurement that happened to land on an integer.
-    assert "56 EA" in section
-    assert "812.5 LF" in section
-    assert "279.5 SF" in section
+    # Every quantity is rendered from the record, so the assertion cannot drift
+    # from what the producer wrote. A whole count keeps no decimal point: a
+    # count of repeated marks is a number of things, and `56.0 EA` would read
+    # like a measurement that happened to land on an integer.
+    assert "{:g} EA".format(source["SYM-2"]["quantity"]) in section
+    assert "{:g} LF".format(source["WALL-TC4"]["quantity"]) in section
+    assert "{:g} SF".format(source["ROOM-3"]["quantity"]) in section
     # The sheet each came from, and the reason naming failed.
     assert "A-101" in section and "A-102" in section
     assert "wall class unlabeled" in section
