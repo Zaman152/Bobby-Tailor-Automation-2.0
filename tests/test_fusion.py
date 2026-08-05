@@ -2787,6 +2787,7 @@ from bobbytailor.vision.fusion import (  # noqa: E402
     _NAME_SOURCE_LIBRARY,
     _NAME_SOURCE_VISION,
     _NAME_SOURCE_WALL_THICKNESS,
+    _WALL_LABEL_PRECEDENCE_REASON,
     _fuse_wall_classes,
     _squash_wall_name,
     map_wall_classes_from_library,
@@ -3088,3 +3089,105 @@ def test_a_pre_24_02_three_tuple_bind_is_tolerated_not_a_crash():
     row = {c["candidate_id"]: c for c in components}["WALL-TC2"]
     assert row["name"] == "CMU Wall"
     assert row["name_source"] == _NAME_SOURCE_WALL_THICKNESS
+
+
+# ── The disagreement audit trail (T-24-06) ─────────────────────────────────
+
+
+def test_wall_label_disagreement_audited():
+    """A vision label the thickness bind outranked is PUBLISHED, not dropped.
+
+    Phase 23's C3a established the principle this enforces: the audit trail
+    may not claim a decision it did not make. The deterministic name wins the
+    row; the reading that lost still reaches the report, with the evidence
+    that beat it attached.
+    """
+    audit = []
+    rows = _emit_wall_classes(
+        labels=_wall_labels({"TC2": "Tilt Up Wall"}),   # contradicts the 8" bind
+        rejected=audit,
+    )
+    assert rows["WALL-TC2"]["name"] == "CMU Wall"       # deterministic wins
+
+    assert len(audit) == 1
+    record = audit[0]
+    assert record["candidate_id"] == "WALL-TC2"
+    assert record["source"] == "wall_class_labels"
+    assert record["answer"] == "Tilt Up Wall"           # the answer that lost
+    assert record["kept_label"] == "CMU Wall"           # the answer that won
+    assert record["reason"] == _WALL_LABEL_PRECEDENCE_REASON
+    # The evidence, so a reviewer never has to re-derive the bind.
+    assert record["matched_thickness_in"] == 8.0        # printed on the object
+    assert record["class_thickness_in"] == 8.0          # LF-weighted, measured
+    assert "outranks" in record["detail"]
+
+
+def test_the_precedence_record_does_not_reuse_a_c3a_suppression_key():
+    """T-24-07. C3a's reinstatement pass acts on SUPPRESSION records; a
+    precedence override is a third kind of thing and must carry its own key,
+    or the reinstatement logic will act on a row that was never suppressed."""
+    assert _WALL_LABEL_PRECEDENCE_REASON != "superseded_by_room_fill"
+    assert "supersede" not in _WALL_LABEL_PRECEDENCE_REASON
+    assert _WALL_LABEL_PRECEDENCE_REASON not in (
+        "unknown_candidate_id", "label_override_blocked", "vision_quantity_blocked",
+    )
+
+
+def test_agreement_and_silence_append_nothing_to_the_audit_trail():
+    """Only a real disagreement is a record. An audit trail that logs
+    agreement is an audit trail nobody reads."""
+    agreeing = []
+    _emit_wall_classes(labels=_wall_labels({"TC2": "CMU  wall"}), rejected=agreeing)
+    assert agreeing == []
+
+    silent = []
+    _emit_wall_classes(labels={}, rejected=silent)
+    assert silent == []
+
+
+def test_the_precedence_record_uses_the_fuse_rooms_field_names():
+    """Mirrors `_fuse_rooms`' `label_override_blocked` shape so reporter.py's
+    per-sheet aggregation reads it with no change."""
+    audit = []
+    _emit_wall_classes(
+        labels=_wall_labels({"TC1": "CMU Wall"}), rejected=audit
+    )
+    assert set(audit[0]) >= {"candidate_id", "source", "answer", "reason", "kept_label"}
+
+
+def test_the_precedence_record_reaches_the_sheet_audit_list_through_fuse_sheet():
+    """Threaded into the sheet's ONE existing list, not a second one."""
+    bundle = _precedence_bundle()
+    bundle["sheet_name"] = "A-101"
+    result = fuse_sheet(
+        bundle,
+        {"wall_class_labels": [
+            {"wall_class_id": "WALL-TC2", "label": "Tilt Up Wall",
+             "confidence": "high"},
+        ]},
+        build_registry(bundle),
+        vocabulary=_precedence_library(),
+        wall_height_ft=36.0,
+        wall_height_source="plan",
+    )
+    records = [
+        r for r in result["fusion_rejected"]
+        if r.get("reason") == _WALL_LABEL_PRECEDENCE_REASON
+    ]
+    assert len(records) == 1
+    assert records[0]["candidate_id"] == "WALL-TC2"
+    assert records[0]["kept_label"] == "CMU Wall"
+
+
+def test_an_absent_audit_list_is_not_a_crash():
+    """A single-purpose caller may omit the list; behaviour is otherwise
+    identical, so the audit record can never become a correctness dependency."""
+    with_list, without_list = [], None
+    rows_a = _emit_wall_classes(
+        labels=_wall_labels({"TC2": "Tilt Up Wall"}), rejected=with_list
+    )
+    rows_b = _emit_wall_classes(labels=_wall_labels({"TC2": "Tilt Up Wall"}))
+    assert {k: v["name"] for k, v in rows_a.items()} == {
+        k: v["name"] for k, v in rows_b.items()
+    }
+    assert len(with_list) == 1 and without_list is None

@@ -1531,6 +1531,61 @@ def map_wall_classes_from_library(
     return result
 
 
+#: The precedence-record reason key. Deliberately its OWN key: Phase 23's C3a
+#: reinstatement logic acts on SUPPRESSION records
+#: (``superseded_by_room_fill``), and a precedence override is a third kind of
+#: thing entirely. Reusing a suppression key here would make the reinstatement
+#: pass try to un-reject a row that was never suppressed.
+_WALL_LABEL_PRECEDENCE_REASON = "wall_class_thickness_bind_outranks_label"
+
+
+def _reject_wall_label_override(
+    candidate_id: str,
+    vision_label,
+    kept_label,
+    matched_thickness_in: Optional[float],
+    class_thickness_in: Optional[float],
+    rejected: Optional[List[dict]],
+) -> None:
+    """Audit a vision label that a printed-thickness bind outranked (T-24-06).
+
+    The losing answer is PUBLISHED, not dropped. Field names mirror
+    ``_fuse_rooms``' ``label_override_blocked`` record
+    (``candidate_id`` / ``source`` / ``answer`` / ``reason`` / ``kept_label``)
+    so ``reporter.py``'s per-sheet aggregation and every existing consumer
+    read it with no change.
+    """
+    if rejected is None:
+        return
+    rejected.append(
+        {
+            "candidate_id": candidate_id,
+            "source": "wall_class_labels",
+            "answer": vision_label,
+            "reason": _WALL_LABEL_PRECEDENCE_REASON,
+            "kept_label": kept_label,
+            # The evidence that decided it, so the reviewer does not have to
+            # re-derive the bind to judge whether it was right.
+            "matched_thickness_in": matched_thickness_in,
+            "class_thickness_in": class_thickness_in,
+            "detail": (
+                "the naming library object %r prints a %s\" thickness and this "
+                "wall class measures %s\" (LF-weighted mean), within the "
+                "%s\" match tolerance; a printed-thickness match is "
+                "deterministic evidence and outranks a vision reading, so the "
+                "reading %r did not name this class"
+                % (
+                    kept_label,
+                    matched_thickness_in,
+                    class_thickness_in,
+                    _WALL_THICKNESS_TOL_IN,
+                    vision_label,
+                )
+            ),
+        }
+    )
+
+
 def _fuse_wall_classes(
     bundle: dict,
     labels_by_id: Dict[str, dict],
@@ -1541,6 +1596,7 @@ def _fuse_wall_classes(
     library_wall_map: Optional[
         Dict[str, Tuple[str, Optional[str], bool, Optional[float]]]
     ] = None,
+    rejected: Optional[List[dict]] = None,
 ) -> None:
     """Wall thickness classes → LF, or SF when the name is a wall_area object.
 
@@ -1572,10 +1628,22 @@ def _fuse_wall_classes(
     4. a hint bind names the class when vision is silent — still ``confident``
        ``False``, still flagged;
     5. neither → the unlabeled ``needs_review`` branch, unchanged.
+
+    Args:
+        rejected: The sheet's ``fusion_rejected`` audit list. Every time a
+            printed-thickness bind outranks a contradicting vision label, ONE
+            record carrying BOTH answers plus the thickness evidence is
+            appended — the audit trail may not claim a decision it did not
+            make (Phase 23 C3a precedent). Omitting it keeps the behaviour
+            identical minus the audit record, so a single-purpose caller does
+            not have to invent a list.
     """
     vocab_map = vocab_map or {}
     library_wall_map = library_wall_map or {}
     lf_by_class = bundle.get("wall_lf_by_class") or {}
+    # The class's own LF-weighted mean thickness, so the audit record can show
+    # the reviewer WHY the deterministic side won without re-deriving it.
+    thickness_by_class = _wall_thickness_in_by_class(bundle)
 
     # Measured building perimeter (for tilt-up / precast panel area = perimeter ×
     # height). None when no footprint / perimeter was measured — a tilt-up wall
@@ -1613,6 +1681,9 @@ def _fuse_wall_classes(
         bind_name = bind[0] if bind else None
         bind_basis = bind[1] if bind else None
         bind_confident = bool(bind[2]) if bind else False
+        # Tolerate a pre-24-02 3-tuple: an absent evidence field is a None in
+        # the audit record, never a crash and never a fabricated number.
+        bind_thickness_in = bind[3] if (bind and len(bind) > 3) else None
         has_label = bool(entry and label and label != _UNKNOWN_LABEL)
 
         if bind_confident:
@@ -1636,6 +1707,14 @@ def _fuse_wall_classes(
                         "match named it %r and outranks the reading (both "
                         "answers are in the fusion audit trail) — verify"
                         % (label, name)
+                    )
+                    _reject_wall_label_override(
+                        cid,
+                        label,
+                        name,
+                        bind_thickness_in,
+                        thickness_by_class.get(cls),
+                        rejected,
                     )
         elif has_label:
             # 3. No confident bind — the vision label names the class, exactly
@@ -3720,6 +3799,9 @@ def fuse_sheet(
         wall_height_ft=wall_height_ft,
         wall_height_source=wall_height_source,
         library_wall_map=library_wall_map,
+        # The sheet's ONE audit list — a precedence override is appended to the
+        # same trail as every other fusion rejection, never a second list.
+        rejected=rejected,
     )
     _fuse_project_area_items(deterministic_bundle, vocabulary, components)
     _fuse_room_fills(
