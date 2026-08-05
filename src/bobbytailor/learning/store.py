@@ -30,6 +30,7 @@ double-checked schema init).
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 import threading
@@ -38,6 +39,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from bobbytailor.config import OUTPUT_DIR
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Scope enum (string constants) — the only values record_correction accepts.
@@ -87,6 +90,37 @@ MAX_VALUE_LEN = 2000
 
 SCHEMA_VERSION = "1"
 SCHEMA_VERSION_KEY = "learning_schema_version"
+
+# ---------------------------------------------------------------------------
+# Per-project vocabulary snapshots (24-05, V4-DET-02/04).
+# ---------------------------------------------------------------------------
+#: Snapshot of the merged project vocabulary / naming library.
+VOCAB_KIND_PROJECT = "project_vocabulary"
+#: Snapshot of THIS plan's AI naming-convention pass.
+VOCAB_KIND_NAMING_CONVENTIONS = "naming_conventions"
+
+#: Serialized-snapshot cap. Deliberately its OWN constant rather than
+#: MAX_VALUE_LEN (2000): a snapshot is a whole object LIST, not one correction
+#: value, and 2000 chars would reject every real vocabulary. The WR-02
+#: discipline is unchanged — an over-length payload is REJECTED (returns 0),
+#: never truncated, because a JSON array cut mid-token would be unreadable on
+#: the next load and would silently degrade the run to fresh derivation.
+MAX_PROJECT_VOCABULARY_LEN = 200_000
+
+#: Table holding those snapshots. Named once so tests and schema inspection do
+#: not re-spell it, and so it reads clearly as NOT ``learning_vocabulary``.
+PROJECT_VOCABULARY_TABLE = "learning_project_vocabulary"
+
+#: Every table this module owns — the enumeration schema inspection / reset
+#: paths read, so a new table cannot be added without being registered.
+LEARNING_TABLES = (
+    "learning_corrections",
+    "learning_vocabulary",
+    "learning_assumptions",
+    "learning_manifests",
+    "learning_metadata",
+    PROJECT_VOCABULARY_TABLE,
+)
 
 # Dedicated learning.db (not stackct.db) — isolates migration risk per
 # RESEARCH §6 parenthetical; CONTEXT grants discretion. Env override for
@@ -167,6 +201,30 @@ CREATE TABLE IF NOT EXISTS learning_metadata (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL,
   updated_at TEXT NOT NULL
+);
+
+-- 24-05: per-project vocabulary SNAPSHOT (V4-DET-02/04, defect F3).
+--
+-- WHY A NEW TABLE AND NOT A COLUMN ON learning_vocabulary: that table is keyed
+-- UNIQUE(project_type, raw_pattern, canonical_name, unit) — it has no project
+-- key and adding one would require REBUILDING that UNIQUE constraint, which is
+-- a destructive migration (24-RESEARCH §13 forbids one). The two are also
+-- different concerns: learning_vocabulary ACCUMULATES a per-TYPE raw→canonical
+-- map as a naming SUGGESTION source; this table holds ONE exact-project object
+-- list so a repeat run stops re-deriving it from the API. Neither reads the
+-- other, and learning_vocabulary is untouched by every function below.
+--
+-- project_key is NOT NULL by design: a NULL/global row here would be inherited
+-- by every project of any type, which is exactly the cross-project naming leak
+-- the per-project scope exists to prevent (T-24-20).
+CREATE TABLE IF NOT EXISTS learning_project_vocabulary (
+  id INTEGER PRIMARY KEY,
+  project_key TEXT NOT NULL,          -- EXACT project only; never NULL/global
+  kind TEXT NOT NULL,                 -- which derivation this snapshot is
+  objects TEXT NOT NULL,              -- JSON array of vocabulary object dicts
+  object_count INTEGER NOT NULL DEFAULT 0,
+  last_seen TEXT NOT NULL,
+  UNIQUE(project_key, kind)           -- ONE current snapshot per project+kind
 );
 """
 
@@ -483,6 +541,147 @@ def record_ai_manifest(
         finally:
             conn.close()
     return written
+
+
+# ---------------------------------------------------------------------------
+# 24-05: per-project vocabulary snapshots (V4-DET-02/04, defect F3).
+#
+# The naming library the wall classifier binds against was re-derived from the
+# API on EVERY run, so the same geometry could publish `Metal Downspout` on one
+# run and `Metal Downspouts` on the next — a deterministic mapper handed a
+# non-deterministic object list. These two functions give a project ONE stored
+# object list that a repeat run reuses instead of re-inventing.
+#
+# Boundary, stated once: this is a NAMING suggestion store. It holds object
+# NAMES and their binding metadata. It never holds a quantity, and nothing here
+# may substitute a measurement (24-RESEARCH §6 anti-amplification).
+# ---------------------------------------------------------------------------
+
+
+def save_project_vocabulary(
+    project_key: Optional[str],
+    objects: Optional[List[Dict[str, Any]]],
+    ts: Optional[str] = None,
+    kind: str = VOCAB_KIND_PROJECT,
+) -> int:
+    """Store THIS project's current vocabulary snapshot. Returns objects stored.
+
+    Replace-in-place: a project has ONE current snapshot per ``kind``, not a
+    growing pile, so reuse can never depend on which of several rows happened
+    to be read first. Implemented as an upsert on the
+    ``UNIQUE(project_key, kind)`` constraint — no row is ever deleted.
+
+    A falsy ``project_key`` is a NO-OP returning 0. It deliberately does not
+    fall back to a global row: a global snapshot would be inherited by every
+    project of every type, which is the cross-project naming leak the exact
+    scope exists to prevent (T-24-20).
+
+    An empty ``objects`` list is also a no-op (mirroring
+    :func:`record_ai_manifest`) — storing an empty snapshot would be
+    indistinguishable from "never saved" on read anyway, and writing one could
+    only ever cost a row.
+
+    ``objects`` are the dicts the vocabulary passes already produce
+    (``canonical_name`` / ``aliases`` / ``basis`` / ``binding_hint`` /
+    ``variant`` / ``thickness_in`` / ``height_ft``); they are stored verbatim
+    as a JSON array. No second object shape is invented here.
+
+    ``learning_vocabulary`` is NOT read, written, altered or deleted by this
+    function — it is a different table with a different scope.
+    """
+    if not project_key:
+        return 0
+    payload = [obj for obj in (objects or []) if isinstance(obj, dict)]
+    if not payload:
+        return 0
+
+    try:
+        serialized = json.dumps(payload, default=str)
+    except (TypeError, ValueError) as exc:  # pragma: no cover - default=str
+        logger.warning(
+            "save_project_vocabulary: %r snapshot is not serializable (%s) "
+            "— not stored; the next run re-derives", project_key, exc,
+        )
+        return 0
+    if len(serialized) > MAX_PROJECT_VOCABULARY_LEN:
+        # REJECTED, never truncated (WR-02): a JSON array cut mid-token cannot
+        # be parsed back and would silently poison every future load.
+        logger.warning(
+            "save_project_vocabulary: %r snapshot exceeds "
+            "MAX_PROJECT_VOCABULARY_LEN (%d > %d chars) — rejected, not "
+            "truncated; the next run re-derives",
+            project_key, len(serialized), MAX_PROJECT_VOCABULARY_LEN,
+        )
+        return 0
+
+    _ensure_schema()
+    seen_at = ts or _utc_now()
+    with _write_lock:
+        conn = get_connection()
+        try:
+            conn.execute(
+                """
+                INSERT INTO learning_project_vocabulary (
+                    project_key, kind, objects, object_count, last_seen
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(project_key, kind) DO UPDATE SET
+                    objects = excluded.objects,
+                    object_count = excluded.object_count,
+                    last_seen = excluded.last_seen
+                """,
+                (str(project_key), str(kind), serialized, len(payload), seen_at),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    return len(payload)
+
+
+def load_project_vocabulary(
+    project_key: Optional[str], kind: str = VOCAB_KIND_PROJECT
+) -> List[Dict[str, Any]]:
+    """THIS project's stored vocabulary snapshot, or ``[]`` when there is none.
+
+    Scoped to the EXACT project key: another project's snapshot is invisible
+    here even when both share a project type.
+
+    Every failure path returns ``[]`` rather than raising — a missing DB file,
+    an unreadable one, a corrupt payload, a schema that never initialised. The
+    caller's contract is "empty means derive fresh", so a broken store costs a
+    run its API saving and nothing else. A learning store must never break a
+    take-off (the 21-09 best-effort convention).
+    """
+    if not project_key:
+        return []
+    try:
+        _ensure_schema()
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                """
+                SELECT objects FROM learning_project_vocabulary
+                WHERE project_key = ? AND kind = ?
+                """,
+                (str(project_key), str(kind)),
+            ).fetchone()
+        finally:
+            conn.close()
+        if row is None:
+            return []
+        parsed = json.loads(row["objects"])
+    except Exception as exc:  # noqa: BLE001 — degrade to fresh derivation
+        logger.warning(
+            "load_project_vocabulary: %r snapshot unreadable (%s) — the run "
+            "derives its vocabulary fresh", project_key, exc,
+        )
+        return []
+    if not isinstance(parsed, list):
+        logger.warning(
+            "load_project_vocabulary: %r snapshot is not a list (%s) — the "
+            "run derives its vocabulary fresh", project_key, type(parsed).__name__,
+        )
+        return []
+    return [obj for obj in parsed if isinstance(obj, dict)]
 
 
 def get_corrections(

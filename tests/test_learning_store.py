@@ -409,3 +409,260 @@ def test_distill_rejects_oversized_canonical_name(learning_db):
     finally:
         conn.close()
     assert row is not None and row["canonical_name"] == "CMU Wall"
+
+
+# ---------------------------------------------------------------------------
+# 24-05: per-project vocabulary snapshots (V4-DET-02/04, defect F3).
+#
+# The naming library was re-derived from the API on every run, so the SAME
+# geometry published `Metal Downspout` on one paid run and `Metal Downspouts`
+# on the next. These tests pin the store half of the fix: one exact-project
+# snapshot, replace-in-place, invisible to other projects, and every failure
+# path degrading to empty so the caller re-derives instead of crashing.
+#
+# The whole point of a NEW table is that `learning_vocabulary` keeps doing its
+# own per-TYPE job untouched — so that is asserted explicitly, not assumed.
+# ---------------------------------------------------------------------------
+
+VOCAB_OBJECTS = [
+    {
+        "canonical_name": "Metal Downspout",
+        "aliases": ["DS", "downspout"],
+        "basis": "count",
+        "binding_hint": "symbol",
+        "variant": None,
+        "thickness_in": None,
+        "height_ft": None,
+    },
+    {
+        "canonical_name": "Tilt Up Wall",
+        "aliases": ["TILT-UP"],
+        "basis": "wall_area",
+        "binding_hint": "wall",
+        "variant": "exterior",
+        "thickness_in": 9.25,
+        "height_ft": 30.0,
+    },
+]
+
+
+def _project_vocab_rows():
+    """Raw rows of the snapshot table (no store helper in the loop).
+
+    Forces the schema first so "no row was written" is an observation about an
+    existing EMPTY table — a rejected save returns before touching the DB, so
+    without this the assertion would pass by erroring on a missing table.
+    """
+    store.init_learning_schema()
+    conn = store.get_connection()
+    try:
+        return [
+            dict(r)
+            for r in conn.execute(
+                "SELECT project_key, kind, objects, object_count "
+                "FROM learning_project_vocabulary ORDER BY id"
+            )
+        ]
+    finally:
+        conn.close()
+
+
+def test_persisted_vocabulary_round_trips_field_for_field(learning_db):
+    """Bullet 1: what went in comes back out, field for field."""
+    n = store.save_project_vocabulary("proj-a", VOCAB_OBJECTS)
+    assert n == len(VOCAB_OBJECTS)
+
+    loaded = store.load_project_vocabulary("proj-a")
+    assert loaded == VOCAB_OBJECTS
+    # Not merely equal-by-name: every field of every object survived.
+    assert loaded[1]["thickness_in"] == 9.25
+    assert loaded[1]["variant"] == "exterior"
+    assert loaded[0]["aliases"] == ["DS", "downspout"]
+
+
+def test_persisted_vocabulary_save_replaces_rather_than_accumulates(learning_db):
+    """Bullet 2: a project has ONE current snapshot, not a growing pile.
+
+    If saves accumulated, reuse would depend on which row happened to be read
+    first — re-introducing exactly the non-determinism this table exists to
+    remove.
+    """
+    store.save_project_vocabulary("proj-a", VOCAB_OBJECTS)
+    store.save_project_vocabulary("proj-a", VOCAB_OBJECTS)
+    replacement = [{"canonical_name": "Bollards", "aliases": [], "basis": "count"}]
+    assert store.save_project_vocabulary("proj-a", replacement) == 1
+
+    rows = _project_vocab_rows()
+    assert len(rows) == 1, rows
+    assert rows[0]["object_count"] == 1
+    assert store.load_project_vocabulary("proj-a") == replacement
+
+
+def test_persisted_vocabulary_absent_project_returns_empty_not_an_error(learning_db):
+    """Bullet 3: a never-saved key reads as empty — the caller derives fresh."""
+    assert store.load_project_vocabulary("never-saved") == []
+    # And an empty store overall (no row at all) is the same non-event.
+    assert _project_vocab_rows() == []
+
+
+def test_persisted_vocabulary_is_scoped_to_the_exact_project(learning_db):
+    """Bullet 4: same project TYPE, different project — no leak (T-24-20).
+
+    `learning_vocabulary` is keyed by project_type on purpose; this table is
+    not, and one project's naming must never drift because a sibling project
+    of the same type was run.
+    """
+    store.save_project_vocabulary("proj-a", VOCAB_OBJECTS)
+    # Both projects are 'industrial' as far as learning_vocabulary is
+    # concerned; the snapshot still does not cross.
+    store.record_ai_manifest("proj-a", "industrial", VOCAB_OBJECTS)
+    store.record_ai_manifest("proj-b", "industrial", VOCAB_OBJECTS)
+
+    assert store.load_project_vocabulary("proj-b") == []
+    assert store.load_project_vocabulary("proj-a") == VOCAB_OBJECTS
+
+
+def test_persisted_vocabulary_leaves_learning_vocabulary_untouched(learning_db):
+    """Bullet 5: the additive promise, asserted rather than assumed.
+
+    A destructive migration of `learning_vocabulary` is T-24-18 (critical).
+    The new table is a different concern with a different scope; every row and
+    the per-type read must be byte-identical across a full save/load cycle.
+    """
+    store.record_ai_manifest("proj-a", "industrial", VOCAB_OBJECTS)
+    before_rows = dump_distilled_tables()
+    before_read = store.get_vocabulary("industrial")
+    assert before_read, "fixture must actually populate learning_vocabulary"
+
+    store.save_project_vocabulary("proj-a", VOCAB_OBJECTS)
+    store.save_project_vocabulary("proj-b", VOCAB_OBJECTS)
+    store.load_project_vocabulary("proj-a")
+    store.load_project_vocabulary("proj-zzz")
+
+    assert dump_distilled_tables() == before_rows
+    assert store.get_vocabulary("industrial") == before_read
+
+    # The module carries no destructive statement against that table at all.
+    src = (
+        __import__("pathlib").Path(store.__file__).read_text(encoding="utf-8")
+    )
+    assert "DROP TABLE" not in src
+    assert "ALTER TABLE learning_vocabulary" not in src
+    assert "DELETE FROM learning_vocabulary" not in src
+
+
+def test_persisted_vocabulary_falsy_project_key_writes_nothing(learning_db):
+    """Bullet 6: no global row — every project would otherwise inherit it."""
+    for key in (None, "", 0):
+        assert store.save_project_vocabulary(key, VOCAB_OBJECTS) == 0
+    assert _project_vocab_rows() == []
+    assert store.load_project_vocabulary(None) == []
+    assert store.load_project_vocabulary("") == []
+
+    # An empty object list is likewise a no-op: an empty snapshot reads
+    # identically to "never saved", so writing one could only cost a row.
+    assert store.save_project_vocabulary("proj-a", []) == 0
+    assert store.save_project_vocabulary("proj-a", None) == 0
+    assert _project_vocab_rows() == []
+
+
+def test_persisted_vocabulary_unreadable_store_degrades_to_empty(
+    learning_db, tmp_path, monkeypatch
+):
+    """Bullet 7: a broken store costs a run its API saving, never the run.
+
+    Three separate failure shapes, because 'it degrades' is only true if the
+    guard covers the whole read: an unopenable DB file, a corrupt payload, and
+    a payload that parses but is not a list.
+    """
+    store.save_project_vocabulary("proj-a", VOCAB_OBJECTS)
+
+    # (a) the DB path is not a database at all.
+    unopenable = tmp_path / "not-a-db"
+    unopenable.mkdir()
+    monkeypatch.setattr(store, "LEARNING_DB_PATH", unopenable)
+    monkeypatch.setattr(store, "_initialized_for", None)
+    assert store.load_project_vocabulary("proj-a") == []
+    # ... and a save against it does not raise either.
+    with pytest.raises(sqlite3.Error):
+        store.get_connection()
+
+    # (b) a corrupt (non-JSON) payload.
+    monkeypatch.setattr(store, "LEARNING_DB_PATH", learning_db)
+    monkeypatch.setattr(store, "_initialized_for", None)
+    conn = store.get_connection()
+    try:
+        conn.execute(
+            "UPDATE learning_project_vocabulary SET objects = ? WHERE project_key = ?",
+            ("{not json", "proj-a"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    assert store.load_project_vocabulary("proj-a") == []
+
+    # (c) valid JSON that is not an object list.
+    conn = store.get_connection()
+    try:
+        conn.execute(
+            "UPDATE learning_project_vocabulary SET objects = ? WHERE project_key = ?",
+            (json.dumps({"objects": []}), "proj-a"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    assert store.load_project_vocabulary("proj-a") == []
+
+
+def test_persisted_vocabulary_kinds_do_not_overwrite_each_other(learning_db):
+    """Two derivations, one project: each keeps its own snapshot.
+
+    `_build_project_vocabulary` and `_build_naming_conventions` are two
+    different API passes over the same project. Sharing one row would make
+    whichever ran last silently answer for both.
+    """
+    conventions = [{"canonical_name": "Pipe Handrail", "aliases": [], "basis": "linear"}]
+    store.save_project_vocabulary("proj-a", VOCAB_OBJECTS)
+    store.save_project_vocabulary(
+        "proj-a", conventions, kind=store.VOCAB_KIND_NAMING_CONVENTIONS
+    )
+
+    assert store.load_project_vocabulary("proj-a") == VOCAB_OBJECTS
+    assert store.load_project_vocabulary(
+        "proj-a", kind=store.VOCAB_KIND_NAMING_CONVENTIONS
+    ) == conventions
+    assert len(_project_vocab_rows()) == 2
+
+
+def test_persisted_vocabulary_oversized_payload_is_rejected_not_truncated(learning_db):
+    """WR-02 discipline, at the snapshot's own (larger) cap.
+
+    A JSON array cut mid-token cannot be parsed back, so every future load
+    would silently fail. Rejection returns 0 and the run re-derives.
+    """
+    stuffed = [
+        {"canonical_name": "X" * 500, "aliases": ["Y" * 500]}
+        for _ in range(store.MAX_PROJECT_VOCABULARY_LEN // 400)
+    ]
+    assert store.save_project_vocabulary("proj-a", stuffed) == 0
+    assert _project_vocab_rows() == []
+    assert store.load_project_vocabulary("proj-a") == []
+
+
+def test_persisted_vocabulary_table_is_registered_in_the_table_list(learning_db):
+    """A table nobody enumerates is a table schema inspection forgets."""
+    assert store.PROJECT_VOCABULARY_TABLE in store.LEARNING_TABLES
+    store.init_learning_schema()
+    conn = store.get_connection()
+    try:
+        present = {
+            r["name"]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+    finally:
+        conn.close()
+    assert set(store.LEARNING_TABLES).issubset(present), (
+        set(store.LEARNING_TABLES) - present
+    )
