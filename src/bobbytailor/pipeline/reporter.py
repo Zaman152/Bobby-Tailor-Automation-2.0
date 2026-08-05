@@ -1190,6 +1190,155 @@ def _coverage_lines(report: dict) -> list:
     return lines
 
 
+#: Human-readable names for the record kinds ``fuse_sheet`` emits. A kind that
+#: is not in this map renders its own raw value with underscores opened out — an
+#: unrecognised kind must still be COUNTED and SHOWN, never quietly skipped,
+#: which is the same failure this whole section exists to abolish.
+_UNNAMED_KIND_LABELS = {
+    "symbol_group": "symbol group",
+    "wall_class": "wall thickness class",
+    "room": "room",
+}
+
+#: How many individual candidates the section lists before deferring the rest to
+#: ``takeoff.json``. Every record is always counted in the totals above the list
+#: and the remainder is named on its own line, so the cap bounds the PAGE, never
+#: the account (T-24-25).
+_UNNAMED_GEOMETRY_LIST_CAP = 25
+
+
+def _unnamed_quantity_text(value) -> Optional[str]:
+    """A ledger quantity as a reader would write it, or None when there is none.
+
+    ``None`` is returned for a record whose quantity was never bound to a scale
+    — INV-08's recorded ABSENCE of a measurement. The caller renders that as a
+    blank, never as a zero. A whole number keeps no decimal point, because a
+    count of 56 repeated marks is 56 things and ``56.0 EA`` reads like a
+    measurement that happened to land on an integer.
+    """
+    try:
+        if value is None or value == "":
+            return None
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number == int(number):
+        return "{:,.0f}".format(number)
+    return "{:,.1f}".format(number)
+
+
+def _unnamed_geometry_lines(report: dict) -> list:
+    """UNIDENTIFIED GEOMETRY section: measured, but not identified (24-06).
+
+    Returns an EMPTY list when the run carried no unnamed geometry, so a report
+    without it renders byte-identically — the section does not exist rather than
+    existing and saying zero, exactly as :func:`_coverage_lines` behaves for a
+    pre-23 report.
+
+    This sits immediately after COVERAGE because the two answer adjacent
+    questions. COVERAGE says what the run did NOT measure. This says what it DID
+    measure and could not name — a different fact, and one that has to be stated
+    in words. 24-04 stopped these candidates publishing under our own handle for
+    them (``SYM-6``, ``ROOM-3``, ``WALL-TC4``); leaving them out of the summary
+    as well would replace one defect with its mirror image, because a
+    silently-omitted 36-count cluster reads to a client as "there are no
+    columns" (INV-08: a deletion and a zero read identically).
+    """
+    ledger = [
+        r for r in (report.get(UNNAMED_GEOMETRY_KEY) or []) if isinstance(r, dict)
+    ]
+    if not ledger:
+        return []
+
+    lines = [
+        "─" * 70,
+        "UNIDENTIFIED GEOMETRY  (these were MEASURED — the quantities below",
+        "                        are real and so are the objects; what the",
+        "                        drawings do not say is what they ARE)",
+        "─" * 70,
+        "{:<64}{:>5}".format("Candidates measured but not identified:", len(ledger)),
+        "",
+        "They are held out of the take-off above on purpose. Naming one of them",
+        "from our own internal handle for it would put an identifier this app",
+        "invented in front of a client as the name of a thing to price. Their",
+        "absence from the take-off is an absence of a NAME, never of an object.",
+        "",
+    ]
+
+    # ── by kind, and by unit within it ───────────────────────────────────────
+    # Grouped by (kind, unit) because a single total across mixed units would be
+    # a number that means nothing. Insertion order is kept so the breakdown reads
+    # in the order the sheets produced it.
+    totals: dict = {}
+    order: list = []
+    for record in ledger:
+        key = (str(record.get("kind") or "unrecorded"), str(record.get("unit") or ""))
+        if key not in totals:
+            totals[key] = {"count": 0, "quantity": 0.0, "unquantified": 0}
+            order.append(key)
+        slot = totals[key]
+        slot["count"] += 1
+        quantity = _unnamed_quantity_text(record.get("quantity"))
+        if quantity is None:
+            # INV-08 again: a record whose quantity is None is a measurement
+            # that was never bound to a scale. Summing it in as a zero would
+            # publish a number nobody measured, so it is counted apart.
+            slot["unquantified"] += 1
+        else:
+            slot["quantity"] += float(record.get("quantity"))
+
+    row = "  {:<14} {:>13}  {:<18} {}"
+    for kind, unit in order:
+        slot = totals[(kind, unit)]
+        label = _UNNAMED_KIND_LABELS.get(kind, kind.replace("_", " "))
+        measured = slot["count"] - slot["unquantified"]
+        quantity_txt = (
+            "{} {}".format(_unnamed_quantity_text(slot["quantity"]), unit).strip()
+            if measured else ""
+        )
+        lines.append(
+            "  {:<32}{:>4} candidate(s){:>18}".format(label, slot["count"], quantity_txt)
+        )
+        if slot["unquantified"]:
+            lines.append(
+                "      ({:,} with no measured quantity — unknown, not zero)".format(
+                    slot["unquantified"]
+                )
+            )
+
+    # ── the individual candidates ────────────────────────────────────────────
+    lines.append("")
+    lines.append(row.format("Candidate", "Quantity", "Sheet", "Why naming failed"))
+    for record in ledger[:_UNNAMED_GEOMETRY_LIST_CAP]:
+        quantity = _unnamed_quantity_text(record.get("quantity"))
+        quantity_txt = (
+            "(not measured)" if quantity is None
+            else "{} {}".format(quantity, record.get("unit") or "").strip()
+        )
+        lines.append(
+            row.format(
+                str(record.get("candidate_id") or "?")[:14],
+                quantity_txt,
+                str(record.get("sheet") or "?")[:18],
+                str(record.get("reason") or "").replace("_", " "),
+            )
+        )
+
+    remainder = len(ledger) - _UNNAMED_GEOMETRY_LIST_CAP
+    if remainder > 0:
+        # Named, never silently truncated: a list that stops without saying it
+        # stopped is the same lie as a missing row (T-24-25).
+        lines.append(
+            "  ... and {:,} more — every one of them is in the".format(remainder)
+        )
+        lines.append(
+            "      `{}` list in takeoff.json".format(UNNAMED_GEOMETRY_KEY)
+        )
+
+    lines.append("")
+    return lines
+
+
 def _scale_confidence_lines(report: dict) -> list:
     """SCALE CONFIDENCE section: per-sheet main-plan solve summary (21-13).
 
@@ -1328,6 +1477,10 @@ def _write_summary(report: dict, path: Path):
 
     # Between API USAGE and SCALE CONFIDENCE, and empty on a pre-23 report.
     lines.extend(_coverage_lines(report))
+    # Immediately after COVERAGE, and empty when the run named everything it
+    # measured. The two answer adjacent questions: what did the run not measure,
+    # then what did it measure but not identify.
+    lines.extend(_unnamed_geometry_lines(report))
     lines.extend(_scale_confidence_lines(report))
     lines.extend(_provenance_breakdown_lines(report))
 

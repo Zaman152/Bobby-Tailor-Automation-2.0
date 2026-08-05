@@ -1309,6 +1309,136 @@ def test_the_report_holds_its_own_copy_of_the_run_settings():
     assert report["run_settings"]["ensemble_n"] == 3
 
 
+def test_the_unnamed_geometry_section_is_absent_when_there_is_nothing_to_say():
+    """The empty contract, copied deliberately from `_coverage_lines`: a report
+    without unnamed geometry renders byte-identically. The section does not
+    exist rather than existing and saying zero."""
+    from bobbytailor.pipeline.reporter import _unnamed_geometry_lines
+
+    assert _unnamed_geometry_lines({}) == []
+    assert _unnamed_geometry_lines({"unnamed_geometry": []}) == []
+    assert _unnamed_geometry_lines({"unnamed_geometry": None}) == []
+
+
+def test_the_summary_renders_the_unnamed_geometry_section_when_there_is():
+    with _isolated_output_dir():
+        report = generate_report(
+            "Unnamed Proj", _two_sheets_with_unnamed_geometry(), [],
+        )
+        text = Path(report["_files"]["summary_txt"]).read_text()
+
+    assert "UNIDENTIFIED GEOMETRY" in text
+    # The count, stated as a number a reader can act on.
+    assert "Candidates measured but not identified:" in text
+    assert "SYM-2" in text and "WALL-TC4" in text and "ROOM-3" in text
+    # In WORDS: what is missing is the identity, not the quantity and not the
+    # object. INV-08's reason this is a section and not only a JSON key.
+    assert "MEASURED" in text
+    assert "absence of a NAME, never of an object" in text
+    # And the section sits where the plan puts it — after COVERAGE, before the
+    # scale block, so the two adjacent questions read as adjacent.
+    assert text.index("UNIDENTIFIED GEOMETRY") < text.index("SCALE CONFIDENCE")
+
+
+def test_the_unnamed_section_breaks_down_by_kind_with_its_measured_quantity():
+    """A reader must be able to tell 'we measured 56 of these and could not name
+    them' from 'these do not exist'."""
+    with _isolated_output_dir():
+        report = generate_report(
+            "Unnamed Proj", _two_sheets_with_unnamed_geometry(), [],
+        )
+        text = Path(report["_files"]["summary_txt"]).read_text()
+
+    section = text.split("UNIDENTIFIED GEOMETRY")[1].split("SCALE CONFIDENCE")[0]
+    assert "symbol group" in section
+    assert "wall thickness class" in section
+    assert "room" in section
+    # A count of 56 repeated marks is 56 things — `56.0 EA` would read like a
+    # measurement that happened to land on an integer.
+    assert "56 EA" in section
+    assert "812.5 LF" in section
+    assert "279.5 SF" in section
+    # The sheet each came from, and the reason naming failed.
+    assert "A-101" in section and "A-102" in section
+    assert "wall class unlabeled" in section
+
+
+def test_a_record_with_no_measured_quantity_is_never_rendered_as_a_zero():
+    """INV-08 inside this section too: a room whose SF was never bound to a
+    scale has no number, which is a different fact from a measured zero."""
+    from bobbytailor.vision.fusion import UNNAMED_ROOM_UNLABELED
+
+    extracted = _baseline_extracted()
+    extracted[0]["unnamed_geometry"] = [
+        _ledger_record("ROOM-9", None, "SF", UNNAMED_ROOM_UNLABELED, "room"),
+    ]
+    with _isolated_output_dir():
+        report = generate_report("Unnamed Proj", extracted, [])
+        text = Path(report["_files"]["summary_txt"]).read_text()
+
+    section = text.split("UNIDENTIFIED GEOMETRY")[1].split("SCALE CONFIDENCE")[0]
+    assert "(not measured)" in section
+    assert "no measured quantity" in section
+    assert "0.0 SF" not in section, "a recorded absence is never summed as zero"
+
+
+def test_the_individual_listing_is_capped_but_never_silently_truncated():
+    """T-24-25: the cap bounds the page, never the account. A list that stops
+    without saying it stopped is the same lie as a missing row."""
+    from bobbytailor.pipeline.reporter import _UNNAMED_GEOMETRY_LIST_CAP
+    from bobbytailor.vision.fusion import UNNAMED_NO_NAME_SOURCE
+
+    over = _UNNAMED_GEOMETRY_LIST_CAP + 7
+    extracted = _baseline_extracted()
+    extracted[0]["unnamed_geometry"] = [
+        _ledger_record(
+            "SYM-%d" % i, 2, "EA", UNNAMED_NO_NAME_SOURCE, "symbol_group",
+        )
+        for i in range(over)
+    ]
+    with _isolated_output_dir():
+        report = generate_report("Unnamed Proj", extracted, [])
+        text = Path(report["_files"]["summary_txt"]).read_text()
+
+    section = text.split("UNIDENTIFIED GEOMETRY")[1].split("SCALE CONFIDENCE")[0]
+    assert "and 7 more" in section
+    assert "takeoff.json" in section
+    # The TOTAL is the whole population, not the printed page of it.
+    assert str(over) in section.split("\n")[4]
+    # And every one of them really is in the artifact the line points at.
+    assert len(report["unnamed_geometry"]) == over
+
+
+def test_an_unrecognised_record_kind_is_still_counted_and_shown():
+    """A kind this renderer has never seen must not vanish from the section —
+    a silent skip here is the defect the section exists to abolish."""
+    from bobbytailor.vision.fusion import UNNAMED_NO_NAME_SOURCE
+
+    extracted = _baseline_extracted()
+    extracted[0]["unnamed_geometry"] = [
+        _ledger_record(
+            "FIX-1", 3, "EA", UNNAMED_NO_NAME_SOURCE, "fixture_cluster",
+        ),
+    ]
+    with _isolated_output_dir():
+        report = generate_report("Unnamed Proj", extracted, [])
+        text = Path(report["_files"]["summary_txt"]).read_text()
+
+    section = text.split("UNIDENTIFIED GEOMETRY")[1].split("SCALE CONFIDENCE")[0]
+    assert "fixture cluster" in section
+    assert "FIX-1" in section
+
+
+def test_a_report_with_no_unnamed_geometry_still_renders_byte_for_byte():
+    """The 23-17 parity pin, re-run: this plan adds nothing to a summary whose
+    run named everything it measured."""
+    with _isolated_output_dir():
+        report = generate_report("Baseline Proj", _baseline_extracted(), [])
+        text = Path(report["_files"]["summary_txt"]).read_text()
+    assert _mask_timestamp(text) == PRE_23_SUMMARY_TXT
+    assert "UNIDENTIFIED GEOMETRY" not in text
+
+
 def test_both_entry_points_hand_the_reporter_their_run_settings():
     """The 23-17 lesson in one grep: a reporter that CAN record the settings
     and a pipeline that never hands them over leaves the question exactly as
