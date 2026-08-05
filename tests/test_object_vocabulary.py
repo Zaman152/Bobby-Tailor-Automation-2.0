@@ -236,3 +236,229 @@ def test_pipeline_stores_vocab_labels_and_merges_via_helper():
     assert "Door" in legend_labels
     assert "Column" in legend_labels
     assert "Bollard" in legend_labels
+
+
+# ── 24-05: the persisted vocabulary (V4-DET-02/04, defect F3) ────────────────
+#
+# The project-level naming pass was re-run against the API on EVERY run, so the
+# object list the deterministic wall classifier binds against changed between
+# runs — `Metal Downspout` on one, `Metal Downspouts` on the next. It is also
+# the dominant repeat-run cost: the two saved paid runs charge $0.422 of a
+# $0.599 run to the project-level passes.
+#
+# Both claims reduce to ONE observable thing offline: the analyzer CALL COUNT.
+# No dollar figure is asserted — the saving is a consequence of the call count,
+# and the call count is what a free test can actually see.
+#
+# Every test here points the learning store at a tmp path. The developer's real
+# store is never read or written (the isolation discipline plan 22-01 landed for
+# the output directory).
+
+import pytest
+
+from bobbytailor.learning import store as learning_store
+from bobbytailor.pipeline.takeoff_pipeline import _canonicalise_persisted_vocabulary
+
+
+@pytest.fixture()
+def isolated_learning_store(tmp_path, monkeypatch):
+    """Point the learning store at an isolated tmp DB (schema re-inits per path)."""
+    db_path = tmp_path / "learning.db"
+    monkeypatch.setattr(learning_store, "LEARNING_DB_PATH", db_path)
+    monkeypatch.setattr(learning_store, "_initialized_for", None)
+    return db_path
+
+
+class _CountingAnalyzer:
+    """Analyzer stub that COUNTS its invocations. No API, no credential."""
+
+    def __init__(self, payload):
+        self._payload = payload
+        self.calls = 0
+
+    def __call__(self, image_path, sheet_name, **kwargs):
+        self.calls += 1
+        # Fresh copy per call — the pass mutates what it parses.
+        return json.loads(json.dumps(self._payload))
+
+
+def _naming_payload():
+    """A canned naming-convention library.
+
+    Both names are canonicalisation IDENTITIES (neither matches an
+    ITEM_NAME_MAP rule that would rewrite it), so the second run's fold is a
+    no-op and `second == first` is a literal equality rather than an equality
+    that happens to survive a rewrite. The fold itself is proven separately by
+    the canonicalisation test below.
+    """
+    return {
+        "objects": [
+            {
+                "canonical_name": "Columns",
+                "aliases": ["COLUMN", "INTERIOR COLUMN"],
+                "basis": "count",
+                "binding_hint": "structural_grid_symbol",
+                "variant": "",
+                "thickness_in": "",
+                "height_ft": "35",
+            },
+            {
+                "canonical_name": "Exterior Tilt Up Wall",
+                "aliases": ["S.C.C.P.", "TILT WALL PANEL"],
+                "basis": "wall_area",
+                "binding_hint": "exterior_wall",
+                "variant": "exterior",
+                "thickness_in": "",
+                "height_ft": "36",
+            },
+        ]
+    }
+
+
+def test_persisted_vocabulary_is_preferred(isolated_learning_store):
+    """A repeat run makes ZERO additional calls and gets the SAME object list.
+
+    This is the determinism claim (identical list) and the cost claim (no
+    additional call) in one assertion, because they are the same fact: the
+    list only changed between runs BECAUSE it was re-derived.
+    """
+    analyzer = _CountingAnalyzer(_naming_payload())
+    first_pipeline = TakeoffPipeline(analyzer=analyzer)
+    assert first_pipeline._settings.learning_enabled, (
+        "the persisted vocabulary is gated on learning_enabled; a disabled "
+        "config would make this test pass by never storing anything"
+    )
+
+    first = first_pipeline._build_naming_conventions(
+        "/tmp/plan.png", "KEYNOTES: ...", None, project_key="proj-a"
+    )
+    # The stub really was the source — otherwise 'no additional calls' below
+    # would be true of a test that never called anything.
+    assert analyzer.calls > 0
+    assert [o["canonical_name"] for o in first] == [
+        "Columns", "Exterior Tilt Up Wall",
+    ]
+    calls_after_first_run = analyzer.calls
+
+    # ... and the derivation was stored, under this project key only.
+    stored = learning_store.load_project_vocabulary(
+        "proj-a", kind=learning_store.VOCAB_KIND_NAMING_CONVENTIONS
+    )
+    assert len(stored) == len(first)
+
+    second_pipeline = TakeoffPipeline(analyzer=analyzer)
+    second = second_pipeline._build_naming_conventions(
+        "/tmp/plan.png", "KEYNOTES: ...", None, project_key="proj-a"
+    )
+
+    # THE cost claim: not "fewer calls" — zero additional calls.
+    assert analyzer.calls == calls_after_first_run
+    # THE determinism claim: the same object list, field for field.
+    assert second == first
+
+
+def test_persisted_vocabulary_is_not_reused_across_projects(
+    isolated_learning_store,
+):
+    """A sibling project derives its own — the snapshot is per-project (T-24-20).
+
+    Without this, 'zero additional calls' above could be satisfied by a global
+    snapshot that every project inherits, which is a naming leak rather than a
+    determinism fix.
+    """
+    analyzer = _CountingAnalyzer(_naming_payload())
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+    pipeline._build_naming_conventions(
+        "/tmp/plan.png", "t", None, project_key="proj-a"
+    )
+    calls_after_proj_a = analyzer.calls
+
+    pipeline._build_naming_conventions(
+        "/tmp/plan.png", "t", None, project_key="proj-b"
+    )
+    assert analyzer.calls > calls_after_proj_a
+
+    # A run with NO project key never persists and never reuses.
+    calls_after_proj_b = analyzer.calls
+    pipeline._build_naming_conventions("/tmp/plan.png", "t", None)
+    assert analyzer.calls > calls_after_proj_b
+    assert learning_store.load_project_vocabulary(
+        "", kind=learning_store.VOCAB_KIND_NAMING_CONVENTIONS
+    ) == []
+
+
+def test_persisted_vocabulary_is_canonicalised_on_read(isolated_learning_store):
+    """A split spelling already in the store folds and is never authoritative.
+
+    Rows written before 24-03 landed can hold BOTH spellings of one object —
+    the singular/plural split defect F2 produced. Promoting that to authority
+    would make persistence worse than the defect it fixes: the split would stop
+    being a per-run accident and become a permanent property of the project.
+    """
+    learning_store.save_project_vocabulary(
+        "proj-split",
+        [
+            {"canonical_name": "Bollard", "aliases": ["BOL"], "basis": "count"},
+            {"canonical_name": "Bollards", "aliases": ["B"], "basis": "count"},
+            {"canonical_name": "Dock Bumper", "aliases": [], "basis": "count"},
+        ],
+        kind=learning_store.VOCAB_KIND_NAMING_CONVENTIONS,
+    )
+
+    analyzer = _CountingAnalyzer(_naming_payload())
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+    loaded = pipeline._build_naming_conventions(
+        "/tmp/plan.png", "t", None, project_key="proj-split"
+    )
+
+    names = [o["canonical_name"] for o in loaded]
+    # ONE entry for the object, under the canonical form 24-03 established.
+    assert names.count("Bollards") == 1
+    assert "Bollard" not in names
+    # THE LOAD-BEARING NEGATIVE: a synonym is not a plural. `Dock Bumper`
+    # matches ITEM_NAME_MAP's `dock.*bumper` rule whose canonical form is
+    # `Dock Leveler`, and it must still resolve to ITSELF. If this ever fails,
+    # the fold has become a synonym mapper and a genuinely distinct object is
+    # disappearing from client reports.
+    assert names == ["Bollards", "Dock Bumper"]
+    # Nothing was deleted — the loser's spelling survives as an alias.
+    bollards = loaded[0]
+    assert "BOL" in bollards["aliases"] and "B" in bollards["aliases"]
+    # And the fold cost no API call.
+    assert analyzer.calls == 0
+
+
+def test_persisted_vocabulary_fold_is_idempotent(isolated_learning_store):
+    """Folding on read twice yields the same list — which is WHY no migration.
+
+    24-RESEARCH section 13 forbids a destructive migration against the store.
+    Canonicalising at the point of use is the stated alternative, and it is only
+    a valid alternative if it is idempotent.
+    """
+    once = _canonicalise_persisted_vocabulary([
+        {"canonical_name": "Bollard", "aliases": ["BOL"], "basis": "count"},
+        {"canonical_name": "Bollards", "aliases": [], "basis": "count"},
+    ])
+    assert _canonicalise_persisted_vocabulary(once) == once
+
+
+def test_persisted_vocabulary_broken_store_still_derives(
+    isolated_learning_store, monkeypatch
+):
+    """A store that raises costs the run its saving, never the run itself."""
+    def _boom(*a, **k):
+        raise RuntimeError("learning db on fire")
+
+    import bobbytailor.pipeline.takeoff_pipeline as tp
+    monkeypatch.setattr(tp, "load_project_vocabulary", _boom)
+    monkeypatch.setattr(tp, "save_project_vocabulary", _boom)
+
+    analyzer = _CountingAnalyzer(_naming_payload())
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+    result = pipeline._build_naming_conventions(
+        "/tmp/plan.png", "t", None, project_key="proj-a"
+    )
+    assert [o["canonical_name"] for o in result] == [
+        "Columns", "Exterior Tilt Up Wall",
+    ]
+    assert analyzer.calls > 0
