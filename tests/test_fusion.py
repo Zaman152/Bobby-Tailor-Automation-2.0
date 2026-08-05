@@ -4081,3 +4081,174 @@ def test_orphan_room_an_absent_wall_reference_is_not_read_as_an_absent_wall():
     assert ROOM_WALL_REFERENCE_FIELD not in room       # the state until 24-07
     result = _room_result([room])
     assert [c["name"] for c in result["components"]] == ["STORAGE"]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 24-04 task 3 — THE RELOCATION, PROVEN BOTH WAYS, ON A REAL SHEET
+#
+# 24-RESEARCH pitfall 3 / threat T-24-14 names the mirror-image defect and it is
+# the strictly worse one: dropping the rows so no identifier appears in the
+# take-off, and silently losing hundreds of counted symbols with them. Its
+# warning sign is a test whose acceptance is "no identifier appears" with no
+# corresponding assertion that the candidates appear somewhere else.
+#
+# `test_no_raw_candidate_ids_reach_the_takeoff` asserts BOTH halves in ONE
+# function, so neither can be satisfied alone. A deletion fails it as loudly as
+# a leak does.
+#
+# ── The free planning measurements this plan was built on ──────────────────
+#
+# Zero-API deterministic-bundle probes, 2026-08-05, over the real Crow set:
+#
+#   * 107 symbol groups across the four sheets. 81 carry NO contained text at
+#     all, 26 carry text that is entirely drafting noise, and 0 carry a genuine
+#     object name. So every one of the 107 reached the identifier fallback.
+#   * 4 / 153 / 1 unlabeled room candidates on pages 0 / 1 / 2.
+#   * Of 45 components published on page 0, 41 were named with their own
+#     candidate ID, beside one room named `4` and one named by a 19-token
+#     harvest.
+#
+# ── Why the ledger is LARGER than the number of take-off rows lost ─────────
+#
+# Merging and deduplication run downstream of `fuse_sheet`: `merge_with_
+# provenance` and `aggregate_takeoff` collapse same-named rows across sheets, so
+# only a fraction of these candidates ever reached publication as distinct
+# lines. A ledger of 42 on page 0 against 45 published components is therefore
+# not a contradiction — it is one record per measured candidate, which is what a
+# reviewer needs, rather than one per surviving report row.
+#
+# ── And the score is EXPECTED to drop ──────────────────────────────────────
+#
+# That is the correct, documented outcome and the same precedent Phase 23's
+# rails set. Nothing here asserts a ledger size: that number is an outcome of
+# the drawing, and pinning it would create pressure to tune the gate until the
+# number matched. The population is PRINTED, never asserted against a floor.
+# ═══════════════════════════════════════════════════════════════════════════
+
+_CROW_FOR_LEDGER = "uploads/Crow - Cass White Road-Plans.pdf"
+
+
+def _crow_page_zero_fused():
+    """The real Crow page 0, fused with no vision answers at all.
+
+    Skips — loudly and by name — rather than passing on an absent fixture: a
+    check that passes for having looked at nothing is exactly what
+    `test_phase23_acceptance.py` rule 3 forbids.
+    """
+    if not os.path.exists(_CROW_FOR_LEDGER):
+        pytest.skip("the real Crow plan set is not present at %s" % _CROW_FOR_LEDGER)
+    import fitz
+
+    from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+    pipe = TakeoffPipeline(analyzer=lambda *a, **k: {})
+    doc = fitz.open(_CROW_FOR_LEDGER)
+    try:
+        bundle = pipe._deterministic_bundle(
+            doc[0], doc, _CROW_FOR_LEDGER, 0, "A-101", "floor_plan"
+        )
+    finally:
+        doc.close()
+    return bundle, fuse_sheet(bundle, {})
+
+
+def test_no_raw_candidate_ids_reach_the_takeoff():
+    """The relocation, asserted in BOTH directions by one test.
+
+    Half one: no published component's name equals its own candidate ID.
+    Half two: the ledger is non-empty.
+    Half three: every nameable candidate is EITHER published OR ledgered —
+    exactly once, never both, never neither, and nothing in the ledger that was
+    never a candidate. Nothing disappeared; nothing was invented.
+    """
+    import collections
+
+    from bobbytailor.vision.fusion import _is_noise_cluster, _wall_candidate_id
+
+    bundle, result = _crow_page_zero_fused()
+    components = result["components"]
+    ledger = result[UNNAMED_GEOMETRY_KEY]
+
+    # ── Half one: nothing publishes under our own handle for it ────────────
+    leaked = [c for c in components if c.get("name") == c.get("candidate_id")]
+    assert leaked == [], "published as an identifier: %r" % [
+        c.get("name") for c in leaked
+    ]
+
+    # ── Half two: and the candidates did not simply vanish ─────────────────
+    assert len(ledger) > 0, (
+        "no unnamed-geometry records at all — either this sheet became fully "
+        "identifiable, or the gate is deleting rows instead of relocating them"
+    )
+    assert all(r.get("quantity") is not None for r in ledger), (
+        "a ledger record lost the quantity it exists to preserve"
+    )
+
+    # ── Half three: the partition is exact ─────────────────────────────────
+    nameable = set()
+    pure_noise = set()
+    for group in bundle.get("symbol_groups") or []:
+        cid = getattr(group, "candidate_id", "")
+        nameable.add(cid)
+        if _is_noise_cluster(getattr(group, "contained_texts", []) or []):
+            # Never an object, so never unidentified geometry either. The
+            # pre-existing drop is unchanged and these are the ONLY candidates
+            # allowed to appear in neither list.
+            pure_noise.add(cid)
+    for cls in bundle.get("wall_lf_by_class") or {}:
+        nameable.add(_wall_candidate_id(cls))
+    for room in bundle.get("rooms") or []:
+        nameable.add(getattr(room, "candidate_id", ""))
+
+    published = collections.Counter(
+        c.get("candidate_id") for c in components if c.get("candidate_id") in nameable
+    )
+    ledgered = collections.Counter(r["candidate_id"] for r in ledger)
+
+    assert set(ledgered) - nameable == set(), (
+        "the ledger invented a candidate the bundle never measured: %r"
+        % sorted(set(ledgered) - nameable)
+    )
+    assert max(ledgered.values()) == 1, (
+        "a candidate was ledgered more than once: %r"
+        % {k: v for k, v in ledgered.items() if v > 1}
+    )
+    assert set(published) & set(ledgered) == set(), (
+        "a candidate both published AND was ledgered: %r"
+        % sorted(set(published) & set(ledgered))
+    )
+    vanished = nameable - set(published) - pure_noise
+    assert vanished == set(ledgered), (
+        "the candidates that left the take-off are not the candidates that "
+        "entered the ledger — %r vanished without a record, %r were ledgered "
+        "without leaving"
+        % (sorted(vanished - set(ledgered)), sorted(set(ledgered) - vanished))
+    )
+
+    # ── The predicted shape change, RECORDED rather than discovered ────────
+    # Printed, never asserted against a floor (24-RESEARCH Open Question 5).
+    by_kind = collections.Counter(r["kind"] for r in ledger)
+    print(
+        "\n24-04 Crow page 0 unnamed-geometry population by kind: %s "
+        "(published %d, nameable %d, pure-noise dropped %d)"
+        % (dict(by_kind), len(components), len(nameable), len(pure_noise))
+    )
+
+
+def test_the_both_ways_assertion_skips_rather_than_passes_without_its_fixture(
+    monkeypatch,
+):
+    """A check either asserts or skips; it may never pass for having looked at
+    nothing (T-23-67). Pointed at a nonexistent PDF, it must SKIP."""
+    monkeypatch.setitem(
+        _crow_page_zero_fused.__globals__,
+        "_CROW_FOR_LEDGER",
+        "uploads/does-not-exist-24-04.pdf",
+    )
+    # `pytest.skip` raises `Skipped`, which derives from BaseException, NOT from
+    # Exception. Catching `Exception` here would let the skip escape and this
+    # guard would itself report as skipped: a green tick for having checked
+    # nothing. Name the type.
+    with pytest.raises(pytest.skip.Exception) as excinfo:
+        test_no_raw_candidate_ids_reach_the_takeoff()
+    assert "does-not-exist-24-04.pdf" in str(excinfo.value)
