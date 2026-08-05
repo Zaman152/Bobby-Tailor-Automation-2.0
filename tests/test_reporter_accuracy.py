@@ -1439,6 +1439,138 @@ def test_a_report_with_no_unnamed_geometry_still_renders_byte_for_byte():
     assert "UNIDENTIFIED GEOMETRY" not in text
 
 
+def _unnamed_report_data() -> dict:
+    """A takeoff.json carrying a two-record ledger, as the reporter writes it."""
+    from bobbytailor.vision.fusion import (
+        UNNAMED_NO_NAME_SOURCE,
+        UNNAMED_WALL_CLASS_UNLABELED,
+    )
+
+    first = _ledger_record(
+        "SYM-6", 36, "EA", UNNAMED_NO_NAME_SOURCE, "symbol_group",
+        evidence_texts=["A-101", "12"],
+    )
+    first["sheet"] = "A-101"
+    second = _ledger_record(
+        "WALL-TC4", 812.5, "LF", UNNAMED_WALL_CLASS_UNLABELED, "wall_class",
+    )
+    second["sheet"] = "A-102"
+    return {
+        "project_name": "P",
+        "takeoff_summary": [{"item": "Doors", "quantity": 4, "unit": "EA"}],
+        "unnamed_geometry": [first, second],
+    }
+
+
+def test_the_excel_workbook_carries_an_unidentified_geometry_sheet(tmp_path):
+    """The estimator's own artifact must show what was measured but not named —
+    otherwise the exclusion 24-04 made reads as 'not found on the drawings'."""
+    wb = _export(_unnamed_report_data(), tmp_path)
+
+    assert "Unidentified Geometry" in wb.sheetnames
+    ws = wb["Unidentified Geometry"]
+    # Row 1 is the caption, row 2 the header, one row per ledger record after.
+    assert ws.max_row - 2 == 2
+
+    rows = {
+        ws.cell(row=r, column=1).value: [
+            ws.cell(row=r, column=c).value for c in range(1, 8)
+        ]
+        for r in range(3, ws.max_row + 1)
+    }
+    assert set(rows) == {"SYM-6", "WALL-TC4"}
+
+    sym = rows["SYM-6"]
+    assert sym[1] == "symbol group"
+    assert sym[2] == "A-101", "the sheet the candidate was measured on"
+    assert sym[3] == 36, "the count is preserved exactly as measured"
+    assert sym[4] == "EA"
+    assert "A-101" in str(sym[5]), "the text found on the drawing"
+    assert sym[6] == "no name source"
+
+    assert rows["WALL-TC4"][3] == 812.5
+    assert rows["WALL-TC4"][6] == "wall class unlabeled"
+
+
+def test_the_excel_unidentified_sheet_says_measurements_not_absences(tmp_path):
+    """T-24-23: a silently-omitted candidate read as 'does not exist' is the
+    defect. The workbook must make that misreading impossible."""
+    wb = _export(_unnamed_report_data(), tmp_path)
+
+    caption = str(wb["Unidentified Geometry"]["A1"].value)
+    assert "REAL MEASUREMENTS" in caption
+    assert "deliberately excluded" in caption
+    assert "NOT missing" in caption
+
+    # And reachable from the run facts, for a reader who never opens the tab.
+    about = {r[0].value: r[1].value for r in wb["About"].iter_rows(min_row=1)}
+    assert "2 candidate(s)" in about["UNIDENTIFIED GEOMETRY"]
+    assert "never missing from it" in about["UNIDENTIFIED GEOMETRY"]
+
+
+def test_a_run_that_named_everything_gains_no_empty_excel_worksheet(tmp_path):
+    """The same rule the summary section follows: nothing to report, no sheet."""
+    wb = _export({
+        "project_name": "P",
+        "takeoff_summary": [{"item": "Doors", "quantity": 4, "unit": "EA"}],
+        "unnamed_geometry": [],
+    }, tmp_path)
+    assert wb.sheetnames == ["Take-Off", "About"]
+    assert "UNIDENTIFIED GEOMETRY" not in {
+        r[0].value for r in wb["About"].iter_rows(min_row=1)
+    }
+
+
+def test_a_ledger_quantity_never_measured_stays_blank_in_the_excel_book(tmp_path):
+    """INV-08 in the spreadsheet: a room whose SF was never bound to a scale has
+    no number, and a zero here would be a number nobody measured."""
+    from bobbytailor.vision.fusion import UNNAMED_ROOM_UNLABELED
+
+    record = _ledger_record("ROOM-9", None, "SF", UNNAMED_ROOM_UNLABELED, "room")
+    record["sheet"] = "A-101"
+    wb = _export({
+        "project_name": "P", "takeoff_summary": [],
+        "unnamed_geometry": [record],
+    }, tmp_path)
+    ws = wb["Unidentified Geometry"]
+    assert ws.cell(row=3, column=1).value == "ROOM-9"
+    assert ws.cell(row=3, column=4).value is None, "blank, not zero"
+
+
+def test_excel_drawing_text_beginning_with_an_equals_is_not_a_formula(tmp_path):
+    """T-24-24. Measured, not assumed: openpyxl infers `data_type='f'` for a
+    string starting with `=` and emits <f>…</f> — a live formula in a workbook
+    built from words a draughtsman typed on a drawing."""
+    from bobbytailor.vision.fusion import UNNAMED_NO_NAME_SOURCE
+
+    record = _ledger_record(
+        "SYM-1", 2, "EA", UNNAMED_NO_NAME_SOURCE, "symbol_group",
+        evidence_texts=["=1+1", "@SUM(A1)"],
+    )
+    record["sheet"] = "=cmd|'/c calc'!A0"
+    wb = _export({
+        "project_name": "P", "takeoff_summary": [],
+        "unnamed_geometry": [record],
+    }, tmp_path)
+    ws = wb["Unidentified Geometry"]
+
+    for column in (3, 6):
+        cell = ws.cell(row=3, column=column)
+        assert cell.data_type == "s", (
+            "drawing-derived text must be written as text, never as a formula"
+        )
+        assert str(cell.value).startswith("="), "and verbatim, not mangled"
+
+
+def test_the_excel_exporter_makes_no_paid_call(tmp_path):
+    """This whole export path is offline — it reads a saved run and nothing
+    else. A workbook build must never be able to charge the API."""
+    source = (Path(__file__).resolve().parents[1]
+              / "scripts" / "export_takeoff_excel.py").read_text()
+    for forbidden in ("ANTHROPIC_API_KEY", "analyze_drawing", "pytest.mark.golden"):
+        assert forbidden not in source
+
+
 def test_both_entry_points_hand_the_reporter_their_run_settings():
     """The 23-17 lesson in one grep: a reporter that CAN record the settings
     and a pipeline that never hands them over leaves the question exactly as

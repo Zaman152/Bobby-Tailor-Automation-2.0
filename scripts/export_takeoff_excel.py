@@ -52,6 +52,26 @@ def _row_provenance(row: dict) -> str:
     return str(row.get("provenance") or provenance_of_row(row))
 
 
+def _write_text(ws, row: int, column: int, value) -> None:
+    """Write drawing-derived free text as TEXT, never as a formula (T-24-24).
+
+    Measured, not assumed: ``ws.append(["=1+1"])`` makes openpyxl infer
+    ``data_type='f'`` and emit ``<f>1+1</f>`` — a live formula in a workbook
+    built from words a draughtsman typed on a drawing. Forcing ``data_type='s'``
+    emits ``<is><t>=1+1</t></is>`` instead, so the cell displays the characters
+    verbatim and the spreadsheet application evaluates nothing. (A leading ``=``
+    is the only trigger openpyxl itself honours; ``@``, ``+`` and ``-`` are
+    already written as strings, and an inline-string cell is not re-parsed.)
+
+    The unnamed-geometry sheet is where this matters most: its evidence column
+    is literally text harvested off the plan, and its reasons quote that text.
+    """
+    cell = ws.cell(row=row, column=column)
+    cell.value = value
+    if isinstance(value, str):
+        cell.data_type = "s"
+
+
 def build(run_dir: Path, out: Path, golden_pdf: Path = None) -> Path:
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
@@ -187,6 +207,55 @@ def build(run_dir: Path, out: Path, golden_pdf: Path = None) -> Path:
             ws3.column_dimensions[ws3.cell(row=2, column=i).column_letter].width = w
         ws3.freeze_panes = "A3"
 
+    # ── unidentified geometry: measured, but the drawings do not name it ─────
+    # The Take-Off sheet lists what the run could both measure AND name. These
+    # were measured and could not be named, so 24-04 holds them out of the
+    # take-off rather than publishing them under an identifier this app invented.
+    # Held out and unlisted, though, they would read to an estimator as "there
+    # are no columns" — the same lie as a blank spelled as a zero, pointing the
+    # other way. The sheet exists so that absence is impossible to misread.
+    unnamed = data.get("unnamed_geometry") or []
+    if unnamed:
+        ws4 = wb.create_sheet("Unidentified Geometry")
+        _write_text(ws4, 1, 1,
+                    "These quantities are REAL MEASUREMENTS whose object "
+                    "identity is unknown. They are deliberately excluded from "
+                    "the Take-Off sheet, NOT missing from it — do not read "
+                    "their absence there as 'not found on the drawings'.")
+        ws4["A1"].font = Font(bold=True, color="9C0006")
+        un_headers = ["Candidate ID", "Kind", "Sheet", "Quantity", "Unit",
+                      "Text found on the drawing", "Why naming failed"]
+        ws4.append(un_headers)
+        for c in ws4[2]:
+            c.font = Font(bold=True, color="FFFFFF")
+            c.fill = head_fill
+            c.alignment = Alignment(horizontal="center", vertical="center")
+
+        for rec in unnamed:
+            if not isinstance(rec, dict):
+                continue
+            # A quantity the run never bound to a scale stays BLANK, exactly as
+            # on the Take-Off sheet: a zero here would be a number nobody
+            # measured (INV-08).
+            qty = rec.get("quantity")
+            if qty == "":
+                qty = None
+            evidence = "; ".join(
+                str(t) for t in (rec.get("evidence_texts") or [])
+            )[:300]
+            r = ws4.max_row + 1
+            _write_text(ws4, r, 1, str(rec.get("candidate_id") or ""))
+            _write_text(ws4, r, 2, str(rec.get("kind") or "").replace("_", " "))
+            _write_text(ws4, r, 3, str(rec.get("sheet") or ""))
+            ws4.cell(row=r, column=4).value = qty
+            _write_text(ws4, r, 5, str(rec.get("unit") or ""))
+            _write_text(ws4, r, 6, evidence)
+            _write_text(ws4, r, 7, str(rec.get("reason") or "").replace("_", " "))
+
+        for i, w in enumerate([16, 20, 22, 12, 7, 52, 30], start=1):
+            ws4.column_dimensions[ws4.cell(row=2, column=i).column_letter].width = w
+        ws4.freeze_panes = "A3"
+
     # ── provenance legend / run facts ────────────────────────────────────────
     ws2 = wb.create_sheet("About")
     api = data.get("api_usage") or {}
@@ -216,6 +285,17 @@ def build(run_dir: Path, out: Path, golden_pdf: Path = None) -> Path:
                 "zero. Raise the budget cap and re-run."
                 % coverage.get("sheets_budget_truncated"),
             ))
+    if unnamed:
+        # Reachable from the run facts, so an estimator who never clicks the
+        # fourth tab still learns the sheet is there and what it means.
+        facts.append((
+            "UNIDENTIFIED GEOMETRY",
+            "%d candidate(s) were MEASURED and could not be named — see the "
+            "Unidentified Geometry sheet. The quantities there are real; what "
+            "is unknown is what the objects ARE. They are deliberately excluded "
+            "from the Take-Off sheet, never missing from it."
+            % len(unnamed),
+        ))
     facts += [
         ("", ""),
         ("PROVENANCE", "MEANING"),
