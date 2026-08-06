@@ -1175,7 +1175,7 @@ Plans:
 Plans:
 
 - [x] 28-01-PLAN.md — Record what corroborated each count; give the count path the detail-sheet guard the dimension path already has (wave 1, V4-FIX-01)
-- [ ] 28-02-PLAN.md — The 56-EA cluster is a 14x4 interior lattice, not a perimeter ring: falsify the doubling, fix `_is_perimeter_ring`, refuse a tied binding (wave 1, V4-FIX-02)
+- [x] 28-02-PLAN.md — The 56-EA cluster is a 14x4 interior lattice, not a perimeter ring: falsify the doubling, fix `_is_perimeter_ring`, refuse a tied binding (wave 1, V4-FIX-02)
 - [ ] 28-03-PLAN.md — An uncorroborated count cannot publish MEASURED; a detail-sheet-only count publishes a blank quoting its withheld reading (wave 2, V4-FIX-01)
 - [ ] 28-04-PLAN.md — A printed thickness two objects both claim identifies neither: uniqueness test, LF-share masonry guard, refusal audit record (wave 2, V4-FIX-03)
 - [ ] 28-05-PLAN.md — Thread `region_ref` fusion→report; a hypothesis-named row may not claim a layer it inherited, while D1's real layer sharing survives (wave 3, V4-FIX-04)
