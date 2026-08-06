@@ -577,12 +577,20 @@ None yet.
 - [Phase 23]: 23-16: a criterion the phase did NOT deliver is named in the gate with its blocker (clip invariance -> DEF-23-SP4; Bob's p3 page-level fpp -> DEF-23-08) and the delivered contract asserted in its place. Silently dropping it would reproduce, inside the gate, the exact failure the corrected passages document.
 - [Phase 23]: 23-16: §14's published TOTAL row does not equal the sum of its own nine rows (45,837/42,835 vs the measured 44,011/41,912 = +5.0%). All nine per-sheet values reproduce exactly on today's engine, so the rows are sound and only the total was unsourced.
 - [Phase 23]: 23-16: a published figure must state its PROVENANCE. §14's 7.0% came from a probe calling the engine directly; a real run could not reach those sheets because the classifier discarded 18 of Moxy's 40 pages.
+- [Phase 28]: 28-01: `geometry` provenance outranks the sheet kind — instance bounding boxes on a details sheet are still bounding boxes, so a geometry-backed count is corroborated wherever it was read.
+- [Phase 28]: 28-01: `text_layer` provenance is NOT corroboration. A printed word is not a counted object; it falls through to `none`/`detail_sheet_only` like any prose count.
+- [Phase 28]: 28-01: self-reported model confidence is not evidence. `test_confidence_flagging::test_high_confidence_count_not_flagged` asserted that a high-confidence count with nothing behind it went unflagged — that IS the confidently-wrong row; the check was split, not deleted.
+- [Phase 28]: 28-01: record-then-decide. The calculator writes the verdict, the aggregator (28-03) makes the publish call. That split is what kept the blast radius to one function plus a two-key whitelist passthrough in `reporter._normalize_calculated` — the only seam between the calculator and `aggregate_takeoff`.
+- [Phase 28]: 28-01: PLAN PREMISE FALSIFIED — run A's `Door Frames-HM` backing row carries `provenance: geometry`, not null as 28-01's measured_facts recorded. So only 2 of the 3 varying keys are uncorroborated; the third moved because a geometry-backed ROW vanished between extraction passes. 28-06's "covers every number that moved" claim needs a second axis or a narrower wording.
+- [Phase 28]: 28-01: an uncorroborated count's review reason names the sheet and the confirmation to go get, and states NO number — a test strips the sheet name and asserts the remainder is digit-free, so an expected count cannot be smuggled into an estimator-facing message.
 
 ## Session Continuity
 
-Last session: 2026-08-06T14:11:11.000Z
-Stopped at: PHASE 24 COMPLETE — 24-10-PLAN.md executed (10 of 10 plans, wave 6). The phase gate is
-`python3 -m pytest -q tests/test_phase24_acceptance.py`. Next: `/gsd-plan-phase 25`.
+Last session: 2026-08-06T23:50:00.000Z
+Stopped at: Completed 28-01-PLAN.md (1 of 7 plans, wave 1). Every count row now carries a
+`count_corroboration` verdict and `count_evidence_sheet_kind`; the detail-sheet item-type list is one
+shared constant both calculator entry points read. No published quantity changed — 28-03 owns that.
+Full offline suite 2208 passed / 1 skipped / 2 deselected. Next: 28-02-PLAN.md (wave 1).
 Resume file: None
 
 ### Phase 23 decisions so far
