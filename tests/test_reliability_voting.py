@@ -11,6 +11,8 @@ sequence of label lists. Pins:
   charges every sample, and is byte-identical to the single-shot path at N==1;
 - (24-08) every analyzer call site is either voted or explicitly exempted.
 """
+import ast
+import importlib
 import json
 from pathlib import Path
 
@@ -589,3 +591,183 @@ def test_run_pass_voted_cleans_up_every_sample_render(pin_ensemble_n, monkeypatc
     assert len(created) == 3                     # one render per sample
     assert not [p for p in created if p.exists()]  # every one cleaned up
     assert analyzer.state["images"] == [str(p) for p in created]
+
+
+# ── 24-08 Part C: the analyzer call-site census ───────────────────────────────
+#
+# A committed census, so a future un-voted pass cannot slip in unnoticed
+# (T-24-36). Every direct analyzer invocation in the pipeline and vision layers
+# must be EITHER routed through a voting fan-out OR named in the exemption list
+# below with its reason recorded.
+#
+# Sites are identified by their ENCLOSING FUNCTION NAME, discovered by parsing
+# the module's AST. No line numbers are pinned — they drift with every edit, and
+# a census that fails on ordinary refactoring is a census people delete.
+
+# Modules scanned. Both analyzer shapes are looked for in both: the pipeline's
+# bound `self._analyzer(...)` and the vocabulary module's INJECTED `analyzer(...)`.
+_CENSUS_MODULES = (
+    "bobbytailor.pipeline.takeoff_pipeline",
+    "bobbytailor.vision.object_vocabulary",
+)
+
+# call-site function -> (module, function whose body WITNESSES the vote, needle)
+#
+# The witness is what makes "this site is voted" a checked fact rather than a
+# claim in a dict. Each entry asserts that the named fan-out really does invoke
+# the call site, in that module's current source.
+_VOTED_CALL_SITES = {
+    "_structured_vision_call": (
+        "bobbytailor.pipeline.takeoff_pipeline",
+        "_voted_structured_vision_call", "self._structured_vision_call(",
+    ),
+    "_single_pass": (
+        "bobbytailor.pipeline.takeoff_pipeline",
+        "_run_pass", "self._single_pass(",
+    ),
+    "_sample_call": (
+        "bobbytailor.pipeline.takeoff_pipeline",
+        "_run_sheet_raster", "run_ensemble(",
+    ),
+    "build_project_vocabulary": (
+        "bobbytailor.pipeline.takeoff_pipeline",
+        "_build_project_vocabulary", "majority_vote_objects(",
+    ),
+    "extract_naming_conventions": (
+        "bobbytailor.pipeline.takeoff_pipeline",
+        "_build_naming_conventions", "majority_keep_conventions(",
+    ),
+}
+
+# EXACTLY ONE exemption, with its reason recorded inline. This is
+# 24-RESEARCH §7.3.3's "record the decision rather than silently skipping it",
+# turned into a committed artifact.
+_EXEMPT_CALL_SITES = {
+    "_tiled_recount": (
+        "the manifest-gated tiled count path. It is reachable ONLY when a human "
+        "supplies a count manifest AND count tiling is enabled. The mission is "
+        "PLANS-ONLY, so this path is out of scope by DECISION, not by oversight. "
+        "It is also a COUNT pass — its identification and its quantity arrive in "
+        "one object with no seam, so voting it would vote quantities by majority."
+    ),
+}
+
+
+def _is_analyzer_call(func) -> bool:
+    """True for `self._analyzer(...)` or a bare injected `analyzer(...)`."""
+    if isinstance(func, ast.Attribute) and func.attr == "_analyzer":
+        return isinstance(func.value, ast.Name) and func.value.id == "self"
+    return isinstance(func, ast.Name) and func.id == "analyzer"
+
+
+def _analyzer_call_sites(source: str) -> set:
+    """Names of the innermost functions containing a direct analyzer call."""
+    sites = set()
+
+    def walk(node, enclosing):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                walk(child, child.name)
+                continue
+            if isinstance(child, ast.Call) and _is_analyzer_call(child.func):
+                sites.add(enclosing)
+            walk(child, enclosing)
+
+    walk(ast.parse(source), "<module>")
+    return sites
+
+
+def _module_source(module_name: str) -> str:
+    return Path(importlib.import_module(module_name).__file__).read_text(encoding="utf-8")
+
+
+def _function_source(source: str, name: str) -> str:
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+            return ast.get_source_segment(source, node) or ""
+    return ""
+
+
+def test_every_analyzer_call_site_is_voted_or_exempt_so_every_pass_is_voted():
+    """No analyzer call site may be un-voted without an explicit named exemption.
+
+    The one exemption is the manifest-gated tiled count path; its reason is
+    recorded in `_EXEMPT_CALL_SITES` above. Everything else must be witnessed
+    as routed through a voting fan-out.
+    """
+    sources = {name: _module_source(name) for name in _CENSUS_MODULES}
+    found = set()
+    for source in sources.values():
+        found |= _analyzer_call_sites(source)
+
+    # A census that matched nothing would PASS for having looked at nothing.
+    # Phase 23's rule 3 forbids exactly that: a check ASSERTS or it SKIPS.
+    assert found, (
+        "the analyzer call-site census found ZERO call sites. The scan is "
+        "broken or pointed at the wrong modules — this is a census failure, "
+        "not a clean bill of health."
+    )
+
+    known = set(_VOTED_CALL_SITES) | set(_EXEMPT_CALL_SITES)
+
+    unclassified = sorted(found - known)
+    assert not unclassified, (
+        "un-voted analyzer call site(s) with no recorded exemption: {}. Route "
+        "them through a voting fan-out, or add them to _EXEMPT_CALL_SITES with "
+        "the reason written out.".format(unclassified)
+    )
+
+    # The other direction: narrowing the scan, or deleting a fan-out, must FAIL
+    # rather than quietly shrink the census.
+    vanished = sorted(known - found)
+    assert not vanished, (
+        "the census no longer finds call site(s) it is supposed to cover: {}. "
+        "Either the scan narrowed or the site moved — update the census "
+        "deliberately.".format(vanished)
+    )
+
+    # Each "voted" claim is WITNESSED in the current source, not just asserted.
+    for site, (module_name, witness_fn, needle) in _VOTED_CALL_SITES.items():
+        body = _function_source(sources[module_name], witness_fn)
+        assert body, "witness function {!r} not found in {}".format(witness_fn, module_name)
+        assert needle in body, (
+            "{!r} is listed as voted via {!r}, but {!r} does not appear in that "
+            "function's body — the routing changed and the census did not."
+            .format(site, witness_fn, needle)
+        )
+
+
+def test_the_census_detector_catches_a_newly_added_call_site():
+    """Positive control: a brand-new un-voted call site IS seen, and IS unknown.
+
+    Without this the census could pass by having a detector that never matches
+    anything — the same vacuous-pass failure the ZERO-sites assertion guards
+    from the other side.
+    """
+    newly_added = (
+        "class Pipeline:\n"
+        "    def _brand_new_identification_pass(self):\n"
+        "        return self._analyzer('sheet.png', 'A-101')\n"
+    )
+
+    sites = _analyzer_call_sites(newly_added)
+
+    assert sites == {"_brand_new_identification_pass"}
+    assert not sites & (set(_VOTED_CALL_SITES) | set(_EXEMPT_CALL_SITES))
+
+
+def test_the_census_exemption_list_is_explicit_and_singular():
+    """One exemption, and it carries a written reason — not a bare name."""
+    assert len(_EXEMPT_CALL_SITES) == 1
+    (site, reason), = _EXEMPT_CALL_SITES.items()
+    assert site == "_tiled_recount"
+    assert "manifest" in reason.lower()
+    assert len(reason) > 80          # a reason, not a shrug
+
+
+def test_the_identification_pass_types_are_exactly_the_table_reading_passes():
+    """Voting eligibility is a small, named set — never "whatever pass ran"."""
+    assert tp._VOTED_IDENTIFICATION_PASS_TYPES == frozenset({"schedule", "legend"})
+    for measured in ("count", "measure", "extraction"):
+        assert measured not in tp._VOTED_IDENTIFICATION_PASS_TYPES
