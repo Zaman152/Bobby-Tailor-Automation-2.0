@@ -1257,14 +1257,51 @@ def _binding_hint_map(vocabulary) -> Dict[str, dict]:
     return out
 
 
+def _unique_top_by_count(cands, hint):
+    """The candidate with a STRICTLY largest count — or ``None`` when two tie.
+
+    ``max(cands, key=count)`` returns the FIRST maximum, so a tie is broken by
+    the order the clusterer happened to emit its groups in. That is not a
+    discriminator, and a hint that names a cluster on it is guessing. The tie is
+    logged with the candidate ids so the refusal is visible: a silent ``None``
+    is indistinguishable from having had no candidates at all.
+    """
+    if not cands:
+        return None
+    top = max(int(_field(g, "count", 0) or 0) for g in cands)
+    winners = [g for g in cands if int(_field(g, "count", 0) or 0) == top]
+    if len(winners) == 1:
+        return winners[0]
+    logger.info(
+        "symbol binding: hint %r left %d candidates tied at %d instances (%s) — "
+        "no binding emitted. The tie has no geometric discriminator behind it, "
+        "and list order is not one.",
+        hint,
+        len(winners),
+        top,
+        ", ".join(_field(g, "candidate_id", "") for g in winners),
+    )
+    return None
+
+
 def _library_symbol_bindings(groups, labels_by_id, binding_map) -> Dict[str, Tuple[str, str]]:
     """Bind unlabeled symbol clusters to naming-library objects by hint+geometry.
 
     Returns ``{candidate_id: (object_name, hint)}``. A cluster already given a
     real vision label is skipped (vision stays primary). ``structural_grid_symbol``
-    binds the largest uniform small-marker cluster (count ≥ ``_GRID_MIN_COUNT``);
-    ``perimeter_jamb_symbol`` binds the largest uniform small-marker cluster whose
-    centres form a perimeter ring. Empty binding map → ``{}`` (unchanged behaviour).
+    considers uniform small-marker clusters (count ≥ ``_GRID_MIN_COUNT``) spread
+    in 2-D; ``perimeter_jamb_symbol`` considers uniform small-marker clusters
+    whose centres form a hollow ring. Each hint names the candidate with a
+    STRICTLY largest count, and names nothing when two tie
+    (:func:`_unique_top_by_count`). Empty binding map → ``{}``.
+
+    **When no binding is emitted, the count is not lost.** The cluster keeps its
+    raw candidate id, :func:`_fuse_symbol_groups` finds no library binding for it
+    and falls through the naming ladder; with no admissible name it emits no
+    component and exactly one record in the sheet's unnamed-geometry ledger,
+    carrying the count, the position and the recorded reason. The object then
+    appears in the report as the absence of a NAME rather than the absence of an
+    object — which is the whole difference between flagging and guessing.
     """
     if not binding_map:
         return {}
@@ -1290,8 +1327,8 @@ def _library_symbol_bindings(groups, labels_by_id, binding_map) -> Dict[str, Tup
             # whose count coincidentally matches the column total (§10).
             and _is_2d_distributed(g)
         ]
-        if cands:
-            winner = max(cands, key=lambda g: int(_field(g, "count", 0) or 0))
+        winner = _unique_top_by_count(cands, "structural_grid_symbol")
+        if winner is not None:
             bindings[_field(winner, "candidate_id", "")] = (
                 grid["name"], "structural_grid_symbol",
             )
@@ -1304,8 +1341,8 @@ def _library_symbol_bindings(groups, labels_by_id, binding_map) -> Dict[str, Tup
             and int(_field(g, "count", 0) or 0) >= _PERIMETER_MIN_COUNT
             and _size_uniform(g) and _is_small_marker(g) and _is_perimeter_ring(g)
         ]
-        if cands:
-            winner = max(cands, key=lambda g: int(_field(g, "count", 0) or 0))
+        winner = _unique_top_by_count(cands, "perimeter_jamb_symbol")
+        if winner is not None:
             bindings[_field(winner, "candidate_id", "")] = (
                 perim["name"], "perimeter_jamb_symbol",
             )
