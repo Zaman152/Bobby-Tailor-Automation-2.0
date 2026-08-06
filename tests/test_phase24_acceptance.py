@@ -30,6 +30,29 @@ growing a second, drifting copy of its literals — exactly as
 ``test_phase23_acceptance.py``'s check 1 invokes the four-plan-set gate. The
 determinism differential (24-09) and the analyzer call-site census (24-08) are
 both invoked here, not duplicated.
+
+THE PHASE'S ACCEPTANCE, IN ONE COMMAND
+--------------------------------------
+::
+
+    python3 -m pytest -q tests/test_phase24_acceptance.py
+
+**It is FREE.** No paid marker, no paid script and no credential appears
+anywhere in it, nor in either module it invokes;
+:func:`test_the_whole_gate_runs_free` greps all three to prove it rather than
+promising it. Running it costs two offline pipeline runs over one PDF and about
+five minutes.
+
+That command invokes the determinism differential and the analyzer call-site
+census. Beneath it, unchanged, sits the no-regression floor::
+
+    python3 -m pytest -q tests/test_four_set_coverage.py tests/test_phase23_acceptance.py
+
+The four-plan-set gate is what catches a change validated on ONE plan set — the
+documented failure mode where sweeping a title-block fraction fixes Moxy and
+breaks Chelsea because nothing looked at Chelsea. Phase 23's own acceptance gate
+is what catches this phase silently undoing the measurement engine beneath it.
+Neither is superseded by this module and both must stay green.
 """
 from __future__ import annotations
 
@@ -787,3 +810,110 @@ def test_the_evidence_check_fails_rather_than_skipping_when_the_directory_is_abs
     with pytest.raises(AssertionError) as excinfo:
         target()
     assert "paid-run-evidence" in str(excinfo.value)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# THE GATE PROVES ITSELF FREE
+#
+# Every token below is ASSEMBLED FROM PARTS, and that is not decoration. This
+# check is a substring scan over this very file, so spelling any of them out —
+# in a docstring, in a comment, in a helpful list of what is forbidden — would
+# make the module fail its own audit while nothing was actually wrong. Splitting
+# them leaves no literal for the scan to find, and the string SEARCHED FOR is
+# the assembled one, so the check is real rather than weakened. The phase-23
+# module solved this same trap and this reuses its technique rather than
+# reinventing it; 24-08 and 24-09 each hit it independently.
+#
+# ONE constant, used for every scanned module, rather than a grep per module:
+# a per-module list is how one module quietly stops being scanned.
+# ═════════════════════════════════════════════════════════════════════════════
+
+FORBIDDEN_TOKENS = tuple(
+    "".join(parts)
+    for parts in (
+        ("pytest.mark.", "gold", "en"),   # the paid pytest marker
+        ("-m ", "gold", "en"),            # and its command-line selection
+        ("accur", "acy_gate"),            # the paid gate shell script
+        ("vision_only", "_benchmark"),    # the paid vision-only benchmark
+        ("gold", "en_convergence"),       # the paid convergence script
+        ("setup_", "gold", "en_fixtures"),  # the paid fixture setup
+        ("ANTHROPIC", "_API_KEY"),        # the credential
+        ("REPLAY", "_RECORD"),            # replay record mode: wraps the REAL
+                                          # analyzer and can therefore spend
+    )
+)
+
+#: Scanned as one set. This module plus everything it invokes that could carry a
+#: paid command — a gate that is free itself but calls a module that is not is
+#: not a free gate.
+SCANNED_MODULES = (
+    "tests/test_phase24_acceptance.py",
+    "tests/test_determinism_harness.py",   # 24-09, invoked by V4-DET-05
+    "tests/test_reliability_voting.py",    # 24-08, invoked by V4-DET-04
+)
+
+
+def test_the_whole_gate_runs_free():
+    """The phase's acceptance costs nothing to run, and that is checked.
+
+    ROADMAP phrases the offline gate as the whole suite. A module cannot invoke
+    the suite it is part of without recursing, so the runnable form of that
+    criterion is asserted instead: neither this module nor either module it
+    invokes contains a paid marker, a paid script name, the credential or the
+    record-mode switch — and ``pytest.ini`` deselects the paid marker by
+    default, so the suite a developer runs is free by CONFIGURATION rather than
+    by remembering a flag.
+
+    The mission's spend is held for the naming layer. A gate that could quietly
+    bill an API is a gate nobody dares run, and a gate nobody runs is a summary
+    document with a longer file extension.
+    """
+    assert len(FORBIDDEN_TOKENS) == 8, "a forbidden token was dropped from the list"
+
+    # Non-vacuity FIRST, and it is a real positive control: every token must be
+    # found in a text built to carry it. Without this, a typo in all eight would
+    # produce exactly the same green tick as a genuinely free tree.
+    for token in FORBIDDEN_TOKENS:
+        assert token, "an empty token matches nothing and scans nothing"
+        assert token in ("prefix " + token + " suffix"), (
+            "the scanner cannot find %r even when it is present" % token
+        )
+
+    offences = {}
+    for relative in SCANNED_MODULES:
+        path = ROOT / relative
+        assert path.is_file(), (
+            "%s is missing — this gate invokes it, so it cannot be scanned and "
+            "cannot be trusted" % relative
+        )
+        text = path.read_text(encoding="utf-8")
+        hits = [token for token in FORBIDDEN_TOKENS if token in text]
+        if hits:
+            offences[relative] = hits
+    assert offences == {}, (
+        "a paid command entered the free acceptance path: %s" % offences
+    )
+
+    ini = (ROOT / "pytest.ini").read_text(encoding="utf-8")
+    assert re.search(r'addopts\s*=\s*-m\s*"not\s+' + "gold" + r'en"', ini), (
+        "pytest.ini no longer deselects the paid marker by default, so the "
+        "plain suite command stopped being free"
+    )
+
+
+def test_this_gate_asserts_no_total_and_no_percentage_of_correctness():
+    """Rule 2, asserted of this module by this module.
+
+    The four figures this project has already been burned by tuning toward, and
+    the two the take-off carries, may not appear as an equality anywhere here.
+    Neither may a percentage: this phase is judged on determinism and honesty,
+    the offline proxy for correctness is rated LOW confidence by the research,
+    and the naive metric is EXPECTED to have dropped when the unnamed-geometry
+    contract landed. That drop is the correct, documented outcome — a gate that
+    could fail because it fell would be a gate arguing for putting invented
+    identifiers back in front of clients.
+    """
+    text = THIS_FILE.read_text(encoding="utf-8")
+    assert not re.search(r"==\s*(28|56|132|136|397600|106997)\b", text)
+    assert not re.search(r"per" + r"cent_correct|" + "accur" + "acy", text)
+
