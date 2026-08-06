@@ -375,7 +375,145 @@ def test_the_ring_and_the_lattice_are_indistinguishable_by_count():
     )
 
 
-# ── 7. The module's own contract ─────────────────────────────────────────────
+# ── 7. `_is_perimeter_ring` tells the two shapes apart ───────────────────────
+
+
+def _jamb_run_boxes(n_pairs, step, size, gap):
+    """A bollard pair at each overhead-door jamb along ONE wall: two parallel
+    runs, no interior at all. The layout the hint is named for."""
+    ox, oy = 1000.0, 1000.0
+    boxes = []
+    for i in range(n_pairs):
+        x = ox + i * step
+        boxes += [
+            (x, oy, x + size, oy + size),
+            (x, oy + gap, x + size, oy + gap + size),
+        ]
+    return boxes
+
+
+def test_the_judged_cluster_is_no_longer_read_as_a_perimeter_ring():
+    group = _judged_cluster()
+    assert F._is_perimeter_ring(group) is False, (
+        "%s is a fully populated lattice (asserted band-by-band above) and must "
+        "not satisfy a predicate named for a hollow ring" % _cid(group)
+    )
+
+
+def test_the_inset_test_alone_would_still_have_accepted_that_lattice():
+    """Why the 25% inset was not enough, measured rather than argued: with only
+    a few rows, almost every mark of a lattice falls OUTSIDE the inset box, so
+    the cluster reads as hollow."""
+    group = _judged_cluster()
+    centroids = F._instance_centroids(group)
+    xs = [c[0] for c in centroids]
+    ys = [c[1] for c in centroids]
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    ix0, ix1 = x0 + 0.25 * (x1 - x0), x1 - 0.25 * (x1 - x0)
+    iy0, iy1 = y0 + 0.25 * (y1 - y0), y1 - 0.25 * (y1 - y0)
+    inner = sum(1 for px, py in centroids if ix0 < px < ix1 and iy0 < py < iy1)
+    assert inner / float(len(centroids)) <= F._PERIMETER_INNER_MAX_FILL, (
+        "%s no longer reads as hollow against the inset box, so this test no "
+        "longer explains anything" % _cid(group)
+    )
+
+
+def test_a_hollow_ring_built_at_the_measured_pitch_is_still_a_ring():
+    group = _judged_cluster()
+    step, size = _measured_pitch(group), _median_mark_size(group)
+    ring = _group_of(_ring_boxes(14, step, size))
+    assert F._is_perimeter_ring(ring) is True
+
+
+def test_a_filled_lattice_of_the_same_pitch_and_mark_is_not_a_ring():
+    group = _judged_cluster()
+    step, size = _measured_pitch(group), _median_mark_size(group)
+    lattice = _group_of(_lattice_boxes(14, 4, step, size))
+    assert F._is_perimeter_ring(lattice) is False
+
+
+def test_a_run_of_jamb_pairs_along_one_wall_is_still_a_ring():
+    group = _judged_cluster()
+    step, size = _measured_pitch(group), _median_mark_size(group)
+    jamb = _group_of(_jamb_run_boxes(10, step, size, gap=step / 4.0))
+    assert F._is_perimeter_ring(jamb) is True, (
+        "the door-jamb layout the hint is named for was rejected"
+    )
+
+
+def test_a_sparse_scatter_lying_on_no_run_is_not_a_ring():
+    """Nine marks in general position clear a 25% inset box by luck — that box
+    covers a quarter of the area, so a random scatter puts about a quarter of
+    its marks inside. Lying on no RUN is the positive evidence that is missing."""
+    scatter = [
+        (1000.0, 1000.0), (1041.0, 1233.0), (1187.0, 1074.0), (1302.0, 1411.0),
+        (1466.0, 1121.0), (1523.0, 1355.0), (1198.0, 1502.0), (1610.0, 1046.0),
+        (1372.0, 1198.0),
+    ]
+    group = _group_of([(x, y, x + 2.0, y + 2.0) for x, y in scatter])
+    assert F._is_2d_distributed(group) is True, "fixture must clear the 2-D gate"
+    assert F._is_perimeter_ring(group) is False
+
+
+def test_a_collinear_strip_is_still_rejected_and_the_two_d_gate_still_decides_it():
+    """The pre-existing gate is not weakened: a strip fails on 2-D spread, before
+    any occupancy is counted."""
+    strips = [
+        g for g in _page_symbols()[1]
+        if len(F._instance_centroids(g)) >= F._PERIMETER_MIN_COUNT
+        and not F._is_2d_distributed(g)
+    ]
+    assert strips, "the plan page carries no collinear strip to check against"
+    for g in strips:
+        assert F._is_perimeter_ring(g) is False, (
+            "%s is collinear and must never read as a ring" % _cid(g)
+        )
+
+
+def test_too_few_marks_is_not_evidence_of_a_ring():
+    group = _judged_cluster()
+    step, size = _measured_pitch(group), _median_mark_size(group)
+    boxes = _ring_boxes(14, step, size)[: F._PERIMETER_MIN_COUNT - 1]
+    assert F._is_perimeter_ring(_group_of(boxes)) is False
+
+
+# ── 8. The real outcome on the plan page ─────────────────────────────────────
+
+
+def test_no_small_marker_cluster_on_the_plan_page_reads_as_a_perimeter_ring():
+    """The honest consequence: the hint finds nothing to name on this sheet.
+
+    The count does not get closer to the take-off's figure; the WRONG NAME goes
+    away. Detecting the real objects is symbol detection's job, not naming's.
+    """
+    bound = [
+        _cid(g) for g in _page_symbols()[1]
+        if int(F._field(g, "count", 0) or 0) >= F._PERIMETER_MIN_COUNT
+        and F._size_uniform(g)
+        and F._is_small_marker(g)
+        and F._is_perimeter_ring(g)
+    ]
+    assert bound == [], (
+        "the perimeter hint still names %r on this sheet — the fix replaced one "
+        "unevidenced name with another" % bound
+    )
+
+
+def test_the_ring_test_still_finds_the_one_genuinely_hollow_ring_on_the_page():
+    """Non-vacuity, on real geometry: the sheet DOES carry a hollow ring, the
+    predicate still recognises it, and it is kept away from the marker hint by
+    the pre-existing size filter rather than by the ring test."""
+    rings = [g for g in _page_symbols()[1] if F._is_perimeter_ring(g)]
+    assert rings, (
+        "the predicate now accepts nothing at all on this sheet — it has stopped "
+        "discriminating and started refusing"
+    )
+    assert all(not F._is_small_marker(g) for g in rings), (
+        "a small-marker ring survived here but not in the binder's own filter"
+    )
+
+
+# ── 9. The module's own contract ─────────────────────────────────────────────
 
 
 def test_this_module_names_no_published_quantity_and_calls_no_paid_service():
