@@ -1,0 +1,248 @@
+"""28-03 — an uncorroborated count may not publish as MEASURED.
+
+28-01 stamped a four-valued ``count_corroboration`` verdict on every count row
+the calculator emits (geometry / schedule / detail_sheet_only / none) and
+deliberately made it inert: recording what backed a number is one decision, and
+whether the number may be PUBLISHED is another. This module pins the second
+decision, which lives here in the aggregator — the one layer that owns the
+four-value client vocabulary and the difference between a blank and a zero.
+
+What the rule is defending against is concrete and was measured, not imagined:
+in the two saved paid Crow runs the ``Stairs`` row published MEASURED,
+``needs_review`` false, at medium confidence — and it was ALSO the row whose
+number disagreed with itself between two identical invocations. An unflagged
+wrong number is worse than a blank, because a reviewer skips it.
+
+Everything here is FREE: no paid marker, no credential, no golden comparison,
+no network. The module audits itself for all four at the bottom.
+"""
+import ast
+import inspect
+from pathlib import Path
+
+from bobbytailor.pipeline import aggregator
+from bobbytailor.pipeline.aggregator import aggregate_takeoff
+
+
+# ─── helpers ────────────────────────────────────────────────────────────────
+
+def _row(rows, name):
+    matches = [r for r in rows if r["item"] == name]
+    assert len(matches) == 1, "expected exactly one %r row, got %r" % (
+        name, [r["item"] for r in rows]
+    )
+    return matches[0]
+
+
+def _count_item(description, corroboration=None, qty=3, **extra):
+    """One calculated COUNT row, shaped as the calculator emits them.
+
+    ``corroboration=None`` means the key is absent altogether — the shape every
+    non-count row (an area, a length) has, and the shape every row in the
+    pre-28-01 codebase had.
+    """
+    item = {
+        "description": description,
+        "item_type": "component",
+        "calculated_quantity": qty,
+        "calculated_unit": "ea",
+        "source_sheet": "A-401",
+        "formula": "count",
+        "confidence": "medium",
+        "auto_verified": True,
+    }
+    if corroboration is not None:
+        item["count_corroboration"] = corroboration
+        item["count_evidence_sheet_kind"] = "detail"
+    item.update(extra)
+    return item
+
+
+def _buckets_of(monkeypatch, items, **kwargs):
+    """Every bucket ``aggregate_takeoff`` published, captured at the publish point.
+
+    ``_row_status`` is the single place a bucket becomes a client status, and it
+    is handed the bucket itself — so spying on it reads the ACTUAL rolled-up
+    record rather than a reconstruction of it. Returns ``(rows, buckets)``.
+    """
+    seen = []
+    real = aggregator._row_status
+
+    def spy(bucket, is_unknown):
+        seen.append(bucket)
+        return real(bucket, is_unknown)
+
+    monkeypatch.setattr(aggregator, "_row_status", spy)
+    rows = aggregate_takeoff(items, **kwargs)
+    return rows, seen
+
+
+def _bucket_for(buckets, description):
+    """The captured bucket one contributing description landed in."""
+    matches = [
+        b for b in buckets
+        if any(description in (r.get("description") or "") for r in b["source_rows"])
+    ]
+    assert len(matches) == 1, (
+        "expected exactly one bucket carrying %r, got %d" % (description, len(matches))
+    )
+    return matches[0]
+
+
+# ─── the roll-up: every bucket knows what corroborated its count ─────────────
+
+def test_rollup_a_new_bucket_starts_with_no_count_verdict():
+    """Distinguishable from "a count contributed and nothing backed it".
+
+    ``None`` means no count row has reached this bucket at all. The string
+    ``"none"`` means one did and nothing corroborated it. Collapsing the two
+    would make every area row in the take-off look like an uncorroborated count.
+    """
+    assert aggregator._new_bucket()["count_corroboration"] is None
+
+
+def test_rollup_combines_two_verdicts_in_one_place():
+    combine = aggregator._stronger_corroboration
+    # An absent verdict never overwrites a recorded one, in either order.
+    assert combine(None, "geometry") == "geometry"
+    assert combine("geometry", None) == "geometry"
+    assert combine(None, None) is None
+    # A corroborated verdict vouches for the bucket whichever side it arrives on.
+    assert combine("none", "geometry") == "geometry"
+    assert combine("geometry", "none") == "geometry"
+    assert combine("detail_sheet_only", "schedule") == "schedule"
+    assert combine("schedule", "detail_sheet_only") == "schedule"
+    # Among uncorroborated verdicts the more specific one dominates, so the
+    # reason a reader is shown names the sheet kind rather than shrugging.
+    assert combine("none", "detail_sheet_only") == "detail_sheet_only"
+    assert combine("detail_sheet_only", "none") == "detail_sheet_only"
+    # A blank string is an ABSENT verdict, not an uncorroborated one.
+    assert combine("geometry", "") == "geometry"
+    assert combine("", None) is None
+    # An unrecognised verdict is never read as corroboration.
+    assert combine(None, "sounds_about_right") == "sounds_about_right"
+    assert not aggregator._count_is_uncorroborated(
+        {"count_corroboration": "geometry"}
+    )
+    assert aggregator._count_is_uncorroborated(
+        {"count_corroboration": "sounds_about_right"}
+    )
+
+
+def test_rollup_the_precedence_is_expressed_exactly_once():
+    """No second copy of the ordering can drift away from the first.
+
+    Modelled on ``_worse_conf``: the ranking table exists once and exactly one
+    function reads it.
+    """
+    module_src = inspect.getsource(aggregator)
+    helper_src = inspect.getsource(aggregator._stronger_corroboration)
+    rank_name = "_CORROBORATION" + "_RANK"
+    assert module_src.count(rank_name) == 1 + helper_src.count(rank_name)
+
+
+def test_rollup_the_loop_consults_that_one_helper(monkeypatch):
+    """Liveness: the accumulation loop uses the shared helper, not a local copy.
+
+    Replace the helper and the bucket's recorded verdict must move with it.
+    """
+    monkeypatch.setattr(
+        aggregator, "_stronger_corroboration", lambda a, b: "spliced_in"
+    )
+    _, buckets = _buckets_of(
+        monkeypatch, [_count_item("dock leveler", corroboration="geometry")]
+    )
+    assert _bucket_for(buckets, "dock leveler")["count_corroboration"] == "spliced_in"
+
+
+def test_rollup_all_corroborated_rows_roll_up_corroborated(monkeypatch):
+    _, buckets = _buckets_of(monkeypatch, [
+        _count_item("dock leveler", corroboration="geometry", qty=2),
+        _count_item("dock leveler", corroboration="schedule", qty=3),
+    ])
+    assert _bucket_for(buckets, "dock leveler")["count_corroboration"] == "geometry"
+
+
+def test_rollup_one_corroborated_row_vouches_for_the_whole_bucket(monkeypatch):
+    """A printed schedule or a geometry reading vouches for the OBJECT, even
+    when a weaker reading of the same object also landed in the bucket."""
+    _, buckets = _buckets_of(monkeypatch, [
+        _count_item("dock leveler", corroboration="none", qty=2),
+        _count_item("dock leveler", corroboration="schedule", qty=3),
+    ])
+    assert _bucket_for(buckets, "dock leveler")["count_corroboration"] == "schedule"
+
+
+def test_rollup_all_uncorroborated_rows_roll_up_uncorroborated(monkeypatch):
+    _, buckets = _buckets_of(monkeypatch, [
+        _count_item("dock leveler", corroboration="none", qty=2),
+        _count_item("dock leveler", corroboration="none", qty=3),
+    ])
+    bucket = _bucket_for(buckets, "dock leveler")
+    assert bucket["count_corroboration"] == "none"
+    assert aggregator._count_is_uncorroborated(bucket)
+
+
+def test_rollup_a_bucket_with_no_count_rows_keeps_an_unset_verdict(monkeypatch):
+    """Areas, lengths, blanks and the injected convention are not counts.
+
+    Absence of the key is never read as "uncorroborated" — that is the
+    difference between flagging the rows this phase is about and flagging the
+    entire take-off.
+    """
+    rows, buckets = _buckets_of(monkeypatch, [
+        {"description": "warehouse floor", "item_type": "flooring",
+         "calculated_quantity": 3960.0, "calculated_unit": "sq_ft",
+         "source_sheet": "A-101"},
+    ])
+    area = _bucket_for(buckets, "warehouse floor")
+    assert area["count_corroboration"] is None
+    assert not aggregator._count_is_uncorroborated(area)
+    mobilization = _bucket_for(buckets, "Mobilization")
+    assert mobilization["count_corroboration"] is None
+    assert _row(rows, "Mobilization")["provenance"] == "STANDARD ITEM"
+
+
+def test_rollup_records_the_verdict_without_moving_a_corroborated_quantity():
+    """Recording is not deciding. A corroborated count publishes exactly what it
+    published before the verdict existed — same number, same status, same flag."""
+    without = aggregate_takeoff([_count_item("dock leveler", qty=4)])
+    with_verdict = aggregate_takeoff(
+        [_count_item("dock leveler", corroboration="geometry", qty=4)]
+    )
+    assert with_verdict == without
+
+
+# ─── this module's own contract ─────────────────────────────────────────────
+
+def test_this_module_names_no_golden_quantity_and_calls_no_paid_service():
+    source = Path(__file__).read_text()
+    # Assembled from halves so the check cannot find itself.
+    forbidden = [
+        "ANTHRO" + "PIC",
+        "crow_cass" + "_golden",
+        "golden" + ".csv",
+        "vision_only" + "_benchmark",
+        "accuracy" + "_gate",
+    ]
+    for token in forbidden:
+        assert token not in source, (
+            "this module must stay free and golden-free; found %r" % token
+        )
+
+
+def test_this_module_imports_nothing_that_could_reach_a_network():
+    """Checked over the module's own import statements rather than by scanning
+    its text — a substring scan for a networking library finds itself."""
+    tree = ast.parse(Path(__file__).read_text())
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(a.name.split(".")[0] for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            imported.add(node.module.split(".")[0])
+    allowed = {"ast", "inspect", "pathlib", "pytest", "bobbytailor"}
+    assert imported <= allowed, (
+        "this module must stay offline; unexpected imports %r"
+        % sorted(imported - allowed)
+    )
