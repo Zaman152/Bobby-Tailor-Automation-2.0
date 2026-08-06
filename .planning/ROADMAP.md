@@ -1032,7 +1032,33 @@ Plans are listed in EXECUTION order; the wave in each plan's frontmatter is auth
 - **Assumption A1 falsified.** The 184→64 `raw_line_items` swing was attributed to the un-ensembled `_run_pass`. The artifacts show run 2 ran at a budget cap **2.5× smaller** (`$0.60` vs `$1.50`), reached **99.8%** of it, and spent **less than half** as much on sheet-level work. Budget, not sampling, is the dominant explanation. Plan 24-08 therefore stands on V4-DET-04's own justification and treats the cost pairing with 24-05 as load-bearing. **Now COMMITTED as a test** (`tests/test_reliability_voting.py::test_f9_swing_is_explained_by_budget_not_sampling`, commit `91698ad`), asserting the relations between the two runs rather than any dollar literal, and landed *before* any 24-08 code changed. The research's secondary door-schedule detail (7 → 0 rows) did **not** reproduce under an independent count and is not relied on.
 - **Expected direction of the score: DOWN.** When the unnamed-geometry contract lands, ~24 published identifier rows plus the coincidental high-count "column" hit leave the take-off. That is the correct, documented outcome (same precedent as Phase 23's rails) and no plan may state a success criterion as an accuracy percentage.
 
-**Plans:** 9/10 plans executed
+**Status:** COMPLETE (2026-08-06) — 10/10 plans executed. The phase's acceptance is one free command:
+`python3 -m pytest -q tests/test_phase24_acceptance.py` (15 checks, ~5 min, zero API). It INVOKES the
+determinism differential and the analyzer call-site census rather than restating them, and the
+four-plan-set gate plus `tests/test_phase23_acceptance.py` remain the no-regression floor beneath it.
+
+**Requirement status, against SHIPPED behaviour rather than against what the plans predicted:**
+
+| Req | Status | The honest boundary |
+|---|---|---|
+| V4-DET-01 | **complete** | Anchor coverage on the mission's primary plan set is LOW — 40 of 107 clusters. That is an outcome of the drawing, not a defect; widening the radius until it rises is the tuning trap. |
+| V4-DET-02 | **complete for its stated subject, one residual open** | The CMU ↔ tilt-up flip cannot recur — both classes carry a printed thickness and are decided deterministically. A wall class with NO thickness match is still named by the reading, and that residual is asserted BY NAME and must not be deleted; it retires when the object list stabilises across two real runs. |
+| V4-DET-03 | **complete** | Delivered in full: dependency-ordered, enum-only ID fields, allowed-empty wall citation, zero numeric properties proved by introspection with a positive control. |
+| V4-DET-04 | **complete as written, limit stated** | Every analyzer call site is voted-with-a-witness or carries the single recorded exemption (the manifest-gated tiled count path, out of a plans-only mission and a count pass besides). The determinism property is proved OFFLINE with scripted stubs; **that it holds on a real drawing has no artifact and needs a paid run.** Nothing claims otherwise. |
+| V4-DET-05 | **complete as REFRAMED** | The literal wording is vacuous and was not implemented; the vacuity is a committed assertion, not a claim. The two-variant differential is delivered and was made to go RED on disk. That the determinism holds on a real PAID run has no artifact. |
+
+**Not claimed anywhere in this phase:** any percentage of correctness. The naive metric is EXPECTED to
+have dropped when the unnamed-geometry contract landed — roughly two dozen invented-identifier rows and
+one coincidental high-count hit left the take-off — and that drop is the correct, documented outcome.
+Measuring the real thing needs a paid run and is not autonomously authorised.
+
+**Carried forward, named not dropped:** the three entries in this phase's `deferred-items.md` —
+`_min_confidence(x, None)` collapsing a confident printed-thickness bind to `low`; the pre-existing
+formula-injection exposure on the Take-Off and Coverage worksheets; and `tests/fixtures/synthetic/*.pdf`
+being regenerated in-tree by every suite run, which is why a clean tree is not a usable pre-commit gate
+in this repo. None is a V4-DET requirement and none was closed here.
+
+**Plans:** 10/10 plans executed
 
 Plans:
 
@@ -1045,7 +1071,7 @@ Plans:
 - [x] 24-07-PLAN.md — Dependency-ordered schema topology + SoM chip carries the anchor + prompt correction (wave 3, V4-DET-03)
 - [x] 24-08-PLAN.md — Ensemble wire-up for `_run_pass` identification passes + call-site census (wave 4, V4-DET-04)
 - [x] 24-09-PLAN.md — Determinism harness: two-variant replay fixtures + differential gate (wave 5, V4-DET-05)
-- [ ] 24-10-PLAN.md — The Phase 24 acceptance gate (wave 6, all five requirements)
+- [x] 24-10-PLAN.md — The Phase 24 acceptance gate (wave 6, all five requirements) — 15 checks; the two research literals and eight execution-time falsifications each named in a committed assertion; the paid-run evidence guarded by a check that FAILS rather than skips
 
 ### Phase 25: Deterministic Symbol Detection
 
