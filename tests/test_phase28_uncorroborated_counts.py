@@ -453,6 +453,40 @@ def test_the_rules_boundary_is_a_recorded_verdict_and_this_is_it():
     assert row["needs_review"] is False
 
 
+#: Calculator producers that can emit an EA row — a COUNT — and stamp no
+#: corroboration verdict on it, so this layer treats it as not-a-count and can
+#: still publish it MEASURED. Measured, not assumed: `_calculate_from_component`
+#: and `_calculate_from_schedule` were given the verdict by 28-01; these two were
+#: not, and the aggregator cannot see what it was never told.
+_COUNT_PRODUCERS_THAT_STAMP_NO_VERDICT = (
+    # a dimension annotation that resolves to a whole EA quantity >= 1
+    "_calculate_from_measurement",
+    # catch basins / manholes / headwalls, always in EA
+    "_calculate_from_civil_structures",
+)
+
+
+def test_the_residual_this_plan_does_not_close_is_named_not_implied():
+    """A tripwire, so the gap is greppable instead of remembered.
+
+    V4-FIX-01 asks that no count publish MEASURED without corroboration. This
+    layer now enforces that for every count carrying a verdict — but a count
+    from a producer that stamps none is invisible to it. Widening the rule to
+    "no verdict means no evidence" would flag every area and length in the
+    take-off, so the fix belongs in the RECORDING layer, not here. If a later
+    plan stamps one of these producers, this test fails and the list must be
+    shortened deliberately.
+    """
+    from bobbytailor.pipeline import calculator
+    for fn in _COUNT_PRODUCERS_THAT_STAMP_NO_VERDICT:
+        src = inspect.getsource(getattr(calculator, fn))
+        assert '"ea"' in src, "%s no longer emits a count at all" % fn
+        assert "count_corroboration" not in src, (
+            "%s now records a verdict — remove it from the residual list and "
+            "say so in the phase gate" % fn
+        )
+
+
 # ─── this module's own contract ─────────────────────────────────────────────
 
 def test_this_module_names_no_golden_quantity_and_calls_no_paid_service():
