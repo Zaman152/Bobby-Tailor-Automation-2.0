@@ -43,9 +43,16 @@ LIBRARY_FALLBACK_UNMEASURED = "library_fallback_unmeasured"
 #: measured in this unit and the row says so (C3b).
 UNIT_CLASS_CONFLICT_UNMEASURED = "unit_class_conflict_unmeasured"
 
+#: A name whose ONLY evidence was a count taken off a sheet this run classified
+#: as DETAILS. A details sheet draws how a thing is built, not how many are
+#: installed, so the reading counts detail drawings rather than objects: a count
+#: of stair details is not a count of stairs. The number is withheld and the row
+#: says so — see the withheld-detail-count block in :func:`aggregate_takeoff`.
+DETAIL_SHEET_COUNT_UNMEASURED = "detail_sheet_count_unmeasured"
+
 _UNMEASURED_SOURCES = frozenset({
     "manifest_missing", "expected_not_measured", LIBRARY_FALLBACK_UNMEASURED,
-    UNIT_CLASS_CONFLICT_UNMEASURED,
+    UNIT_CLASS_CONFLICT_UNMEASURED, DETAIL_SHEET_COUNT_UNMEASURED,
 })
 
 # ─── What corroborated a count (28-01 records it, this layer acts on it) ─────
@@ -935,6 +942,11 @@ def aggregate_takeoff(
     # into an area object, or the reverse). Materialised after the row loop for
     # the same reason as above: withholding the number must leave a ROW.
     unit_class_conflicts: Dict[str, List[Dict]] = defaultdict(list)
+    # Counts whose ONLY corroboration was the drawing they were read off, on a
+    # sheet this run typed `detail`. Materialised after the row loop for the
+    # same reason as the two collectors above: withholding the number must
+    # leave a ROW, and the row must quote what it withheld.
+    withheld_detail_counts: Dict[str, List[Dict]] = defaultdict(list)
     for item in calculated_items:
         if item.get("qty_source") == "plan_schedule_legend":
             desc = item.get("description", "")
@@ -1126,6 +1138,26 @@ def aggregate_takeoff(
             })
             continue
 
+        # ── A count of detail DRAWINGS never becomes a count of objects ──────
+        #
+        # 28-01 recorded the verdict on the row; this is where it is acted on.
+        # On Crow, `Stairs` published 1 EA in one run and 2 EA in an identical
+        # re-run, both times MEASURED at needs_review=False — a count of the
+        # stair details drawn on A-401, presented as a count of installed
+        # stairs. Flagging it would not be enough: the reading does not measure
+        # the object the row names, so the number is WITHHELD and materialised
+        # below as a blank that quotes it. Diverted here, exactly like a
+        # unit-class conflict, so it can never reach `bucket["quantity"]`.
+        if str(item.get("count_corroboration") or "").strip() == "detail_sheet_only":
+            withheld_detail_counts[canonical_name].append({
+                "sheet": item.get("source_sheet"),
+                "qty": qty,
+                "unit": (canonical_unit or unit or "").upper(),
+                "description": desc,
+                "sheet_kind": item.get("count_evidence_sheet_kind"),
+            })
+            continue
+
         bucket = buckets[canonical_name]
         bucket["quantity"] += qty
         bucket["unit"] = canonical_unit or unit
@@ -1245,6 +1277,54 @@ def aggregate_takeoff(
             "description": "%s (reading withheld — measured in a different "
                            "unit class from this row's unit)" % name,
             "formula": "unit_class_conflict_not_measured",
+        })
+
+    # ── Withheld detail-sheet counts become BLANKS, never silence ────────────
+    #
+    # The third instance of the same contract, and for the same reason as the
+    # two above: dropping the number is only half of it. An object whose only
+    # evidence was a count of its own detail drawings must still appear saying
+    # "not measured", with the withheld reading quoted — otherwise the fix
+    # trades a confidently wrong `1 EA` for a deletion, and a deletion and a
+    # zero read the same to a client.
+    for name, withheld in withheld_detail_counts.items():
+        detail = "; ".join(
+            "%r read %s %s on %s" % (
+                w["description"],
+                int(w["qty"]) if float(w["qty"]) == int(w["qty"]) else w["qty"],
+                w["unit"], w["sheet"] or "?",
+            )
+            for w in withheld
+        )
+        if buckets.get(name, {}).get("has_rows"):
+            buckets[name]["needs_review"] = True
+            buckets[name]["review_reasons"].add(
+                "a count read off a details sheet was NOT summed into this "
+                "quantity (%s) — a details sheet shows how a thing is built "
+                "rather than how many are installed" % detail
+            )
+            continue
+        bucket = buckets[name]
+        bucket["unit"] = withheld[0]["unit"]
+        bucket["item_type"] = bucket["item_type"] or "detail_sheet_count"
+        bucket["needs_review"] = True
+        bucket["confidence"] = "low"
+        bucket["source"] = DETAIL_SHEET_COUNT_UNMEASURED
+        bucket["review_reasons"].add(
+            "the only reading that resolved to this object was a count taken "
+            "from a sheet this run classified as details (%s); a details sheet "
+            "shows how a thing is built rather than how many are installed, so "
+            "the reading counts detail drawings and is WITHHELD — this is a "
+            "BLANK, not a zero, and it needs a plan-sheet or schedule "
+            "confirmation" % detail
+        )
+        bucket["source_rows"].append({
+            "sheet": None,
+            "qty": None,
+            "description": "%s (count withheld — read off a details sheet, "
+                           "which shows how a thing is built rather than how "
+                           "many are installed)" % name,
+            "formula": "detail_sheet_count_not_measured",
         })
 
     # Only enrich with standard line items when a genuine take-off was produced.
