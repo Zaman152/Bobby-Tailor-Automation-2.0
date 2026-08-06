@@ -227,7 +227,8 @@ def _compare_published(a: PublishedItemSets, b: PublishedItemSets) -> list:
     :func:`test_the_residual_a_vision_named_wall_class_still_moves_with_its_label`,
     which asserts that residual by name rather than letting it hide here.
 
-    This is the ONE comparison the gate makes.
+    This is the ONE comparison the gate makes and the ONE the flip demonstration
+    exercises, so what is proven to fail is exactly the logic that runs in anger.
     """
     diffs = []
     if a.summary_names != b.summary_names:
@@ -249,6 +250,33 @@ def _compare_published(a: PublishedItemSets, b: PublishedItemSets) -> list:
             "%d vs %d value(s)" % (len(a.quantities), len(b.quantities))
         )
     return diffs
+
+
+def _with_renamed_item(report: dict, old: str, new: str) -> dict:
+    """A shallow copy of *report* with one published item renamed.
+
+    The poison lives here, in memory, and never reaches
+    ``tests/fixtures/replay/``.
+    """
+    poisoned = dict(report)
+    poisoned["takeoff_summary"] = [
+        dict(row, item=(new if (row.get("item") or "").strip() == old else row.get("item")))
+        for row in report.get("takeoff_summary") or []
+    ]
+    return poisoned
+
+
+def _with_candidate_named(report: dict, candidate_id: str, name: str) -> dict:
+    """A copy of *report* in which one LEDGERED candidate was published instead."""
+    poisoned = dict(report)
+    poisoned["unnamed_geometry"] = [
+        rec for rec in report.get("unnamed_geometry") or []
+        if (rec.get("candidate_id") or "").strip() != candidate_id
+    ]
+    poisoned["takeoff_summary"] = list(report.get("takeoff_summary") or []) + [
+        {"item": name, "unit": "EA", "quantity": 1.0}
+    ]
+    return poisoned
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -508,6 +536,73 @@ def test_the_residual_a_vision_named_wall_class_still_moves_with_its_label(
     assert sorted(q for _n, _u, q in only_a) == sorted(q for _n, _u, q in only_b), (
         "a QUANTITY moved, not merely its label — beyond the documented residual"
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# A gate nobody has seen fail is a gate nobody knows works
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_the_gate_detects_a_naming_flip(differential):
+    """Poison one published name and require :func:`_compare_published` to see it.
+
+    The poisoned variant is built IN MEMORY from variant A's real report, so it
+    exercises the real data through the real comparison helper — the same
+    function the gate calls in anger, never a parallel reimplementation that
+    could drift — and no poisoned fixture ever reaches disk.
+    """
+    report = differential["variant_a"][0]
+    baseline = _published_item_sets(report)
+    victim = sorted(baseline.summary_names)[0]
+
+    poisoned = _published_item_sets(
+        _with_renamed_item(report, victim, victim + " (flipped)")
+    )
+    diffs = _compare_published(baseline, poisoned)
+    assert diffs, (
+        "the gate did NOT notice one published item renamed — it is vacuous"
+    )
+    assert any("published item names moved" in d for d in diffs)
+
+
+def test_the_gate_detects_a_candidate_named_in_one_variant_and_ledgered_in_the_other(
+    differential,
+):
+    """The same defect wearing its other hat, also demonstrated failing."""
+    report = differential["variant_a"][0]
+    baseline = _published_item_sets(report)
+    poisoned = _published_item_sets(
+        _with_candidate_named(report, FLIPPED_CANDIDATE_ID, "Dock Bumper")
+    )
+    diffs = _compare_published(baseline, poisoned)
+    assert diffs, "the gate did NOT notice a ledgered candidate being published"
+    assert any("ledger moved" in d for d in diffs)
+
+
+def test_the_gate_detects_a_quantity_that_moved():
+    """A word must never move a number, and the check for it must be able to fail."""
+    base = {"calculated_takeoff": [{"description": "Wall", "calculated_unit": "LF",
+                                    "calculated_quantity": 10.0}],
+            "takeoff_summary": [{"item": "Wall"}]}
+    moved = {"calculated_takeoff": [{"description": "Wall", "calculated_unit": "LF",
+                                     "calculated_quantity": 11.0}],
+             "takeoff_summary": [{"item": "Wall"}]}
+    diffs = _compare_published(
+        _published_item_sets(base), _published_item_sets(moved)
+    )
+    assert any("QUANTITY moved" in d for d in diffs)
+
+
+def test_two_identical_reports_report_no_difference():
+    """The positive control. Without it the helper could be reporting differences
+    unconditionally and every demonstration above would pass for nothing."""
+    report = {"calculated_takeoff": [{"description": "Wall", "calculated_unit": "LF",
+                                      "calculated_quantity": 10.0}],
+              "takeoff_summary": [{"item": "Wall"}],
+              "unnamed_geometry": [{"candidate_id": "SYM-9"}]}
+    assert _compare_published(
+        _published_item_sets(report), _published_item_sets(dict(report))
+    ) == []
 
 
 # ─────────────────────────────────────────────────────────────────────────────
