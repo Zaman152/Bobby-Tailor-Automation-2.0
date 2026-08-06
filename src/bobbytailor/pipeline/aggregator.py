@@ -48,6 +48,90 @@ _UNMEASURED_SOURCES = frozenset({
     UNIT_CLASS_CONFLICT_UNMEASURED,
 })
 
+# ─── What corroborated a count (28-01 records it, this layer acts on it) ─────
+#
+#: The verdicts :func:`calculator._count_corroboration` records on a count row,
+#: ranked. A HIGHER rank wins a combination, which gives the roll-up two
+#: properties at once: one corroborated contributing row vouches for the whole
+#: bucket, and among uncorroborated rows the more specific verdict survives to
+#: be reported (`detail_sheet_only` says which sheet kind; `none` only shrugs).
+#: This table is the ONLY expression of the precedence — see
+#: :func:`_stronger_corroboration`, its only reader.
+_CORROBORATION_RANK = {
+    "none": 0,
+    "detail_sheet_only": 1,
+    "schedule": 2,
+    "geometry": 3,
+}
+
+#: The verdicts that mean something outside the reading itself backs the count:
+#: a table PRINTED on the plans, or geometry that recorded where the instances
+#: are. A description read off a drawing is neither.
+_CORROBORATED = frozenset({"schedule", "geometry"})
+
+
+def _stronger_corroboration(current: Optional[str], incoming: Optional[str]) -> Optional[str]:
+    """Combine two corroboration verdicts. THE one place the precedence lives.
+
+    Modelled on :func:`_worse_conf`, and deliberately the mirror of it: the
+    worst confidence wins there because confidence is a claim about certainty,
+    while the BEST corroboration wins here because corroboration is evidence —
+    one row that was backed by a printed schedule vouches for the object even
+    if a weaker reading of the same object also landed in the bucket.
+
+    ``None`` means "no count row has contributed yet" and is never the answer
+    when a real verdict is available, in either argument order. An empty string
+    is treated the same way. An unrecognised verdict ranks with ``none``, so a
+    string this function has never seen can never be mistaken for corroboration.
+    """
+    a = (current or "").strip() or None
+    b = (incoming or "").strip() or None
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return b if _CORROBORATION_RANK.get(b, 0) > _CORROBORATION_RANK.get(a, 0) else a
+
+
+def _count_is_uncorroborated(bucket: Dict) -> bool:
+    """True when a count contributed to this bucket and nothing backed it.
+
+    The two-state test the whole rule turns on. An UNSET verdict is not an
+    uncorroborated one: an area, a length, a blank and the injected Mobilization
+    convention all carry no verdict at all, and reading their silence as "no
+    evidence" would flag the entire take-off instead of the count rows this
+    exists for.
+    """
+    verdict = (bucket.get("count_corroboration") or "").strip()
+    return bool(verdict) and verdict not in _CORROBORATED
+
+
+def _new_bucket() -> Dict:
+    """One project-level bucket, before any row has contributed to it."""
+    return {
+        "quantity": 0.0,
+        "unit": "",
+        "source_sheets": set(),
+        "source_rows": [],
+        "item_type": "",
+        "needs_review": False,
+        "confidence": None,
+        "review_reasons": set(),
+        "source": "",
+        # Where a legend-backed quantity actually came from (C4). Only
+        # "human_input" — an estimator's own take-off, ingested from a human
+        # input file — may publish as HUMAN INPUT; a schedule the app read off
+        # the plans is a machine measurement.
+        "legend_origin": "",
+        "auto_verified": True,   # AND of contributing rows; only meaningful with rows
+        "has_rows": False,
+        # What backed the COUNT rows that built this bucket, rolled up from
+        # their recorded verdicts (28-01). ``None`` means no count row has
+        # contributed — distinguishable from ``"none"``, which means one did
+        # and nothing corroborated it.
+        "count_corroboration": None,
+    }
+
 #: Units in which a building quantity is counted, not dimensioned. A value in
 #: these units below one whole unit is not a small measurement — it is a
 #: mis-scaled or mis-typed one.
@@ -820,24 +904,7 @@ def aggregate_takeoff(
     — the naming provenance marker only; quantities are summed from the
     underlying items untouched (quantity provenance is never altered here).
     """
-    buckets: Dict[str, Dict] = defaultdict(lambda: {
-        "quantity": 0.0,
-        "unit": "",
-        "source_sheets": set(),
-        "source_rows": [],
-        "item_type": "",
-        "needs_review": False,
-        "confidence": None,
-        "review_reasons": set(),
-        "source": "",
-        # Where a legend-backed quantity actually came from (C4). Only
-        # "human_input" — an estimator's own take-off, ingested from a human
-        # input file — may publish as HUMAN INPUT; a schedule the app read off
-        # the plans is a machine measurement.
-        "legend_origin": "",
-        "auto_verified": True,   # AND of contributing rows; only meaningful with rows
-        "has_rows": False,
-    })
+    buckets: Dict[str, Dict] = defaultdict(_new_bucket)
 
     # Items whose quantity comes from an authoritative companion take-off legend
     # are the single source of truth for that item. The legend's printed label and
@@ -1077,6 +1144,11 @@ def aggregate_takeoff(
         if reason:
             bucket["review_reasons"].add(reason)
         bucket["confidence"] = _worse_conf(bucket["confidence"], item.get("confidence"))
+        # ...and roll up what BACKED the count, beside the flag it rolls up.
+        # A row that is not a count carries no verdict and leaves this unset.
+        bucket["count_corroboration"] = _stronger_corroboration(
+            bucket["count_corroboration"], item.get("count_corroboration"),
+        )
         # A bucket is auto-verified only if EVERY contributing row was auto-accepted.
         bucket["has_rows"] = True
         if not item.get("auto_verified"):
