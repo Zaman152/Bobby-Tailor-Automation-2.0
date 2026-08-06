@@ -36,6 +36,7 @@ WHAT THIS MODULE ASSERTS, AND WHAT IT REFUSES TO ASSERT
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -407,8 +408,272 @@ def test_the_verdict_survives_normalisation_into_the_report_layer():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Task 3 — pinned against the two saved runs, never against a golden number
+# ─────────────────────────────────────────────────────────────────────────────
+
+_EVIDENCE_ROOT = ROOT / ".planning" / "paid-run-evidence"
+#: The phase-24 determinism A/B. Both are FROZEN artifacts: opened read-only,
+#: never re-scored, never rewritten. Re-scoring them after a code change returns
+#: the same numbers, because the numbers are what was saved — which is exactly
+#: why this module reasons about their RECORDED FIELDS instead.
+_RUN_A = "VisionOnly_P24DET_Crow_20260806_194607"
+_RUN_B = "VisionOnly_P24DET_Crow_20260806_195704"
+
+
+def _load_run(dir_name: str) -> dict:
+    path = _EVIDENCE_ROOT / dir_name / "takeoff.json"
+    if not path.exists():
+        pytest.skip(
+            "saved run %s is absent from .planning/paid-run-evidence — this gate "
+            "asserts against recorded runs and will not pass without them"
+            % dir_name
+        )
+    with open(path, "r", encoding="utf-8") as fh:  # read mode, always
+        return json.load(fh)
+
+
+def _sheet_kinds(run: dict) -> dict:
+    """``source_sheet`` → the sheet type that run itself recorded for it."""
+    return {e.get("sheet"): e.get("type") for e in run.get("sheet_log", [])}
+
+
+def _verdict_of(row: dict, kinds: dict) -> str:
+    """Run the shipped verdict function over a row as it was RECORDED."""
+    return _count_corroboration(
+        row.get("provenance"),
+        kinds.get(row.get("source_sheet")),
+        row.get("item_type"),
+        row.get("qty_source"),
+    )
+
+
+def _published(run: dict) -> dict:
+    return {(r["item"], r["unit"]): r for r in run.get("takeoff_summary", [])}
+
+
+def _backing_rows(run: dict, summary_row: dict) -> list:
+    """The calculated rows the published row was rolled up from."""
+    wanted = {(d.get("sheet"), d.get("description"))
+              for d in (summary_row.get("detail") or [])}
+    return [r for r in run.get("calculated_takeoff", [])
+            if (r.get("source_sheet"), r.get("description")) in wanted]
+
+
+def _quantity_key(row: dict) -> tuple:
+    return (row.get("item_type"),
+            str(row.get("calculated_unit") or "").lower(),
+            row.get("calculated_quantity"))
+
+
+def test_the_saved_runs_every_quantity_that_moved_was_a_count_nothing_confirmed():
+    """Prediction, not tuning: the verdict covers every quantity that varied.
+
+    The differing published keys are computed at runtime by comparing the two
+    ``takeoff_summary`` lists — they are never typed in as the subject of the
+    check. (For the reader: they are ``Stairs``, ``Lift`` and ``Door Frames-HM``.)
+
+    **A plan premise measured false, asserted rather than quietly dropped.**
+    28-01's plan recorded run A's ``Door Frames-HM`` row as carrying no
+    provenance. It does: the row is ``provenance: geometry``. So the honest
+    claim is weaker and more specific than "everything that varied was
+    uncorroborated". What actually holds, and is asserted here, is that every
+    backing row of a varying key is either
+
+    * classified uncorroborated by the verdict function — the number moved
+      because nothing pinned it; or
+    * classified ``geometry`` and **absent altogether** from the other run — the
+      number did not move, the ROW vanished, which is an extraction-pass
+      variance one layer upstream and not something a corroboration verdict can
+      or should claim to catch.
+
+    Recording that distinction is the point. A gate that asserted the plan's
+    original sentence would be asserting something the evidence contradicts.
+    """
+    a, b = _load_run(_RUN_A), _load_run(_RUN_B)
+    ka, kb = _sheet_kinds(a), _sheet_kinds(b)
+    pa, pb = _published(a), _published(b)
+
+    shared = set(pa) & set(pb)
+    differing = sorted(k for k in shared
+                       if pa[k].get("quantity") != pb[k].get("quantity"))
+    if not differing:
+        pytest.skip("the two saved runs published no differing quantity to explain")
+
+    other_side = {
+        _RUN_A: {_quantity_key(r) for r in b.get("calculated_takeoff", [])},
+        _RUN_B: {_quantity_key(r) for r in a.get("calculated_takeoff", [])},
+    }
+
+    uncorroborated_hits = 0
+    for key in differing:
+        for run_name, run, published, kinds in (
+            (_RUN_A, a, pa, ka), (_RUN_B, b, pb, kb),
+        ):
+            for row in _backing_rows(run, published[key]):
+                verdict = _verdict_of(row, kinds)
+                if verdict in ("detail_sheet_only", "none"):
+                    uncorroborated_hits += 1
+                    continue
+                assert _quantity_key(row) not in other_side[run_name], (
+                    "%s in %s is backed by a row the verdict calls %r, and an "
+                    "identical row exists in the other run — so the published "
+                    "quantity moved for a reason this verdict does not explain "
+                    "and must not be claimed to" % (key, run_name, verdict)
+                )
+
+    assert uncorroborated_hits, (
+        "no varying key was backed by an uncorroborated row — the verdict "
+        "explained none of the observed variance, so this gate proved nothing"
+    )
+
+
+def test_the_saved_runs_a_geometry_backed_number_never_moved():
+    """The converse, asserted only where it holds.
+
+    Every row run B recorded with ``provenance: geometry`` has a
+    quantity-identical counterpart in run A. Geometry is the layer 24-RESEARCH
+    found already deterministic, and this is that finding restated as a check on
+    the corroboration signal itself: the thing the verdict trusts is the thing
+    that did not move.
+
+    **The reverse implication is deliberately NOT asserted.** An uncorroborated
+    row may happen to agree across two runs — the two runs published 48 of 51
+    keys identically and most of those rows have no provenance at all. Asserting
+    "uncorroborated ⇒ varies" would be a claim the evidence does not support,
+    and would turn a coincidence into a contract.
+
+    The single geometry row that has NO counterpart is asserted too, by
+    property: it did not change value, it disappeared, and it disappeared out of
+    a published key that varied.
+    """
+    a, b = _load_run(_RUN_A), _load_run(_RUN_B)
+
+    def geometry_rows(run):
+        return [r for r in run.get("calculated_takeoff", [])
+                if r.get("provenance") == "geometry"]
+
+    ga, gb = geometry_rows(a), geometry_rows(b)
+    if not ga or not gb:
+        pytest.skip("a saved run recorded no geometry-backed calculated row")
+
+    keys_a = {_quantity_key(r) for r in ga}
+    orphans_b = [r for r in gb if _quantity_key(r) not in keys_a]
+    assert orphans_b == [], (
+        "geometry-backed rows in %s with no quantity-equal counterpart in %s: %s"
+        % (_RUN_B, _RUN_A, [_quantity_key(r) for r in orphans_b])
+    )
+
+    keys_b = {_quantity_key(r) for r in gb}
+    orphans_a = [r for r in ga if _quantity_key(r) not in keys_b]
+
+    pa, pb = _published(a), _published(b)
+    varied = {k for k in set(pa) & set(pb)
+              if pa[k].get("quantity") != pb[k].get("quantity")}
+    accounted = set()
+    for key in varied:
+        accounted.update(id(r) for r in _backing_rows(a, pa[key]))
+    for row in orphans_a:
+        assert id(row) in accounted, (
+            "a geometry-backed row in %s vanished from %s without any published "
+            "quantity moving: %s — an unexplained disappearance, not a variance "
+            "this phase has characterised" % (_RUN_A, _RUN_B, _quantity_key(row))
+        )
+
+
+def test_the_saved_runs_printed_schedule_rows_are_corroborated_and_untouched():
+    """The row that must NOT be flagged by anything this phase adds.
+
+    A quantity read off a table printed on the plans is corroborated by that
+    table. The rows are located by their recorded formula prefix, not by item
+    name and not by number, so the check does not depend on which schedule the
+    plan set happened to carry.
+    """
+    found = 0
+    for run_name in (_RUN_A, _RUN_B):
+        run = _load_run(run_name)
+        kinds = _sheet_kinds(run)
+        rows = [r for r in run.get("calculated_takeoff", [])
+                if str(r.get("formula_applied") or "").startswith(
+                    "authoritative plan schedule")]
+        for row in rows:
+            found += 1
+            assert _verdict_of(row, kinds) == "schedule", (
+                "%s in %s reads off a printed plan schedule and the verdict "
+                "failed to say so" % (row.get("description"), run_name)
+            )
+    if not found:
+        pytest.skip("neither saved run recorded an authoritative plan-schedule row")
+
+
+def test_the_saved_evidence_tree_is_opened_read_only():
+    """T-28-02. This module reads frozen artifacts; it must never write one.
+
+    Asserted of the module's own source: every ``open`` in this file passes an
+    explicit read mode, and no mutating primitive appears at all. The mutating
+    tokens are assembled from halves; the mode check is a regex over the call
+    sites rather than a substring scan, because a substring scan for a write
+    mode has to spell one out and would then fail on itself — the self-defeating
+    grep 24-09 and 24-10 both hit.
+    """
+    text = THIS_FILE.read_text(encoding="utf-8")
+
+    sites = [m.start() for m in re.finditer(r"\bopen\(", text)]
+    assert sites, "no open call site in this file — the read-only check is vacuous"
+    for offset in sites:
+        assert text[max(0, offset - 5):offset] == "with ", (
+            "an unmanaged open call in a read-only gate, at offset %d" % offset
+        )
+    for args in re.findall(r"\bopen\(([^)]*)\)", text):
+        assert re.search(r"""['"]r['"]""", args), (
+            "an open call in a read-only gate states no read mode: %s" % args
+        )
+
+    forbidden = (
+        "json." + "dump",
+        ".unlink" + "(",
+        ".write" + "_text(",
+        ".mkdir" + "(",
+        "shutil." + "rmtree",
+    )
+    hits = [token for token in forbidden if token in text]
+    assert hits == [], "mutating primitives in a read-only gate: %s" % hits
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # The module's own contract
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_the_module_names_no_golden_literal():
+    """No Crow item's expected count is typed here, and none is compared against.
+
+    Two checks, because either alone is dodgeable:
+
+    1. The module never reaches for the golden fixture — not by path, not by
+       import, not by name. The token is assembled from halves so this check
+       does not trip on itself.
+    2. No assertion inside the evidence-backed tests compares anything to a
+       numeric literal. Every expectation in that section is derived from the
+       OTHER run's recorded fields at runtime. Tuning a number here until the
+       gate went green is the failure mode this forbids.
+    """
+    text = THIS_FILE.read_text(encoding="utf-8")
+    fixture_tokens = ("crow" + "_cass", "golden" + "_validator",
+                      "_golden" + ".csv", "golden" + "_takeoff")
+    hits = [t for t in fixture_tokens if t in text]
+    assert hits == [], "this gate reached for a golden fixture: %s" % hits
+
+    evidence_section = text.split("# Task 3 —", 1)
+    assert len(evidence_section) == 2, "the evidence section marker moved"
+    section = evidence_section[1].split("# The module's own contract", 1)[0]
+    offenders = [
+        line.strip() for line in section.splitlines()
+        if "assert" in line
+        and re.search(r"[=!<>]=?\s*-?\d+(\.\d+)?\s*(,|\)|$)", line)
+    ]
+    assert offenders == [], (
+        "an evidence assertion compares against a numeric literal: %s" % offenders
+    )
 
 
 def test_the_whole_module_runs_free():
