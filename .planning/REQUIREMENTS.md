@@ -226,6 +226,18 @@ delivered that is stated here rather than ticked away.
 - **V4-PROD-06**: `output/`/`uploads/` anchored to a configured data root, not CWD
 - **V4-PROD-07**: Rate limiting, upload magic-byte sniffing, remaining CONCERNS security items closed
 
+### Accuracy Remediation — Crow defects (Phase 28, runs before Phase 25)
+
+Evidence: `.planning/paid-run-evidence/VisionOnly_P24DET_Crow_20260806_19{4607,5704}` — two identical
+paid runs, $1.1573, human-in-the-loop (plans-only input + quantity-free manifest), scored against the
+take-off. All five are reproducible offline against those saved artifacts.
+
+- **V4-FIX-01**: No count publishes `MEASURED` / `needs_review=False` without corroboration. `Stairs` published clean at 1.00 (run A) and 2.00 (run B) against golden 10 — unflagged, 90% wrong, irreproducible. Uncorroborated counts flag.
+- **V4-FIX-02**: The Bollards 2× (56 vs 28) is diagnosed and fixed at its cause — a double-count signature, never resolved by dividing by two.
+- **V4-FIX-03**: CMU Wall binds the correct thickness class (11,286 SF vs golden 2,204; ~313 LF bound where golden implies ~61).
+- **V4-FIX-04**: One measured region backs one published row; the 397,600 SF footprint no longer fans out to three (Exposed Structure / Sealed Concrete / Concrete Pad), so summing the SF column cannot triple-count the building.
+- **V4-FIX-05**: Per-sheet vision extraction variance is stabilised or surfaced as a flag — the 3-of-51 quantity deltas between identical runs (raw items 113 vs 124) must never present as a silently different number.
+
 ## v2 Requirements
 
 ### Architecture & Scale

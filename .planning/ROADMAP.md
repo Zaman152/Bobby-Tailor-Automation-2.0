@@ -1146,6 +1146,36 @@ Plans:
 
 - [ ] TBD (run /gsd-plan-phase 27 to break down)
 
+### Phase 28: Accuracy Remediation (Crow defects)
+
+> **EXECUTION ORDER NOTE:** this phase is numbered 28 but runs NEXT, immediately after Phase 24 and
+> BEFORE Phase 25. It remediates defects a paid validation run exposed on 2026-08-06; leaving them in
+> place would corrupt Phase 25's own measurements. `depends_on` is Phase 24, not Phase 27.
+
+**Goal:** Every defect the $1.16 Crow human-in-the-loop validation exposed is fixed or honestly flagged — no confidently-wrong number survives, the reproducible binding errors are corrected, and the remaining run-to-run variance is pushed out of the extraction pass.
+
+**Depends on:** Phase 24
+
+**Requirements:** V4-FIX-01 … V4-FIX-05
+
+**Evidence (all reproducible FREE):** `.planning/paid-run-evidence/VisionOnly_P24DET_Crow_20260806_194607` (run A) and `…_195704` (run B), plus that directory's README recording the A/B verdict. Two identical invocations, $1.1573 total.
+
+**Success Criteria** (what must be TRUE):
+
+1. **No confidently-wrong number.** `Stairs` published `MEASURED`, `needs_review=False`, confidence medium, at 1.00 (A) / 2.00 (B) against golden 10 — unflagged, 90% wrong, and irreproducible. A count that cannot be corroborated must be flagged, never published clean. This is the phase's first duty.
+2. **The Bollards 2× is resolved at its cause.** 56 vs golden 28 on a single detail line with `formula: count`. A clean doubling is a double-count signature (plan+detail double-marking, or two marks per object) — diagnose it, do NOT divide by two.
+3. **CMU Wall binds the right thickness class.** 11,286 SF vs golden 2,204 (412% high), deterministic provenance, bit-identical in both runs — the printed-thickness match is putting ~313 LF into CMU where golden implies ~61 LF. A reproducible binding error, not noise.
+4. **One measured area backs one published row.** The 397,600 SF footprint still fans out to three published rows (Exposed Structure, Sealed Concrete, Concrete Pad); an estimator summing the SF column triple-counts the building. Legitimate layer-sharing stays, emergent duplication goes.
+5. **Extraction variance is contained.** The 3-of-51 quantity differences between identical runs all originate in the per-sheet vision extraction pass (raw items 113 vs 124), one layer upstream of the naming layer Phase 24 stabilised. Either stabilise it or make its instability visible as a flag — never as a silently different number.
+
+**Non-goals:** symbol DETECTION for Columns/Ladder/Stairs is Phase 25's, not this phase's. Do not chase the count 132, 28, or 10 here — flag honestly and hand them on.
+
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 28 to break down)
+
 ---
 *Roadmap created: 2026-05-26*  
 *Updated: 2026-06-03 — Phase 20 Takeoff Measurement Precision added (7 plans, 5 waves)*  
