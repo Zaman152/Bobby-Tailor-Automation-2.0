@@ -453,8 +453,16 @@ class TestPassParity:
             f"sheet_type={sheet_type!r}: expected {expected_passes}, got {result}"
         )
 
-    def test_floor_plan_runs_count_measure_schedule(self):
-        """floor_plan sheets get count+measure+schedule passes via pipeline."""
+    def test_floor_plan_runs_count_measure_schedule(self, monkeypatch):
+        """floor_plan sheets get count+measure+schedule passes via pipeline.
+
+        N is pinned to 1 because this asserts the number of PASSES. Since 24-08
+        the schedule pass majority-votes N samples, so at the default N the
+        call count would measure samples rather than passes and this parity
+        claim would quietly stop being about parity. The fan-out has its own
+        coverage in tests/test_reliability_voting.py.
+        """
+        monkeypatch.setattr(_tp, "ensemble_settings", lambda: {"n": 1, "budget_usd": 10.0})
         count_r = {"components": [], "measurements": []}
         measure_r = {"components": [], "measurements": [], "rooms": [], "pipe_runs": []}
         schedule_r = {"components": [], "measurements": [], "schedules": []}

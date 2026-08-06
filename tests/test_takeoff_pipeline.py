@@ -110,6 +110,26 @@ def _make_analyzer(responses: list[dict]):
     return mock
 
 
+@pytest.fixture(autouse=True)
+def _single_shot_identification_passes(monkeypatch):
+    """Pin the 24-08 identification ensemble to N=1 for this module.
+
+    Every test here is about pass STRUCTURE — which passes run, in what order,
+    and what the merged result looks like. Since 24-08 the schedule and legend
+    passes majority-vote N samples, so at the default N an assertion like
+    ``call_count == 3`` about the number of PASSES would silently become an
+    assertion about the number of SAMPLES, and each test's scripted response
+    list would run out mid-pass.
+
+    Pinning N=1 keeps each test testing exactly what it was written to test.
+    The voted path has its own dedicated coverage in
+    ``tests/test_reliability_voting.py``, and the fan-out is asserted THROUGH
+    ``run_sheet`` by ``test_schedule_pass_fans_out_to_the_ensemble`` below,
+    which re-pins N itself — so this fixture hides nothing.
+    """
+    monkeypatch.setattr(_tp, "ensemble_settings", lambda: {"n": 1, "budget_usd": 10.0})
+
+
 # ---------------------------------------------------------------------------
 # title_sheet — must skip all API calls
 # ---------------------------------------------------------------------------
@@ -254,6 +274,29 @@ class TestSchedulePass:
 
         assert "schedules" in result
         assert result["schedules"][0]["name"] == "DOOR SCHEDULE"
+
+    def test_schedule_pass_fans_out_to_the_ensemble(self, monkeypatch):
+        """The 24-08 fan-out is REAL through run_sheet, not only in the unit tests.
+
+        The positive control for this module's autouse N=1 pin: with N=3 the
+        schedule pass issues three calls and the result declares the vote. A row
+        every read agreed on survives. This is also where the COST of the
+        wire-up is visible — one schedule pass is now N billable calls.
+        """
+        monkeypatch.setattr(_tp, "ensemble_settings", lambda: {"n": 3, "budget_usd": 10.0})
+        rows = [{"DOOR MARK": "101", "TYPE": "HM"}]
+        calls = []
+
+        def analyzer(image_path, sheet_name, **kwargs):
+            calls.append(kwargs.get("pass_type"))
+            return {"schedules": [{"name": "DOOR SCHEDULE", "rows": [dict(r) for r in rows]}]}
+
+        pipeline = TakeoffPipeline(analyzer=analyzer)
+        result = pipeline.run_sheet("A8.1.png", "A8.1", sheet_type="schedule")
+
+        assert calls == ["schedule", "schedule", "schedule"]   # ONE pass, N samples
+        assert result["schedules"][0]["name"] == "DOOR SCHEDULE"
+        assert result["schedules"][0]["rows"] == rows
 
 
 # ---------------------------------------------------------------------------

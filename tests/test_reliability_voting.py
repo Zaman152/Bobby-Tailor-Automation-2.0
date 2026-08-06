@@ -16,8 +16,9 @@ from pathlib import Path
 
 import pytest
 
+from bobbytailor.pipeline import takeoff_pipeline as tp
 from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
-from bobbytailor.vision.ensemble import BudgetGuard
+from bobbytailor.vision.ensemble import BudgetExceeded, BudgetGuard
 from bobbytailor.vision.object_vocabulary import majority_vote_objects
 
 
@@ -301,3 +302,290 @@ def test_f9_swing_is_explained_by_budget_not_sampling():
     # 5. The swing the research attributed to sampling is real — and sits on
     #    top of every confound above. Stated as inequality, never as counts.
     assert len(run1["raw_line_items"]) != len(run2["raw_line_items"])
+
+
+# ── 24-08 Part B: _run_pass votes the IDENTIFICATION passes on row identity ───
+#
+# Scripted stubs only. The determinism property these pin is provable offline;
+# measuring it live would cost real money and is not autonomously authorised.
+
+_BOLLARDS = {"ITEM": "Bollards", "QTY": "24", "UNIT": "EA"}
+_COLUMNS = {"ITEM": "Columns", "QTY": "12", "UNIT": "EA"}
+_LADDER = {"ITEM": "Ladder", "QTY": "1", "UNIT": "EA"}
+
+
+def _legend(rows):
+    """One QUANTITY TAKEOFF LEGEND table carrying *rows*, as the pass returns it."""
+    return [{
+        "name": "QUANTITY TAKEOFF LEGEND",
+        "table_purpose": "takeoff_legend",
+        "use_for_takeoff": True,
+        "columns": ["ITEM", "QTY", "UNIT"],
+        "rows": [dict(r) for r in rows],
+    }]
+
+
+def _make_pass_analyzer(scripts, cost_usd=0.0):
+    """Stub with ``_run_pass``'s analyzer signature, returning ``scripts[i]``.
+
+    ``scripts[i]`` is the ``schedules`` list for the i-th call; the last script
+    repeats once exhausted. Records call count and the image path each call was
+    handed on ``analyzer.state``.
+    """
+    state = {"i": 0, "images": []}
+
+    def analyzer(image_path, sheet_name="", pass_type="schedule",
+                 model_override=None, sheet_type=None, user_hint=None, **kwargs):
+        idx = min(state["i"], len(scripts) - 1)
+        payload = scripts[idx]
+        state["i"] += 1
+        state["images"].append(image_path)
+        return {
+            "schedules": json.loads(json.dumps(payload)),
+            "_cost_usd": cost_usd,
+            "_tokens_in": 1,
+            "_tokens_out": 1,
+            "_model_used": "stub",
+        }
+
+    analyzer.state = state
+    return analyzer
+
+
+@pytest.fixture
+def pin_ensemble_n(monkeypatch):
+    """Pin the ensemble size `_run_pass` reads, independent of env config."""
+    def _pin(n):
+        monkeypatch.setattr(
+            tp, "ensemble_settings", lambda: {"n": n, "budget_usd": 10.0}
+        )
+    return _pin
+
+
+def test_run_pass_voted_at_n1_is_byte_identical_to_single_shot(pin_ensemble_n):
+    """N==1 returns the raw analyzer dict, untouched — no vote metadata at all."""
+    pin_ensemble_n(1)
+    analyzer = _make_pass_analyzer([_legend([_BOLLARDS, _COLUMNS])])
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+
+    res = pipeline._run_pass("img.png", "A-101", "schedule", None)
+
+    assert analyzer.state["i"] == 1
+    assert res == {
+        "schedules": _legend([_BOLLARDS, _COLUMNS]),
+        "_cost_usd": 0.0,
+        "_tokens_in": 1,
+        "_tokens_out": 1,
+        "_model_used": "stub",
+    }
+    assert "_voted" not in res
+    assert "_vote_samples" not in res
+
+
+def test_run_pass_voted_identical_samples_equal_any_one_sample(pin_ensemble_n):
+    """N>1 with agreeing reads yields one sample's answer, plus vote metadata."""
+    pin_ensemble_n(3)
+    one = _legend([_BOLLARDS, _COLUMNS])
+    analyzer = _make_pass_analyzer([one, one, one])
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+
+    res = pipeline._run_pass("img.png", "A-101", "schedule", None)
+
+    assert analyzer.state["i"] == 3
+    assert res["schedules"] == _legend([_BOLLARDS, _COLUMNS])
+    assert res["_voted"] is True
+    assert res["_vote_samples"] == 3
+
+
+def test_run_pass_voted_majority_row_survives_minority_row_dropped(pin_ensemble_n):
+    """A row in 2 of 3 reads survives; a row in 1 of 3 does not.
+
+    The minority row is in the FIRST sample deliberately: a single-shot
+    `_run_pass` would publish it, so this test cannot pass by coincidence if
+    the voting is ever disabled.
+    """
+    pin_ensemble_n(3)
+    analyzer = _make_pass_analyzer([
+        _legend([_BOLLARDS, _COLUMNS, _LADDER]),
+        _legend([_BOLLARDS, _COLUMNS]),
+        _legend([_BOLLARDS]),
+    ])
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+
+    res = pipeline._run_pass("img.png", "A-101", "legend", None)
+
+    items = [r["ITEM"] for r in res["schedules"][0]["rows"]]
+    assert items == ["Bollards", "Columns"]      # Ladder (1 of 3) dropped
+
+
+def test_run_pass_voted_a_tie_drops_the_row(pin_ensemble_n):
+    """An exact split is not a majority — flag-don't-guess drops the row."""
+    pin_ensemble_n(4)
+    analyzer = _make_pass_analyzer([
+        _legend([_BOLLARDS, _COLUMNS]),
+        _legend([_BOLLARDS, _COLUMNS]),
+        _legend([_BOLLARDS]),
+        _legend([_BOLLARDS]),
+    ])
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+
+    res = pipeline._run_pass("img.png", "A-101", "legend", None)
+
+    items = [r["ITEM"] for r in res["schedules"][0]["rows"]]
+    assert items == ["Bollards"]                 # Columns 2-of-4 is a TIE
+
+
+def test_run_pass_voted_folds_two_spellings_of_one_row_into_one(pin_ensemble_n):
+    """Row identity is the AGGREGATOR's fold, so `Bollard` and `Bollards` are one row.
+
+    The LOSING spelling is in the first sample deliberately, so a single-shot
+    `_run_pass` would publish `Bollard` and this test cannot pass by coincidence.
+    """
+    pin_ensemble_n(3)
+    singular = {"ITEM": "Bollard", "QTY": "24", "UNIT": "EA"}
+    analyzer = _make_pass_analyzer([
+        _legend([singular]),
+        _legend([_BOLLARDS]),
+        _legend([_BOLLARDS]),
+    ])
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+
+    res = pipeline._run_pass("img.png", "A-101", "legend", None)
+
+    rows = res["schedules"][0]["rows"]
+    assert len(rows) == 1                        # one row, not two spellings
+    assert rows[0]["ITEM"] == "Bollards"         # the plurality spelling
+
+
+def test_run_pass_voted_never_synthesises_a_quantity_no_sample_returned():
+    """The published row is VERBATIM one sample's — never an average or a blend."""
+    disagreeing = {"ITEM": "Bollards", "QTY": "26", "UNIT": "EA"}
+    samples = [
+        {"schedules": _legend([_BOLLARDS])},
+        {"schedules": _legend([_BOLLARDS])},
+        {"schedules": _legend([disagreeing])},
+    ]
+
+    out = tp._vote_schedule_rows(samples)
+
+    quantities = [r["QTY"] for r in out[0]["rows"]]
+    assert quantities == ["24"]                  # the plurality READ
+    assert "25" not in quantities                # never a computed middle
+
+
+def test_run_pass_voted_only_the_identification_pass_types(pin_ensemble_n):
+    """count / measure / extraction stay single-shot — quantities are not voted."""
+    pin_ensemble_n(3)
+    for pass_type in ("count", "measure", "extraction"):
+        analyzer = _make_pass_analyzer([_legend([_BOLLARDS])])
+        pipeline = TakeoffPipeline(analyzer=analyzer)
+
+        res = pipeline._run_pass("img.png", "A-101", pass_type, None)
+
+        assert analyzer.state["i"] == 1, pass_type
+        assert "_voted" not in res, pass_type
+
+
+def test_run_pass_budget_charges_every_sample(pin_ensemble_n):
+    """Each of the N samples is charged through the guard, not just the first."""
+    pin_ensemble_n(3)
+    analyzer = _make_pass_analyzer([_legend([_BOLLARDS])], cost_usd=0.10)
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+    guard = BudgetGuard(10.0)
+
+    pipeline._run_pass("img.png", "A-101", "schedule", None, budget=guard)
+
+    assert analyzer.state["i"] == 3
+    assert guard.spent_usd == pytest.approx(0.30)
+
+
+def test_run_pass_budget_exhausted_partway_votes_over_the_paid_samples(pin_ensemble_n):
+    """Room for two of three samples: sampling stops and the count is recorded."""
+    pin_ensemble_n(3)
+    analyzer = _make_pass_analyzer([
+        _legend([_BOLLARDS, _COLUMNS]),
+        _legend([_BOLLARDS, _COLUMNS]),
+        _legend([_LADDER]),
+    ], cost_usd=1.0)
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+    guard = BudgetGuard(2.0)                     # exactly two $1.00 samples
+
+    res = pipeline._run_pass("img.png", "A-101", "schedule", None, budget=guard)
+
+    assert analyzer.state["i"] == 2              # stopped, never a third
+    assert res["_vote_samples"] == 2             # the partial is DECLARED
+    assert guard.spent_usd == pytest.approx(2.0)
+    items = [r["ITEM"] for r in res["schedules"][0]["rows"]]
+    assert items == ["Bollards", "Columns"]
+
+
+def test_run_pass_budget_declines_an_extra_sample_it_cannot_afford(pin_ensemble_n):
+    """No headroom for sample 2 → it is never issued, so no charge is refused.
+
+    A REFUSED charge means the vendor was paid for a call whose result is then
+    discarded. Declining the extra sample up front is strictly cheaper, and it
+    cannot affect the first sample, which is always attempted.
+    """
+    pin_ensemble_n(3)
+    analyzer = _make_pass_analyzer([_legend([_BOLLARDS])], cost_usd=1.0)
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+    guard = BudgetGuard(1.5)                     # room for one sample, not two
+
+    res = pipeline._run_pass("img.png", "A-101", "schedule", None, budget=guard)
+
+    assert analyzer.state["i"] == 1
+    assert guard.refused_charges == 0            # nothing paid for and binned
+    assert res["_vote_samples"] == 1             # a one-sample read, declared
+    assert res["schedules"] == _legend([_BOLLARDS])   # returned UNFOLDED
+
+
+def test_run_pass_budget_no_paid_sample_raises_rather_than_returning_empty(pin_ensemble_n):
+    """A first charge the guard refuses surfaces BudgetExceeded, never {}."""
+    pin_ensemble_n(3)
+    analyzer = _make_pass_analyzer([_legend([_BOLLARDS])], cost_usd=1.0)
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+    guard = BudgetGuard(0.5)                     # cannot afford even one
+
+    with pytest.raises(BudgetExceeded):
+        pipeline._run_pass("img.png", "A-101", "schedule", None, budget=guard)
+
+    assert analyzer.state["i"] == 1
+    assert guard.refused_charges == 1            # the refusal is on the record
+
+
+def test_run_pass_budget_already_exhausted_raises_before_any_call(pin_ensemble_n):
+    """The pre-24-08 entry pre-check is unchanged by the ensemble wire-up."""
+    pin_ensemble_n(3)
+    analyzer = _make_pass_analyzer([_legend([_BOLLARDS])], cost_usd=1.0)
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+    guard = BudgetGuard(0.0)
+
+    with pytest.raises(BudgetExceeded):
+        pipeline._run_pass("img.png", "A-101", "schedule", None, budget=guard)
+
+    assert analyzer.state["i"] == 0
+
+
+def test_run_pass_voted_cleans_up_every_sample_render(pin_ensemble_n, monkeypatch, tmp_path):
+    """Each sample renders AND unlinks its own pass image — no temp leak (T-24-37)."""
+    pin_ensemble_n(3)
+    created = []
+
+    def fake_render(pdf_path, page_index, scale):
+        path = tmp_path / "render-{}.png".format(len(created))
+        path.write_bytes(b"png")
+        created.append(path)
+        return str(path)
+
+    monkeypatch.setattr(TakeoffPipeline, "_render_pdf_page", staticmethod(fake_render))
+    analyzer = _make_pass_analyzer([_legend([_BOLLARDS])])
+    pipeline = TakeoffPipeline(analyzer=analyzer)
+
+    pipeline._run_pass(
+        "img.png", "A-101", "legend", None, sheet_type="floor_plan",
+        pdf_path="plan.pdf", page_index=0, render_scale=2.5,
+    )
+
+    assert len(created) == 3                     # one render per sample
+    assert not [p for p in created if p.exists()]  # every one cleaned up
+    assert analyzer.state["images"] == [str(p) for p in created]

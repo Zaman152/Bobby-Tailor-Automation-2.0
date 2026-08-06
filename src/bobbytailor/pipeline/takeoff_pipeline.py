@@ -32,6 +32,7 @@ Phase notes:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -608,6 +609,232 @@ def _vote_categorical_labels(samples: list, vote_key: str) -> list:
         else:
             label, conf = "unknown", "low"
         voted.append({id_key_by_id[cid]: cid, "label": label, "confidence": conf})
+    return voted
+
+
+# ── 24-08: row-identity majority vote for the IDENTIFICATION passes ───────────
+#
+# WHY THIS EXISTS AND `_vote_categorical_labels` ABOVE DOES NOT SERVE.
+# That voter votes a per-candidate LABEL under a known candidate-ID key, and it
+# needs the candidate set to be fixed by the request's schema enums. `_run_pass`
+# sends no schema and no candidate list: the schedule and legend passes return
+# free-form tables of free-form rows, and what varies between two reads of one
+# drawing is WHICH ROWS EXIST — not the label attached to an already-known row.
+# So the vote key here has to be the ROW'S OWN IDENTITY: a schedule row's
+# MARK/TAG, a legend row's ITEM/DESCRIPTION.
+#
+# That identity is folded through `_norm_item_key` — the AGGREGATOR's bucket
+# identity, IMPORTED rather than re-implemented, because a second folding rule
+# is precisely how two folding rules drift apart (the mistake 24-02, 24-03 and
+# 24-05 each explicitly refused to make). Two spellings of one row are one row
+# here for exactly the reason they are one row downstream.
+#
+# A surviving row's field values are taken VERBATIM from one sample that
+# carried it — the most common exact payload, ties broken by first-seen sample
+# order. Field values are never mixed across samples, so the voter can never
+# synthesise a row, or a QUANTITY, that no paid sample actually returned
+# (T-24-34). A quantity is also never part of a row's identity: a quantity is
+# the field that may legitimately be misread between two passes, so making it
+# part of "are these the same row?" would turn one row into two.
+#
+# NOT A TEMPERATURE PROBLEM. Hosted-API nondeterminism comes from
+# batch-size-dependent GPU reduction kernels, not from sampling; pinning the
+# temperature to zero cannot fix it, and `ensemble._probe_temperature_ignored`
+# is this codebase's own recorded acknowledgement of that. No temperature
+# parameter is introduced here, deliberately — and the grep that proves it
+# would be defeated by writing one into a comment, so this says it in words.
+
+# Pass types that are pure IDENTIFICATION — they READ a printed table off the
+# drawing — and are therefore eligible for majority voting.
+#
+# `count`, `measure` and `extraction` are EXCLUDED. Their identification portion
+# ("there is a bollard here") and their measurement portion ("its quantity is
+# 24") arrive inside the SAME object with no seam between them, so there is no
+# way to vote which objects exist without also voting their numbers. A
+# majority-voted quantity would violate this phase's own contract that numbers
+# come from geometry, so the passes are left single-shot rather than voted
+# unsafely.
+_VOTED_IDENTIFICATION_PASS_TYPES = frozenset({"schedule", "legend"})
+
+# Row fields that may carry a row's identity, most specific first.
+_ROW_IDENTITY_KEYS = (
+    "mark", "tag", "item", "item_no", "description", "name", "label",
+    "symbol", "type", "id",
+)
+
+# Row fields that may NEVER contribute to a row's identity — the quantity and
+# unit columns are exactly what two honest reads are allowed to differ on.
+_ROW_QUANTITY_KEYS = frozenset({
+    "qty", "quantity", "count", "ea", "total", "totals", "amount", "sum",
+    "unit", "units", "uom", "sf", "lf", "area", "length", "height", "width",
+})
+
+# Fields that may carry a TABLE's identity, most specific first.
+_TABLE_IDENTITY_KEYS = ("name", "table_purpose", "schedule_type", "description")
+
+
+def _canonical_signature(obj) -> str:
+    """A stable, order-insensitive text signature of a JSON-ish value."""
+    try:
+        return json.dumps(obj, sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        return repr(obj)
+
+
+def _lowered_keys(row: dict) -> dict:
+    """``row`` re-keyed by lowercased field name; first spelling wins.
+
+    Column headers arrive as the drawing prints them ("MARK", "Mark", "mark"),
+    so identity lookup must be case-insensitive or one sheet's casing would
+    make two reads of one row two rows.
+    """
+    out: dict = {}
+    for k, v in row.items():
+        out.setdefault(str(k).strip().lower(), v)
+    return out
+
+
+def _row_identity(row) -> str:
+    """The fold-normalised identity of one schedule/legend row.
+
+    Falls back, in order, to: a named identity column → the first non-quantity
+    text field the row carries → the row's own canonical signature (a row with
+    no text at all IS its own identity, which is still deterministic).
+    """
+    if not isinstance(row, dict):
+        return _canonical_signature(row)
+    lowered = _lowered_keys(row)
+    for key in _ROW_IDENTITY_KEYS:
+        val = lowered.get(key)
+        if isinstance(val, str) and val.strip():
+            folded = _norm_item_key(val)
+            if folded:
+                return folded
+    for key, val in lowered.items():
+        if key in _ROW_QUANTITY_KEYS:
+            continue
+        if isinstance(val, str) and val.strip():
+            folded = _norm_item_key(val)
+            if folded:
+                return folded
+    return _canonical_signature(row)
+
+
+def _table_identity(sched) -> str:
+    """The fold-normalised identity of one schedule/legend TABLE."""
+    if not isinstance(sched, dict):
+        return _canonical_signature(sched)
+    for key in _TABLE_IDENTITY_KEYS:
+        val = sched.get(key)
+        if isinstance(val, str) and val.strip():
+            folded = _norm_item_key(val)
+            if folded:
+                return folded
+    return _canonical_signature({k: v for k, v in sched.items() if k != "rows"})
+
+
+def _majority_payload(payloads: list):
+    """The most common EXACT payload among *payloads*; ties → first seen.
+
+    Returns one of the inputs verbatim — fields are never merged across
+    samples — so the vote cannot assemble a row, or a number, that no sample
+    actually produced.
+    """
+    tally: dict = {}
+    order: list = []
+    first: dict = {}
+    for payload in payloads:
+        sig = _canonical_signature(payload)
+        if sig not in tally:
+            tally[sig] = 0
+            order.append(sig)
+            first[sig] = payload
+        tally[sig] += 1
+    top = max(tally.values())
+    for sig in order:
+        if tally[sig] == top:
+            return first[sig]
+    return payloads[0]
+
+
+def _vote_schedule_rows(samples: list, vote_key: str = "schedules") -> list:
+    """Majority-vote the identification passes' tables and rows on row identity.
+
+    Contract:
+      * a TABLE whose identity appears in a STRICT majority of samples survives;
+      * within a surviving table, a ROW whose identity appears in a strict
+        majority of ALL samples survives — counted against every sample, not
+        only the ones that carried the table, because a table two of three
+        reads saw is already weak evidence and its rows must clear the same bar;
+      * a minority row, and a TIE, is DROPPED — flag-don't-guess, the same rule
+        `_vote_categorical_labels` applies when it yields the unknown sentinel;
+      * surviving payloads are verbatim from one sample (`_majority_payload`);
+      * first-seen order is preserved, so the output is a deterministic function
+        of the sample sequence.
+
+    A surviving table may legitimately end with an EMPTY row list when the reads
+    agree the table exists but agree on none of its rows. That is the honest
+    answer, and `claude_analyzer._merge_schedule_lists` already ignores a table
+    with no rows.
+    """
+    n = len(samples)
+    if n <= 1:
+        # Nothing to vote on. Folding a single read would silently EDIT it —
+        # a one-sample "vote" must return that read untouched.
+        first = samples[0] if n else {}
+        items = first.get(vote_key) if isinstance(first, dict) else None
+        return list(items) if isinstance(items, list) else []
+
+    per_sample: list = []
+    table_order: list = []
+    for res in samples:
+        buckets: dict = {}
+        items = res.get(vote_key) if isinstance(res, dict) else None
+        if isinstance(items, list):
+            for sched in items:
+                if not isinstance(sched, dict):
+                    continue
+                key = _table_identity(sched)
+                if key not in buckets:
+                    buckets[key] = {
+                        "meta": {k: v for k, v in sched.items() if k != "rows"},
+                        "rows": [],
+                    }
+                    if key not in table_order:
+                        table_order.append(key)
+                rows = sched.get("rows")
+                if isinstance(rows, list):
+                    buckets[key]["rows"].extend(r for r in rows if isinstance(r, dict))
+        per_sample.append(buckets)
+
+    voted: list = []
+    for key in table_order:
+        carriers = [b[key] for b in per_sample if key in b]
+        if len(carriers) * 2 <= n:
+            continue  # minority table, or a tie → dropped
+
+        row_order: list = []
+        row_by_sample: list = []
+        for bucket in per_sample:
+            mapping: dict = {}
+            for row in (bucket.get(key) or {}).get("rows") or []:
+                rkey = _row_identity(row)
+                if rkey not in mapping:
+                    mapping[rkey] = row
+                    if rkey not in row_order:
+                        row_order.append(rkey)
+            row_by_sample.append(mapping)
+
+        rows: list = []
+        for rkey in row_order:
+            carried = [m[rkey] for m in row_by_sample if rkey in m]
+            if len(carried) * 2 <= n:
+                continue  # minority row, or a tie → dropped
+            rows.append(_majority_payload(carried))
+
+        table = dict(_majority_payload([c["meta"] for c in carriers]))
+        table["rows"] = rows
+        voted.append(table)
     return voted
 
 
@@ -5286,20 +5513,33 @@ class TakeoffPipeline:
         legend_region: Optional[str] = None,
         budget: Optional[BudgetGuard] = None,
     ) -> dict:
-        """Execute a single extraction pass via analyze_drawing.
+        """Execute one extraction pass via analyze_drawing, voted where eligible.
+
+        For the IDENTIFICATION pass types (:data:`_VOTED_IDENTIFICATION_PASS_TYPES`
+        — the schedule and legend passes, which READ a printed table) this
+        samples up to ``ensemble_settings()["n"]`` times and majority-votes the
+        tables and rows on ROW IDENTITY (:func:`_vote_schedule_rows`), so a
+        single stochastic read can no longer change the take-off's shape. Every
+        other pass type, and an ensemble size of one, take the pre-24-08
+        single-shot path unchanged and byte-identically.
 
         Args:
             image_path:     Path to the sheet image.
             sheet_name:     Sheet identifier for logging and model selection.
             pass_type:      Name of the pass ("count", "measure", "schedule").
             model_override: Model slug to use, or None for default.
-            budget:         Per-run BudgetGuard; the completed call's
-                            ``_cost_usd`` is charged. A refused charge raises
-                            BudgetExceeded and the result is discarded (the
-                            ledger only holds paid-and-accepted work).
+            budget:         Per-run BudgetGuard; EVERY sample's ``_cost_usd`` is
+                            charged. A refused charge raises BudgetExceeded and
+                            that result is discarded (the ledger only holds
+                            paid-and-accepted work). When the guard runs out
+                            part-way through an ensemble, sampling stops and the
+                            vote runs over the samples already paid for, with
+                            ``_vote_samples`` recording the reduced count — a
+                            partial vote is never presented as a full one.
 
         Raises:
-            BudgetExceeded: When the guard is exhausted or refuses the charge.
+            BudgetExceeded: When the guard is exhausted or refuses the charge
+                            before any sample completed.
         """
         if budget is not None and budget.exhausted:
             raise BudgetExceeded(budget.spent_usd, budget.max_usd)
@@ -5310,6 +5550,103 @@ class TakeoffPipeline:
         else:
             logger.info("  pass=%r sheet=%r (default model)", pass_type, sheet_name)
 
+        n = self._identification_ensemble_n(pass_type)
+        if n <= 1:
+            return self._single_pass(
+                image_path, sheet_name, pass_type, model_override, sheet_type,
+                pdf_path, page_index, render_scale, user_hint, legend_region,
+                budget,
+            )
+
+        samples: list = []
+        per_sample_cost = 0.0
+        for _ in range(n):
+            if budget is not None and getattr(budget, "exhausted", False):
+                break
+            if samples and budget is not None and budget.would_exceed(per_sample_cost):
+                # Look before leaping on the EXTRA samples only. A refused
+                # charge means the vendor was paid for a call whose result is
+                # then discarded; declining to make it is strictly cheaper and
+                # cannot change the first sample, which is always attempted.
+                logger.info(
+                    "_run_pass: %r pass=%r — stopping ensemble at %d/%d samples, "
+                    "no budget headroom for another", sheet_name, pass_type,
+                    len(samples), n,
+                )
+                break
+            try:
+                res = self._single_pass(
+                    image_path, sheet_name, pass_type, model_override, sheet_type,
+                    pdf_path, page_index, render_scale, user_hint, legend_region,
+                    budget,
+                )
+            except BudgetExceeded:
+                break
+            if isinstance(res, dict):
+                samples.append(res)
+                per_sample_cost = max(per_sample_cost, _result_cost_usd(res))
+
+        if not samples:
+            # No paid samples — surface the same signal a single call would, so
+            # the caller's ``except BudgetExceeded`` flags the sheet. Never a
+            # silent empty (phase-23 C2: budget exhaustion stays LOUD).
+            if budget is not None:
+                raise BudgetExceeded(budget.spent_usd, budget.max_usd)
+            return {}
+
+        if len(samples) == 1:
+            # Exhausted after one sample. Return that read UNFOLDED — voting
+            # over one sample would silently edit it — but record the reduced
+            # count so a partial is never mistaken for a full vote (T-24-35).
+            result = dict(samples[0])
+            result["_voted"] = True
+            result["_vote_samples"] = 1
+            return result
+
+        base = next((s for s in samples if not s.get("error")), samples[0])
+        result = dict(base)
+        result["schedules"] = _vote_schedule_rows(samples)
+        result.update(_sum_usage(samples))  # aggregate paid usage/cost
+        result["_voted"] = True
+        result["_vote_samples"] = len(samples)
+        return result
+
+    @staticmethod
+    def _identification_ensemble_n(pass_type: str) -> int:
+        """Ensemble size for *pass_type*: N for identification, 1 for the rest.
+
+        A stubbed or unreadable config degrades to 1 — single-shot, i.e. exactly
+        the pre-24-08 behaviour — never to an unbounded fan-out.
+        """
+        if pass_type not in _VOTED_IDENTIFICATION_PASS_TYPES:
+            return 1
+        try:
+            return int(ensemble_settings()["n"])
+        except Exception:  # noqa: BLE001 — config stubbed → single-shot
+            return 1
+
+    def _single_pass(
+        self,
+        image_path: str,
+        sheet_name: str,
+        pass_type: str,
+        model_override: Optional[str],
+        sheet_type: Optional[str] = None,
+        pdf_path: Optional[str] = None,
+        page_index: Optional[int] = None,
+        render_scale: Optional[float] = None,
+        user_hint: Optional[str] = None,
+        legend_region: Optional[str] = None,
+        budget: Optional[BudgetGuard] = None,
+    ) -> dict:
+        """ONE analyze_drawing call: render → call → clean up → charge → guard.
+
+        This is `_run_pass`'s pre-24-08 body verbatim, minus the entry budget
+        pre-check and the pass logging, which `_run_pass` still owns so they
+        happen once per PASS rather than once per SAMPLE. Each sample renders
+        AND unlinks its own temporary pass image in the ``finally`` below, so an
+        ensemble cannot leak temp files (T-24-37).
+        """
         pass_image = image_path
         if render_scale and pdf_path is not None and page_index is not None:
             if (
