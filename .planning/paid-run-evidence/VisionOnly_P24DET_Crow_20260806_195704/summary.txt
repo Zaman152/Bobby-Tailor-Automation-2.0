@@ -1,0 +1,378 @@
+══════════════════════════════════════════════════════════════════════
+QUANTITY TAKEOFF SUMMARY
+══════════════════════════════════════════════════════════════════════
+Project:          VisionOnly P24DET Crow
+Generated:        2026-08-06T19:57:04.557632
+Sheets analyzed:  4
+Raw items:        124
+Calculated items: 36
+
+──────────────────────────────────────────────────────────────────────
+API USAGE & COST
+──────────────────────────────────────────────────────────────────────
+Total cost:       $0.3892 USD
+  on sheets:      $0.3648 USD
+  project-level:  $0.0244 USD  (charged to the run, stamped on no sheet — the naming/vocabulary passes and any sheet that lost its usage stamp)
+Input tokens:     18,934
+Output tokens:    16,165
+Cost per sheet:   $0.0973 USD
+Budget:           $0.3892 spent of $2.50 cap
+
+──────────────────────────────────────────────────────────────────────
+COVERAGE  (a blank is NOT a zero — an unmeasured item has no number,
+           which is a different fact from a measured zero)
+──────────────────────────────────────────────────────────────────────
+Pages in source PDF:              4
+  measured (geometry):            4
+  vision-only (no geometry):      0
+  skipped by classifier:          0
+  not applicable (cover/idx):     0
+  errored:                        0
+Drawings measured:                                                  0
+Drawings dropped (no printed scale of their own):                   1
+Viewports excluded as off-scale (measuring them would be wrong):    4
+
+!! 1 drawing(s) were dropped for having no printed scale of their own
+   — measuring them at a borrowed scale would be a squared error
+!! 31 expected line item(s) have NO measurement path — do NOT read
+   their blank quantity as zero
+!! [A-101] wall-height cross-check: the published 36.00 ft (plan)
+   DISAGREES with the elevation datum ladder's 48.00 ft by 33% — BOTH
+   are flagged, neither is preferred, and the ladder publishes no
+   height (D-11). Every wall area derived from the published height
+   inherits this uncertainty; a datum ladder measures parapet-to-
+   floor and a plan callout may state clear height, and which one the
+   walls are bid at is an estimator's call, not a silent substitution
+!! [A-201] elevation cross-check: silhouette sum 133478 SF vs the
+   independent perimeter x datum-height route 2972.0 LF x 48.00 ft =
+   142656 SF — agreement within 6.4%. The second route is a cross-
+   check only and publishes no quantity (D-11)
+
+Expected line items:             51
+  MEASURED                        9
+  NEEDS REVIEW                   10
+  HUMAN INPUT                     0
+  STANDARD ITEM                   1
+  NOT MEASURED                   31   ← do NOT read these as zero
+
+──────────────────────────────────────────────────────────────────────
+UNIDENTIFIED GEOMETRY  (these were MEASURED — the quantities below
+                        are real and so are the objects; what the
+                        drawings do not say is what they ARE)
+──────────────────────────────────────────────────────────────────────
+Candidates measured but not identified:                            35
+
+They are held out of the take-off above on purpose. Naming one of them
+from our own internal handle for it would put an identifier this app
+invented in front of a client as the name of a thing to price. Their
+absence from the take-off is an absence of a NAME, never of an object.
+
+  symbol group                      22 candidate(s)            194 EA
+  wall thickness class               7 candidate(s)        2,461.1 LF
+  room                               6 candidate(s)      396,382.0 SF
+
+  Candidate           Quantity  Sheet              Why naming failed
+  SYM-6                  36 EA  A-101              no name source
+  SYM-7                  32 EA  A-101              label is drafting noise
+  SYM-9                  14 EA  A-101              no name source
+  SYM-10                 14 EA  A-101              no name source
+  SYM-11                 14 EA  A-101              no name source
+  SYM-17                  9 EA  A-101              label is drafting noise
+  SYM-18                  8 EA  A-101              label is drafting noise
+  SYM-19                  6 EA  A-101              label is drafting noise
+  SYM-20                  6 EA  A-101              label is drafting noise
+  SYM-21                  6 EA  A-101              no name source
+  SYM-22                  5 EA  A-101              label is drafting noise
+  SYM-23                  5 EA  A-101              label is drafting noise
+  SYM-24                  5 EA  A-101              label is drafting noise
+  SYM-25                  4 EA  A-101              label is drafting noise
+  SYM-26                  4 EA  A-101              no name source
+  SYM-27                  4 EA  A-101              no name source
+  SYM-28                  4 EA  A-101              no name source
+  SYM-29                  4 EA  A-101              no name source
+  SYM-31                  4 EA  A-101              label is drafting noise
+  SYM-32                  4 EA  A-101              no name source
+  SYM-34                  3 EA  A-101              label is drafting noise
+  SYM-35                  3 EA  A-101              label is drafting noise
+  WALL-TC10            33.9 LF  A-101              wall class unlabeled
+  WALL-TC11            24.7 LF  A-101              wall class unlabeled
+  WALL-TC2          1,113.5 LF  A-101              wall class unlabeled
+  ... and 10 more — every one of them is in the
+      `unnamed_geometry` list in takeoff.json
+
+──────────────────────────────────────────────────────────────────────
+SCALE CONFIDENCE
+──────────────────────────────────────────────────────────────────────
+  [output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png] main R1   1" = 40'     conf=high    method=ransac_consensus           (30 dims, 89% share, printed ✓)
+  [output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0002.png] main R2   1" = 24.8355' conf=low     method=ransac_consensus_offladder (1 dims, 100% share, printed ✗)
+
+──────────────────────────────────────────────────────────────────────
+PROVENANCE BREAKDOWN
+──────────────────────────────────────────────────────────────────────
+  geometry              14 items
+  text_layer             1 items
+  Geometry/text-derived quantities: 15/15 (100.0% of provenance-tagged items)
+
+──────────────────────────────────────────────────────────────────────
+LINKED SHEETS & CROSS-REFERENCES
+──────────────────────────────────────────────────────────────────────
+Drawing cross-references: 21 total, 0 resolved
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 7 on A-401 — Typical Bollard Detail  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 13 on A-401 — Enlarged Ramp Plan  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 12 on A-401 — Ramp w/ Landing Section  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 11 on A-401 — Fire Riser / Electrical Panel Protection  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 10 on A-401 — Stair Section  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 9 on A-401 — Z-Guard Detail  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 8 on A-401 — Stair Rail  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 6 on A-401 — Stair Plan  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 5 on A-401 — Section @ Pump / Electrical Room  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 4 on A-401 — Ramp Rail Section  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 3 on A-401 — Plan @ Dock Leveler (Future)  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 2 on A-401 — Side Section @ Leveler (Future)  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png → detail 1 on A-401 — Section at Dock Leveler (Future)  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png → detail 2 on A-601 — Door & Frame Types  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png → detail 1 on A-601 — Door Jambs and Heads  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png → detail H1 on A-601 — Hollow Metal Frame at Exterior EIFS wall - Head detail  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png → detail H2 on A-601 — Metal Door Track at Overhead - Head detail  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png → detail H3 on A-601 — CMU wall overhead door head  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png → detail J1 on A-601 — Hollow Metal Frame Jamb at Exterior EIFS wall  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png → detail J2 on A-601 — Metal Door Track Jamb with safety guard plate  [TARGET SHEET NOT FOUND]
+  • output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png → detail J3 on A-601 — CMU Jamb with overhead door and jamb anchor  [TARGET SHEET NOT FOUND]
+
+──────────────────────────────────────────────────────────────────────
+SHEET-BY-SHEET LOG (source traceability)
+──────────────────────────────────────────────────────────────────────
+  [output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png] type=floor_plan     meas=  0 comp= 11 rooms=  0 mat=  0 conf=?
+  [output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0002.png] type=elevation      meas=  0 comp=  4 rooms=  0 mat=  0 conf=?
+  [output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png] type=detail         meas= 33 comp= 27 rooms=  0 mat=  9 conf=medium
+  [output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png] type=detail         meas=  0 comp= 16 rooms=  0 mat=  7 conf=medium
+
+──────────────────────────────────────────────────────────────────────
+RAW ITEMS BY CATEGORY
+──────────────────────────────────────────────────────────────────────
+  COMPONENT          58 items
+  SCHEDULE_HEADER     3 items
+  SCHEDULE_ROW       14 items
+  MEASUREMENT        33 items
+  MATERIAL           16 items
+
+──────────────────────────────────────────────────────────────────────
+CALCULATED TAKEOFF BY ESTIMATION TABLE
+──────────────────────────────────────────────────────────────────────
+  DOORS               8 items
+  BOLLARD             1 items
+  CONCRETE_SLAB       8 items
+  SEALED_CONCRETE     1 items
+  EXPOSED_STRUCTURE     1 items
+  NONE                6 items
+  TILT_UP_WALL        1 items
+  CMU_WALL            1 items
+  TAKEOFF_LEGEND      6 items
+  ELECTRICAL_FIXTURE     1 items
+  STAIRS              1 items
+  LIFT                1 items
+
+══════════════════════════════════════════════════════════════════════
+PROJECT TAKEOFF SUMMARY (CONSOLIDATED)
+══════════════════════════════════════════════════════════════════════
+  ITEM                                              QTY  UNIT    
+──────────────────────────────────────────────────────────────────────
+  Bollards                                           56  EA      
+  Building Perimeter                              2,972  LF      
+  CMU Wall                                       11,286  SF      
+  Canopy                                              —  SF      
+  Columns                                             —  EA      
+  Columns-H-35'                                       —  EA      
+  Concrete Curb                                       —  LF      
+  Concrete Pad                                  397,600  SF      
+  Curb & Gutter                                       —  LF      
+  Dock Bumper                                         —  EA      
+  Dock Leveler                                        —  EA      
+  Door Frames - Hollow Metal (door schedule)           29  EA      
+  Door Frames-AL                                      —  EA      
+  Door Frames-HC                                      —  EA      
+  Door Frames-HM                                      —  EA      
+  Door Frames-IM                                      —  EA      
+  Door Frames-SC                                      —  EA      
+  Door Frames-STL                                     —  EA      
+  Doors - Aluminum (door schedule)                    6  EA      
+  Doors - Hollow Metal (door schedule)               29  EA      
+  Doors - Steel (door schedule)                      70  EA      
+  Doors-HC                                            —  EA      
+  Doors-IM                                            —  EA      
+  Doors-SC                                            —  EA      
+  Doors-STL                                           —  EA      
+  Electrical Panels                                   1  EA      
+  Exposed Structure                             397,600  SF      
+  Fire riser                                          1  EA      
+  Glazing                                             —  SF      
+  Guard Rail                                          —  LF      
+  Gutter                                              —  LF      
+  Hand Rail                                           —  LF      
+  Internal Tilt up walls                        106,992  SF      
+  LED Wall Pack                                       —  EA      
+  Ladder                                              —  EA      
+  Ladder-H-20'                                        —  EA      
+  Lift                                                1  EA      
+  Mobilization                                        1  EA      
+  OVERALL EAST ELEVATION                       16,141.2  SF      
+  OVERALL NORTH ELEVATION                      48,534.8  SF      
+  OVERALL SOUTH ELEVATION                        52,625  SF      
+  OVERALL WEST ELEVATION                       16,177.2  SF      
+  PVC Cleanouts                                       —  EA      
+  Pipe Guardrail                                      —  LF      
+  Pre-Engineered Metal Canopy                         —  EA      
+  Ramp                                                —  EA      
+  Roof Hatch                                          —  EA      
+  Sealed Concrete                               397,600  SF      
+  Stairs                                              2  EA      
+  Tilt Up Wall                                        —  SF      
+  Vapor Barrier                                       —  SF      
+
+──────────────────────────────────────────────────────────────────────
+DETAILED CALCULATED TAKEOFF (with sources)
+──────────────────────────────────────────────────────────────────────
+  136.0 EA      DOOR                                      [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ 
+  56.0 EA      Bollards                                  [table:bollard, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ 
+  5.0 LF      tilt-up concrete panel                    [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ 
+  397600.0 SF      Concrete Pad                              [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ 
+  397600.0 SF      Sealed Concrete                           [table:sealed_concrete, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ 
+  397600.0 SF      Exposed Structure                         [table:exposed_structure, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ 
+  2972.0 LF      Building Perimeter                        [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ 
+  106992.0 SF      Tilt Up Wall                              [table:tilt_up_wall, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ 
+  11286.0 SF      CMU Wall                                  [table:cmu_wall, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ 
+  70.0 EA      Doors - Steel (door schedule)             [table:takeoff_legend, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ Door Schedule (extracted from plans)
+  29.0 EA      Doors - Hollow Metal (door schedule)      [table:takeoff_legend, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ Door Schedule (extracted from plans)
+  6.0 EA      Doors - Aluminum (door schedule)          [table:takeoff_legend, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ Door Schedule (extracted from plans)
+  29.0 EA      Door Frames - Hollow Metal (door schedule)  [table:takeoff_legend, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ Door Schedule (extracted from plans)
+  397600.0 SF      Exposed Structure                         [table:takeoff_legend, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ Building Footprint (measured from overall dimensions)
+  397600.0 SF      Sealed Concrete                           [table:takeoff_legend, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0001.png @ Building Footprint (measured from overall dimensions)
+  16177.2 SF      OVERALL WEST ELEVATION                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0002.png @ 
+  52625.0 SF      OVERALL SOUTH ELEVATION                   [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0002.png @ 
+  16141.2 SF      OVERALL EAST ELEVATION                    [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0002.png @ 
+  48534.8 SF      OVERALL NORTH ELEVATION                   [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0002.png @ 
+  0.02 cy      Handrail pipe OD at concrete slab support  [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png @ Detail 10 - Stair Section
+  0.05 cy      Concrete curb - ramp landing section      [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png @ Detail 12 - Ramp w/ Landing Section
+  0.07 cy      Concrete slab thickness - dock leveler section  [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png @ Detail 1 - Section at Dock Leveler (Future)
+  0.1 cy      Concrete footing - ramp rail section      [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png @ Detail 4 - Ramp Rail Section
+  0.05 cy      Concrete slab on metal deck thickness - pump room  [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png @ Detail 5 - Section @ Pump/Electrical Room
+  0.15 cy      Preformed concrete edge - dock leveler section  [table:concrete_slab, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png @ Detail 5 - Section @ Pump/Electrical Room
+  1.0 ea      Fire riser                                [table:none, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png @ Detail 11 - Fire Riser / Electrical Panel Protection
+  1.0 ea      Electrical panel                          [table:electrical_fixture, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png @ Detail 11 - Fire Riser / Electrical Panel Protection
+  2.0 ea      Stair / Stair Run - Open Metal Grate Tread  [table:stairs, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png @ Detail 10 (Stair Section) and Detail 6 (Stair Plan) in lower portion of sheet
+  1.0 ea      Dock Leveler / Hydraulic Lift (Future)    [table:lift, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png @ Details 1, 2, and 3 - Section at Dock Leveler (Future), Side Section @ Leveler (Future), Plan @ Dock Leveler (Future)
+  2.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png @ DOOR SCHEDULE
+  2.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png @ DOOR SCHEDULE
+  2.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png @ DOOR SCHEDULE
+  2.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png @ DOOR SCHEDULE
+  2.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png @ DOOR SCHEDULE
+  2.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png @ DOOR SCHEDULE
+  2.0 ea      DOOR SCHEDULE                             [table:doors, waste:×1.0]
+              source: output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0004.png @ DOOR SCHEDULE
+
+──────────────────────────────────────────────────────────────────────
+RAW DIMENSIONAL MEASUREMENTS (by sheet)
+──────────────────────────────────────────────────────────────────────
+
+  [output/screenshots/VisionOnly_P24DET_Crow_20260806_195053/page_0003.png]  (33 measurements)
+     1.5 in        Steel pipe guardrail OD - ramp plan
+                @ Detail 12 - Ramp w/ Landing Section and Detail 13 - Enlarged Ramp Plan
+     1.5 in        Steel pipe guardrail OD - ramp rail section
+                @ Detail 4 - Ramp Rail Section
+     1.5 in        Handrail pipe OD - stair section
+                @ Detail 10 - Stair Section
+     1.5 in        Handrail pipe OD at stair plan
+                @ Detail 6 - Stair Plan
+     1.5 in        Handrail pipe OD - stair rail detail
+                @ Detail 8 - Stair Rail
+     1.5 in        Vertical support pipe OD at ramp landing
+                @ Detail 12 - Ramp w/ Landing Section
+     1.5 in        Handrail pipe OD at concrete slab support
+                @ Detail 10 - Stair Section
+     1.5 in        Dia. vertical support pipe at stair section
+                @ Detail 10 - Stair Section
+     6 in        Steel pipe bollard OD - typ. bollard detail
+                @ Detail 7 - Typ. Bollard
+     1.5 in        Steel pipe bollard OD - ramp rail section
+                @ Detail 4 - Ramp Rail Section
+     4 in        Concrete curb - ramp landing section
+                @ Detail 12 - Ramp w/ Landing Section
+     10 ft        Ramp landing width
+                @ Detail 12 - Ramp w/ Landing Section
+     5 ft        Ramp width at landing section
+                @ Detail 12 - Ramp w/ Landing Section
+     4 ft        Guard post spacing not to exceed
+                @ Detail 11 - Fire Riser / Electrical Panel Protection
+     1.5 in        Quick bolt typical - stair rail
+                @ Detail 8 - Stair Rail
+     8 in        CMU wall thickness - pump/electrical room section
+                @ Detail 5 - Section @ Pump/Electrical Room
+     6 in        Concrete slab thickness - dock leveler section
+                @ Detail 1 - Section at Dock Leveler (Future)
+     8 in        Concrete footing - ramp rail section
+                @ Detail 4 - Ramp Rail Section
+     1.5 in        Vertical support spacing - dock leveler section
+                @ Detail 2 - Side Section @ Leveler (Future)
+     1.5 in        Z-guard detail - guardrail OD
+                @ Detail 9 - Z-Guard Detail
+     1.5 in        Z-guard detail - guardrail attachment OD
+                @ Detail 9 - Z-Guard Detail
+     6 in        Steel stringer angle size - stair stringer
+                @ Detail 8 - Stair Rail
+     4 in        Concrete slab on metal deck thickness - pump room
+                @ Detail 5 - Section @ Pump/Electrical Room
+     0.5 in        Truck court slope at dock leveler
+                @ Detail 1 - Section at Dock Leveler (Future)
+     1 ea        Overhead sectional door - dock leveler plan
+                @ Detail 3 - Plan @ Dock Leveler (Future)
+     1 ea        Dock bumper - dock leveler plan
+                @ Detail 3 - Plan @ Dock Leveler (Future)
+     1 ea        Dock leveler - dock leveler plan
+                @ Detail 3 - Plan @ Dock Leveler (Future)
+     1 ea        Rubber bumper - dock leveler section
+                @ Detail 1 - Section at Dock Leveler (Future)
+     1 ea        Expansion joint - typical bollard
+                @ Detail 7 - Typ. Bollard
+     4 ft        Fire riser clearance to electrical panel bollard spacing dimension A
+                @ Detail 11 - Fire Riser / Electrical Panel Protection
+     4 ft        Fire riser clearance to electrical panel bollard dimension B
+                @ Detail 11 - Fire Riser / Electrical Panel Protection
+     12 in        Preformed concrete edge - dock leveler section
+                @ Detail 5 - Section @ Pump/Electrical Room
+     12 in        12 premolded expansion joint material with sealer - ramp rail section
+                @ Detail 4 - Ramp Rail Section

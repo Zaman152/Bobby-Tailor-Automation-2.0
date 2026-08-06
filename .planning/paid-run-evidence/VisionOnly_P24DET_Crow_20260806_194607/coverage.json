@@ -1,0 +1,727 @@
+{
+  "project_name": "VisionOnly P24DET Crow",
+  "generated_at": "2026-08-06T19:46:07.988060",
+  "source_pdf": "/var/folders/h6/l790gj257v78f94x9yvv21_c0000gn/T/vision_only_cbgpt2bj/Crow - Cass White Road-Plans.pdf",
+  "summary": {
+    "pages_in_source": 4,
+    "sheets_measured": 4,
+    "sheets_budget_truncated": 0,
+    "sheets_vision_only": 0,
+    "sheets_skipped": 0,
+    "sheets_errored": 0,
+    "sheets_not_applicable": 0,
+    "drawings_measured": 0,
+    "drawings_excluded_off_scale": 4,
+    "drawings_dropped_no_scale": 1,
+    "silent_loss_pages": [],
+    "items_measured": 8,
+    "items_needs_review": 11,
+    "items_not_measured": 31,
+    "items_human_input": 0,
+    "items_standard": 1,
+    "coverage_pct_pages": 100.0,
+    "coverage_pct_items": 15.7
+  },
+  "warnings": [
+    "1 drawing(s) were dropped for having no printed scale of their own \u2014 measuring them at a borrowed scale would be a squared error",
+    "31 expected line item(s) have NO measurement path \u2014 do NOT read their blank quantity as zero",
+    "[A-101] wall-height cross-check: the published 36.00 ft (plan) DISAGREES with the elevation datum ladder's 48.00 ft by 33% \u2014 BOTH are flagged, neither is preferred, and the ladder publishes no height (D-11). Every wall area derived from the published height inherits this uncertainty; a datum ladder measures parapet-to-floor and a plan callout may state clear height, and which one the walls are bid at is an estimator's call, not a silent substitution",
+    "[A-201] elevation cross-check: silhouette sum 133478 SF vs the independent perimeter x datum-height route 2972.0 LF x 48.00 ft = 142656 SF \u2014 agreement within 6.4%. The second route is a cross-check only and publishes no quantity (D-11)"
+  ],
+  "sheets": [
+    {
+      "page_index": 0,
+      "sheet_name": "A-101",
+      "sheet_type": "floor_plan",
+      "type_source": "title_block",
+      "sheet_type_full_text": "floor_plan",
+      "classifier_keyword": "FLOOR PLAN",
+      "classifier_context": "/24/2026 2601014 OVERALL FLOOR PLAN A-101",
+      "classifier_overruled": false,
+      "disposition": "measured_partial",
+      "reason": "1 drawing(s) on this sheet were not measured \u2014 see the per-drawing reasons",
+      "measurable_signal": {
+        "plan_titles": 1,
+        "printed_scales": 5,
+        "viewports": 5,
+        "schedules": 0,
+        "geometry": 1
+      },
+      "drawings": [
+        {
+          "region_id": "R3",
+          "title": "TYPICAL S.C.C.P. JOINT DETAIL",
+          "plan_kind": "",
+          "disposition": "excluded_off_scale",
+          "reason": "its printed scale 0.0093 ft/pt differs from the resolved page scale 0.5556 ft/pt; measuring it at the page scale would be 60x wrong, so it was deliberately excluded \u2014 this is NOT a failed measurement",
+          "printed_scale_fpi": 0.6667,
+          "area_sf": null,
+          "needs_review": false
+        },
+        {
+          "region_id": "R4",
+          "title": "TYPICAL S.C.C.P./ SF DETAIL",
+          "plan_kind": "",
+          "disposition": "excluded_off_scale",
+          "reason": "its printed scale 0.0093 ft/pt differs from the resolved page scale 0.5556 ft/pt; measuring it at the page scale would be 60x wrong, so it was deliberately excluded \u2014 this is NOT a failed measurement",
+          "printed_scale_fpi": 0.6667,
+          "area_sf": null,
+          "needs_review": false
+        },
+        {
+          "region_id": "R5",
+          "title": "TYPICAL S.C.C.P. CORNER DETAIL",
+          "plan_kind": "",
+          "disposition": "excluded_off_scale",
+          "reason": "its printed scale 0.0093 ft/pt differs from the resolved page scale 0.5556 ft/pt; measuring it at the page scale would be 60x wrong, so it was deliberately excluded \u2014 this is NOT a failed measurement",
+          "printed_scale_fpi": 0.6667,
+          "area_sf": null,
+          "needs_review": false
+        },
+        {
+          "region_id": "R6",
+          "title": "TYP. S.C.C.P. MITERED CORNER",
+          "plan_kind": "",
+          "disposition": "excluded_off_scale",
+          "reason": "its printed scale 0.0093 ft/pt differs from the resolved page scale 0.5556 ft/pt; measuring it at the page scale would be 60x wrong, so it was deliberately excluded \u2014 this is NOT a failed measurement",
+          "printed_scale_fpi": 0.6667,
+          "area_sf": null,
+          "needs_review": false
+        },
+        {
+          "region_id": "FILL-1",
+          "title": "OVERALL - AR PLAN",
+          "plan_kind": "AR",
+          "disposition": "skipped_no_scale",
+          "reason": "no printed scale beneath the title \u2014 measuring it at a borrowed scale would be a squared error",
+          "printed_scale_fpi": null,
+          "area_sf": null,
+          "needs_review": false
+        }
+      ],
+      "items_emitted": 12,
+      "cost_usd": 0.164875,
+      "budget_truncated": false,
+      "is_silent_loss": false
+    },
+    {
+      "page_index": 1,
+      "sheet_name": "A-201",
+      "sheet_type": "elevation",
+      "type_source": "title_block",
+      "sheet_type_full_text": "elevation",
+      "classifier_keyword": "ELEVATIONS",
+      "classifier_context": "24/2026 2601014 EXTERIOR ELEVATIONS - OPTION 01 A-201",
+      "classifier_overruled": false,
+      "disposition": "measured",
+      "reason": "",
+      "measurable_signal": {
+        "plan_titles": 0,
+        "printed_scales": 4,
+        "viewports": 2,
+        "schedules": 0
+      },
+      "drawings": [],
+      "items_emitted": 4,
+      "cost_usd": 0.0,
+      "budget_truncated": false,
+      "is_silent_loss": false
+    },
+    {
+      "page_index": 2,
+      "sheet_name": "A-401",
+      "sheet_type": "detail",
+      "type_source": "title_block",
+      "sheet_type_full_text": "detail",
+      "classifier_keyword": "DETAILS",
+      "classifier_context": "04/24/2026 2601014 MISC. DETAILS A-401",
+      "classifier_overruled": false,
+      "disposition": "measured",
+      "reason": "",
+      "measurable_signal": {
+        "plan_titles": 0,
+        "printed_scales": 13,
+        "viewports": 10,
+        "schedules": 0
+      },
+      "drawings": [],
+      "items_emitted": 24,
+      "cost_usd": 0.092841,
+      "budget_truncated": false,
+      "is_silent_loss": false
+    },
+    {
+      "page_index": 3,
+      "sheet_name": "A-601",
+      "sheet_type": "detail",
+      "type_source": "title_block",
+      "sheet_type_full_text": "detail",
+      "classifier_keyword": "DETAILS",
+      "classifier_context": "DOOR SCHEDULES, FRAMES & DETAILS A-601",
+      "classifier_overruled": false,
+      "disposition": "measured",
+      "reason": "",
+      "measurable_signal": {
+        "plan_titles": 0,
+        "printed_scales": 2,
+        "viewports": 1,
+        "schedules": 0
+      },
+      "drawings": [],
+      "items_emitted": 15,
+      "cost_usd": 0.088026,
+      "budget_truncated": false,
+      "is_silent_loss": false
+    }
+  ],
+  "items": [
+    {
+      "name": "Bollards",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 56.0,
+      "basis": "bollard",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "a reading in a DIFFERENT measurement class was NOT summed into this quantity ('Concrete core diameter - bollard footing' read 0.22 CY via formula '18 sf \u00d7 4\" / (12 \u00d7 27) = 0.22 cy' and this row publishes in EA \u2014 volume vs count); named by naming library (perimeter_jamb_symbol \u2192 Bollards); vision label unavailable \u2014 verify",
+      "expected_from": "manifest"
+    },
+    {
+      "name": "Building Perimeter",
+      "unit": "LF",
+      "status": "NEEDS REVIEW",
+      "quantity": 2972.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "unclassified item (no estimation table matched)",
+      "expected_from": "vision"
+    },
+    {
+      "name": "CMU Wall",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 11286.0,
+      "basis": "cmu_wall",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "low-confidence count; wall class named by naming library (thickness bind) \u2014 verify; vision read this class as 'tilt-up concrete panel'; the printed-thickness match named it 'CMU Wall' and outranks the reading (both answers are in the fusion audit trail) \u2014 verify; reinstated: this reading was suppressed in favour of a region-measured 'CMU Wall', and that row was then itself rejected \u2014 a supersession whose superseder dies is not a supersession, so the measurement stands rather than leaving the object with no number at all (the superseding route read 31104.0 SF). Verify which route is right before bidding",
+      "expected_from": "manifest"
+    },
+    {
+      "name": "Canopy",
+      "unit": "SF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "roof_area",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Columns",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Columns-H-35'",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "manifest object not found in plans",
+      "expected_from": "manifest_missing"
+    },
+    {
+      "name": "Concrete Curb",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "unit_class_conflict",
+      "source_sheets": [],
+      "reason": "the only reading that resolved to this object was measured in a DIFFERENT measurement class from the unit it would publish in, and there is no conversion between them, so the number is WITHHELD \u2014 this is a BLANK, not a zero ('Concrete curb dimension - ramp plan' read 0.05 CY via formula '4 sf \u00d7 4\" / (12 \u00d7 27) = 0.05 cy' and this row publishes in LF \u2014 volume vs linear)",
+      "expected_from": "unit_class_conflict_unmeasured"
+    },
+    {
+      "name": "Concrete Pad",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 397600.0,
+      "basis": "concrete_slab",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "this row's NAME is a hypothesis, and 1 expected item(s) sharing its unit and measure basis were never measured \u2014 'Vapor Barrier'. It may be answering one of them under a different name; the quantity and unit are unchanged and nothing was merged",
+      "expected_from": "library"
+    },
+    {
+      "name": "Curb & Gutter",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "linear",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Dock Bumper",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Dock Leveler",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Door Frames - Hollow Metal (door schedule)",
+      "unit": "EA",
+      "status": "MEASURED",
+      "quantity": 29.0,
+      "basis": "doors",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "",
+      "expected_from": "plan_schedule_legend"
+    },
+    {
+      "name": "Door Frames-AL",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Door Frames-HC",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Door Frames-HM",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 4.0,
+      "basis": "doors",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "this row's NAME is a hypothesis, and 16 expected item(s) sharing its unit and measure basis were never measured \u2014 'Columns', 'Dock Bumper', 'Dock Leveler' and 13 more. It may be answering one of them under a different name; the quantity and unit are unchanged and nothing was merged",
+      "expected_from": "library"
+    },
+    {
+      "name": "Door Frames-IM",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Door Frames-SC",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Door Frames-STL",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Doors - Aluminum (door schedule)",
+      "unit": "EA",
+      "status": "MEASURED",
+      "quantity": 6.0,
+      "basis": "doors",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "",
+      "expected_from": "plan_schedule_legend"
+    },
+    {
+      "name": "Doors - Hollow Metal (door schedule)",
+      "unit": "EA",
+      "status": "MEASURED",
+      "quantity": 29.0,
+      "basis": "doors",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "",
+      "expected_from": "plan_schedule_legend"
+    },
+    {
+      "name": "Doors - Steel (door schedule)",
+      "unit": "EA",
+      "status": "MEASURED",
+      "quantity": 70.0,
+      "basis": "doors",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "a separate 'Doors-HM' reading of this item (library) was suppressed as a duplicate of the authoritative legend row 'Doors' \u2014 it was NOT added to this quantity",
+      "expected_from": "plan_schedule_legend"
+    },
+    {
+      "name": "Doors-HC",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Doors-IM",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Doors-SC",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Doors-STL",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Electrical Panels",
+      "unit": "EA",
+      "status": "MEASURED",
+      "quantity": 1.0,
+      "basis": "electrical_fixture",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0003.png"
+      ],
+      "reason": "",
+      "expected_from": "vision"
+    },
+    {
+      "name": "Exposed Structure",
+      "unit": "SF",
+      "status": "MEASURED",
+      "quantity": 397600.0,
+      "basis": "exposed_structure",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "a separate 'Exposed Structure' reading of this item (manifest) was suppressed as a duplicate of the authoritative legend row 'Exposed Structure' \u2014 it was NOT added to this quantity",
+      "expected_from": "plan_schedule_legend"
+    },
+    {
+      "name": "Fire riser",
+      "unit": "EA",
+      "status": "NEEDS REVIEW",
+      "quantity": 1.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0003.png"
+      ],
+      "reason": "unclassified item (no estimation table matched)",
+      "expected_from": "vision"
+    },
+    {
+      "name": "Glazing",
+      "unit": "SF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "wall_area",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Guard Rail",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "linear",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Gutter",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Hand Rail",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "linear",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Internal Tilt up walls",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 106992.0,
+      "basis": "tilt_up_wall",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "low-confidence count; wall class named by naming library (hint bind) \u2014 verify; reinstated: this reading was suppressed in favour of a region-measured 'Tilt Up Wall', and that row was then itself rejected \u2014 a supersession whose superseder dies is not a supersession, so the measurement stands rather than leaving the object with no number at all (the superseding route read 31104.0 SF). Verify which route is right before bidding",
+      "expected_from": "manifest"
+    },
+    {
+      "name": "LED Wall Pack",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "wall_area",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Ladder",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Ladder-H-20'",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "manifest object not found in plans",
+      "expected_from": "manifest_missing"
+    },
+    {
+      "name": "Lift",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "manifest object not found in plans",
+      "expected_from": "manifest_missing"
+    },
+    {
+      "name": "Mobilization",
+      "unit": "EA",
+      "status": "STANDARD ITEM",
+      "quantity": 1.0,
+      "basis": "standard_line_item",
+      "source_sheets": [],
+      "reason": "",
+      "expected_from": "detected"
+    },
+    {
+      "name": "OVERALL EAST ELEVATION",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 16141.2,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0002.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",
+      "expected_from": "vision"
+    },
+    {
+      "name": "OVERALL NORTH ELEVATION",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 48534.8,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0002.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",
+      "expected_from": "vision"
+    },
+    {
+      "name": "OVERALL SOUTH ELEVATION",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 52625.0,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0002.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",
+      "expected_from": "vision"
+    },
+    {
+      "name": "OVERALL WEST ELEVATION",
+      "unit": "SF",
+      "status": "NEEDS REVIEW",
+      "quantity": 16177.2,
+      "basis": "component",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0002.png"
+      ],
+      "reason": "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied",
+      "expected_from": "vision"
+    },
+    {
+      "name": "PVC Cleanouts",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Pipe Guardrail",
+      "unit": "LF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "unit_class_conflict",
+      "source_sheets": [],
+      "reason": "the only reading that resolved to this object was measured in a DIFFERENT measurement class from the unit it would publish in, and there is no conversion between them, so the number is WITHHELD \u2014 this is a BLANK, not a zero ('Steel pipe handrail diameter at concrete support' read 0.02 CY via formula '2 sf \u00d7 4\" / (12 \u00d7 27) = 0.02 cy' and this row publishes in LF \u2014 volume vs linear)",
+      "expected_from": "unit_class_conflict_unmeasured"
+    },
+    {
+      "name": "Pre-Engineered Metal Canopy",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Ramp",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "wall_area",
+      "source_sheets": [],
+      "reason": "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Roof Hatch",
+      "unit": "EA",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "count",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (EA) and measure basis (count) and were named by a hypothesis rather than by printed evidence \u2014 'Door Frames-HM'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    },
+    {
+      "name": "Sealed Concrete",
+      "unit": "SF",
+      "status": "MEASURED",
+      "quantity": 397600.0,
+      "basis": "sealed_concrete",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0001.png"
+      ],
+      "reason": "a separate 'Sealed Concrete' reading of this item (manifest) was suppressed as a duplicate of the authoritative legend row 'Sealed Concrete' \u2014 it was NOT added to this quantity",
+      "expected_from": "plan_schedule_legend"
+    },
+    {
+      "name": "Stairs",
+      "unit": "EA",
+      "status": "MEASURED",
+      "quantity": 1.0,
+      "basis": "stairs",
+      "source_sheets": [
+        "output/screenshots/VisionOnly_P24DET_Crow_20260806_193834/page_0003.png"
+      ],
+      "reason": "",
+      "expected_from": "manifest"
+    },
+    {
+      "name": "Tilt Up Wall",
+      "unit": "SF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "unit_class_conflict",
+      "source_sheets": [],
+      "reason": "the only reading that resolved to this object was measured in a DIFFERENT measurement class from the unit it would publish in, and there is no conversion between them, so the number is WITHHELD \u2014 this is a BLANK, not a zero ('tilt-up concrete panel' read 5.0 LF via formula 'count' and this row publishes in SF \u2014 linear vs area)",
+      "expected_from": "unit_class_conflict_unmeasured"
+    },
+    {
+      "name": "Vapor Barrier",
+      "unit": "SF",
+      "status": "NOT MEASURED",
+      "quantity": null,
+      "basis": "floor_area",
+      "source_sheets": [],
+      "reason": "NOT reconciled by name: 1 measured row(s) share this unit (SF) and measure basis (floor_area) and were named by a hypothesis rather than by printed evidence \u2014 'Concrete Pad'. This row is still a BLANK, not a zero, and nothing was renamed or merged; a human must decide whether any of them is this object; expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero",
+      "expected_from": "expected_not_measured"
+    }
+  ]
+}
