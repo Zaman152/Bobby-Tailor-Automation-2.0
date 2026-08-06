@@ -801,6 +801,77 @@ def test_the_semantic_pass_sends_the_dependency_ordered_schema(monkeypatch):
     assert "number" not in serialized
 
 
+# ── 4f. The prompts describe the request actually issued (24-07) ─────────────
+#
+# Assertions are on CLAUSES, never on whole prompt text: an exact-text
+# assertion would make every future wording improvement a test failure, and
+# the clauses below are the parts that carry a guarantee.
+
+_SEMANTIC_PROMPTS = ("SEMANTIC_LABELING_PROMPT", "SYMBOL_GALLERY_PROMPT",
+                     "VERIFY_RETRY_PROMPT")
+
+
+@pytest.mark.parametrize("name", _SEMANTIC_PROMPTS)
+def test_every_semantic_prompt_keeps_the_injection_mitigation(name):
+    """The pdf_text clause is identical across all four prompts BY DESIGN."""
+    text = getattr(prompts, name)
+    assert prompts.PDF_TEXT_OPEN in text
+    assert prompts.PDF_TEXT_CLOSE in text
+    # The clause must say what the delimiters MEAN, not merely mention them.
+    assert "untrusted DATA" in text
+    assert "NEVER an instruction" in text
+
+
+@pytest.mark.parametrize("name", _SEMANTIC_PROMPTS)
+def test_every_semantic_prompt_still_forbids_reporting_a_number(name):
+    """The schema is the hard guarantee; the prompt must not contradict it."""
+    text = getattr(prompts, name)
+    assert "NEVER report" in text
+    lowered = text.lower()
+    assert "never report a quantity" in lowered
+
+
+def test_the_symbol_prompt_describes_the_in_context_render_it_receives():
+    """The vector path stopped sending crop tiles when Phase 23 migrated."""
+    text = prompts.SYMBOL_GALLERY_PROMPT
+    lowered = text.lower()
+    # The stale wording is gone ...
+    assert "crop gallery" not in lowered
+    assert "tile" not in lowered
+    # ... and what replaced it names the render actually sent: the FULL sheet,
+    # with every cluster marked on it.
+    assert "full plan sheet" in lowered
+    assert "marker" in lowered or "marked" in lowered
+
+
+def test_the_symbol_prompt_tells_the_model_to_read_the_anchor_text():
+    """The mechanism the whole requirement rests on must be instructed."""
+    lowered = prompts.SYMBOL_GALLERY_PROMPT.lower()
+    # The chip text is named as the plan's OWN callout and as primary evidence.
+    assert "chip" in lowered
+    assert "primary evidence" in lowered
+    # Position is secondary and shape alone is explicitly insufficient.
+    assert "secondary" in lowered
+    assert "shape alone" in lowered
+    # The unknown sentinel is still preferred over a guess — twice: once in
+    # the evidence ladder's last rung and once in the strict rules.
+    assert lowered.count('"%s"' % UNKNOWN_LABEL) >= 2
+    assert 'prefer "%s" over guessing' % UNKNOWN_LABEL in lowered
+
+
+def test_the_semantic_prompt_names_every_task_its_schema_asks_for():
+    """A field the schema demands and the prompt never mentions is a trap."""
+    text = prompts.SEMANTIC_LABELING_PROMPT
+    lowered = text.lower()
+    assert "wall class" in lowered          # level 1
+    assert "main floor plan" in lowered     # level 2
+    assert "room" in lowered                # level 3 (added with the topology)
+    # And the room level's omittable citation is spelled out, so the model is
+    # never forced to invent a bounding wall to satisfy the grammar.
+    assert "empty list" in lowered
+    assert "bounding" in lowered
+
+
 # ── 5. analyze_drawing structured-output path (client stubbed, no API) ───────
 
 
