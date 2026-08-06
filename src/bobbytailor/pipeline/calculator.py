@@ -384,6 +384,19 @@ MATERIAL_NOTE_MAP = [
 ]
 
 
+#: Item types whose appearance on a TYPICAL-DETAILS sheet says how the thing is
+#: BUILT, not how many were installed — so neither calculator entry point may
+#: read an install quantity off such a sheet without other evidence. It lives
+#: here, once, because ``_calculate_from_measurement`` and
+#: ``_calculate_from_component`` both have to answer that question the same way;
+#: when the list was written inline in only one of them, the other kept counting
+#: detail drawings as objects (RC-6, widened by 23-15 / INV-06).
+_DETAIL_SHEET_NOT_AN_INSTALL_COUNT = (
+    "bollard", "stairs", "columns", "ladder", "lift",
+    "guard_rail", "hand_rail", "striping", "trench_drain",
+)
+
+
 # ─── Public entry point ──────────────────────────────────────────────────────
 
 def apply_estimation_tables(extracted_data: dict, project_type: str = "auto",
@@ -523,10 +536,9 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
         # Detail sheets: dimension callouts are not install counts (RC-6).
         # Widened (23-15 / INV-06): a dimension annotation on a DETAIL sheet is
         # a specification, not a run — rails/striping/trench drains included.
-        if sheet_type == "detail" and item_type in (
-            "bollard", "stairs", "columns", "ladder", "lift",
-            "guard_rail", "hand_rail", "striping", "trench_drain",
-        ):
+        # The list is the shared module constant so the count path cannot drift
+        # away from it again (28-01).
+        if sheet_type == "detail" and item_type in _DETAIL_SHEET_NOT_AN_INSTALL_COUNT:
             return None
 
         # Apply formula
