@@ -380,9 +380,12 @@ def test_row_status_still_reaches_the_plan_schedule_legend_branch():
 
 
 def test_the_row_status_docstring_states_what_this_branch_prevents():
-    doc = aggregator._row_status.__doc__ or ""
+    doc = (aggregator._row_status.__doc__ or "").lower()
+    # Both kinds of corroboration are named, and so is the failure that earned
+    # the branch: one number, two identical runs, two different answers.
     assert "schedule" in doc and "geometry" in doc
     assert "identical" in doc
+    assert "description read off a drawing" in doc
 
 
 def test_an_uncorroborated_count_publishes_needs_review_end_to_end():
@@ -431,6 +434,23 @@ def test_an_area_row_beside_an_uncorroborated_count_is_untouched():
     assert area["provenance"] == "MEASURED"
     assert area["needs_review"] is False
     assert area["review_reasons"] == []
+
+
+def test_the_rules_boundary_is_a_recorded_verdict_and_this_is_it():
+    """The stated limit of this rule, committed rather than left implicit.
+
+    The decision is made on a RECORDED verdict, never re-derived here — the
+    aggregator cannot see the sheet a number came off. So a count emitted by a
+    producer that stamps no verdict is treated as not-a-count and still
+    publishes MEASURED. That is the plan's rule ("absence is never read as
+    uncorroborated"), and it is what keeps the rule from flagging every area
+    and length in the take-off; the residual is the set of producers that emit
+    counts without stamping one, which is a coverage question for the phase
+    gate, not a decision this layer can make.
+    """
+    row = _row(aggregate_takeoff([_count_item("dock leveler", qty=4)]), "Dock Leveler")
+    assert row["provenance"] == "MEASURED"
+    assert row["needs_review"] is False
 
 
 # ─── this module's own contract ─────────────────────────────────────────────

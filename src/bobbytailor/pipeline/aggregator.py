@@ -861,6 +861,18 @@ def _row_status(bucket: Dict, is_unknown: bool) -> str:
     Presenting machine-read data as human-vouched inverts the one distinction
     this vocabulary exists to draw, and it inflates apparent trust in exactly
     the rows a reviewer would otherwise check.
+
+    **MEASURED is EARNED by a count too (V4-FIX-01).** Crow's `Stairs` row
+    published MEASURED, ``needs_review`` false, at medium confidence — and it
+    was also the one number that disagreed with itself between two identical
+    invocations, 1 EA in one run and 2 EA in the other. It was a count of the
+    stair details drawn on a details sheet, and nothing in the run confirmed
+    it. An unflagged wrong number is worse than a blank because a reviewer
+    skips it, so a count with nothing behind it may not reach MEASURED here.
+    Corroboration is a SCHEDULE the app read off the plans, or GEOMETRY that
+    recorded where the instances are. A description read off a drawing is
+    neither: it is the reading itself, not a confirmation of it. A row that
+    never contributed a count carries no verdict at all and is untouched.
     """
     if is_unknown:
         return ITEM_NOT_MEASURED
@@ -872,6 +884,13 @@ def _row_status(bucket: Dict, is_unknown: bool) -> str:
     if not bucket.get("has_rows"):
         return ITEM_NOT_MEASURED
     if bucket.get("needs_review"):
+        return ITEM_NEEDS_REVIEW
+    if _count_is_uncorroborated(bucket):
+        # Positioned AFTER the flag check so it can only ever add a flag, never
+        # clear one, and BEFORE the legend branch so nothing below can promote
+        # an unconfirmed count back to MEASURED. The matching reason is set on
+        # the bucket by `aggregate_takeoff`, not here: this function computes a
+        # status and must stay free of side effects.
         return ITEM_NEEDS_REVIEW
     if bucket.get("source") == "plan_schedule_legend":
         # An authoritative legend — but authoritative is not the same question
@@ -1326,6 +1345,25 @@ def aggregate_takeoff(
                            "many are installed)" % name,
             "formula": "detail_sheet_count_not_measured",
         })
+
+    # ── A surviving uncorroborated count says so, in words ───────────────────
+    #
+    # `_row_status` refuses to call such a count MEASURED; this is the other
+    # half of the same decision, set here because the reasons are set here and
+    # a status function must not acquire side effects. Setting the flag as well
+    # as the reason is what keeps the published row self-consistent — a row
+    # reading NEEDS REVIEW while carrying `needs_review: False` and
+    # `auto_verified: True` would flag it to a reader and clear it to every
+    # numeric consumer at the same time.
+    for bucket in buckets.values():
+        if bucket.get("has_rows") and _count_is_uncorroborated(bucket):
+            bucket["needs_review"] = True
+            bucket["review_reasons"].add(
+                "no printed schedule and no counted geometry backs this count "
+                "— nothing in this run confirms how many are installed, so it "
+                "is published as NEEDS REVIEW rather than as a measurement; "
+                "confirm it against a plan sheet or a schedule before it is bid"
+            )
 
     # Only enrich with standard line items when a genuine take-off was produced.
     if buckets:
