@@ -213,6 +213,121 @@ def test_rollup_records_the_verdict_without_moving_a_corroborated_quantity():
     assert with_verdict == without
 
 
+# ─── a detail-sheet count publishes a blank, with its reading quoted ────────
+
+_DETAIL_ROW = dict(
+    description="stair detail", corroboration="detail_sheet_only", qty=2,
+    source_sheet="A-401",
+)
+
+
+def test_a_detail_sheet_count_never_reaches_a_published_quantity():
+    """A count of stair DETAILS is not a count of stairs.
+
+    The number is withheld rather than flagged-and-published, because the
+    reading does not measure the object the row names: it measures how many
+    times the object was DRAWN.
+    """
+    row = _row(aggregate_takeoff([_count_item(**_DETAIL_ROW)]), "Stairs")
+    assert row["quantity"] is None
+    assert row["quantity_fmt"] == "—"
+    assert row["provenance"] == "NOT MEASURED"
+    assert row["needs_review"] is True
+    assert row["auto_verified"] is False
+    assert row["confidence"] == "low"
+    assert row["source"] == aggregator.DETAIL_SHEET_COUNT_UNMEASURED
+
+
+def test_the_withheld_blank_is_still_a_row_that_quotes_what_it_withheld():
+    """Withholding is not deleting. A deletion and a zero read the same to a
+    client; this row says the number exists, says what it was, and says why it
+    is not being published."""
+    row = _row(aggregate_takeoff([_count_item(**_DETAIL_ROW)]), "Stairs")
+    reason = " ".join(row["review_reasons"])
+    assert "stair detail" in reason
+    assert "2" in reason
+    assert "A-401" in reason
+    assert "BLANK, not a zero" in reason
+    # A named rule on the row itself, so the audit trail shows which rule fired.
+    formulas = [r.get("formula") for r in row["detail"]]
+    assert "detail_sheet_count_not_measured" in formulas
+    assert row["line_count"] == 0
+
+
+def test_the_withheld_reason_suggests_no_count_of_its_own():
+    """It may quote the reading it withheld and name the sheet. It may not
+    imply what the number ought to be — writing an expected count into an
+    estimator-facing message is the failure mode this phase exists to end."""
+    row = _row(aggregate_takeoff([_count_item(**_DETAIL_ROW)]), "Stairs")
+    reason = " ".join(row["review_reasons"])
+    assert "details sheet" in reason
+    assert "how many" in reason
+    residue = reason.replace("A-401", "").replace("2", "")
+    assert not any(ch.isdigit() for ch in residue), residue
+
+
+def test_a_corroborated_reading_of_the_same_object_keeps_its_quantity():
+    """The detail-sheet reading is not SUMMED into a real measurement, and the
+    real measurement is not thrown away because a weaker reading existed."""
+    rows = aggregate_takeoff([
+        _count_item("stair detail", corroboration="geometry", qty=5,
+                    source_sheet="A-101"),
+        _count_item(**_DETAIL_ROW),
+    ])
+    row = _row(rows, "Stairs")
+    assert row["quantity"] == 5
+    assert row["needs_review"] is True
+    reason = " ".join(row["review_reasons"])
+    assert "NOT summed into this quantity" in reason
+    assert "stair detail" in reason and "A-401" in reason
+
+
+def test_the_withheld_marker_joins_the_existing_unmeasured_markers():
+    """T-28-16: every consumer that already understands "this source means the
+    row is a marker, not a measurement" understands this one, without being
+    told about it individually."""
+    assert aggregator.DETAIL_SHEET_COUNT_UNMEASURED in aggregator._UNMEASURED_SOURCES
+
+
+def test_no_consumer_special_cases_the_new_marker():
+    src = Path(aggregator.__file__).resolve().parents[1]
+    named_in = sorted(
+        p.relative_to(src).as_posix()
+        for p in src.rglob("*.py")
+        if aggregator.DETAIL_SHEET_COUNT_UNMEASURED in p.read_text()
+    )
+    assert named_in == ["pipeline/aggregator.py"], named_in
+
+
+def test_withholding_one_count_disturbs_no_other_row():
+    others = [
+        {"description": "warehouse floor", "item_type": "flooring",
+         "calculated_quantity": 3960.0, "calculated_unit": "sq_ft",
+         "source_sheet": "A-101"},
+        _count_item("Door Frames - Hollow Metal (door schedule)",
+                    corroboration="schedule", qty=29,
+                    qty_source="plan_schedule_legend", source_sheet="A-601"),
+    ]
+    before = {r["item"]: r for r in aggregate_takeoff(list(others))}
+    after = {r["item"]: r for r in aggregate_takeoff(others + [_count_item(**_DETAIL_ROW)])}
+    assert set(after) - set(before) == {"Stairs"}
+    for name, row in before.items():
+        assert after[name] == row, name
+
+
+def test_the_door_schedule_count_still_publishes_measured():
+    """The row this rule is most likely to damage, asserted directly: a count
+    read out of a table PRINTED on the plans is corroborated BY that table."""
+    row = _row(aggregate_takeoff([
+        _count_item("Door Frames - Hollow Metal (door schedule)",
+                    corroboration="schedule", qty=29,
+                    qty_source="plan_schedule_legend", source_sheet="A-601"),
+    ]), "Door Frames - Hollow Metal (door schedule)")
+    assert row["quantity"] == 29
+    assert row["provenance"] == "MEASURED"
+    assert row["needs_review"] is False
+
+
 # ─── this module's own contract ─────────────────────────────────────────────
 
 def test_this_module_names_no_golden_quantity_and_calls_no_paid_service():
