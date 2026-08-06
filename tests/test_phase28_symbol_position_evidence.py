@@ -521,7 +521,124 @@ def test_the_ring_test_still_finds_the_one_genuinely_hollow_ring_on_the_page():
     )
 
 
-# ── 9. The module's own contract ─────────────────────────────────────────────
+# ── 9. A tie is not a decision ───────────────────────────────────────────────
+#
+# `_library_symbol_bindings` filtered candidates and then took `max(..., key=
+# count)`. `max` returns the FIRST maximum, so when two surviving clusters carry
+# the same count the winner is whichever the clusterer happened to emit first.
+# An ambiguity resolved by list order is a guess wearing a decision's clothes.
+
+
+def _marker_group(cid, boxes, size_ft=(0.8, 0.9)):
+    g = _group_of(boxes)
+    g["candidate_id"] = cid
+    g["bbox_size_ft"] = size_ft
+    return g
+
+
+def _two_rings(step, size):
+    return [
+        _marker_group("SYM-A", _ring_boxes(14, step, size)),
+        _marker_group(
+            "SYM-B", _ring_boxes(14, step, size, origin=(9000.0, 9000.0))
+        ),
+    ]
+
+
+def _two_grids(step, size):
+    return [
+        _marker_group("SYM-C", _lattice_boxes(6, 6, step, size)),
+        _marker_group(
+            "SYM-D", _lattice_boxes(6, 6, step, size, origin=(9000.0, 9000.0))
+        ),
+    ]
+
+
+_PERIM_LIB = {"perimeter_jamb_symbol": {"name": "Perimeter Object", "basis": "count"}}
+_GRID_LIB = {"structural_grid_symbol": {"name": "Grid Object", "basis": "count"}}
+
+
+def test_two_perimeter_candidates_tied_on_count_bind_nothing():
+    group = _judged_cluster()
+    step, size = _measured_pitch(group), _median_mark_size(group)
+    rings = _two_rings(step, size)
+    assert all(F._is_perimeter_ring(g) for g in rings), "both fixtures must survive the filters"
+    assert rings[0]["count"] == rings[1]["count"], "the fixtures must tie"
+
+    bindings = F._library_symbol_bindings(rings, {}, _PERIM_LIB)
+    assert bindings == {}, (
+        "a tie was resolved into a name: %r. Whichever cluster the clusterer "
+        "emitted first would have been named." % bindings
+    )
+
+
+def test_two_grid_candidates_tied_on_count_bind_nothing():
+    group = _judged_cluster()
+    step, size = _measured_pitch(group), _median_mark_size(group)
+    grids = _two_grids(step, size)
+    assert all(
+        int(g["count"]) >= F._GRID_MIN_COUNT and F._is_2d_distributed(g)
+        and F._is_small_marker(g) and F._size_uniform(g)
+        for g in grids
+    ), "both fixtures must survive the grid filters"
+
+    bindings = F._library_symbol_bindings(grids, {}, _GRID_LIB)
+    assert bindings == {}, (
+        "the columns hint inherited the defect being fixed on the bollards "
+        "hint: %r" % bindings
+    )
+
+
+def test_a_refused_tie_says_which_candidates_tied(caplog):
+    group = _judged_cluster()
+    step, size = _measured_pitch(group), _median_mark_size(group)
+    with caplog.at_level("INFO", logger=F.logger.name):
+        F._library_symbol_bindings(_two_rings(step, size), {}, _PERIM_LIB)
+    logged = "\n".join(r.getMessage() for r in caplog.records)
+    assert "SYM-A" in logged and "SYM-B" in logged, (
+        "a refusal nobody can see is indistinguishable from a cluster that was "
+        "never a candidate; log was %r" % logged
+    )
+
+
+def test_a_single_surviving_candidate_still_binds():
+    group = _judged_cluster()
+    step, size = _measured_pitch(group), _median_mark_size(group)
+    only = [_marker_group("SYM-A", _ring_boxes(14, step, size))]
+    bindings = F._library_symbol_bindings(only, {}, _PERIM_LIB)
+    assert bindings == {"SYM-A": ("Perimeter Object", "perimeter_jamb_symbol")}
+
+
+def test_an_unambiguous_larger_candidate_still_wins():
+    """A strictly larger count is a discriminator; only a TIE is refused."""
+    group = _judged_cluster()
+    step, size = _measured_pitch(group), _median_mark_size(group)
+    cands = [
+        _marker_group("SYM-A", _ring_boxes(10, step, size)),
+        _marker_group("SYM-B", _ring_boxes(14, step, size, origin=(9000.0, 9000.0))),
+    ]
+    bindings = F._library_symbol_bindings(cands, {}, _PERIM_LIB)
+    assert list(bindings) == ["SYM-B"]
+
+
+def test_no_surviving_candidate_binds_nothing():
+    group = _judged_cluster()
+    step, size = _measured_pitch(group), _median_mark_size(group)
+    lattice = [_marker_group("SYM-A", _lattice_boxes(14, 4, step, size))]
+    assert F._library_symbol_bindings(lattice, {}, _PERIM_LIB) == {}
+
+
+def test_the_real_plan_page_emits_no_perimeter_binding():
+    """End to end on the drawing: with the ring test honest and the tie rule in
+    place, the hint names nothing here. The object reaches the report as an
+    absence of a NAME, not an absence of an object — its count and position are
+    still measured, they are simply not published under a name nothing earned.
+    """
+    bindings = F._library_symbol_bindings(_page_symbols()[1], {}, _PERIM_LIB)
+    assert bindings == {}, "the hint still names %r on the plan page" % bindings
+
+
+# ── 10. The module's own contract ────────────────────────────────────────────
 
 
 def test_this_module_names_no_published_quantity_and_calls_no_paid_service():
