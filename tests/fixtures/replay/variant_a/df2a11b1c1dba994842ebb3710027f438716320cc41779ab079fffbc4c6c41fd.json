@@ -1,0 +1,67 @@
+{
+  "request": {
+    "model": "claude-opus-4-8",
+    "pass_type": "semantic",
+    "sheet_name": "A-101",
+    "sheet_type": "floor_plan",
+    "prompt": "Sheet name: A-101\n\nAnalyze this drawing and return the JSON.",
+    "image_count": 1
+  },
+  "response": {
+    "wall_classes": [
+      {
+        "wall_class_id": "WALL-TC1",
+        "label": "Tilt Up Wall",
+        "confidence": "medium"
+      },
+      {
+        "wall_class_id": "WALL-TC10",
+        "label": "CMU Wall",
+        "confidence": "medium"
+      }
+    ],
+    "regions": [
+      {
+        "region_id": "R1",
+        "is_main_plan": true,
+        "confidence": "high"
+      },
+      {
+        "region_id": "R3",
+        "is_main_plan": false,
+        "confidence": "high"
+      },
+      {
+        "region_id": "R4",
+        "is_main_plan": false,
+        "confidence": "high"
+      },
+      {
+        "region_id": "R5",
+        "is_main_plan": false,
+        "confidence": "high"
+      },
+      {
+        "region_id": "R6",
+        "is_main_plan": false,
+        "confidence": "high"
+      }
+    ],
+    "rooms": [],
+    "confidence": "medium"
+  },
+  "provenance": {
+    "authored_by": "scripts/author_replay_fixtures.py",
+    "api_calls_made": 0,
+    "record_mode_used": false,
+    "variant": "variant_a",
+    "reconstructed_from_run": "VisionOnly_P23V_Crow_20260804_141952",
+    "reconstructed_from_run_label": "14:19 run",
+    "gap": null,
+    "derived_from_fields": [
+      "takeoff_summary[].item where source in ['library', 'learned', 'expected_not_measured'] (the run's object names)",
+      "raw_line_items[].description beginning WALL-/ROOM- (the classes and rooms the run could NOT name, which stay absent here)"
+    ],
+    "note": "Both runs named their tilt-up class the same TEXT; the recorded variance is the ASSIGNMENT, so the assignment is inverted here \u2014 the precedent committed by 24-02's test_wall_class_label_invariance."
+  }
+}

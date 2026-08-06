@@ -1,0 +1,137 @@
+{
+  "request": {
+    "model": "claude-opus-4-8",
+    "pass_type": "symbol_gallery",
+    "sheet_name": "A-101",
+    "sheet_type": "floor_plan",
+    "prompt": "Sheet name: A-101\n\nEach marked symbol ID repeats this many times on the sheet: SYM-1\u00d7136, SYM-7\u00d732, SYM-8\u00d716, SYM-12\u00d713, SYM-13\u00d713, SYM-14\u00d712, SYM-15\u00d712, SYM-16\u00d711, SYM-17\u00d79, SYM-18\u00d78, SYM-19\u00d76, SYM-20\u00d76, SYM-22\u00d75, SYM-23\u00d75, SYM-24\u00d75, SYM-25\u00d74, SYM-30\u00d74, SYM-31\u00d74, SYM-33\u00d74, SYM-34\u00d73, SYM-35\u00d73, SYM-36\u00d73. Identify what each marked symbol is by picking the best-matching object type. Use the repetition count and where it sits (a symbol repeating on a regular structural grid is columns; a symbol repeating along the building perimeter is bollards; etc.). Answer 'unknown' only if genuinely unidentifiable.\n\nThe drawing prints these words next to each marked candidate \u2014 this is the plan's own callout for it and is your primary evidence for identifying it:\n<pdf_text>\nSYM-1: DOOR\nSYM-7: A-101\nSYM-8: 10\nSYM-12: 10\nSYM-13: SS\nSYM-14: 1\nSYM-15: DW\nSYM-16: TYP.\nSYM-17: 7\nSYM-18: 2\nSYM-19: 12\nSYM-20: DWG\nSYM-22: DW\nSYM-23: A-101\nSYM-24: 10\nSYM-25: 1/A-112\nSYM-30: A\nSYM-31: 14'-0\"x16'-0\"\nSYM-33: A-201\nSYM-34: 9\nSYM-35: 3\nSYM-36: 350'\n</pdf_text>\n\nAnalyze this drawing and return the JSON.",
+    "image_count": 1
+  },
+  "response": {
+    "matches": [
+      {
+        "symbol_id": "SYM-1",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-7",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-8",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-12",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-13",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-14",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-15",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-16",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-17",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-18",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-19",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-20",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-22",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-23",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-24",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-25",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-30",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-31",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-33",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-34",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-35",
+        "label": "unknown",
+        "confidence": "low"
+      },
+      {
+        "symbol_id": "SYM-36",
+        "label": "unknown",
+        "confidence": "low"
+      }
+    ]
+  },
+  "provenance": {
+    "authored_by": "scripts/author_replay_fixtures.py",
+    "api_calls_made": 0,
+    "record_mode_used": false,
+    "variant": "variant_a",
+    "reconstructed_from_run": "VisionOnly_P23V_Crow_20260804_141952",
+    "reconstructed_from_run_label": "14:19 run",
+    "gap": null,
+    "derived_from_fields": [
+      "raw_line_items[].description beginning SYM- (every symbol row in both artifacts except the library-named cluster, i.e. this pass bound nothing in either run \u2014 'unknown' is the OBSERVED answer)"
+    ],
+    "note": "IDENTICAL across the two variants, deliberately: both runs bound nothing through this pass. The 56-EA cluster that published as Bollard in one run and Dock Bumper in the other carries a recorded text absence and is excluded from this request altogether (24-07), so no answer here can name it."
+  }
+}
