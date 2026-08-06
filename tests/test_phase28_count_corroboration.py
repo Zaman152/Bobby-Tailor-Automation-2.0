@@ -49,7 +49,10 @@ for _p in (ROOT, ROOT / "src"):
 from bobbytailor.pipeline import calculator  # noqa: E402
 from bobbytailor.pipeline.calculator import (  # noqa: E402
     _DETAIL_SHEET_NOT_AN_INSTALL_COUNT,
+    _calculate_from_component,
     _calculate_from_measurement,
+    _calculate_from_schedule,
+    _count_corroboration,
 )
 
 THIS_FILE = Path(__file__)
@@ -125,6 +128,282 @@ def test_the_measurement_path_behaviour_did_not_move_in_the_hoist():
     for _label, value, unit, desc, raw in probes:
         m = {"value": value, "unit": unit, "description": desc, "raw_text": raw}
         assert _calculate_from_measurement(m, "A-401", "detail") is None, desc
+
+
+def test_the_constant_is_what_the_count_path_actually_consults(monkeypatch):
+    """The sibling path reads the SAME object — that is the point of hoisting it.
+
+    ``_calculate_from_component`` was handed the ``sheet_type`` argument from the
+    beginning and never looked at it. Now it does, through this constant.
+    """
+    c = {"name": "Stair / Stair Run", "quantity": 2, "unit": "ea"}
+    assert _calculate_from_component(c, "A-401", "detail")["count_corroboration"] == \
+        "detail_sheet_only"
+
+    thinner = tuple(t for t in _DETAIL_SHEET_NOT_AN_INSTALL_COUNT if t != "stairs")
+    monkeypatch.setattr(calculator, "_DETAIL_SHEET_NOT_AN_INSTALL_COUNT", thinner)
+    assert _calculate_from_component(c, "A-401", "detail")["count_corroboration"] == \
+        "none", (
+            "the count path still called it a detail-sheet count after stairs was "
+            "removed from the constant — it is reading its own copy"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Task 2 — every count row records what corroborated it
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _reason_without_the_sheet_name(reason: str, sheet_name: str) -> str:
+    return reason.replace(sheet_name, "")
+
+
+def test_a_geometry_backed_count_is_corroborated_by_geometry():
+    """``provenance == "geometry"`` means instance bounding boxes on the page.
+
+    That is the one signal separating a symbol-cluster count from a model's
+    prose count, and it is the corroboration test.
+    """
+    row = _calculate_from_component(
+        {"name": "Bollard", "quantity": 3, "unit": "ea", "provenance": "geometry"},
+        "A-101", "floor_plan",
+    )
+    assert row["count_corroboration"] == "geometry"
+    assert _count_corroboration("geometry", "detail", "stairs") == "geometry", (
+        "geometry outranks the sheet kind: bboxes on a details sheet are still bboxes"
+    )
+
+
+def test_a_printed_schedule_row_is_corroborated_by_the_schedule():
+    """A table on the plan STATING a number is itself the corroboration.
+
+    This is what keeps the hollow-metal door-frame schedule row publishing as a
+    measured quantity once 28-03 starts withholding uncorroborated counts.
+    """
+    rows = _calculate_from_schedule(
+        {
+            "name": "DOOR SCHEDULE",
+            "table_purpose": "takeoff_legend",
+            "rows": [{"DESCRIPTION": "Door Frames - Hollow Metal",
+                      "QUANTITY": "29", "UNIT": "EA"}],
+        },
+        "A-101",
+    )
+    assert rows, "the schedule route produced no row to check"
+    assert all(r["count_corroboration"] == "schedule" for r in rows)
+    assert all(r["formula"].startswith("authoritative plan schedule") for r in rows)
+
+
+def test_every_route_out_of_the_schedule_calculator_comes_out_corroborated():
+    """All three emitted shapes — legend, table-matched, and fall-through."""
+    legend = _calculate_from_schedule(
+        {"name": "TAKEOFF", "table_purpose": "takeoff_legend",
+         "rows": [{"DESCRIPTION": "Bollards", "QUANTITY": "12", "UNIT": "EA"}]},
+        "A-101")
+    tabled = _calculate_from_schedule(
+        {"name": "DOOR SCHEDULE",
+         "rows": [{"DESCRIPTION": "Hollow metal door", "QTY": "7"}]},
+        "A-101")
+    other = _calculate_from_schedule(
+        {"name": "EQUIPMENT SCHEDULE",
+         "rows": [{"DESCRIPTION": "Mysterious Widget XJ", "QTY": "5"}]},
+        "A-101")
+    produced = legend + tabled + other
+    assert produced, "no schedule rows were produced by any of the three routes"
+    assert {r["count_corroboration"] for r in produced} == {"schedule"}
+
+
+def test_an_install_count_read_off_a_details_sheet_is_marked_as_counting_drawings():
+    """THE defect. ``Stairs``, read off a sheet the run itself typed ``detail``.
+
+    The recorded ``source_location`` in the saved runs names stair *details*, so
+    what moved between the runs was the number of details the model noticed. The
+    row is now marked, flagged, and given a reason an estimator can act on — and
+    the number is still on it, because 28-03 owns the publish decision.
+    """
+    row = _calculate_from_component(
+        {"name": "Stair / Stair Run", "quantity": 2, "unit": "ea",
+         "confidence": "medium"},
+        "A-401", "detail",
+    )
+    assert row["count_corroboration"] == "detail_sheet_only"
+    assert row["count_evidence_sheet_kind"] == "detail"
+    assert row["needs_review"] is True
+    reason = row["review_reason"]
+    assert "A-401" in reason, "the reason must name the sheet the count came off"
+    assert "detail" in reason.lower()
+    assert "installed" in reason.lower(), (
+        "the reason must say the reading counts drawings, not installed objects"
+    )
+    assert ("schedule" in reason.lower() or "plan sheet" in reason.lower()), (
+        "the reason must name the confirmation an estimator should go get"
+    )
+    assert not any(ch.isdigit() for ch in
+                   _reason_without_the_sheet_name(reason, "A-401")), (
+        "the reason states no number: naming an expected count here would be "
+        "tuning the message to a golden answer"
+    )
+
+
+def test_an_uncorroborated_count_on_any_other_sheet_kind_gets_its_own_verdict():
+    """Not every uncorroborated count is a details-sheet count.
+
+    A prose count off a floor plan has no geometry and no printed table behind
+    it either. It is flagged, with a reason that does not misdescribe the sheet.
+    """
+    row = _calculate_from_component(
+        {"name": "Bollard", "quantity": 3, "unit": "ea", "confidence": "high"},
+        "A-101", "floor_plan",
+    )
+    assert row["count_corroboration"] == "none"
+    assert row["count_evidence_sheet_kind"] == "floor_plan"
+    assert row["needs_review"] is True
+    assert row["review_reason"], "an uncorroborated count must carry a reason"
+    assert "details sheet" not in row["review_reason"].lower()
+
+
+def test_an_item_type_outside_the_list_on_a_details_sheet_is_merely_uncorroborated():
+    """The details-sheet verdict is scoped to the shared list, not to the sheet.
+
+    A door count off a details sheet is uncorroborated — but calling it a
+    detail-drawing count would be a claim about doors the list does not make.
+    """
+    row = _calculate_from_component(
+        {"name": "Hollow metal door", "quantity": 4, "unit": "ea"},
+        "A-401", "detail",
+    )
+    assert row["item_type"] not in _DETAIL_SHEET_NOT_AN_INSTALL_COUNT
+    assert row["count_corroboration"] == "none"
+    assert row["count_evidence_sheet_kind"] == "detail"
+
+
+def test_a_text_layer_count_is_not_geometry():
+    """``text_layer`` provenance is a string read off the PDF, not a bbox census.
+
+    It is recorded, it is not corroboration, and pretending otherwise would let
+    a printed word stand in for a counted object.
+    """
+    assert _count_corroboration("text_layer", "floor_plan", "bollard") == "none"
+    assert _count_corroboration("text_layer", "detail", "stairs") == "detail_sheet_only"
+
+
+def test_the_verdict_moves_no_quantity_and_drops_no_row():
+    """The number on the row is byte-identical in every branch.
+
+    28-01 records. It does not withhold. A row that vanished here would destroy
+    the audit trail the phase is trying to build (T-28-03).
+    """
+    probes = (
+        ({"name": "Stair / Stair Run", "quantity": 2, "unit": "ea"}, "A-401", "detail"),
+        ({"name": "Bollard", "quantity": 3, "unit": "ea"}, "A-101", "floor_plan"),
+        ({"name": "Bollard", "quantity": 3, "unit": "ea",
+          "provenance": "geometry"}, "A-101", "floor_plan"),
+        ({"name": "Mysterious Widget XJ", "quantity": 7, "unit": "ea"},
+         "A-401", "detail"),
+        ({"name": "Hollow metal door", "quantity": 4, "unit": "ea"},
+         "A-201", "elevation"),
+    )
+    for c, sheet, kind in probes:
+        row = _calculate_from_component(c, sheet, kind)
+        assert row is not None, (c, sheet, kind)
+        table = calculator.ESTIMATION_TABLES.get(row["item_type"], {})
+        wf = table.get("waste_factor", 1.0)
+        expected = round(float(c["quantity"]) * row["waste_factor_applied"], 2)
+        assert row["quantity"] == expected, (c, sheet, kind)
+        assert row["raw_value"] == c["quantity"]
+        assert row["provenance"] == c.get("provenance"), (
+            "the verdict must not rewrite provenance"
+        )
+        del table, wf
+
+
+def test_the_sheet_kind_is_carried_verbatim():
+    """``count_evidence_sheet_kind`` is the argument, not an interpretation of it."""
+    for kind in ("detail", "floor_plan", "elevation", "unknown", "schedule"):
+        row = _calculate_from_component(
+            {"name": "Bollard", "quantity": 3, "unit": "ea"}, "A-101", kind)
+        assert row["count_evidence_sheet_kind"] == kind
+
+
+def test_an_upstream_review_reason_is_appended_to_never_replaced():
+    """The flag-don't-guess signal from fusion must survive into the take-off.
+
+    The existing ``reasons`` list and its ``dict.fromkeys`` de-duplication is the
+    mechanism; a second one would be a place for the two to disagree.
+    """
+    upstream = "symbol group named by deterministic geometry"
+    row = _calculate_from_component(
+        {"name": "Stair / Stair Run", "quantity": 2, "unit": "ea",
+         "needs_review": True, "review_reason": upstream},
+        "A-401", "detail",
+    )
+    assert upstream in row["review_reason"]
+    assert row["review_reason"] != upstream, "the corroboration reason was dropped"
+    assert row["review_reason"].count(upstream) == 1
+
+
+def test_a_repeated_reason_is_de_duplicated_by_the_existing_mechanism():
+    """Feeding the verdict's own words back in upstream yields one copy, not two."""
+    seeded = _calculate_from_component(
+        {"name": "Stair / Stair Run", "quantity": 2, "unit": "ea"},
+        "A-401", "detail")["review_reason"]
+    row = _calculate_from_component(
+        {"name": "Stair / Stair Run", "quantity": 2, "unit": "ea",
+         "needs_review": True, "review_reason": seeded},
+        "A-401", "detail",
+    )
+    assert row["review_reason"].count(seeded) == 1
+
+
+def test_a_low_confidence_or_unclassified_count_keeps_the_reason_it_already_had():
+    """Every condition that set ``needs_review`` before still sets it, and says why."""
+    low = _calculate_from_component(
+        {"name": "Bollard", "quantity": 3, "unit": "ea", "confidence": "low",
+         "provenance": "geometry"},
+        "A-101", "floor_plan")
+    assert low["needs_review"] is True
+    assert "low-confidence count" in low["review_reason"]
+    assert low["count_corroboration"] == "geometry"
+
+    unclassified = _calculate_from_component(
+        {"name": "Mysterious Widget XJ", "quantity": 2, "unit": "ea",
+         "provenance": "geometry"},
+        "A-101", "floor_plan")
+    assert unclassified["needs_review"] is True
+    assert "unclassified" in unclassified["review_reason"]
+
+
+def test_a_geometry_backed_count_is_not_flagged_by_this_phase():
+    """Corroborated counts are left exactly as they were — no new flag, no reason.
+
+    A phase that flagged everything would be a phase that told an estimator
+    nothing.
+    """
+    row = _calculate_from_component(
+        {"name": "Bollard", "quantity": 3, "unit": "ea", "confidence": "high",
+         "provenance": "geometry"},
+        "A-101", "floor_plan")
+    assert row["count_corroboration"] == "geometry"
+    assert row["needs_review"] is False
+    assert row["review_reason"] == ""
+
+
+def test_the_verdict_survives_normalisation_into_the_report_layer():
+    """A field the aggregator cannot see is a field that was never written.
+
+    ``_normalize_calculated`` whitelists keys on the way from the calculator to
+    ``aggregate_takeoff``. 28-03 consumes ``count_corroboration`` there, so the
+    key has to be on the whitelist or this plan's whole artifact is inert.
+    """
+    from bobbytailor.pipeline.reporter import _normalize_calculated
+
+    rows = _normalize_calculated([
+        _calculate_from_component(
+            {"name": "Stair / Stair Run", "quantity": 2, "unit": "ea"},
+            "A-401", "detail"),
+    ])
+    assert rows[0]["count_corroboration"] == "detail_sheet_only"
+    assert rows[0]["count_evidence_sheet_kind"] == "detail"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
