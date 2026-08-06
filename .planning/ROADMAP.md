@@ -1023,6 +1023,7 @@ Plans are listed in EXECUTION order; the wave in each plan's frontmatter is auth
 4. Ensemble voting is wired onto every remaining identification pass that can flip
 5. A determinism harness runs the same fixture N× and asserts identical line items — regression protection for the whole class of bug
    - **REFRAMED at planning (2026-08-05), not reduced.** The literal wording is **vacuous** against `tests/replay_analyzer.py`: `ReplayAnalyzer.__call__` is a pure function of a SHA256 over `(model, pass_type, prompt, image_count)`, so running one fixture N× is identical *by construction* and would detect none of the observed defects — a gate that passes for having looked at nothing (the failure `test_phase23_acceptance.py` rule 3 forbids). *Delivered contract:* a **two-variant differential** — geometry held fixed, the model's answers VARIED within schema-legal bounds (run 1's labels vs run 2's), asserting the published `(name, unit, quantity, measure_basis)` set is invariant. Plan 24-09 additionally demonstrates the gate FAILING on a deliberate naming flip, so it is a proven detector rather than a passing test. *Citation:* `24-RESEARCH.md` §8.1–8.2.
+   - **DELIVERED 2026-08-06, with two corrections the measurement forced.** (a) There is **no `measure_basis` field in this codebase**, and the `(name, unit, quantity)` tuple set is measurably **not** invariant — a wall class with no printed-thickness match is still named by vision, which is 24-02's own documented, still-open residual. The gate therefore asserts the three invariants that DO hold — the published item-name set, the unnamed-geometry ledger's candidate set, and the quantity multiset (a word may never move a number) — and `test_the_residual_a_vision_named_wall_class_still_moves_with_its_label` asserts the residual **by name** rather than letting it hide. (b) **Ensembled passes are explicitly OUT of the differential's scope**: after 24-08 a pass issues N requests carrying ONE replay key, so a key-addressed replay source votes unanimously by construction. The harness pins the ensemble to one sample and a test asserts the pin is real. The gate was made to go **RED on disk** against a poisoned third variant (3 failed / 15 passed) before the pristine fixtures were restored; the poison was never committed. Runs free in 2 min 56 s. *See:* `24-09-SUMMARY.md`.
 
 **Planning-time findings that reframe this phase** (both measured FREE from committed artifacts, no API):
 
@@ -1031,7 +1032,7 @@ Plans are listed in EXECUTION order; the wave in each plan's frontmatter is auth
 - **Assumption A1 falsified.** The 184→64 `raw_line_items` swing was attributed to the un-ensembled `_run_pass`. The artifacts show run 2 ran at a budget cap **2.5× smaller** (`$0.60` vs `$1.50`), reached **99.8%** of it, and spent **less than half** as much on sheet-level work. Budget, not sampling, is the dominant explanation. Plan 24-08 therefore stands on V4-DET-04's own justification and treats the cost pairing with 24-05 as load-bearing. **Now COMMITTED as a test** (`tests/test_reliability_voting.py::test_f9_swing_is_explained_by_budget_not_sampling`, commit `91698ad`), asserting the relations between the two runs rather than any dollar literal, and landed *before* any 24-08 code changed. The research's secondary door-schedule detail (7 → 0 rows) did **not** reproduce under an independent count and is not relied on.
 - **Expected direction of the score: DOWN.** When the unnamed-geometry contract lands, ~24 published identifier rows plus the coincidental high-count "column" hit leave the take-off. That is the correct, documented outcome (same precedent as Phase 23's rails) and no plan may state a success criterion as an accuracy percentage.
 
-**Plans:** 8/10 plans executed
+**Plans:** 9/10 plans executed
 
 Plans:
 
@@ -1043,7 +1044,7 @@ Plans:
 - [x] 24-06-PLAN.md — Ledger surfacing: report key, summary.txt section, Excel sheet + `run_settings` telemetry (wave 3; resolves OQ-1 for every future run)
 - [x] 24-07-PLAN.md — Dependency-ordered schema topology + SoM chip carries the anchor + prompt correction (wave 3, V4-DET-03)
 - [x] 24-08-PLAN.md — Ensemble wire-up for `_run_pass` identification passes + call-site census (wave 4, V4-DET-04)
-- [ ] 24-09-PLAN.md — Determinism harness: two-variant replay fixtures + differential gate (wave 5, V4-DET-05)
+- [x] 24-09-PLAN.md — Determinism harness: two-variant replay fixtures + differential gate (wave 5, V4-DET-05)
 - [ ] 24-10-PLAN.md — The Phase 24 acceptance gate (wave 6, all five requirements)
 
 ### Phase 25: Deterministic Symbol Detection
