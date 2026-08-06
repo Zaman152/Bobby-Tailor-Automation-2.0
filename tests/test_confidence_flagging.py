@@ -33,12 +33,39 @@ def test_unclassified_component_flags_needs_review():
 
 
 def test_high_confidence_count_not_flagged():
+    """A corroborated high-confidence count is left alone.
+
+    REVISED BY 28-01. This test used to assert that a high-confidence count with
+    NOTHING behind it went unflagged — which is precisely the confidently-wrong
+    row the Crow run shipped (``Stairs``: confidence medium, needs_review False,
+    1.00 in one run and 2.00 in the next, off a details sheet). Self-reported
+    confidence is the model's opinion of itself, not evidence. So the count is
+    only unflagged when something corroborates it — here, counted geometry.
+    """
     e = _calculate_from_component(
-        {"name": "Bollard", "quantity": 3, "unit": "ea", "confidence": "high"},
+        {"name": "Bollard", "quantity": 3, "unit": "ea", "confidence": "high",
+         "provenance": "geometry"},
         "A1", "floor_plan",
     )
     assert e["needs_review"] is False
     assert e["confidence"] == "high"
+    assert e["count_corroboration"] == "geometry"
+
+
+def test_high_confidence_is_not_corroboration():
+    """The other half of the revision, asserted rather than deleted.
+
+    Same input minus the geometry: still high confidence, now flagged, with a
+    reason that names the sheet and tells the estimator what to go confirm.
+    """
+    e = _calculate_from_component(
+        {"name": "Bollard", "quantity": 3, "unit": "ea", "confidence": "high"},
+        "A1", "floor_plan",
+    )
+    assert e["confidence"] == "high"
+    assert e["count_corroboration"] == "none"
+    assert e["needs_review"] is True
+    assert "A1" in e["review_reason"]
 
 
 def test_approximate_measurement_flags_needs_review():

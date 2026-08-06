@@ -396,6 +396,62 @@ _DETAIL_SHEET_NOT_AN_INSTALL_COUNT = (
     "guard_rail", "hand_rail", "striping", "trench_drain",
 )
 
+#: ``qty_source`` markers meaning the number was read off a table PRINTED on the
+#: plans. A table stating a quantity is itself the corroboration.
+_SCHEDULE_QTY_SOURCES = frozenset({"schedule", "plan_schedule_legend"})
+
+
+def _count_corroboration(provenance, sheet_type, item_type, qty_source=None) -> str:
+    """What, if anything, backs this count? One of four verdicts.
+
+    ``geometry``
+        Instance bounding boxes were counted on the page. This is the only
+        signal separating a symbol-cluster count from a model's prose count, and
+        it outranks the sheet kind — bboxes on a details sheet are still bboxes.
+    ``schedule``
+        The number was read out of a table printed on the plans.
+    ``detail_sheet_only``
+        Neither of the above, on a sheet this run classified ``detail``, for an
+        item type in :data:`_DETAIL_SHEET_NOT_AN_INSTALL_COUNT`. A details sheet
+        draws how a thing is BUILT; a count taken off one is a count of
+        drawings, not of installed objects.
+    ``none``
+        Neither of the above, anywhere else. Recorded, not accused: the number
+        may well be right, but nothing in this run confirms it.
+
+    The verdict is RECORDED on the row. Whether an uncorroborated count may be
+    published is a separate decision, made once, downstream (28-03).
+    """
+    if str(qty_source or "").strip() in _SCHEDULE_QTY_SOURCES:
+        return "schedule"
+    if str(provenance or "").strip() == "geometry":
+        return "geometry"
+    if (str(sheet_type or "").strip().lower() == "detail"
+            and item_type in _DETAIL_SHEET_NOT_AN_INSTALL_COUNT):
+        return "detail_sheet_only"
+    return "none"
+
+
+def _uncorroborated_count_reason(verdict: str, sheet_name: str) -> str:
+    """The estimator-facing sentence for an uncorroborated count.
+
+    It names the sheet and the action to take, and it states no number — naming
+    an expected count here would be writing the answer into the message.
+    """
+    where = sheet_name or "the source sheet"
+    if verdict == "detail_sheet_only":
+        return (
+            "the only evidence for this count is on %s, which this run classified "
+            "as a details sheet; a details sheet shows how a thing is built rather "
+            "than how many were installed, so this reading counts detail drawings "
+            "and needs a plan-sheet or schedule confirmation before it is bid" % where
+        )
+    return (
+        "count read from a per-sheet description on %s with no counted geometry and "
+        "no printed schedule behind it; confirm it against a plan sheet or a "
+        "schedule before it is bid" % where
+    )
+
 
 # ─── Public entry point ──────────────────────────────────────────────────────
 
@@ -631,12 +687,28 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
         is_unclassified = item_type == "general"
         upstream_review = bool(c.get("needs_review", False))
         upstream_reason = (c.get("review_reason") or "").strip()
-        needs_review = (conf == "low") or is_unclassified or upstream_review
+
+        # WHAT BACKED THIS NUMBER (28-01). `_calculate_from_measurement` has
+        # refused a detail-sheet install quantity since RC-6; this path was
+        # handed the same `sheet_type` and never consulted it, which is how a
+        # count of stair DETAILS on a details sheet reached the report as a
+        # count of stairs. The verdict is recorded here and acted on downstream —
+        # nothing is deleted at this layer.
+        corroboration = _count_corroboration(
+            c.get("provenance"), sheet_type, item_type
+        )
+        uncorroborated = corroboration in ("detail_sheet_only", "none")
+
+        needs_review = (
+            (conf == "low") or is_unclassified or upstream_review or uncorroborated
+        )
         reasons: List[str] = []
         if is_unclassified:
             reasons.append("unclassified item (no estimation table matched)")
         elif conf == "low":
             reasons.append("low-confidence count")
+        if uncorroborated:
+            reasons.append(_uncorroborated_count_reason(corroboration, sheet_name))
         if upstream_review and upstream_reason:
             reasons.append(upstream_reason)
         reason = "; ".join(dict.fromkeys(reasons))
@@ -653,6 +725,11 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
             # (aggregation, audit) can still tell a geometry count from a vision
             # guess — it was being nulled between fusion and the report.
             "provenance": c.get("provenance"),
+            # What corroborated the count, and the sheet kind it was read from,
+            # carried verbatim so the publish decision downstream is made on a
+            # recorded fact rather than re-derived from a path it cannot see.
+            "count_corroboration": corroboration,
+            "count_evidence_sheet_kind": sheet_type,
             "waste_factor_applied": wf,
             "formula": f"count × {wf}" if wf != 1.0 else "count",
             "source_sheet": sheet_name,
@@ -1133,6 +1210,9 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
                 "waste_factor_applied": 1.0,
                 "formula": f"authoritative plan schedule ({qty_source} {legend_unit})",
                 "qty_source": "plan_schedule_legend",
+                # A table PRINTED on the plans stating a quantity is itself the
+                # corroboration for that count (28-01).
+                "count_corroboration": "schedule",
                 "legend_origin": legend_origin,
                 "source_sheet": sheet_name,
                 "source_location": f"{sched_name}{' row ' + mark if mark else ''}",
@@ -1160,6 +1240,7 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
                 "waste_factor_applied": table.get("waste_factor", 1.0),
                 "formula": formula_out,
                 "qty_source": "schedule",
+                "count_corroboration": "schedule",
                 "source_sheet": sheet_name,
                 "source_location": f"{sched_name}{' row ' + mark if mark else ''}",
                 "source_raw": row_text,
@@ -1178,6 +1259,7 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
                 "waste_factor_applied": 1.0,
                 "formula": f"count from schedule (qty column = {qty_source})",
                 "qty_source": "schedule",
+                "count_corroboration": "schedule",
                 "source_sheet": sheet_name,
                 "source_location": f"{sched_name}{' row ' + mark if mark else ''}",
                 "source_raw": row_text,

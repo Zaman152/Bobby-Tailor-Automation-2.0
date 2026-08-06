@@ -963,6 +963,13 @@ def _normalize_calculated(estimates: list) -> List[Dict[str, Any]]:
             # Preserve deterministic provenance (geometry/text_layer/schedule_table)
             # so a symbol count is never surfaced as a null-provenance number.
             "provenance": e.get("provenance"),
+            # What corroborated a counted quantity — geometry, a printed
+            # schedule, or nothing — and the sheet kind it was read from. This
+            # whitelist is the only gate between the calculator and
+            # aggregate_takeoff, so a verdict left off it would be a verdict
+            # nobody downstream can ever see (28-01).
+            "count_corroboration": e.get("count_corroboration"),
+            "count_evidence_sheet_kind": e.get("count_evidence_sheet_kind"),
             "waste_factor": e.get("waste_factor_applied", 1.0),
             "formula_applied": e.get("formula", ""),   # NEW: shows the actual math
             "approximate": e.get("approximate", False),
