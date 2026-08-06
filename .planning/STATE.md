@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 24
 current_phase_name: binding-determinism-text-anchored-labeling
 status: in_progress
-stopped_at: Completed 24-03-PLAN.md (3 of 10 plans, wave 1)
-last_updated: "2026-08-05T00:00:00.000Z"
-last_activity: 2026-08-05
-last_activity_desc: "24-03 killed the naming-library variance at its root. _norm_item_key collapsed separators and case but NOT plurals, so `bollard` and `bollards` were two bucket identities and a measured row could stand beside a blank expected row for the same object. _plural_stem is now a pure trailing-suffix rule with no lexicon, no alias table and no distance measure; canonical_library_name compares plural-insensitive STEMS, extended in place. Proven on the recorded names, not invented ones: replaying the saved runs' own item names, the 14:19 run's blank `Bollards` row is SUPPRESSED (its measured row was `Bollard`) — defect F2, closed on real data. Three naming authorities that raced with no arbiter now answer to NAME_AUTHORITY_PRECEDENCE and resolve_published_name, the one function that decides which authority names a row; the legend path routes through it as a verbatim authority so the claim is literally true. Learned names are canonicalised on READ, idempotent, no migration. DEVIATION (Rule 2): the research's `library > learned > vision` is applied to the learned store's AI tier (record_ai_manifest's persisted model answers — the tier the F1 evidence indicts) and NOT to its human tier, because demoting a human's correction below a library that is half LLM-derived vocabulary would break V3-LEARN-02 and contradict the store's own human-wins invariant. Where two names genuinely cannot reconcile (`Dock Bumper` vs `Bollards`) BOTH rows are flagged — never merged, never deleted — with pairing keyed on the measured row's naming AUTHORITY, never on name similarity. 24-02's residual differential did NOT start failing, and that is CORRECT: the storefront pair is a compound rename, not a plural, and folding it would be the defect. Suite 1992 -> 2017 passed, 0 regressions. V4-DET-02 still NOT ticked — 24-05 owes the stable object list. PRIOR: 24-02 inverted the wall-class naming precedence. map_wall_classes_from_library was already a complete zero-API classifier (printed-thickness match within 1.5 in, plus the guard forbidding a masonry object from binding the dominant-LF perimeter class) but sat in an elif BEHIND the stochastic vision label, so identical geometry could publish as CMU on one run and tilt-up on the next. Deterministic evidence now leads: a thickness match names the class outright, vision may corroborate (raising confidence, clearing the review reason) or dissent (name unmoved, row flagged, one fusion_rejected record carrying BOTH answers plus the printed and measured thicknesses). name_source now distinguishes the three naming authorities and is registered in _NAME_AUTHORITY at the SAME rank as naming_library so the inversion cannot silently re-order region-sharing arbitration. test_wall_class_label_invariance holds one geometry bundle fixed and varies only the model answer across the two saved paid runs, asserting an identical (name, quantity, unit) SET — mutation-checked, since reverting the precedence makes it fail with CMU Wall at 2,196 SF vs 106,992 SF, a 49x swing on identical geometry. Suite 1972 -> 1992 passed, 0 regressions. RESIDUAL, named not hidden: the bind is invariant GIVEN its object list, and that list is re-derived from the API every run (defect F3) — 24-03 folds the name form and 24-05 persists the vocabulary; V4-DET-02 is NOT ticked in REQUIREMENTS.md yet."
+stopped_at: Completed 24-07-PLAN.md (7 of 10 plans, wave 3) — CLOSED OUT after an interruption; tasks 1-2 landed in session 1 (e7b648b, 2b3e56a), task 3 in the close-out session (7cbdf40)
+last_updated: "2026-08-06T00:00:00.000Z"
+last_activity: 2026-08-06
+last_activity_desc: "24-07 delivered the anchor to the model and made a topological gap unexpressible — and it is the phase's first INTERRUPTED plan, closed out in a second session (tasks 1-2 in session 1: e7b648b, 2b3e56a; task 3 found written-but-uncommitted and committed on VERIFIED merit as 7cbdf40, after re-running every acceptance command for all three tasks rather than trusting the diff because it existed). The marker chip drew `label = candidate_id` and nothing else — a box and an identifier, exactly the symbol-conveyed condition the evidence base measures at 0.03-0.39 against 0.65-0.92 for text-anchored classes. `render_overlay(..., anchors=)` now threads 24-01's records so a chip reads `SYM-9 DOCK BUMPER`; a RECORDED ABSENCE renders the bare ID with no placeholder, byte-identical to before. The deeper change is that the question is no longer asked when the drawing has no answer: a cluster with a recorded absence is EXCLUDED from the request rather than asked and then discarded (Crow: 40 of 107 anchored, 67 absences), flowing to 24-04's ledger and staying flagged — never named from its outline. Crucially the exclusion fires on a RECORDED ABSENCE only, never on 'this ID is missing from the map', because a candidate with no record was never interrogated and reading that as 'nothing names it' would let a failed anchor computation silently empty a whole vision pass (INV-08). The anchor is delivered TWICE by design — on the chip as the evidence, and in the user hint as its survivable delivery after the 1568px downscale — and the hint table is `wrap_pdf_text`-wrapped (T-24-27/T-24-01 met, verified at takeoff_pipeline.py:891, not assumed). `semantic_labeling_schema` was FLAT, which is why both saved paid runs published four rooms at ~10-11 SF each on a 397,600 SF warehouse; it is now declared skeleton-first (wall_classes -> regions -> rooms), each level referencing only IDs defined above it, every ID field an enum. Omittability is an ALLOWED EMPTY LIST rather than an optional property: a present-and-empty `bounding_wall_ids` is a positive 'I can cite none' that 24-04's orphan-room branch reads, so the model is never forced to invent a reference. ZERO numeric properties, proven by a test that discovers builders by module INTROSPECTION and fails loudly on one it cannot construct, paired with a positive control asserting the raster path does carry an integer — so the ban is not vacuous. DEVIATIONS (Rule 2, session 1): the request was asking about candidates whose markers it never sent, since render_overlay partitions and the batch caps at 20 — `_ids_shown_on` now builds the enums from the IDs actually MARKED, the same defect as asking about an unanchored cluster in a different costume; and room candidates had to be MARKED, not merely enumerated, with an all-zero bbox read as position UNKNOWN and therefore not asked about. A pass-boundary adapter kept the schema change from reaching fusion, so 196 fusion/voting tests are untouched. SYMBOL_GALLERY_PROMPT still described a crop gallery of tiles the vector path stopped sending at Phase 23; it now names the full-sheet in-context render and an explicit evidence ladder — chip text PRIMARY, position and repetition SECONDARY, drawn shape ALONE insufficient -> 'unknown'. LOUD SEQUENCING CONSEQUENCE: every replay fixture key is a SHA256 over (model, pass_type, prompt, image_count) and this plan changed BOTH the prompt text and, on room-heavy sheets, the image count (Crow page 1: 1 -> 5). Plan 24-09 MUST author its fixtures AFTER 7cbdf40, never before, or the differential gate passes for having looked at nothing. Suite 2092 -> 2131 passed, 1 skipped, 2 deselected, 0 regressions; four-set + phase-23 acceptance 28 passed, 1 skipped. NOT MEASURED and not measurable offline: the 0.03->0.65 figure is from published benchmarks on other datasets (assumption A3) — this plan is judged on whether the anchor is present, correct and delimited, never on an accuracy percentage. V4-DET-01's prompt half and V4-DET-03 are DELIVERED but NOT ticked; 24-10 is their closer. PRIOR: 24-03 killed the naming-library variance at its root. _norm_item_key collapsed separators and case but NOT plurals, so `bollard` and `bollards` were two bucket identities and a measured row could stand beside a blank expected row for the same object. _plural_stem is now a pure trailing-suffix rule with no lexicon, no alias table and no distance measure; canonical_library_name compares plural-insensitive STEMS, extended in place. Proven on the recorded names, not invented ones: replaying the saved runs' own item names, the 14:19 run's blank `Bollards` row is SUPPRESSED (its measured row was `Bollard`) — defect F2, closed on real data. Three naming authorities that raced with no arbiter now answer to NAME_AUTHORITY_PRECEDENCE and resolve_published_name, the one function that decides which authority names a row; the legend path routes through it as a verbatim authority so the claim is literally true. Learned names are canonicalised on READ, idempotent, no migration. DEVIATION (Rule 2): the research's `library > learned > vision` is applied to the learned store's AI tier (record_ai_manifest's persisted model answers — the tier the F1 evidence indicts) and NOT to its human tier, because demoting a human's correction below a library that is half LLM-derived vocabulary would break V3-LEARN-02 and contradict the store's own human-wins invariant. Where two names genuinely cannot reconcile (`Dock Bumper` vs `Bollards`) BOTH rows are flagged — never merged, never deleted — with pairing keyed on the measured row's naming AUTHORITY, never on name similarity. 24-02's residual differential did NOT start failing, and that is CORRECT: the storefront pair is a compound rename, not a plural, and folding it would be the defect. Suite 1992 -> 2017 passed, 0 regressions. V4-DET-02 still NOT ticked — 24-05 owes the stable object list. PRIOR: 24-02 inverted the wall-class naming precedence. map_wall_classes_from_library was already a complete zero-API classifier (printed-thickness match within 1.5 in, plus the guard forbidding a masonry object from binding the dominant-LF perimeter class) but sat in an elif BEHIND the stochastic vision label, so identical geometry could publish as CMU on one run and tilt-up on the next. Deterministic evidence now leads: a thickness match names the class outright, vision may corroborate (raising confidence, clearing the review reason) or dissent (name unmoved, row flagged, one fusion_rejected record carrying BOTH answers plus the printed and measured thicknesses). name_source now distinguishes the three naming authorities and is registered in _NAME_AUTHORITY at the SAME rank as naming_library so the inversion cannot silently re-order region-sharing arbitration. test_wall_class_label_invariance holds one geometry bundle fixed and varies only the model answer across the two saved paid runs, asserting an identical (name, quantity, unit) SET — mutation-checked, since reverting the precedence makes it fail with CMU Wall at 2,196 SF vs 106,992 SF, a 49x swing on identical geometry. Suite 1972 -> 1992 passed, 0 regressions. RESIDUAL, named not hidden: the bind is invariant GIVEN its object list, and that list is re-derived from the API every run (defect F3) — 24-03 folds the name form and 24-05 persists the vocabulary; V4-DET-02 is NOT ticked in REQUIREMENTS.md yet."
 progress:
   total_phases: 28
   completed_phases: 20
   total_plans: 131
-  completed_plans: 119
-  percent: 91
+  completed_plans: 122
+  percent: 93
 ---
 
 # Project State
@@ -30,8 +30,22 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 ## Current Position
 
 Phase: 24 (binding-determinism-text-anchored-labeling) — **IN PROGRESS**
-Plan: 3 of 10 complete (wave 1 of 6)
-Status: **wave 1 is complete.** 24-01 shipped the phase's one new deterministic primitive —
+Plan: 7 of 10 complete (waves 1–3 done; next is 24-08, wave 4)
+Status: **waves 1, 2 and 3 are complete.** See `24-04`/`24-05`/`24-06`/`24-07-SUMMARY.md` for those
+plans; the wave-1 narrative below is retained because 24-05's open assertion still points at it.
+
+**24-07 was the phase's first INTERRUPTED plan and is now CLOSED OUT.** Tasks 1–2 landed in the
+original session (`e7b648b`, `2b3e56a`); task 3 was found written-but-uncommitted and was committed
+as `7cbdf40` only after every acceptance command for all three tasks was re-run. Two-session
+provenance is recorded in `24-07-SUMMARY.md`.
+
+**Read this before 24-09.** Every replay fixture key is a SHA256 over
+`(model, pass_type, prompt, image_count)`. 24-07 changed the prompt text AND, on room-heavy sheets,
+the image count (Crow page 1: 1 → 5). **24-09 must author its fixtures after `7cbdf40`, never
+before** — a fixture keyed to the pre-24-07 prompt hashes to a key nothing will request, and the
+differential gate would pass for having looked at nothing (24-RESEARCH pitfall 6).
+
+Wave-1 detail, retained: 24-01 shipped the phase's one new deterministic primitive —
 every symbol group, room and wall class carries the words the drawing printed nearest to it, or a
 **recorded absence**, computed before any vision call. 24-02 then made the wall-class NAME a
 decision rather than a reading: a printed-thickness match outranks a vision label unconditionally,
@@ -49,16 +63,20 @@ did **not**, and that is the correct outcome, not a miss: the residual is `Alumi
 to prevent. That assertion is **24-05's** to retire, by stabilising the per-project object list so
 both runs derive the same name in the first place. Do not delete or weaken it before then.
 
-Ready for 24-04 (the unnamed-geometry ledger consumes `anchor_text is None`; note that
-`_HYPOTHESIS_NAME_SOURCES` already excludes `vision`, so removing `SYM-*` rows from the take-off
-changes no 24-03 assertion), 24-05 (per-project vocabulary persistence — must respect
-`learning_vocabulary.source`, since human vs ai is now a live arbitration distinction, and must
-NOT write a migration) and 24-07 (the SoM chip consumes the anchor text — and **must** wrap it in
-`<pdf_text>` delimiters, threat T-24-01).
-Last activity: 2026-08-05 — 24-03 folded the canonical name form and declared the one naming-authority
-arbiter (see last_activity_desc).
+24-04, 24-05, 24-06 and 24-07 have all landed. T-24-01 is **met**: the anchor table reaches the
+prompt only through `wrap_pdf_text` (`takeoff_pipeline.py:891`), verified at the source during
+24-07's close-out rather than assumed.
 
-Progress: [█████████░] 90%
+Ready for **24-08** (ensemble wire-up for `_run_pass` identification passes — it touches call
+sites, not the schema or the prompts, so nothing in 24-07 conflicts), then **24-09** (subject to the
+fixture-sequencing warning above) and **24-10** (the phase gate, which inherits the V4-DET-01/03
+requirement ticks and the in-tree synthetic-fixture regeneration logged in `deferred-items.md`).
+
+Last activity: 2026-08-06 — 24-07 put the drawing's own words on the marker chip, stopped asking
+about clusters the drawing does not name, and made a topological gap unexpressible by schema
+(see last_activity_desc).
+
+Progress: [█████████░] 93%
 
 Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans. Carried forward, named not
 dropped: **DEF-23-SP4** (the geometric viewport-bounded clip cell — blocked behind the domain question

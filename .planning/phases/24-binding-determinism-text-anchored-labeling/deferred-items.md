@@ -46,3 +46,21 @@ openpyxl itself honours; `@`, `+` and `-` are already written as strings.
   existing assertion moves).
 - **Suggested owner:** the 24-10 phase gate, or any later plan that touches the
   exporter.
+
+---
+
+## Deferred — found during 24-07, NOT fixed (out of scope)
+
+**`tests/fixtures/synthetic/*.pdf` are rewritten by every full-suite run.**
+
+`dimensions_synthetic.pdf`, `floorplan_synthetic.pdf` and `symbols_synthetic.pdf`
+show as modified in `git status` after `python3 -m pytest -q`: the fixtures are
+regenerated in-tree (new PDF timestamps) rather than built into a `tmp_path`.
+
+- **Pre-existing**, unrelated to any edit in this plan, and never staged by
+  24-07's commits — each commit staged its files individually.
+- **Why not fixed here:** the executor scope boundary. It is a test-infrastructure
+  change touching three fixture builders, with no bearing on V4-DET-01/03.
+- **Cost of leaving it:** a full-suite run leaves a dirty tree, so "clean tree"
+  cannot be used as a pre-commit gate anywhere in this project.
+- **Suggested owner:** the 24-10 phase gate.

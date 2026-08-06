@@ -1041,7 +1041,7 @@ Plans:
 - [x] 24-04-PLAN.md — Unnamed-geometry contract: the three `or cid` leak sites + room name-plausibility gate (wave 2, V4-DET-01)
 - [x] 24-05-PLAN.md — Per-project vocabulary persistence & reuse (wave 2; resolves OQ-2 per-project scope, funds 24-08)
 - [x] 24-06-PLAN.md — Ledger surfacing: report key, summary.txt section, Excel sheet + `run_settings` telemetry (wave 3; resolves OQ-1 for every future run)
-- [ ] 24-07-PLAN.md — Dependency-ordered schema topology + SoM chip carries the anchor + prompt correction (wave 3, V4-DET-03)
+- [x] 24-07-PLAN.md — Dependency-ordered schema topology + SoM chip carries the anchor + prompt correction (wave 3, V4-DET-03)
 - [ ] 24-08-PLAN.md — Ensemble wire-up for `_run_pass` identification passes + call-site census (wave 4, V4-DET-04)
 - [ ] 24-09-PLAN.md — Determinism harness: two-variant replay fixtures + differential gate (wave 5, V4-DET-05)
 - [ ] 24-10-PLAN.md — The Phase 24 acceptance gate (wave 6, all five requirements)
