@@ -328,6 +328,111 @@ def test_the_door_schedule_count_still_publishes_measured():
     assert row["needs_review"] is False
 
 
+# ─── _row_status may not call an uncorroborated count MEASURED ──────────────
+
+def _bucket(**over):
+    bucket = aggregator._new_bucket()
+    bucket.update({"has_rows": True, "quantity": 4.0, "unit": "EA"})
+    bucket.update(over)
+    return bucket
+
+
+def test_row_status_refuses_measured_for_an_uncorroborated_count():
+    """The single place a bucket becomes ITEM_MEASURED, closed against the one
+    thing it was letting through: a count nothing confirmed."""
+    assert aggregator._row_status(
+        _bucket(count_corroboration="none"), False
+    ) == "NEEDS REVIEW"
+    assert aggregator._row_status(
+        _bucket(count_corroboration="detail_sheet_only"), False
+    ) == "NEEDS REVIEW"
+
+
+def test_row_status_is_unchanged_for_a_corroborated_count():
+    for verdict in ("geometry", "schedule"):
+        assert aggregator._row_status(
+            _bucket(count_corroboration=verdict), False
+        ) == "MEASURED", verdict
+
+
+def test_row_status_is_unchanged_for_every_bucket_that_never_counted():
+    """Areas, blanks, the injected convention and the legend cases are not
+    counts and must answer exactly what they answered before this branch."""
+    assert aggregator._row_status(_bucket(), False) == "MEASURED"
+    assert aggregator._row_status(_bucket(), True) == "NOT MEASURED"
+    assert aggregator._row_status(
+        _bucket(has_rows=False, item_type="standard_line_item"), False
+    ) == "STANDARD ITEM"
+    assert aggregator._row_status(_bucket(has_rows=False), False) == "NOT MEASURED"
+    assert aggregator._row_status(_bucket(needs_review=True), False) == "NEEDS REVIEW"
+
+
+def test_row_status_still_reaches_the_plan_schedule_legend_branch():
+    """The new branch is not allowed to shadow the branch below it: a
+    schedule-corroborated count keeps whichever answer the legend rules give."""
+    assert aggregator._row_status(
+        _bucket(count_corroboration="schedule", source="plan_schedule_legend",
+                legend_origin="human_input"), False
+    ) == "HUMAN INPUT"
+    assert aggregator._row_status(
+        _bucket(count_corroboration="schedule", source="plan_schedule_legend"), False
+    ) == "MEASURED"
+
+
+def test_the_row_status_docstring_states_what_this_branch_prevents():
+    doc = aggregator._row_status.__doc__ or ""
+    assert "schedule" in doc and "geometry" in doc
+    assert "identical" in doc
+
+
+def test_an_uncorroborated_count_publishes_needs_review_end_to_end():
+    row = _row(aggregate_takeoff([
+        _count_item("dock leveler", corroboration="none", qty=4,
+                    count_evidence_sheet_kind="floor_plan"),
+    ]), "Dock Leveler")
+    assert row["quantity"] == 4
+    assert row["provenance"] == "NEEDS REVIEW"
+    assert row["needs_review"] is True
+    assert row["auto_verified"] is False
+    reason = " ".join(row["review_reasons"])
+    assert "no printed schedule" in reason
+    assert "no counted geometry" in reason
+    # It states no number of its own — the reading is already on the row.
+    assert not any(ch.isdigit() for ch in reason), reason
+
+
+def test_a_geometry_backed_count_still_publishes_measured_end_to_end():
+    row = _row(aggregate_takeoff([
+        _count_item("dock leveler", corroboration="geometry", qty=4),
+    ]), "Dock Leveler")
+    assert row["quantity"] == 4
+    assert row["provenance"] == "MEASURED"
+    assert row["needs_review"] is False
+    assert row["auto_verified"] is True
+    assert row["review_reasons"] == []
+
+
+def test_the_injected_convention_still_publishes_as_a_standard_item():
+    rows = aggregate_takeoff([_count_item("dock leveler", corroboration="none")])
+    row = _row(rows, "Mobilization")
+    assert row["provenance"] == "STANDARD ITEM"
+    assert row["quantity"] == 1
+    assert row["needs_review"] is False
+
+
+def test_an_area_row_beside_an_uncorroborated_count_is_untouched():
+    rows = aggregate_takeoff([
+        {"description": "warehouse floor", "item_type": "flooring",
+         "calculated_quantity": 3960.0, "calculated_unit": "sq_ft",
+         "source_sheet": "A-101", "auto_verified": True, "confidence": "high"},
+        _count_item("dock leveler", corroboration="none"),
+    ])
+    area = _row(rows, "Flooring")
+    assert area["provenance"] == "MEASURED"
+    assert area["needs_review"] is False
+    assert area["review_reasons"] == []
+
+
 # ─── this module's own contract ─────────────────────────────────────────────
 
 def test_this_module_names_no_golden_quantity_and_calls_no_paid_service():
