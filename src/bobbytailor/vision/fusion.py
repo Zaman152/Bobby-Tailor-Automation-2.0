@@ -1006,6 +1006,16 @@ _MARKER_MAX_SIZE_FT = 3.0        # a "marker" (column/bollard) is a small symbol
 _MARKER_SIZE_CV_MAX = 0.5        # instances must be roughly uniform in size
 _PERIMETER_MIN_COUNT = 8         # a plausible perimeter/jamb repetition
 _PERIMETER_INNER_MAX_FILL = 0.25 # a ring is hollow: ≤25% of points in the centre
+# A hollow ring's interior band holds ONE MARK PER SIDE — two. A band holding
+# more than that is a populated row/column, not the two flanks of a ring.
+_PERIMETER_RING_BAND_MAX = 2
+# A ring is assembled from two runs per axis: its two opposite sides. A filled
+# lattice has one run per row AND one per column, so it exceeds this on both.
+_PERIMETER_MAX_DENSE_BANDS = 2
+# Every mark on a ring lies on one of the ring's runs. The same fraction the
+# hollowness test already tolerates off the boundary is tolerated off the runs;
+# a mark that lies on no run at all is not part of any ring.
+_PERIMETER_MIN_RUN_COVERAGE = 1.0 - _PERIMETER_INNER_MAX_FILL
 
 
 def _instance_dims(group) -> Tuple[List[float], List[float]]:
@@ -1125,11 +1135,76 @@ def _is_collinear_strip(group) -> bool:
     return minor is not None and minor < _min_2d_span_pt(group)
 
 
+def _occupancy_bands(values: List[float], tol: float) -> List[List[int]]:
+    """Indices of *values* greedily grouped into bands no more than ``tol`` apart.
+
+    Same greedy snapping as :func:`_cluster_lines`, but it returns the MEMBERS of
+    each band rather than the band's position — a ring is told from a lattice by
+    how full its bands are, and by which marks lie in a full one.
+    """
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    bands: List[List[int]] = []
+    bucket: List[int] = []
+    for i in order:
+        if bucket and values[i] - values[bucket[-1]] > tol:
+            bands.append(bucket)
+            bucket = []
+        bucket.append(i)
+    if bucket:
+        bands.append(bucket)
+    return bands
+
+
+def _is_built_from_ring_runs(centroids: List[Tuple[float, float]], tol: float) -> bool:
+    """True when these centres are explained by a ring's runs, not by a lattice.
+
+    Two conditions, both properties of the SHAPE:
+
+    * **At most two dense bands per axis.** A ring is two runs per axis — its
+      opposite sides. A filled lattice has one run per row and one per column,
+      so it blows this on both axes at once.
+    * **Nearly every mark lies on one of those runs.** A ring is made of its
+      sides; a mark on no run is not on any ring. Without this, a sparse
+      scatter — whose bands are all too thin to be dense, so the first condition
+      is vacuously satisfied — would read as a ring on no evidence at all.
+    """
+    if not centroids:
+        return False
+    xb = _occupancy_bands([c[0] for c in centroids], tol)
+    yb = _occupancy_bands([c[1] for c in centroids], tol)
+    dense = [b for b in xb + yb if len(b) > _PERIMETER_RING_BAND_MAX]
+    for axis in (xb, yb):
+        n_dense = sum(1 for b in axis if len(b) > _PERIMETER_RING_BAND_MAX)
+        if n_dense > _PERIMETER_MAX_DENSE_BANDS:
+            return False
+    on_a_run = set()
+    for band in dense:
+        on_a_run.update(band)
+    return len(on_a_run) >= _PERIMETER_MIN_RUN_COVERAGE * len(centroids)
+
+
 def _is_perimeter_ring(group) -> bool:
-    """True when instance centres hug the bbox edges (a hollow perimeter ring).
+    """True when instance centres form a HOLLOW ring — two runs per axis, with
+    an empty interior — rather than a filled 2-D lattice of marks.
 
     Requires a genuine 2-D spread first — a collinear strip is all-boundary /
     zero-inner and would otherwise pass the hollow-ring test spuriously.
+
+    Two independent hollowness signals must BOTH hold, because either alone is
+    fooled:
+
+    * the 25%-inset fill, which asks whether marks avoid the middle of the
+      cluster's own bbox. On a lattice only a few rows deep, almost every mark
+      falls outside a 25% inset, so a fully populated 14×4 array reads as hollow
+      — this is exactly how a lattice on the structural bay grid acquired a
+      perimeter object's name on Crow page 0 (V4-FIX-02);
+    * the run structure (:func:`_is_built_from_ring_runs`), which asks whether
+      the marks are ARRANGED as a ring's sides: at most two dense bands per
+      axis, and nearly every mark on one of them.
+
+    Neither threshold is derived from any expected object count. A ring's
+    interior band holds one mark per side, and a ring has two sides per axis —
+    both are facts about the shape.
     """
     centroids = _instance_centroids(group)
     if len(centroids) < _PERIMETER_MIN_COUNT:
@@ -1145,7 +1220,12 @@ def _is_perimeter_ring(group) -> bool:
     ix0, ix1 = x0 + 0.25 * w, x1 - 0.25 * w
     iy0, iy1 = y0 + 0.25 * h, y1 - 0.25 * h
     inner = sum(1 for px, py in centroids if ix0 < px < ix1 and iy0 < py < iy1)
-    return inner / float(len(centroids)) <= _PERIMETER_INNER_MAX_FILL
+    if inner / float(len(centroids)) > _PERIMETER_INNER_MAX_FILL:
+        return False
+    # Bands are grouped at the SAME tolerance that separates a 2-D array from a
+    # collinear strip — derived from the instances' own median size, so no
+    # second, unrelated tolerance enters the predicate.
+    return _is_built_from_ring_runs(centroids, _min_2d_span_pt(group))
 
 
 def _binding_hint_map(vocabulary) -> Dict[str, dict]:

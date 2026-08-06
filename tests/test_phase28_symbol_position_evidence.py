@@ -508,8 +508,16 @@ def test_the_ring_test_still_finds_the_one_genuinely_hollow_ring_on_the_page():
         "the predicate now accepts nothing at all on this sheet — it has stopped "
         "discriminating and started refusing"
     )
-    assert all(not F._is_small_marker(g) for g in rings), (
-        "a small-marker ring survived here but not in the binder's own filter"
+    survivors = {
+        _cid(g): ("too large to be a marker" if not F._is_small_marker(g)
+                  else "instance sizes are not uniform")
+        for g in rings
+    }
+    assert all(
+        not (F._is_small_marker(g) and F._size_uniform(g)) for g in rings
+    ), (
+        "a uniform small-marker ring survived the ring test but not the "
+        "binder's filter, so the two disagree: %r" % survivors
     )
 
 
