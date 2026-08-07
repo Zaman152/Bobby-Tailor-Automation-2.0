@@ -2173,6 +2173,95 @@ def _reject_wall_label_override(
     )
 
 
+#: The refusal-record reason key. Its OWN key, and deliberately not
+#: :data:`_WALL_LABEL_PRECEDENCE_REASON`: an override says "the printed
+#: thickness beat the reading", a refusal says "the printed thickness proved
+#: nothing and the reading stands". A reader who cannot tell those apart by key
+#: alone cannot count either of them. Like the override key it is not a C3a
+#: suppression key, so the reinstatement pass never sees it.
+_WALL_THICKNESS_BIND_CONTESTED_REASON = "wall_class_thickness_bind_refused_as_contested"
+
+
+def _contest_sentence(contest: dict) -> str:
+    """Why a printed-thickness match was refused, in one estimator-facing clause."""
+    objects = [str(o) for o in (contest.get("objects") or []) if str(o).strip()]
+    also = [str(c) for c in (contest.get("also_matched_classes") or [])]
+    cth = contest.get("class_thickness_in")
+    measured = (
+        "this wall class measures %s\" (LF-weighted mean) and " % cth
+        if cth is not None
+        else ""
+    )
+    if len(objects) > 1:
+        return (
+            "%sthe naming library objects %s all print a thickness within the "
+            "%s\" match tolerance of it — a number two objects both print "
+            "identifies neither of them"
+            % (measured, ", ".join(repr(o) for o in objects), _WALL_THICKNESS_TOL_IN)
+        )
+    named = repr(objects[0]) if objects else "a naming library object"
+    if also:
+        return (
+            "%sthe naming library object %s prints a thickness within the %s\" "
+            "match tolerance of it AND of %s — a number that fits several "
+            "classes does not say which of them it describes"
+            % (measured, named, _WALL_THICKNESS_TOL_IN, ", ".join(also))
+        )
+    return (
+        "%sthe printed-thickness match by %s did not discriminate"
+        % (measured, named)
+    )
+
+
+def _reject_contested_wall_thickness_bind(
+    candidate_id: str,
+    contest: dict,
+    kept_label,
+    rejected: Optional[List[dict]],
+) -> None:
+    """Audit a printed-thickness bind refused for not discriminating (T-28-19).
+
+    The refused answer is PUBLISHED with the evidence that failed, on the same
+    field names as :func:`_reject_wall_label_override` so a reader moving
+    between the two is not learning a second vocabulary. ``kept_label`` is what
+    names the class instead, or ``None`` when nothing does and the class
+    reaches the unnamed-geometry ledger.
+    """
+    if rejected is None:
+        return
+    objects = [str(o) for o in (contest.get("objects") or []) if str(o).strip()]
+    rejected.append(
+        {
+            "candidate_id": candidate_id,
+            "source": "wall_class_labels",
+            # The answer that LOST is the library object's claim on this class.
+            "answer": " / ".join(objects) or None,
+            "reason": _WALL_THICKNESS_BIND_CONTESTED_REASON,
+            "kept_label": kept_label,
+            "contesting_objects": objects,
+            "also_matched_classes": list(contest.get("also_matched_classes") or []),
+            "class_thickness_in": contest.get("class_thickness_in"),
+            "detail": (
+                "a printed-thickness match was REFUSED as contested: %s. A "
+                "printed thickness is evidence of dimension and only becomes "
+                "evidence of identity when exactly one candidate claims it, so "
+                "it did not outrank %s"
+                % (
+                    _contest_sentence(contest),
+                    (
+                        "the vision reading %r, which names this class instead"
+                        % kept_label
+                        if kept_label
+                        else "anything — nothing else names this class, and its "
+                             "measured length is preserved in the "
+                             "unnamed-geometry ledger"
+                    ),
+                )
+            ),
+        }
+    )
+
+
 def _fuse_wall_classes(
     bundle: dict,
     labels_by_id: Dict[str, dict],
@@ -2185,6 +2274,7 @@ def _fuse_wall_classes(
     ] = None,
     rejected: Optional[List[dict]] = None,
     unnamed: Optional[List[dict]] = None,
+    contested_wall_classes: Optional[Dict[str, dict]] = None,
 ) -> None:
     """Wall thickness classes → LF, or SF when the name is a wall_area object.
 
@@ -2229,8 +2319,15 @@ def _fuse_wall_classes(
             bind nor a label named emits NO component and one record here
             carrying its LF. Omitting the list keeps the class out of the
             take-off either way — the record is simply not retained.
+        contested_wall_classes: ``map_wall_classes_from_library``'s report of
+            the classes whose printed-thickness match was refused for not
+            discriminating (28-04). A refusal is recorded on the row and in the
+            audit trail, and a class that was CONTESTED reads differently in
+            the ledger from a class nothing matched at all. Omitting it changes
+            no name — only the explanation is lost.
     """
     vocab_map = vocab_map or {}
+    contested_wall_classes = contested_wall_classes or {}
     library_wall_map = library_wall_map or {}
     lf_by_class = bundle.get("wall_lf_by_class") or {}
     # Where each class's linework sits, so an unnamed-geometry record can say
@@ -2335,6 +2432,25 @@ def _fuse_wall_classes(
             name, basis, confident = bind_name, bind_basis, False
             name_source = _NAME_SOURCE_LIBRARY
         # 5. Neither → falls through to the unlabeled else-branch below.
+
+        # A printed-thickness match that did not discriminate was refused up in
+        # the mapper. Whatever named this class instead, the refusal is a fact
+        # about the evidence and belongs on the row AND in the audit trail —
+        # silently taking the second-best answer is how the wrong one got
+        # published in the first place.
+        contest = contested_wall_classes.get(cls)
+        if contest is not None:
+            _reject_contested_wall_thickness_bind(cid, contest, name, rejected)
+            if name is not None:
+                dissent_note = "; ".join(
+                    part for part in (
+                        dissent_note,
+                        "a printed-thickness match was refused as contested "
+                        "(%s), so %r names this class on weaker evidence than "
+                        "a deterministic bind — verify"
+                        % (_contest_sentence(contest), name),
+                    ) if part
+                )
 
         if name is not None:
             if (
@@ -2448,7 +2564,18 @@ def _fuse_wall_classes(
                         reason=UNNAMED_WALL_CLASS_UNLABELED,
                         kind="wall_class",
                         detail=(
+                            # A class something claimed but could not prove is
+                            # a DIFFERENT fact from a class nothing claimed,
+                            # and a reviewer is owed the difference: the first
+                            # says a candidate name exists and was not
+                            # evidenced, the second says none was offered.
                             "%.1f LF of wall linework was measured in this "
+                            "thickness class, and no vision label identifies "
+                            "what the wall is; a printed-thickness match was "
+                            "refused as contested — %s"
+                            % (round(float(lf), 1), _contest_sentence(contest))
+                            if contest is not None
+                            else "%.1f LF of wall linework was measured in this "
                             "thickness class, but no printed-thickness match "
                             "and no vision label identifies what the wall is"
                             % round(float(lf), 1)
@@ -4515,10 +4642,15 @@ def fuse_sheet(
         deterministic_bundle.get("symbol_groups") or [], symbol_labels, binding_map
     )
     wall_objects = _wall_objects_from_vocabulary(vocabulary)
+    # Classes whose printed-thickness match did not discriminate. Collected
+    # here rather than re-derived in the fuser, so the refusal an audit record
+    # explains is the SAME refusal the mapper made (28-04).
+    contested_wall_classes: Dict[str, dict] = {}
     library_wall_map = map_wall_classes_from_library(
         deterministic_bundle.get("wall_lf_by_class") or {},
         _wall_thickness_in_by_class(deterministic_bundle),
         wall_objects,
+        contested=contested_wall_classes,
     )
 
     _fuse_symbol_groups(
@@ -4537,6 +4669,7 @@ def fuse_sheet(
         # same trail as every other fusion rejection, never a second list.
         rejected=rejected,
         unnamed=unnamed,
+        contested_wall_classes=contested_wall_classes,
     )
     _fuse_project_area_items(deterministic_bundle, vocabulary, components)
     _fuse_room_fills(
