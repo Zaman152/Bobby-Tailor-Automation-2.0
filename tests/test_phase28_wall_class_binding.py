@@ -412,6 +412,134 @@ def test_the_bind_does_not_depend_on_the_order_the_objects_arrive_in():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Task 2 — a masonry object is a small wall; test the share, not the ranking
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# The guard that already existed excluded exactly ONE class — the single
+# most-LF one. A sheet with a dozen thickness classes has plenty of large
+# classes that are not the largest, and a masonry object could take any of
+# them. What makes a wall masonry-shaped is its SIZE relative to the sheet, not
+# its position in a ranking.
+
+
+def _names_in(mapping):
+    return {v[0] for v in mapping.values()}
+
+
+def test_a_masonry_object_refuses_a_large_share_class_that_is_not_the_dominant_one():
+    """The exact hole the rank test left open.
+
+    TC2 is not the largest class, so the dominant guard has nothing to say
+    about it — but it carries a large fraction of every wall line on the sheet,
+    which is not what a room-scale masonry exception looks like.
+    """
+    lf = {"TC1": 500.0, "TC2": 400.0, "TC3": 10.0}
+    th = {"TC1": 12.0, "TC2": 8.0, "TC3": 20.0}
+    mapping = map_wall_classes_from_library(lf, th, [_cmu("8")])
+    assert lf["TC2"] < lf["TC1"], "TC2 must not be the dominant class"
+    assert mapping.get("TC2", (None,))[0] != "CMU Wall", (
+        "a masonry object took a class carrying %.0f%% of the sheet's wall "
+        "linework: %r" % (100 * lf["TC2"] / sum(lf.values()), mapping.get("TC2"))
+    )
+
+
+def test_the_object_refused_on_share_is_not_consumed_either():
+    """A refusal on size is still a refusal to IDENTIFY, not a deletion."""
+    lf = {"TC1": 500.0, "TC2": 400.0, "TC3": 10.0}
+    th = {"TC1": 12.0, "TC2": 8.0, "TC3": 20.0}
+    mapping = map_wall_classes_from_library(lf, th, [_cmu("8")])
+    assert "CMU Wall" in _names_in(mapping), (
+        "the masonry object vanished instead of falling through to the hint "
+        "pass: %r" % (mapping,)
+    )
+    cls = [c for c, v in mapping.items() if v[0] == "CMU Wall"][0]
+    assert mapping[cls][2] is False, "a hint bind is never confident"
+    assert cls == "TC3", "the hint pass must still prefer the small class"
+
+
+def test_a_masonry_object_still_binds_a_genuinely_small_class():
+    """The case that must not regress."""
+    mapping = map_wall_classes_from_library(
+        {"TC1": 900.0, "TC2": 60.0},
+        {"TC1": 12.0, "TC2": 8.0},
+        [_cmu("8")],
+    )
+    assert mapping["TC2"][0] == "CMU Wall"
+    assert mapping["TC2"][2] is True
+
+
+def test_the_dominant_exclusion_still_holds_where_the_share_test_is_silent():
+    """Two overlapping guards, and here only the rank test speaks.
+
+    Five equal classes: every one of them is well under the share threshold, so
+    the share test excludes none. The largest is still the perimeter wall and a
+    masonry object still may not have it.
+    """
+    lf = {"TC%d" % i: 100.0 for i in range(1, 6)}
+    th = {"TC1": 8.0, "TC2": 12.0, "TC3": 16.0, "TC4": 20.0, "TC5": 24.0}
+    shares = {c: v / sum(lf.values()) for c, v in lf.items()}
+    assert max(shares.values()) < F._MASONRY_MAX_LF_SHARE, (
+        "this fixture no longer isolates the rank test — some class exceeds "
+        "the share threshold: %r" % shares
+    )
+    mapping = map_wall_classes_from_library(lf, th, [_cmu("8")])
+    assert mapping.get("TC1", (None,))[0] != "CMU Wall"
+
+
+def test_the_hint_pass_cannot_walk_around_the_share_guard():
+    """The same rule on the other route.
+
+    A masonry object whose printed thickness matches nothing still reaches
+    pass 2, where it is handed the smallest non-dominant class. When the only
+    class left is itself a large share of the sheet, that assignment is the
+    same wrong claim arriving by a different door.
+    """
+    lf = {"TC1": 550.0, "TC2": 450.0}
+    mapping = map_wall_classes_from_library(
+        lf, {"TC1": 12.0, "TC2": 8.0}, [_cmu("20")]
+    )
+    assert "CMU Wall" not in _names_in(mapping), (
+        "the hint pass assigned a masonry object a class carrying %.0f%% of "
+        "the sheet's wall linework: %r"
+        % (100 * lf["TC2"] / sum(lf.values()), mapping)
+    )
+
+
+def test_the_share_guard_binds_no_absolute_length_at_all():
+    """The strongest statement that nothing here is tuned to a drawing.
+
+    Scale every length on the sheet by an arbitrary factor and the guard must
+    reach an identical verdict. A threshold derived from any particular plan's
+    footage could not survive this, because a share is a ratio and a target
+    length is not.
+    """
+    lf = {"TC1": 500.0, "TC2": 400.0, "TC3": 10.0}
+    th = {"TC1": 12.0, "TC2": 8.0, "TC3": 20.0}
+    scaled = {c: v * 137.0 for c, v in lf.items()}
+    assert map_wall_classes_from_library(
+        lf, th, [_cmu("8")]
+    ) == map_wall_classes_from_library(scaled, th, [_cmu("8")])
+
+
+def test_the_share_threshold_is_a_dimensionless_fraction():
+    assert isinstance(F._MASONRY_MAX_LF_SHARE, float)
+    assert 0.0 < F._MASONRY_MAX_LF_SHARE < 1.0
+
+
+def test_a_non_masonry_object_is_untouched_by_the_share_rule():
+    """The rule encodes what a masonry wall IS. It is not a general
+    restriction on binding large classes, and a tilt-up object — whose whole
+    nature is to be the big one — must be unaffected."""
+    mapping = map_wall_classes_from_library(
+        {"TC1": 500.0, "TC2": 400.0, "TC3": 10.0},
+        {"TC1": 12.0, "TC2": 8.0, "TC3": 20.0},
+        [_precast("8")],
+    )
+    assert mapping["TC2"][0] == "Precast Panel"
+    assert mapping["TC2"][2] is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # This module's own contract
 # ─────────────────────────────────────────────────────────────────────────────
 
