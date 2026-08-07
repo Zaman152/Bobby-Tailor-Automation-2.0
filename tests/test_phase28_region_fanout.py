@@ -282,6 +282,274 @@ def test_the_stamp_is_kept_out_of_the_symbol_group_naming_gate():
     assert NAME_SOURCE_VOCABULARY_BASIS not in fusion.NAME_WORTHY_SOURCES
 
 
+# ═══ Task 2 — a hypothesis may not claim a layer it did not measure ═════════
+
+
+def _crow_fan_out():
+    """The three-row fan-out, rebuilt from the shape both saved runs recorded.
+
+    Five calculated rows, not three, because that is what actually reached the
+    aggregator: the plan's own authoritative legend named and quantified
+    `Exposed Structure` and `Sealed Concrete`, and fusion ALSO bound each of
+    them — and `Concrete Pad` — to the measured footprint. The two legend rows
+    shadowed their detected twins, which is why both published rows carry the
+    review reason *"a separate reading of this item was suppressed as a
+    duplicate of the authoritative legend row"* verbatim in the saved artifact.
+    """
+    return [
+        _legend_row("Exposed Structure", CROW_FOOTPRINT_SF),
+        _legend_row("Sealed Concrete", CROW_FOOTPRINT_SF),
+        _detected_row("Exposed Structure", CROW_FOOTPRINT_SF,
+                      region_ref="footprint",
+                      name_source=NAME_SOURCE_VOCABULARY_BASIS),
+        _detected_row("Sealed Concrete", CROW_FOOTPRINT_SF,
+                      region_ref="footprint",
+                      name_source=NAME_SOURCE_VOCABULARY_BASIS),
+        _detected_row("Concrete Pad", CROW_FOOTPRINT_SF,
+                      region_ref="footprint",
+                      name_source=NAME_SOURCE_VOCABULARY_BASIS),
+    ]
+
+
+def _crow_rows():
+    return aggregate_takeoff(
+        _crow_fan_out(),
+        library=_library("Exposed Structure", "Sealed Concrete", "Concrete Pad"),
+    )
+
+
+def test_the_crow_fan_out_resolves_to_two_published_rows_and_one_blank():
+    """The defect, and the whole of the fix.
+
+    Before this rule the same five inputs published THREE numbers of the same
+    area, and an estimator who summed the SF column priced the building three
+    times. Both golden-correct rows keep their quantities — they are different
+    building layers through one plan area and phase 23's D1 admits them. The
+    third publishes a blank: its name is a hypothesis, and it never measured a
+    slab.
+    """
+    rows = _crow_rows()
+    published = {
+        r["item"]: r["quantity"] for r in rows
+        if r["quantity"] is not None and r["unit"] == "SF"
+    }
+    assert published == {
+        "Exposed Structure": CROW_FOOTPRINT_SF,
+        "Sealed Concrete": CROW_FOOTPRINT_SF,
+    }
+    pad = _row(rows, "Concrete Pad")
+    assert pad["quantity"] is None
+    assert pad["source"] == aggregator.REGION_SHARED_HYPOTHESIS_UNMEASURED
+    assert pad["needs_review"] is True
+    assert pad["provenance"] == "NOT MEASURED"
+
+
+def test_the_blank_names_the_rows_that_hold_the_region_and_the_area_it_withheld():
+    """A deletion and a zero read identically to a client; so does a blank with
+    no explanation. The row has to say what was withheld and who holds the
+    region, or a reviewer cannot tell a suppressed duplicate from a measurement
+    the app never made."""
+    pad = _row(_crow_rows(), "Concrete Pad")
+    reason = " ".join(pad["review_reasons"])
+    assert "Exposed Structure" in reason and "Sealed Concrete" in reason
+    assert "footprint" in reason
+    assert str(int(CROW_FOOTPRINT_SF)) in reason
+    assert "BLANK, not a zero" in reason
+    assert "hypothesis" in reason and "INHERITED" in reason
+    withheld = [
+        d for d in pad["detail"]
+        if d["formula"] == "region_shared_hypothesis_not_measured"
+    ]
+    assert len(withheld) == 1
+    assert "Exposed Structure" in withheld[0]["description"]
+
+
+def test_the_legend_row_inherits_the_region_of_the_reading_it_shadowed():
+    """Without this the fan-out is invisible: the two rows an estimator sees are
+    legend rows, which record no region of their own, and the group would be a
+    group of one."""
+    rows = _crow_rows()
+    for name in ("Exposed Structure", "Sealed Concrete"):
+        reason = " ".join(_row(rows, name)["review_reasons"])
+        assert "suppressed as a duplicate of the authoritative legend row" in reason
+    # ...and the proof that the region travelled with it: remove the two
+    # detected twins and nothing has a region to contend over, so the
+    # hypothesis publishes its number exactly as it did before this rule.
+    without_twins = [
+        i for i in _crow_fan_out()
+        if i.get("qty_source") or i["description"] == "Concrete Pad"
+    ]
+    rows = aggregate_takeoff(
+        without_twins,
+        library=_library("Exposed Structure", "Sealed Concrete", "Concrete Pad"),
+    )
+    assert _row(rows, "Concrete Pad")["quantity"] == CROW_FOOTPRINT_SF
+
+
+def test_two_equal_quantities_on_different_regions_both_publish():
+    """T-28-26. The rule keys on the RECORDED REGION IDENTITY, never on the
+    numbers. Two genuinely distinct regions that happen to measure the same area
+    are two measurements, and an arbitration that could not tell them apart
+    would be deciding by coincidence."""
+    rows = aggregate_takeoff(
+        [
+            _legend_row("Sealed Concrete", 1716.7),
+            _detected_row("Sealed Concrete", 1716.7, region_ref="fill:FILL-2",
+                          name_source=NAME_SOURCE_VOCABULARY_BASIS),
+            _detected_row("Concrete Pad", 1716.7, region_ref="fill:FILL-9",
+                          name_source=NAME_SOURCE_VOCABULARY_BASIS),
+        ],
+        library=_library("Sealed Concrete", "Concrete Pad"),
+    )
+    assert _row(rows, "Sealed Concrete")["quantity"] == 1716.7
+    assert _row(rows, "Concrete Pad")["quantity"] == 1716.7
+
+
+def test_a_lone_hypothesis_on_its_region_keeps_its_quantity():
+    """This rule resolves CONTENTION over one region. It does not demote a row
+    for being a hypothesis — that flag already exists and says so."""
+    rows = aggregate_takeoff(
+        [_detected_row("Concrete Pad", CROW_FOOTPRINT_SF, region_ref="footprint",
+                       name_source=NAME_SOURCE_VOCABULARY_BASIS)],
+        library=_library("Concrete Pad"),
+    )
+    pad = _row(rows, "Concrete Pad")
+    assert pad["quantity"] == CROW_FOOTPRINT_SF
+    assert pad["source"] == "library"
+
+
+def test_a_region_held_only_by_hypotheses_is_left_alone():
+    """No arbiter, no arbitration.
+
+    A region every row inherited has nothing on it that the plan named, so
+    picking a winner among them by any other means would be exactly the emergent
+    sharing INV-00 §4 forbids. This is also D1's three-layer share on a run with
+    no legend, and it must survive untouched.
+    """
+    rows = aggregate_takeoff(
+        [
+            _detected_row("Sealed Concrete", CROW_FOOTPRINT_SF,
+                          region_ref="footprint",
+                          name_source=NAME_SOURCE_VOCABULARY_BASIS),
+            _detected_row("Exposed Structure", CROW_FOOTPRINT_SF,
+                          region_ref="footprint",
+                          name_source=NAME_SOURCE_VOCABULARY_BASIS),
+            _detected_row("Concrete Pad", CROW_FOOTPRINT_SF,
+                          region_ref="footprint",
+                          name_source=NAME_SOURCE_VOCABULARY_BASIS),
+        ],
+        library=_library("Sealed Concrete", "Exposed Structure", "Concrete Pad"),
+    )
+    for name in ("Sealed Concrete", "Exposed Structure", "Concrete Pad"):
+        assert _row(rows, name)["quantity"] == CROW_FOOTPRINT_SF, name
+
+
+def test_a_row_that_recorded_no_region_is_never_touched():
+    """Most of the take-off records no region at all. An absent region groups
+    with nothing — it must never be read as an empty-string region that every
+    regionless row shares."""
+    rows = aggregate_takeoff(
+        [
+            _legend_row("Sealed Concrete", CROW_FOOTPRINT_SF),
+            _detected_row("Concrete Pad", CROW_FOOTPRINT_SF),
+            _detected_row("Vapor Barrier", CROW_FOOTPRINT_SF),
+        ],
+        library=_library("Sealed Concrete", "Concrete Pad", "Vapor Barrier"),
+    )
+    assert _row(rows, "Concrete Pad")["quantity"] == CROW_FOOTPRINT_SF
+    assert _row(rows, "Vapor Barrier")["quantity"] == CROW_FOOTPRINT_SF
+
+
+def test_a_different_unit_on_the_same_region_is_a_different_measurement():
+    """A perimeter and an area are both backed by the footprint and neither is a
+    duplicate of the other."""
+    rows = aggregate_takeoff(
+        [
+            _legend_row("Sealed Concrete", CROW_FOOTPRINT_SF),
+            _detected_row("Sealed Concrete", CROW_FOOTPRINT_SF,
+                          region_ref="footprint",
+                          name_source=NAME_SOURCE_VOCABULARY_BASIS),
+            _detected_row("Building Perimeter", 2972.0, region_ref="footprint",
+                          unit="LF", item_type="linear",
+                          name_source=NAME_SOURCE_VOCABULARY_BASIS),
+        ],
+        library=_library("Sealed Concrete")
+        + _library("Building Perimeter", basis="linear", unit="LF"),
+    )
+    assert _row(rows, "Building Perimeter")["quantity"] == 2972.0
+
+
+def test_the_rule_never_compares_two_quantities():
+    """T-28-26, asserted against the code rather than against a case.
+
+    A case-by-case test proves the rule did not compare numbers on THAT input.
+    This proves it cannot: no comparison anywhere in the rule mentions a
+    quantity, so there is no input on which it could start deciding by
+    coincidence.
+    """
+    source = inspect.getsource(aggregator._withhold_region_sharing_hypotheses)
+    tree = ast.parse(source.lstrip())
+    compares = [n for n in ast.walk(tree) if isinstance(n, ast.Compare)]
+    for node in compares:
+        rendered = ast.dump(node)
+        assert "quantity" not in rendered, ast.dump(node)
+
+    # ...and the rule READS a quantity exactly once, in the line that quotes the
+    # withheld number back to the reader. Counted as syntax rather than as text,
+    # so the prose above it is free to say the word.
+    def _reads_a_quantity(node):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            return (
+                node.func.attr == "get"
+                and bool(node.args)
+                and isinstance(node.args[0], ast.Constant)
+                and node.args[0].value == "quantity"
+            )
+        if isinstance(node, ast.Subscript):
+            index = getattr(node, "slice", None)
+            return isinstance(index, ast.Constant) and index.value == "quantity"
+        return False
+
+    reads = [n for n in ast.walk(tree) if _reads_a_quantity(n)]
+    assert len(reads) == 1, [ast.dump(n) for n in reads]
+
+
+def test_the_new_marker_joins_the_existing_unmeasured_markers():
+    """T-28-25: every consumer that already understands "this source means the
+    row is a marker, not a measurement" understands this one, without being told
+    about it individually."""
+    assert (
+        aggregator.REGION_SHARED_HYPOTHESIS_UNMEASURED
+        in aggregator._UNMEASURED_SOURCES
+    )
+
+
+def test_no_consumer_special_cases_the_new_marker():
+    src = Path(aggregator.__file__).resolve().parents[1]
+    named_in = sorted(
+        p.relative_to(src).as_posix()
+        for p in src.rglob("*.py")
+        if aggregator.REGION_SHARED_HYPOTHESIS_UNMEASURED in p.read_text()
+    )
+    assert named_in == ["pipeline/aggregator.py"], named_in
+
+
+def test_withholding_one_row_disturbs_no_other():
+    """The rest of the take-off is not collateral."""
+    others = [
+        {"description": "doors - steel", "item_type": "doors",
+         "calculated_quantity": 70, "calculated_unit": "ea",
+         "source_sheet": "A-601", "formula": "count",
+         "count_corroboration": "schedule", "confidence": "high"},
+    ]
+    rows = aggregate_takeoff(
+        _crow_fan_out() + others,
+        library=_library("Exposed Structure", "Sealed Concrete", "Concrete Pad"),
+    )
+    doors = [r for r in rows if r["item"].lower().startswith("doors")]
+    assert len(doors) == 1 and doors[0]["quantity"] == 70
+
+
 # ═══ Module self-audit — this file spends nothing ═══════════════════════════
 
 

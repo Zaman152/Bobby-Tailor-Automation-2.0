@@ -50,9 +50,17 @@ UNIT_CLASS_CONFLICT_UNMEASURED = "unit_class_conflict_unmeasured"
 #: says so — see the withheld-detail-count block in :func:`aggregate_takeoff`.
 DETAIL_SHEET_COUNT_UNMEASURED = "detail_sheet_count_unmeasured"
 
+#: A name whose quantity is the area of a MEASURED REGION that rows the plan
+#: itself named already publish. The object was not measured: its measure basis
+#: is area-shaped, so it inherited the region rather than measuring the layer it
+#: names. The number is withheld and the row says so — see
+#: :func:`_withhold_region_sharing_hypotheses`.
+REGION_SHARED_HYPOTHESIS_UNMEASURED = "region_shared_hypothesis_unmeasured"
+
 _UNMEASURED_SOURCES = frozenset({
     "manifest_missing", "expected_not_measured", LIBRARY_FALLBACK_UNMEASURED,
     UNIT_CLASS_CONFLICT_UNMEASURED, DETAIL_SHEET_COUNT_UNMEASURED,
+    REGION_SHARED_HYPOTHESIS_UNMEASURED,
 })
 
 #: ``vision.fusion.NAME_SOURCE_VOCABULARY_BASIS`` — the marker on a row whose
@@ -863,6 +871,121 @@ def _cross_reference_unreconciled(
         )
 
 
+def _whole_or_decimal(qty):
+    """A quantity rendered for a human, without a trailing ``.0`` on a whole one."""
+    try:
+        value = float(qty)
+    except (TypeError, ValueError):
+        return qty
+    return int(value) if value.is_integer() else value
+
+
+def _name_is_a_hypothesis(bucket: Dict) -> bool:
+    """True when this row's NAME is an inference rather than printed evidence.
+
+    No new predicate is written here — "is this row's name a hypothesis?" is a
+    question the module already answers, and answering it twice is how two
+    answers drift apart. :data:`_HYPOTHESIS_NAME_SOURCES` is that answer (a
+    library alias resolution and a learned-store recall, with the reasoning in
+    its own comment); fusion's vocabulary-basis marker says the same thing one
+    step further upstream, about a row that was named by a vocabulary object's
+    measure basis with nothing on the sheet naming it.
+
+    A legend, a schedule, a manifest entry and a vision reading of the drawing's
+    own text are all EVIDENCE, and none of them is here.
+    """
+    return (
+        str(bucket.get("source") or "") in _HYPOTHESIS_NAME_SOURCES
+        or str(bucket.get("name_source") or "") == _NAME_SOURCE_VOCABULARY_BASIS
+    )
+
+
+def _withhold_region_sharing_hypotheses(buckets: Dict[str, Dict]) -> None:
+    """A hypothesis may not claim a layer of a region it never measured.
+
+    The defect, identical in both saved paid Crow runs: the 397,600 SF building
+    footprint publishes THREE times — ``Exposed Structure`` and ``Sealed
+    Concrete`` from the plan's own authoritative legend, and ``Concrete Pad``
+    sourced ``library`` with a review reason that opens *"this row's NAME is a
+    hypothesis"*. An estimator who sums the SF column prices the building three
+    times.
+
+    **This does not take back phase 23's D1 exception.** A shell warehouse's
+    footprint genuinely carries the slab, the sealed-concrete finish troweled
+    onto it and the exposed roof structure above; three distinct layers through
+    one plan area is not three copies of one quantity, and fusion's
+    ``_arbitrate_one_area_one_item`` is what admits them. What this rule adds is
+    the requirement D1 left implicit: a row must have PRINTED EVIDENCE for its
+    NAME before it may claim one of those layers. A row named by a library alias
+    or by a vocabulary's measure basis never measured the layer it names — it
+    inherited the region because its basis is area-shaped, which is the same
+    sentence fusion already writes when it suppresses a layerless row.
+
+    What this rule deliberately does NOT do, each because the alternative would
+    be worse than the defect:
+
+    * **It never compares two quantities.** The grouping key is the recorded
+      region identity, so two genuinely distinct regions that happen to measure
+      the same area are two measurements and both publish. Arbitrating on
+      numeric equality would be a coincidence rule.
+    * **It does not demote a row for being a hypothesis.** A hypothesis-named
+      row alone on its region keeps its quantity and its existing flag; this
+      rule resolves CONTENTION over one region and nothing else.
+    * **It decides nothing when no row in the group was named by evidence.** A
+      region held only by hypotheses has no arbiter, and picking one of them by
+      any other means would be the emergent sharing INV-00 §4 forbids. That case
+      is exactly D1's three-layer share on a run with no legend, and it survives
+      untouched.
+    * **It touches no row that already publishes a blank**, and none with no
+      recorded region — an absent region is absent, never an empty string that
+      would herd every regionless row into one imaginary region.
+    """
+    groups: Dict[tuple, List[tuple]] = defaultdict(list)
+    for name in sorted(buckets):
+        bucket = buckets[name]
+        if not bucket.get("has_rows"):
+            continue
+        if bucket.get("source") in _UNMEASURED_SOURCES:
+            continue
+        region = str(bucket.get("region_ref") or "").strip()
+        if not region:
+            continue
+        unit = str(bucket.get("unit") or "").strip().upper()
+        groups[(region, unit)].append((name, bucket))
+
+    for (region, unit), members in sorted(groups.items()):
+        if len(members) < 2:
+            continue
+        evidence = [n for n, b in members if not _name_is_a_hypothesis(b)]
+        hypotheses = [(n, b) for n, b in members if _name_is_a_hypothesis(b)]
+        if not evidence or not hypotheses:
+            continue
+        for name, bucket in hypotheses:
+            withheld = _whole_or_decimal(bucket.get("quantity"))
+            bucket["needs_review"] = True
+            bucket["confidence"] = "low"
+            bucket["source"] = REGION_SHARED_HYPOTHESIS_UNMEASURED
+            bucket["review_reasons"].add(
+                "the measured region behind this number (%s) is already backed "
+                "by %s, whose name(s) the plan itself printed. This row's NAME "
+                "is a hypothesis and its measure basis is area-shaped, so it "
+                "INHERITED that region rather than measuring the layer it "
+                "names — the %s %s it would have published is WITHHELD. This is "
+                "a BLANK, not a zero: the region's area publishes once per "
+                "building layer the plan evidenced, and summing this column "
+                "must not price that one region twice"
+                % (region, _name_list(sorted(evidence)), withheld, unit)
+            )
+            bucket["source_rows"].append({
+                "sheet": None,
+                "qty": None,
+                "description": "%s (quantity withheld — the measured region %s "
+                               "is held by %s, named by printed evidence)"
+                               % (name, region, _name_list(sorted(evidence))),
+                "formula": "region_shared_hypothesis_not_measured",
+            })
+
+
 def _row_status(bucket: Dict, is_unknown: bool) -> str:
     """The client status, COMPUTED FROM THE RECORD.
 
@@ -1401,6 +1524,17 @@ def aggregate_takeoff(
                 "is published as NEEDS REVIEW rather than as a measurement; "
                 "confirm it against a plan sheet or a schedule before it is bid"
             )
+
+    # ── One measured region backs one row per building layer ─────────────────
+    #
+    # The fourth member of the family above, and the same contract: the number
+    # is withheld, the ROW stays, and it says why. What is different is what it
+    # arbitrates — not whether ONE reading may be believed, but which of several
+    # rows may claim a region they all report. Fusion decides that between
+    # components on one sheet; this decides it between the project-level rows a
+    # client actually bids from, where a legend row and a detected row that
+    # never met in fusion finally sit side by side.
+    _withhold_region_sharing_hypotheses(buckets)
 
     # Only enrich with standard line items when a genuine take-off was produced.
     if buckets:
