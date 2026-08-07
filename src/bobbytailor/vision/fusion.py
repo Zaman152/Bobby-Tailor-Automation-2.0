@@ -1810,6 +1810,45 @@ def _is_masonry_object(obj: dict) -> bool:
     name = str(obj.get("name") or obj.get("canonical_name") or "")
     return bool(_MASONRY_NAME_RE.search(name))
 
+
+def _wall_class_lf_share(lf_by_class: Dict[str, float]) -> Dict[str, float]:
+    """Each wall class's LF as a fraction of ALL wall linework on the sheet.
+
+    A pure ratio — it carries no length, no unit and no plan's dimensions, so
+    nothing derived from it can be traced to a particular drawing's figures.
+    """
+    try:
+        total = float(sum(float(v or 0.0) for v in (lf_by_class or {}).values()))
+    except (TypeError, ValueError):
+        return {}
+    if total <= 0:
+        return {}
+    out: Dict[str, float] = {}
+    for cls, lf in (lf_by_class or {}).items():
+        try:
+            out[cls] = float(lf or 0.0) / total
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _masonry_bind_forbidden(
+    obj: dict,
+    cls: str,
+    dominant_class: Optional[str],
+    lf_share: Dict[str, float],
+) -> bool:
+    """True when a masonry object may not bind this wall class.
+
+    Non-masonry objects are never forbidden by this rule — it encodes what a
+    masonry wall IS, not a general binding restriction.
+    """
+    if not _is_masonry_object(obj):
+        return False
+    # The dominant (most-LF) class is the exterior perimeter wall.
+    return cls == dominant_class
+
+
 # A thickness token in inches: "8", "8\"", "7 5/8", "8 in".
 _THICKNESS_TOKEN_RE = re.compile(r"(\d+(?:\.\d+)?)(?:\s+(\d+)\s*/\s*(\d+))?")
 
@@ -1874,6 +1913,7 @@ def map_wall_classes_from_library(
     lf_by_class: Dict[str, float],
     thickness_by_class: Dict[str, float],
     wall_objects: List[dict],
+    contested: Optional[Dict[str, dict]] = None,
 ) -> Dict[str, Tuple[str, Optional[str], bool, Optional[float]]]:
     """Map wall thickness classes to naming-library wall objects.
 
@@ -1889,6 +1929,26 @@ def map_wall_classes_from_library(
     EVIDENCE that decided a disagreement rather than making a reviewer
     re-derive it. Consumers that only need the first three fields index the
     tuple rather than unpacking it.
+
+    **A printed thickness is evidence of DIMENSION. It becomes evidence of
+    IDENTITY only when exactly one candidate object claims exactly one
+    candidate class (28-04, V4-FIX-03).** A number that two library objects
+    both print does not discriminate between them; a number that fits two
+    measured classes does not say which of them it describes. In either case
+    the match identifies nothing, so no confident bind is recorded and the
+    class falls through to the hint pass or stays unclaimed. Picking the
+    *nearer* candidate is deliberately not available: inside a tolerance the
+    residual difference is precisely the noise the tolerance exists to absorb,
+    and reading it back as a preference is reading signal out of noise.
+
+    Args:
+        contested: An optional dict FILLED IN PLACE with one entry per class
+            whose thickness match was refused for not discriminating —
+            ``{class: {"objects": [names], "also_matched_classes": [ids],
+            "class_thickness_in": float}}``. It is carried separately rather
+            than folded into the return value so that every existing caller,
+            which indexes the four-tuple, is untouched. Omitting it changes no
+            behaviour; the explanation is simply not retained.
     """
     result: Dict[str, Tuple[str, Optional[str], bool, Optional[float]]] = {}
     if not lf_by_class or not wall_objects:
@@ -1903,36 +1963,68 @@ def map_wall_classes_from_library(
     dominant_class = (
         max(lf_by_class, key=lambda c: lf_by_class.get(c, 0.0)) if lf_by_class else None
     )
+    lf_share = _wall_class_lf_share(lf_by_class)
 
-    # Pass 1 — printed-thickness match (authoritative).
+    def _obj_name_of(obj: dict) -> str:
+        return str(obj.get("name") or obj.get("canonical_name") or "").strip()
+
+    # Pass 1 — printed-thickness match, admitted ONLY when it discriminates.
+    #
+    # Computed as a bipartite candidacy over (object, class) pairs rather than
+    # as a first-match-wins loop over objects. The old shape could not ask the
+    # uniqueness question — by the time an object had taken a class, the class
+    # was already gone from every later object's view — which is why it was
+    # never asked. As a side effect the bind no longer depends on the order the
+    # vocabulary happens to arrive in.
+    classes_by_obj: Dict[int, List[str]] = {}
+    objs_by_class: Dict[str, List[int]] = {}
+    printed_by_obj: Dict[int, float] = {}
     for oi, obj in enumerate(wall_objects):
         th = _parse_thickness_in(obj.get("thickness_in"))
         if th is None:
-            continue
-        exclude_dominant = _is_masonry_object(obj)
-        best = None
+            continue  # prints no thickness → contests nothing, claims nothing
+        printed_by_obj[oi] = th
         for cls in classes:
-            if cls in used_classes:
+            if _masonry_bind_forbidden(obj, cls, dominant_class, lf_share):
                 continue
-            if exclude_dominant and cls == dominant_class:
-                continue  # never bind CMU to the dominant perimeter class
             cth = thickness_by_class.get(cls)
             if cth is None:
                 continue
-            d = abs(cth - th)
-            if d <= _WALL_THICKNESS_TOL_IN and (best is None or d < best[0]):
-                best = (d, cls)
-        if best is not None:
-            obj_name = str(obj.get("name") or obj.get("canonical_name") or "").strip()
-            if obj_name:
-                result[best[1]] = (
-                    obj_name,
-                    obj.get("basis") or obj.get("measure"),
-                    True,
-                    th,
-                )
-                used_classes.add(best[1])
-                used_objs.add(oi)
+            if abs(cth - th) <= _WALL_THICKNESS_TOL_IN:
+                classes_by_obj.setdefault(oi, []).append(cls)
+                objs_by_class.setdefault(cls, []).append(oi)
+
+    for cls in classes:
+        ois = objs_by_class.get(cls)
+        if not ois:
+            continue
+        also = sorted(
+            {c for oi in ois for c in classes_by_obj.get(oi, ())} - {cls}
+        )
+        if len(ois) > 1 or also:
+            # The match does not discriminate — either two objects print this
+            # class's thickness, or the one that does also fits another class.
+            # Neither object is consumed: it failed to prove an identity, it
+            # did not cease to exist, and it is still available to pass 2.
+            if contested is not None:
+                contested[cls] = {
+                    "objects": [_obj_name_of(wall_objects[oi]) for oi in ois],
+                    "also_matched_classes": also,
+                    "class_thickness_in": thickness_by_class.get(cls),
+                }
+            continue
+        oi = ois[0]
+        obj = wall_objects[oi]
+        obj_name = _obj_name_of(obj)
+        if obj_name:
+            result[cls] = (
+                obj_name,
+                obj.get("basis") or obj.get("measure"),
+                True,
+                printed_by_obj[oi],
+            )
+            used_classes.add(cls)
+            used_objs.add(oi)
 
     # Pass 2 — hint-based (dominant/perimeter = exterior; thinner = interior).
     remaining = [c for c in classes if c not in used_classes]
