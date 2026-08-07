@@ -432,6 +432,28 @@ def _count_corroboration(provenance, sheet_type, item_type, qty_source=None) -> 
     return "none"
 
 
+#: Fields fusion records about WHERE a number came from and WHO named it, which
+#: both calculator entry points must hand on untouched. Kept as one tuple for
+#: the same reason :data:`_DETAIL_SHEET_NOT_AN_INSTALL_COUNT` is: written inline
+#: in one entry point and forgotten in the other, the two paths drift and half
+#: the report loses its provenance without anything failing.
+_CARRIED_REGION_FIELDS = ("region_ref", "name_source")
+
+
+def _carry_measured_region(src: dict, out: dict) -> None:
+    """Hand fusion's region identity and naming authority to the calculated row.
+
+    Absent, never empty. A row that was measured on no particular region must
+    not carry ``region_ref: ""``, because the region arbitration downstream
+    groups by that value and an empty string would collect every regionless row
+    in the project into one enormous "region" (28-05).
+    """
+    for field in _CARRIED_REGION_FIELDS:
+        value = str(src.get(field) or "").strip()
+        if value:
+            out[field] = value
+
+
 def _uncorroborated_count_reason(verdict: str, sheet_name: str) -> str:
     """The estimator-facing sentence for an uncorroborated count.
 
@@ -631,7 +653,7 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
         auto_verified = bool(not is_approx and scale_conf == "high")
         confidence_out = "high" if auto_verified else ("low" if is_approx else "medium")
 
-        return {
+        out = {
             "item_type": item_type,
             "description": description,
             "raw_value": raw_value,
@@ -651,6 +673,8 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
             "auto_verified": auto_verified,
             "review_reason": "approximate dimension (field verify)" if is_approx else "",
         }
+        _carry_measured_region(m, out)
+        return out
     except Exception as e:
         logger.warning(f"Calc from measurement failed: {e}")
         return None
@@ -713,7 +737,7 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
             reasons.append(upstream_reason)
         reason = "; ".join(dict.fromkeys(reasons))
 
-        return {
+        out = {
             "item_type": item_type if item_type != "general" else "component",
             "description": name,
             "specification": spec,
@@ -723,7 +747,15 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
             "unit": unit,
             # Carry the deterministic provenance through so downstream consumers
             # (aggregation, audit) can still tell a geometry count from a vision
-            # guess — it was being nulled between fusion and the report.
+            # guess — it was being nulled between fusion and the report. The
+            # measured REGION and the naming authority were nulled at the same
+            # seam and for want of the same three lines (28-05): without them a
+            # consumer cannot tell one measured region from another, nor a row
+            # the plan named from a row a vocabulary named, and the only thing
+            # left to arbitrate on is whether two numbers happen to be equal.
+            # They are carried by `_carry_measured_region` below, which omits an
+            # absent value rather than writing an empty one — a blank region
+            # reference would group every regionless row together.
             "provenance": c.get("provenance"),
             # What corroborated the count, and the sheet kind it was read from,
             # carried verbatim so the publish decision downstream is made on a
@@ -740,6 +772,8 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
             "needs_review": needs_review,
             "review_reason": reason,
         }
+        _carry_measured_region(c, out)
+        return out
     except Exception as e:
         logger.warning(f"Calc from component failed: {e}")
         return None

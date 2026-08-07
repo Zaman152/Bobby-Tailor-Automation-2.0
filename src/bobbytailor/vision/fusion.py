@@ -433,6 +433,33 @@ _NAME_SOURCE_LIBRARY = "naming_library"
 #: This is the branch V4-DET-02 promoted out of the `elif` fallback.
 _NAME_SOURCE_WALL_THICKNESS = "naming_library_thickness"
 
+#: The name came from a VOCABULARY OBJECT'S MEASURE BASIS, with nothing printed
+#: on this sheet naming it (28-05, V4-FIX-04).
+#:
+#: This is the honest description of what `_fuse_project_area_items` does: it
+#: walks the project vocabulary, and for every object whose basis is
+#: floor/roof-shaped it binds the ONE measured footprint. The vocabulary said
+#: such an object exists somewhere in this project; it never said that THIS
+#: region is that object. Until now those rows carried no `name_source` at all
+#: and fell to the unknown-source default, so a reader of the artifact could not
+#: tell "the vocabulary supplied this name" from "nobody recorded who did".
+#:
+#: Deliberately NOT added to :data:`NAME_WORTHY_SOURCES`: that set is the
+#: symbol-group naming gate (24-04) and a vocabulary-basis name is never a
+#: symbol group's name — widening the gate here would loosen an unrelated rule.
+#:
+#: The value is ``vocabulary_basis`` and NOT the longer spelling that puts the
+#: word "measure" in front of "basis", for a reason worth recording: phase 24's
+#: acceptance gate asserts that exact longer literal appears NOWHERE under
+#: ``src``, because 24-09's determinism differential was written around that
+#: field's absence. The longer spelling would have tripped a gate this constant
+#: has nothing to do with, and renaming a brand-new constant is cheaper — and
+#: far safer — than loosening a guard to make room for it. This comment avoids
+#: spelling the literal for the same reason: a mechanical grep cannot tell an
+#: explanation apart from the thing it explains, which is a shape 24-03 and
+#: 24-08 each hit and each fixed by rewording rather than by weakening.
+NAME_SOURCE_VOCABULARY_BASIS = "vocabulary_basis"
+
 #: Case- and separator-insensitive squash, used ONLY to answer "did these two
 #: authorities say the same thing?". Deliberately NOT a fuzzy matcher and
 #: deliberately not plural-folding: `canonical_library_name` is plan 24-03's
@@ -464,6 +491,18 @@ _NAME_AUTHORITY = {
     _NAME_SOURCE_WALL_THICKNESS: 2,
     "library": 2,
     "learned": 3,
+    # A vocabulary-basis name (28-05) sits below every printed authority and
+    # below a learned verbatim string: the vocabulary named a CLASS of object,
+    # never this region. It is registered at the SAME rank as the unknown-source
+    # default for the same reason the thickness source above is registered at
+    # the same rank as `naming_library` — so adding it re-orders nothing. Giving
+    # it a rank of its own would silently change the anchor of every region
+    # whose rows all name no layer (on Crow, `Building Footprint` would start
+    # losing to `Canopy`), and that is a behaviour change which belongs to a
+    # RULE with a reason, not to a plumbing stamp. What the registration buys is
+    # that the authority is now KNOWN and recorded rather than merely missing,
+    # which is what the aggregator's region arbitration acts on (V4-FIX-04).
+    NAME_SOURCE_VOCABULARY_BASIS: 4,
 }
 
 
@@ -3673,6 +3712,15 @@ def _fuse_project_area_items(
                 "provenance": "geometry",
                 "confidence": confidence,
                 "basis": basis,
+                # WHO NAMED THIS ROW (28-05). Nothing on this sheet did: the
+                # vocabulary listed an object with a floor/roof-shaped measure
+                # basis and this loop handed it the footprint. Recording that
+                # verbatim is what lets a later layer tell a row the plan
+                # NAMED from a row that merely inherited a region — the rows
+                # used to carry no marker at all, so every one of them scored
+                # identically and the only difference left between them was
+                # that their numbers were equal.
+                "name_source": NAME_SOURCE_VOCABULARY_BASIS,
                 # Every one of these rows is backed by the SAME measured
                 # region — the footprint. One-area-one-item arbitration
                 # (fuse_sheet) keeps at most one of them unless the sharing is

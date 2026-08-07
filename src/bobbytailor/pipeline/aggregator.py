@@ -55,6 +55,17 @@ _UNMEASURED_SOURCES = frozenset({
     UNIT_CLASS_CONFLICT_UNMEASURED, DETAIL_SHEET_COUNT_UNMEASURED,
 })
 
+#: ``vision.fusion.NAME_SOURCE_VOCABULARY_BASIS`` — the marker on a row whose
+#: name came from a vocabulary object's measure basis with nothing printed on the
+#: sheet naming it (28-05).
+#:
+#: Carried BY VALUE rather than imported, so ``pipeline`` keeps taking no
+#: dependency on ``vision`` — the dependency runs the other way and importing
+#: fusion here would reverse it. The same one-line indirection fusion itself uses
+#: for ``text_anchor.KIND_TAG``, and checked by a test that fails if the two
+#: strings ever diverge.
+_NAME_SOURCE_VOCABULARY_BASIS = "vocabulary_basis"
+
 # ─── What corroborated a count (28-01 records it, this layer acts on it) ─────
 #
 #: The verdicts :func:`calculator._count_corroboration` records on a count row,
@@ -137,6 +148,12 @@ def _new_bucket() -> Dict:
         # contributed — distinguishable from ``"none"``, which means one did
         # and nothing corroborated it.
         "count_corroboration": None,
+        # WHICH measured region backs this bucket, and WHO named it — both
+        # recorded by fusion and carried through the calculator (28-05). Empty
+        # means no contributing row named a region, which is the shape of every
+        # count and of every reading taken off no particular geometry.
+        "region_ref": "",
+        "name_source": "",
     }
 
 #: Units in which a building quantity is counted, not dimensioned. A value in
@@ -1105,6 +1122,16 @@ def aggregate_takeoff(
                         "was NOT added to this quantity"
                         % (canonical_name, bucket_source or "detected", shadowed_by)
                     )
+                    # ...and the region the suppressed reading was MEASURED on
+                    # belongs to the row that survived it. This branch has just
+                    # declared the two rows the same item; the detected one
+                    # recorded which measured region backed it and the legend
+                    # row records nothing at all, so without this the legend row
+                    # reaches publication with no region and the fan-out over
+                    # that region cannot be seen (28-05). First-seen wins, like
+                    # `source`.
+                    if item.get("region_ref") and not buckets[target]["region_ref"]:
+                        buckets[target]["region_ref"] = str(item["region_ref"])
                 continue
         # ── Canonicalising a NAME may not silently reclassify its UNIT ───────
         #
@@ -1188,6 +1215,16 @@ def aggregate_takeoff(
         # First-seen wins, exactly like `source`.
         if bucket_legend_origin and not bucket["legend_origin"]:
             bucket["legend_origin"] = bucket_legend_origin
+        # WHICH measured region backed this number, and WHO named the row it came
+        # from — recorded by fusion, carried by the calculator, and rolled up
+        # here first-seen like `source` above (28-05). Both were being dropped
+        # at this seam, which left any layer that has to tell one measured
+        # region from another with nothing to key on but whether two numbers
+        # happened to be equal.
+        if item.get("region_ref") and not bucket["region_ref"]:
+            bucket["region_ref"] = str(item["region_ref"])
+        if item.get("name_source") and not bucket["name_source"]:
+            bucket["name_source"] = str(item["name_source"])
         # Roll up uncertainty signals so the summary can highlight shaky rows.
         if item.get("needs_review"):
             bucket["needs_review"] = True
