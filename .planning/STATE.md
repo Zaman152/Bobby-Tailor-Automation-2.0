@@ -225,6 +225,7 @@ Phase 23 (measurement-engine-completion) is COMPLETE — all 17 plans; offline s
 | Phase 24 P02 | 3h 45m | 3 tasks | 3 files |
 | Phase 24 P03 | 4h 05m | 3 tasks | 3 files |
 | Phase 24 P10 | ~4h 30m | 3 tasks | 4 files |
+| Phase 28 P04 | 160 min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -594,10 +595,34 @@ None yet.
 - [Phase 28]: 28-03: a status branch alone would have published a self-contradicting row — `provenance: NEEDS REVIEW` beside `needs_review: False` and `auto_verified: True`, flagging itself to a human and clearing itself to every numeric consumer. The flag is set with the reason; `_row_status` keeps the branch as the INVARIANT at the publish point, asserted directly on hand-built buckets so it is not dead code.
 - [Phase 28]: 28-03: a withheld reading always leaves a ROW that quotes what it withheld — the third instance of the blank-not-zero contract in aggregator.py, copied from the unit-class-conflict block rather than reinvented, with a new `source` marker placed INSIDE `_UNMEASURED_SOURCES` and a test asserting no module outside aggregator.py names it.
 - [Phase 28]: 28-03: V4-FIX-01 is ADVANCED, not ticked. `_calculate_from_measurement`'s whole-EA path and `_calculate_from_civil_structures` emit counts and record no verdict, so the requirement's universal claim is not yet true app-wide; the gap is a committed tripwire test that FAILS when someone closes it, not a sentence in a document.
+- [Phase 28]: 28-04: PLAN PREMISE FALSIFIED — the contest on Crow is ONE object against THREE classes, not two objects against one class. Measured free on page 0: an 8" object is within the 1.5" tolerance of TC1 (8.80", 36.63%), TC5 (8.00", 6.70%) and TC10 (7.20", 0.72%), and the frozen runs show exactly one thickness bind occurred, so no second object contested it. The object-axis test the plan specified would have changed nothing on this sheet.
+- [Phase 28]: 28-04: uniqueness is MUTUAL — a confident bind requires that exactly one object claims the class AND that the object's thickness fits exactly one class. Same principle, both axes; implementing only the named axis would have shipped a correct rule that left the defect the plan exists to fix in place.
+- [Phase 28]: 28-04: pass 1 is a bipartite (object, class) candidacy, not a loop. The old object-outer loop COULD NOT ASK the uniqueness question — by the time an object had taken a class the class was gone from every later object's view — which is why it was never asked. Free side effect: the bind no longer depends on vocabulary order.
+- [Phase 28]: 28-04: inside a tolerance, "nearer" is the noise the tolerance exists to absorb. TC5 agreed to the decimal and TC1 was 0.8" away, both inside 1.5" — preferring the exact agreement was reading signal out of what we had already declared to be noise.
+- [Phase 28]: 28-04: the LF-share masonry guard does NOT fire on Crow (TC5 is 6.70% against a 25% cap) and was NOT lowered until it did. It closes a real hole — a masonry object could take a 40%-share class that merely was not the largest — but uniqueness is what fixed this drawing, and no commit claims otherwise. The threshold's independence from any drawing is PROVED by scaling every length on the sheet, not asserted in a comment.
+- [Phase 28]: 28-04: V4-FIX-03 is ADVANCED, not ticked. The class Crow published `CMU Wall` under is now contested and confidently named by nothing, but with the thickness route refused `CMU Wall` falls to pass 2's masonry-by-hint rule, which hands it the SMALLEST remaining class (TC13, 2.5 LF) on no evidence beyond "masonry is small". That unevidenced hint bind is a flag-don't-guess residual of the same family this phase exists to close, and it is out of 28-04's fence.
+- [Phase 28]: 28-04: 24-09's residual test is UNAFFECTED and was not edited — the harness replays fixtures whose naming response is `{"objects": []}`, so the mapper returns before pass 1 and no contest can arise. The reason is recorded so the green tick is interpretable.
 
 ## Session Continuity
 
-Last session: 2026-08-06T23:50:00Z
+Last session: 2026-08-07T02:40:00Z
+Stopped at: Completed 28-04-PLAN.md (4 of 7 plans, wave 2 done). A printed thickness is evidence of
+DIMENSION and only becomes evidence of IDENTITY when exactly one candidate claims it — so
+`map_wall_classes_from_library` pass 1 is now a bipartite (object, class) candidacy requiring MUTUAL
+uniqueness, the masonry guard tests an LF SHARE at any rank rather than only the top rank, and a
+refused bind reaches `fusion_rejected` under its own key naming the objects that contested it. The
+plan's premise was falsified first and free: the contest on Crow is one object against THREE classes
+(8" fits TC1 8.80", TC5 8.00", TC10 7.20"), not two objects against one class, so the object-axis
+test the plan specified would have changed nothing — both axes shipped. Measured on the real
+geometry: TC5, the class that published `CMU Wall`, is now CONTESTED and confidently named by
+nothing; `CMU Wall` is not consumed and falls to pass 2's hint rule. The share guard did NOT fire
+(6.70% vs a 25% cap) and was not tuned until it did. V4-FIX-03 is ADVANCED, not ticked — pass 2's
+masonry-by-hint rule now decides where `CMU Wall` lands on no evidence, a residual named for 28-07.
+24-09's residual test is unaffected and unedited. Full offline suite 2300 passed / 1 skipped /
+2 deselected (1:08:40) against a 2264 baseline: +36, exactly the new module, zero regressions.
+Next: 28-05-PLAN.md (wave 3).
+
+Previous session: 2026-08-06T23:50:00Z
 Stopped at: Completed 28-03-PLAN.md (3 of 7 plans, wave 2). 28-01's verdict now DECIDES: a count whose
 only evidence was a details sheet is withheld as a blank quoting the reading, the sheet and the rule
 that withheld it; a surviving count with no printed schedule and no counted geometry publishes NEEDS
