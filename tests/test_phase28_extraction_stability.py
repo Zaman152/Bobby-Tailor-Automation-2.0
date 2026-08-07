@@ -276,13 +276,13 @@ def test_route_an_unknown_route_string_is_ranked_least_reproducible():
 
 def test_route_a_published_geometry_row_carries_the_measured_route():
     rows = aggregate_takeoff([
-        _item("dock door frame", qty=4.0, provenance="geometry"),
+        _item("hollow metal frame", qty=4.0, provenance="geometry"),
     ])
     assert _row(rows, "Frame-HM")["quantity_route"] == QUANTITY_ROUTE_MEASURED
 
 
 def test_route_a_published_reading_row_carries_the_reading_route():
-    rows = aggregate_takeoff([_item("Storefront Window", qty=6.0)])
+    rows = aggregate_takeoff([_item("aluminum window unit", qty=6.0)])
     assert _row(rows, "Windows")["quantity_route"] == QUANTITY_ROUTE_SHEET_READING
 
 
@@ -319,11 +319,17 @@ def test_route_a_blank_row_carries_no_route():
     new column.
     """
     class _Manifest:
+        """The smallest manifest the aggregator will accept: it names nothing on
+        the sheet and reports one object it never found."""
+
+        def resolve(self, description, unit):
+            return None
+
         def missing(self, present):
             from types import SimpleNamespace
             return [SimpleNamespace(name="Ladder", unit="EA", measure="count")]
 
-    rows = aggregate_takeoff([_item("Storefront Window", qty=6.0)],
+    rows = aggregate_takeoff([_item("aluminum window unit", qty=6.0)],
                              manifest=_Manifest())
     blank = _row(rows, "Ladder")
     assert blank["quantity"] is None
@@ -357,7 +363,7 @@ def test_route_an_injected_standard_line_item_carries_no_route():
     Nobody read it, measured it or printed it on a plan, so none of the three
     routes describes it and it takes none of them.
     """
-    rows = aggregate_takeoff([_item("Storefront Window", qty=6.0)])
+    rows = aggregate_takeoff([_item("aluminum window unit", qty=6.0)])
     mobilization = [r for r in rows if r["item_type"] == "standard_line_item"]
     assert mobilization, "no standard line item was injected"
     for row in mobilization:
@@ -376,7 +382,7 @@ def test_route_nothing_else_about_the_published_row_shape_moved():
     recorded_keys = set().union(*(set(r) for r in saved["takeoff_summary"]))
     rows = aggregate_takeoff([
         _item("Bollard at dock", qty=8.0, provenance="geometry"),
-        _item("Storefront Window", qty=6.0),
+        _item("aluminum window unit", qty=6.0),
     ])
     for row in rows:
         assert set(row) == recorded_keys | {"quantity_route"}, (
@@ -394,7 +400,7 @@ def test_route_no_status_quantity_or_flag_moved_when_the_route_was_added():
     rows = aggregate_takeoff([
         _item("Bollard at dock", qty=8.0, provenance="geometry"),
         _item("bollards along drive", qty=3.0),
-        _item("Storefront Window", qty=6.0),
+        _item("aluminum window unit", qty=6.0),
     ])
     bollards = _row(rows, "Bollards")
     assert bollards["quantity"] == 11.0

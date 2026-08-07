@@ -6,6 +6,13 @@ import re
 from collections import OrderedDict, defaultdict
 from typing import Dict, List, Optional
 
+# ONE definition of which ``qty_source`` markers mean "read off a table PRINTED
+# on the plans" (28-06). IMPORTED rather than restated: both modules live in
+# ``pipeline``, so unlike the ``vision`` constants below there is no
+# dependency-direction reason for a second copy — and a second copy is exactly
+# how the calculator starts stamping a marker this layer no longer recognises.
+# ``calculator`` imports nothing from ``bobbytailor``, so there is no cycle.
+from bobbytailor.pipeline.calculator import _SCHEDULE_QTY_SOURCES
 from bobbytailor.pipeline.coverage import (
     ITEM_HUMAN_INPUT,
     ITEM_MEASURED,
@@ -119,6 +126,109 @@ def _stronger_corroboration(current: Optional[str], incoming: Optional[str]) -> 
     return b if _CORROBORATION_RANK.get(b, 0) > _CORROBORATION_RANK.get(a, 0) else a
 
 
+# ─── How reproducible is this number? (28-06, V4-FIX-05) ────────────────────
+#
+# Two identical invocations of this pipeline over the same Crow PDF read 113
+# and 124 raw line items, and 3 of 51 published quantities moved. Phase 24
+# stabilised the NAMING layer and proved it; the residual variance is one layer
+# upstream, in the per-sheet vision extraction pass — the model reading
+# different descriptions off the same pixels. Stabilising THAT means sampling a
+# paid pass repeatedly, which is a spend decision and not something this layer
+# can make. What this layer can do is refuse to let the instability present as
+# a settled number, by having every published quantity say how it was produced.
+#
+# Three routes, and each one answers the same two questions: what produced the
+# number, and does a re-run reproduce it.
+
+#: Geometry measured off the page, or a dimension string read verbatim out of
+#: the PDF's text layer, or a table parsed structurally out of the file. All
+#: three are deterministic functions of the PDF: **a re-run reproduces the
+#: number exactly.** In the two saved paid runs this partition held every one of
+#: its quantities.
+QUANTITY_ROUTE_MEASURED = "measured_from_drawing"
+
+#: The number was copied out of a schedule or legend PRINTED on the plans — the
+#: calculator's ``qty_source`` says so. **A re-run reproduces it**, because the
+#: table is part of the file. It gets its own value rather than being folded
+#: into the one above because it is a quantity the DESIGNER stated, not one this
+#: app measured, and conflating the two would misstate the six
+#: ``plan_schedule_legend`` rows in each saved Crow run.
+QUANTITY_ROUTE_PRINTED_SCHEDULE = "printed_schedule"
+
+#: A model read the number off a sheet image and nothing deterministic backs it.
+#: **A re-run MAY answer differently.** This says the number is not
+#: reproducible; it does NOT say the number is wrong, and it is not a flag —
+#: 28-03 already flags the uncorroborated counts, and a second flag on the same
+#: rows would double-count the warning and make both easier to ignore.
+QUANTITY_ROUTE_SHEET_READING = "sheet_reading"
+
+#: Ranked by reproducibility, LEAST first. A LOWER rank wins a combination, so a
+#: bucket is only as reproducible as its least reproducible contributor. This
+#: table is the ONLY expression of the precedence — see
+#: :func:`_less_reproducible_route`, its only reader.
+_QUANTITY_ROUTE_RANK = {
+    QUANTITY_ROUTE_SHEET_READING: 0,
+    QUANTITY_ROUTE_PRINTED_SCHEDULE: 1,
+    QUANTITY_ROUTE_MEASURED: 2,
+}
+
+#: ``vision.fusion.DETERMINISTIC_PROVENANCES`` — the row provenances whose
+#: numbers are a function of the file rather than of a reading.
+#:
+#: Carried BY VALUE for the same reason :data:`_NAME_SOURCE_VOCABULARY_BASIS` is:
+#: ``pipeline`` must keep taking no dependency on ``vision``. A copy is only
+#: safe with a check that fails the moment the copies disagree, and
+#: ``test_route_the_deterministic_provenance_set_has_not_drifted`` is it — it
+#: asserts this set against fusion's AND against the reporter's third copy.
+_DETERMINISTIC_QUANTITY_PROVENANCES = frozenset(
+    {"geometry", "text_layer", "schedule_table"}
+)
+
+
+def _quantity_route(provenance, qty_source) -> str:
+    """Which of the three routes produced this row's number.
+
+    Precedence is stated once, here, and the printed table is checked FIRST for
+    the same reason :func:`calculator._count_corroboration` checks it first: a
+    quantity read out of a table printed on the plans is that table's number
+    whatever else fusion recorded about the row it landed on.
+
+    An unrecognised provenance falls to the reading route. That is the same safe
+    floor ``fusion.DEFAULT_PROVENANCE`` applies, and it means a typo in some
+    future provenance value can never silently promote a model reading into a
+    number a reader will treat as reproducible.
+    """
+    if str(qty_source or "").strip() in _SCHEDULE_QTY_SOURCES:
+        return QUANTITY_ROUTE_PRINTED_SCHEDULE
+    if str(provenance or "").strip() in _DETERMINISTIC_QUANTITY_PROVENANCES:
+        return QUANTITY_ROUTE_MEASURED
+    return QUANTITY_ROUTE_SHEET_READING
+
+
+def _less_reproducible_route(current: Optional[str], incoming: Optional[str]):
+    """Combine two routes. THE one place the precedence lives.
+
+    Modelled on :func:`_worse_conf` and deliberately NOT on
+    :func:`_stronger_corroboration`. Corroboration is evidence, so the BEST
+    contributing verdict vouches for the whole bucket. Reproducibility is not
+    evidence — it is a property of the weakest link, and a total that summed one
+    model reading into four measured numbers is a number a re-run may answer
+    differently. So the LEAST reproducible contributor wins.
+
+    ``None`` means "no row has contributed yet" and never wins over a real
+    route, in either argument order; an empty string is treated the same way. An
+    unrecognised route ranks with the reading route, so a string this function
+    has never seen can never be mistaken for a reproducible one.
+    """
+    a = (current or "").strip() or None
+    b = (incoming or "").strip() or None
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return a if _QUANTITY_ROUTE_RANK.get(a, 0) <= _QUANTITY_ROUTE_RANK.get(b, 0) else b
+
+
 def _count_is_uncorroborated(bucket: Dict) -> bool:
     """True when a count contributed to this bucket and nothing backed it.
 
@@ -156,6 +266,11 @@ def _new_bucket() -> Dict:
         # contributed — distinguishable from ``"none"``, which means one did
         # and nothing corroborated it.
         "count_corroboration": None,
+        # HOW the number was produced, rolled up from the contributing rows'
+        # recorded provenance and qty_source (28-06). ``None`` means no row has
+        # contributed — a blank, or a convention the app injected. There is no
+        # number to characterise in either case and none is invented.
+        "quantity_route": None,
         # WHICH measured region backs this bucket, and WHO named it — both
         # recorded by fusion and carried through the calculator (28-05). Empty
         # means no contributing row named a region, which is the shape of every
@@ -1360,6 +1475,15 @@ def aggregate_takeoff(
         bucket["count_corroboration"] = _stronger_corroboration(
             bucket["count_corroboration"], item.get("count_corroboration"),
         )
+        # ...and roll up HOW the number was produced, beside the two above and
+        # by the same mechanism. Unlike corroboration this applies to every
+        # row, not only to counts: an area a model read off a sheet is exactly
+        # as reproducible as a count it read off one. The combination takes the
+        # LEAST reproducible contributor — see `_less_reproducible_route`.
+        bucket["quantity_route"] = _less_reproducible_route(
+            bucket["quantity_route"],
+            _quantity_route(item.get("provenance"), item.get("qty_source")),
+        )
         # A bucket is auto-verified only if EVERY contributing row was auto-accepted.
         bucket["has_rows"] = True
         if not item.get("auto_verified"):
@@ -1645,6 +1769,18 @@ def aggregate_takeoff(
         # as a human input (the aggregator's `source` is a NAMING marker — its
         # own docstring says quantity provenance is never altered here).
         row["provenance"] = provenance_of_row(dict(row, status=status))
+        # Beside it, and answering a different question. `provenance` above says
+        # what the CLIENT should make of the row (measured / needs review / not
+        # measured). This says how the number was PRODUCED, and therefore
+        # whether a re-run reproduces it — a fact the four-value vocabulary has
+        # no way to express, and the one the 3-of-51 quantity deltas between two
+        # identical Crow runs turned on (28-06).
+        #
+        # A row with no number takes no route. A withheld quantity, a
+        # never-measured blank and an app-injected convention are all in that
+        # class: inventing a pedigree for a number that was never published
+        # would be the "blank rendered as a value" failure in a new column.
+        row["quantity_route"] = None if qty is None else b.get("quantity_route")
         row["measured"] = bool(qty is not None and b.get("has_rows"))
         result.append(row)
     return result
