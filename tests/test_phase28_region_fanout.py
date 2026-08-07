@@ -45,7 +45,9 @@ from bobbytailor.vision.fusion import (
     _NAME_AUTHORITY,
     _arbitrate_one_area_one_item,
     _fuse_project_area_items,
+    _reinstate_orphaned_supersessions,
     _share_rank,
+    _suppress_superseded_wall_items,
 )
 
 
@@ -548,6 +550,188 @@ def test_withholding_one_row_disturbs_no_other():
     )
     doors = [r for r in rows if r["item"].lower().startswith("doors")]
     assert len(doors) == 1 and doors[0]["quantity"] == 70
+
+
+# ═══ Task 3 — phase 23's D1 exception, proved intact ════════════════════════
+
+
+def test_three_evidence_named_layers_on_one_region_all_publish():
+    """D1, restated at the layer where the new rule lives.
+
+    A shell warehouse's footprint genuinely carries the structural slab, the
+    sealed-concrete finish troweled onto it and the exposed roof structure
+    above. Three distinct layers through one plan area is not three copies of
+    one quantity, and phase 23 built that exception deliberately after
+    collapsing all six Crow rows to one cost roughly thirty accuracy points.
+
+    This test exists so that no future reader mistakes 28-05 for a rollback of
+    it: when the plan itself names all three, all three publish.
+    """
+    rows = aggregate_takeoff(
+        [
+            _legend_row("Concrete Pad", CROW_FOOTPRINT_SF),
+            _legend_row("Sealed Concrete", CROW_FOOTPRINT_SF),
+            _legend_row("Exposed Structure", CROW_FOOTPRINT_SF),
+            _detected_row("Concrete Pad", CROW_FOOTPRINT_SF,
+                          region_ref="footprint",
+                          name_source=NAME_SOURCE_VOCABULARY_BASIS),
+            _detected_row("Sealed Concrete", CROW_FOOTPRINT_SF,
+                          region_ref="footprint",
+                          name_source=NAME_SOURCE_VOCABULARY_BASIS),
+            _detected_row("Exposed Structure", CROW_FOOTPRINT_SF,
+                          region_ref="footprint",
+                          name_source=NAME_SOURCE_VOCABULARY_BASIS),
+        ],
+        library=_library("Concrete Pad", "Sealed Concrete", "Exposed Structure"),
+    )
+    for name in ("Concrete Pad", "Sealed Concrete", "Exposed Structure"):
+        row = _row(rows, name)
+        assert row["quantity"] == CROW_FOOTPRINT_SF, name
+        assert row["source"] != aggregator.REGION_SHARED_HYPOTHESIS_UNMEASURED
+
+
+def test_fusion_still_admits_three_declared_layers_on_one_region():
+    """The same guarantee one layer down, where D1 actually lives. A layerless
+    row on a shared region is still suppressed with the `one_area_one_item`
+    reason, and the three that name a layer are still marked deliberate."""
+    components = [
+        {"name": n, "quantity": CROW_FOOTPRINT_SF, "unit": "SF",
+         "region_ref": "footprint",
+         "name_source": NAME_SOURCE_VOCABULARY_BASIS}
+        for n in ("Concrete Pad", "Sealed Concrete", "Exposed Structure",
+                  "Vapor Barrier")
+    ]
+    rejected: list = []
+    _arbitrate_one_area_one_item(components, rejected)
+    assert sorted(c["name"] for c in components) == [
+        "Concrete Pad", "Exposed Structure", "Sealed Concrete",
+    ]
+    assert sorted(c["building_layer"] for c in components) == [
+        "floor_finish", "roof_structure", "slab",
+    ]
+    assert [r["answer"] for r in rejected] == ["Vapor Barrier"]
+    assert rejected[0]["reason"] == "one_area_one_item"
+    assert "names no distinct building layer" in rejected[0]["detail"]
+
+
+def _fill_2_cascade():
+    """The three rows from region `fill:FILL-2`, from the saved run's own
+    ``fusion_rejected`` records.
+
+    `Concrete Pad` at 1,716.7 SF ANCHORED that region; the thickness-class
+    estimate was superseded by the room fill, the room fill was then arbitrated
+    away against the anchor, and the anchor itself was finally killed by
+    `one_object_one_quantity` because the same object is measured whole as the
+    footprint. Changing which row anchors a region changes which rows are
+    suppressed against it, and `_reinstate_orphaned_supersessions` re-checks
+    supersessions whose superseder died — so this cascade is where an anchor
+    that quietly moved would surface.
+    """
+    return [
+        {"name": "Tilt Up Wall", "quantity": 106992.0, "unit": "SF",
+         "provenance": "geometry", "confidence": "high",
+         "candidate_id": "WALL-TC1", "basis": "wall_area",
+         "needs_review": False, "review_reason": ""},
+        {"name": "Tilt Up Wall", "quantity": 31104.0, "unit": "SF",
+         "provenance": "geometry", "confidence": "high",
+         "candidate_id": "FILL-2", "name_source": "room_fill",
+         "basis": "wall_area", "region_ref": "fill:FILL-2",
+         "needs_review": False, "review_reason": ""},
+        {"name": "Concrete Pad", "quantity": 1716.7, "unit": "SF",
+         "provenance": "geometry", "confidence": "high",
+         "candidate_id": "FILL-2", "name_source": "room_fill",
+         "basis": "floor_area", "region_ref": "fill:FILL-2",
+         "needs_review": False, "review_reason": ""},
+    ]
+
+
+def _run_the_whole_cascade(components):
+    """The three stages in the exact order `fuse_sheet` runs them."""
+    rejected: list = []
+    room_fill_walls: dict = {}
+    for c in components:
+        if c.get("name_source") == "room_fill" and c.get("basis") == "wall_area":
+            room_fill_walls.setdefault(
+                str(c.get("name") or "").strip().lower(), []
+            ).append(c)
+    supersessions = _suppress_superseded_wall_items(
+        components, room_fill_walls, rejected
+    )
+    _arbitrate_one_area_one_item(components, rejected)
+    _reinstate_orphaned_supersessions(components, supersessions, rejected)
+    return (
+        sorted((c["name"], c["quantity"], c.get("building_layer"))
+               for c in components),
+        sorted((r["answer"], r["reason"], r.get("detail") or "")
+               for r in rejected),
+    )
+
+
+def test_the_fill_2_cascade_is_re_checked_and_not_assumed():
+    """Both regions in one components list, run through the real three stages.
+
+    The footprint fan-out and the FILL-2 cascade share the name `Concrete Pad`,
+    so they are not two independent problems: the footprint row is what kills
+    FILL-2's anchor by `one_object_one_quantity`, and killing an anchor is what
+    orphans the supersessions taken against it.
+
+    Run twice — once with task 1's stamp and once with it stripped, which is
+    the pre-28-05 shape — and asserted IDENTICAL. Not "the cascade still looks
+    right", which would be an opinion, but "the cascade is bit-for-bit the one
+    that was there before".
+    """
+    stamped = _footprint_components() + _fill_2_cascade()
+    unstamped = [
+        {k: v for k, v in c.items()
+         if not (k == "name_source" and v == NAME_SOURCE_VOCABULARY_BASIS)}
+        for c in _footprint_components() + _fill_2_cascade()
+    ]
+    assert _run_the_whole_cascade(stamped) == _run_the_whole_cascade(unstamped)
+
+
+def test_the_fill_2_cascade_still_reaches_the_end_state_it_was_built_to_reach():
+    """...and the end state itself, named rather than merely compared.
+
+    Written first as "nothing called `Tilt Up Wall` survives", which is the C3a
+    DEFECT, and corrected when the cascade said otherwise — which is the whole
+    reason the plan asked for this to be re-checked rather than assumed. What
+    actually happens is phase 23's C3a fix doing its job: FILL-2's room-fill row
+    is arbitrated away against the anchor, the anchor is then killed by
+    `one_object_one_quantity` because the same object is measured whole as the
+    footprint, and the thickness-class reading whose superseder just died is
+    REINSTATED at 106,992 SF, flagged, with its history in the reason.
+
+    Every part of that chain runs through the footprint rows this plan stamped,
+    which is exactly why it had to be exercised here and not taken on trust.
+    """
+    components = _footprint_components() + _fill_2_cascade()
+    survivors, rejected = _run_the_whole_cascade(components)
+    by_name = {n: (q, layer) for n, q, layer in survivors}
+    assert sorted(by_name) == [
+        "Concrete Pad", "Exposed Structure", "Sealed Concrete", "Tilt Up Wall",
+    ]
+    # One footprint row per building layer, no layer claimed twice.
+    layers = sorted(l for n, (_q, l) in by_name.items() if l)
+    assert layers == ["floor_finish", "roof_structure", "slab"]
+    # The reinstated wall, at the reading that was suppressed — not the 31,104
+    # SF room fill that displaced it and not a symbol count.
+    assert by_name["Tilt Up Wall"][0] == 106992.0
+    wall = [c for c in components if c["name"] == "Tilt Up Wall"][0]
+    assert wall["needs_review"] is True
+    assert "reinstated" in wall["review_reason"]
+
+    reasons = {r for _a, r, _d in rejected}
+    assert "one_object_one_quantity" in reasons
+    assert "one_area_one_item" in reasons
+    # ...and the anchor of the footprint region is still the row that anchored
+    # it before this plan, named here so a future change to `_share_rank` cannot
+    # move it silently.
+    footprint_suppressions = [
+        d for _a, r, d in rejected
+        if r == "one_area_one_item" and "(footprint)" in d
+    ]
+    assert len(footprint_suppressions) == 2
+    assert all("'Concrete Pad'" in d for d in footprint_suppressions)
 
 
 # ═══ Module self-audit — this file spends nothing ═══════════════════════════

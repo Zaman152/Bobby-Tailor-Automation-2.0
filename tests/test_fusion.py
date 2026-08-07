@@ -1605,7 +1605,21 @@ def test_on_the_real_crow_bundle_the_footprint_backs_one_item_per_layer():
 
     Collapsing all six to ONE was the regression: it deleted two golden items
     (Sealed Concrete, Exposed Structure) and left a learned verbatim name in
-    their place."""
+    their place.
+
+    **28-05 examined this test and left every assertion standing, deliberately.**
+    Its vocabulary is a plain dict with no naming evidence of any kind, so all
+    three survivors are named by their measure basis and nothing else — and that
+    is still exactly what D1 asserts AT THIS LAYER. Fusion's contract is "one
+    measured region backs at most one line item PER BUILDING LAYER", and naming
+    a layer IS the declaration; whether the NAME itself was evidenced is a
+    different question, asked one layer up where a legend row and a detected row
+    finally meet (`tests/test_phase28_region_fanout.py`). Weakening anything
+    here to make room for that question would have been the rollback of D1 this
+    plan exists not to be. The stamp assertion below is ADDED, not substituted:
+    it pins that these three rows are evidence-free, which is what makes the
+    aggregator's refusal to arbitrate between them the correct behaviour rather
+    than a lucky one."""
     from bobbytailor.deterministic.footprint_takeoff import (
         extract_building_footprint,
     )
@@ -1635,6 +1649,16 @@ def test_on_the_real_crow_bundle_the_footprint_backs_one_item_per_layer():
     layers = [c.get("building_layer") for c in value_rows]
     assert sorted(layers) == ["floor_finish", "roof_structure", "slab"]
     assert len(layers) == len(set(layers))
+    # ...and every one of the three was named by the vocabulary's measure basis,
+    # with nothing printed on this sheet naming it (28-05). Recorded here so a
+    # reader can see that D1's three-layer share is decided WITHOUT consulting
+    # naming evidence, which is the whole reason a second rule had to be written
+    # elsewhere rather than this one being tightened.
+    from bobbytailor.vision import fusion as fusion_module
+
+    assert {c.get("name_source") for c in value_rows} == {
+        fusion_module.NAME_SOURCE_VOCABULARY_BASIS
+    }
 
     suppressed = [
         r for r in result["fusion_rejected"]
