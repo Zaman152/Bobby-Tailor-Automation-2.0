@@ -919,16 +919,25 @@ def test_a_measured_zero_and_a_blank_stay_distinguishable_in_the_csv():
 
 
 def test_the_csv_keeps_every_existing_column_in_its_existing_position():
-    """T-23-70 for the CSV: provenance is appended LAST."""
+    """T-23-70 for the CSV: a new column is APPENDED, never inserted.
+
+    The list grew by one in 28-06 (`quantity_route`) and the contract is
+    unchanged and restated here as two assertions rather than one frozen list:
+    the columns that existed before keep their exact indices, and anything new
+    sits after them. A consumer reading `row[9]` for the provenance still reads
+    the provenance.
+    """
     import csv
     with _isolated_output_dir():
         report = generate_report("CSV Proj", _baseline_extracted(), _cmu_estimate())
         with open(report["_files"]["takeoff_summary_csv"], newline="") as f:
             fieldnames = csv.DictReader(f).fieldnames
-    assert fieldnames == [
+    established = [
         "item", "quantity", "unit", "confidence", "needs_review", "source",
         "review_notes", "source_sheets", "line_count", "provenance",
     ]
+    assert fieldnames[:len(established)] == established
+    assert fieldnames == established + ["quantity_route"]
 
 
 def test_a_human_entered_quantity_never_publishes_a_stale_provenance():
@@ -1588,3 +1597,198 @@ def test_both_entry_points_hand_the_reporter_their_run_settings():
                 "src/bobbytailor/scrape/scraper.py"):
         source = (root / rel).read_text()
         assert "run_settings=" in source, f"{rel} never passes run_settings"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 28-06 — the REPRODUCIBILITY section, and the route column beside it
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Two identical invocations of this pipeline over the same Crow PDF read 113 and
+# 124 raw line items and published 3 of 51 quantities differently. The
+# aggregator now records HOW each published number was produced; this is where a
+# human who reads `summary.txt` rather than `takeoff.json` finds out.
+
+
+def _routed(item, quantity, unit, route):
+    """One published take-off row, shaped as `aggregate_takeoff` emits them."""
+    return {
+        "item": item,
+        "quantity": quantity,
+        "quantity_fmt": "—" if quantity is None else "{:,.0f}".format(quantity),
+        "unit": unit,
+        "quantity_route": route,
+    }
+
+
+def _reproducibility_section(text: str) -> str:
+    assert "REPRODUCIBILITY" in text, "the section is missing from summary.txt"
+    return text.split("REPRODUCIBILITY", 1)[1]
+
+
+def test_the_reproducibility_section_is_absent_from_a_report_that_never_routed():
+    """The empty contract, copied from `_coverage_lines` and
+    `_unnamed_geometry_lines`: a report produced before this field existed
+    renders byte-identically. Saying "no row took the reading route" about a run
+    that never classified its rows would be an answer to a question that run
+    never asked."""
+    from bobbytailor.pipeline.reporter import _reproducibility_lines
+
+    assert _reproducibility_lines({}) == []
+    assert _reproducibility_lines({"takeoff_summary": []}) == []
+    assert _reproducibility_lines({"takeoff_summary": None}) == []
+    assert _reproducibility_lines({"takeoff_summary": [
+        {"item": "CMU Wall", "quantity": 100.0, "unit": "SF"},
+    ]}) == []
+
+
+def test_the_reproducibility_section_says_so_when_no_row_took_the_reading_route():
+    """An absent section and a clean run must not look the same.
+
+    A run every one of whose numbers came off the drawing or out of a printed
+    table has something to SAY, and it is not the same statement as a run that
+    never asked the question.
+    """
+    from bobbytailor.pipeline.reporter import (
+        QUANTITY_ROUTE_MEASURED,
+        QUANTITY_ROUTE_PRINTED_SCHEDULE,
+        _reproducibility_lines,
+    )
+
+    lines = _reproducibility_lines({"takeoff_summary": [
+        _routed("CMU Wall", 2204.0, "SF", QUANTITY_ROUTE_MEASURED),
+        _routed("Doors-HM", 29.0, "EA", QUANTITY_ROUTE_PRINTED_SCHEDULE),
+        _routed("Ladder", None, "EA", None),
+    ]})
+    text = "\n".join(lines)
+    assert "REPRODUCIBILITY" in text
+    assert "no published number came from a model reading a sheet" in text
+    # ...and it names none of the rows, because none of them took that route.
+    for name in ("CMU Wall", "Doors-HM", "Ladder"):
+        assert name not in text
+
+
+def test_the_reproducibility_section_names_exactly_the_reading_route_rows():
+    """Every reading-route row, with its quantity and unit — and no other row.
+
+    No count is asserted as a fixed number anywhere here. The expectation is
+    derived from the rows handed in, so the check cannot drift into pinning a
+    particular run's shape.
+    """
+    from bobbytailor.pipeline.reporter import (
+        QUANTITY_ROUTE_MEASURED,
+        QUANTITY_ROUTE_PRINTED_SCHEDULE,
+        QUANTITY_ROUTE_SHEET_READING,
+        _reproducibility_lines,
+    )
+
+    rows = [
+        _routed("CMU Wall", 2204.0, "SF", QUANTITY_ROUTE_MEASURED),
+        _routed("Doors-HM", 29.0, "EA", QUANTITY_ROUTE_PRINTED_SCHEDULE),
+        _routed("Stairs", 1.0, "EA", QUANTITY_ROUTE_SHEET_READING),
+        _routed("Bollards", 56.0, "EA", QUANTITY_ROUTE_SHEET_READING),
+        _routed("Ladder", None, "EA", None),
+    ]
+    text = "\n".join(_reproducibility_lines({"takeoff_summary": rows}))
+    expected = [r for r in rows
+                if r["quantity_route"] == QUANTITY_ROUTE_SHEET_READING]
+    for row in expected:
+        assert row["item"] in text
+        assert row["quantity_fmt"] in text
+        assert row["unit"] in text
+    for row in rows:
+        if row in expected:
+            continue
+        assert row["item"] not in text, (
+            "%r took a reproducible route or published no number and must not "
+            "be named here" % row["item"]
+        )
+    assert str(len(expected)) in text
+
+
+def test_the_reproducibility_section_fences_the_conclusion_a_reader_would_draw():
+    """It states the fact AND what must not be concluded from it, the way the
+    unidentified-geometry section does when it says a candidate's absence is an
+    absence of a NAME and never of an object.
+
+    Two fences, both load-bearing:
+
+    * appearing here is not evidence a number is wrong; and
+    * the section cannot see the other half of the variance. Whether a row is
+      produced AT ALL is decided in the same per-sheet reading, and a single run
+      has no way to know about its own absences — which is exactly how
+      ``Door Frames-HM`` published 4 EA in one Crow run and nothing in the next.
+    """
+    from bobbytailor.pipeline.reporter import (
+        QUANTITY_ROUTE_SHEET_READING,
+        _reproducibility_lines,
+    )
+
+    text = "\n".join(_reproducibility_lines({"takeoff_summary": [
+        _routed("Stairs", 1.0, "EA", QUANTITY_ROUTE_SHEET_READING),
+    ]}))
+    assert "not a claim that" in text and "wrong" in text
+    assert "may answer" in text or "may read" in text
+    assert "whether the row appears at all" in text
+
+
+def test_the_summary_file_carries_the_reproducibility_section():
+    """End to end: a real run through `generate_report`, read off disk."""
+    with _isolated_output_dir():
+        report = generate_report(
+            "Route Proj", _baseline_extracted(), _cmu_estimate(),
+        )
+        text = Path(report["_files"]["summary_txt"]).read_text()
+
+    section = _reproducibility_section(text)
+    assert "CMU Wall" in section, (
+        "the calculated row carried no deterministic provenance, so its number "
+        "came by the reading route and the section must name it"
+    )
+    # Adjacent to the question it extends: PROVENANCE BREAKDOWN counts what
+    # each raw item was tagged with; this says which PUBLISHED numbers a repeat
+    # run may answer differently.
+    assert text.index("PROVENANCE BREAKDOWN") < text.index("REPRODUCIBILITY")
+
+
+def test_the_takeoff_summary_csv_carries_the_route_column():
+    """A spreadsheet reader sees it too, and a blank's cell stays empty."""
+    import csv as _csv
+
+    from bobbytailor.pipeline.reporter import (
+        QUANTITY_ROUTE_SHEET_READING,
+        _write_takeoff_summary_csv,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "takeoff_summary.csv"
+        _write_takeoff_summary_csv([
+            _routed("Stairs", 1.0, "EA", QUANTITY_ROUTE_SHEET_READING),
+            _routed("Ladder", None, "EA", None),
+        ], out)
+        with open(out, newline="") as fh:
+            rows = list(_csv.DictReader(fh))
+
+    assert "quantity_route" in rows[0]
+    by_item = {r["item"]: r for r in rows}
+    assert by_item["Stairs"]["quantity_route"] == QUANTITY_ROUTE_SHEET_READING
+    assert by_item["Ladder"]["quantity_route"] == "", (
+        "a row with no published number has no route, and an invented one "
+        "would read as a pedigree for a number nobody produced"
+    )
+
+
+def test_the_route_column_is_appended_last_in_the_csv():
+    """Every existing column keeps its index, the same contract `provenance`
+    was added under."""
+    import csv as _csv
+
+    from bobbytailor.pipeline.reporter import _write_takeoff_summary_csv
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "takeoff_summary.csv"
+        _write_takeoff_summary_csv([_routed("Stairs", 1.0, "EA", None)], out)
+        with open(out, newline="") as fh:
+            header = next(_csv.reader(fh))
+
+    assert header[-1] == "quantity_route"
+    assert header[-2] == "provenance"

@@ -709,6 +709,67 @@ def test_the_saved_runs_were_opened_read_only():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Task 3 — the artifact a human actually reads
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_the_summary_section_names_exactly_what_a_real_aggregation_routed():
+    """The section's membership is DERIVED from the aggregator's own output.
+
+    No item name is typed in as the expectation and no count is asserted as a
+    literal: the aggregator is run over a mixed set of rows, and the section is
+    then required to name every published row it routed to the reading route and
+    no other published row. A section that named one row too many or one too few
+    would be describing a take-off the run did not produce.
+    """
+    from bobbytailor.pipeline.reporter import _reproducibility_lines
+
+    rows = aggregate_takeoff([
+        _item("hollow metal frame", qty=4.0, provenance="geometry"),
+        _item("Bollard at dock", qty=8.0, provenance="text_layer"),
+        _item("aluminum window unit", qty=6.0),
+        _item("Sprinkler head", qty=12.0),
+        _item("door schedule count", qty=29.0, qty_source="plan_schedule_legend"),
+    ])
+    text = "\n".join(_reproducibility_lines({"takeoff_summary": rows}))
+
+    reading = {r["item"] for r in rows
+               if r.get("quantity_route") == QUANTITY_ROUTE_SHEET_READING}
+    assert reading, "the fixture routed nothing to the reading route"
+    for name in reading:
+        assert name in text, "%r took the reading route and is not named" % name
+    for row in rows:
+        if row["item"] in reading:
+            continue
+        assert row["item"] not in text, (
+            "%r did not take the reading route and must not be named: route %r"
+            % (row["item"], row.get("quantity_route"))
+        )
+
+
+def test_the_summary_section_never_names_a_row_that_published_no_number():
+    """A blank has no route, so it cannot appear among the unreproducible.
+
+    The failure this forbids is specific: listing a never-measured row under a
+    heading about numbers a re-run may answer differently would tell a reader
+    there IS a number and that it is shaky, when there is no number at all.
+    """
+    from bobbytailor.pipeline.reporter import _reproducibility_lines
+
+    rows = aggregate_takeoff([
+        _item("Stair / Stair Run", qty=1.0,
+              count_corroboration="detail_sheet_only",
+              count_evidence_sheet_kind="detail"),
+        _item("Sprinkler head", qty=12.0),
+    ])
+    withheld = [r for r in rows if r["quantity"] is None]
+    assert withheld, "the fixture withheld nothing"
+    text = "\n".join(_reproducibility_lines({"takeoff_summary": rows}))
+    for row in withheld:
+        assert row["item"] not in text
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # The module's own contract
 # ─────────────────────────────────────────────────────────────────────────────
 
