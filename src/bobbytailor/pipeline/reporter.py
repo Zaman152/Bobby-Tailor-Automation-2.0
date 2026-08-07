@@ -15,6 +15,16 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from bobbytailor.config import OUTPUT_DIR
 from bobbytailor.pipeline.coverage import CoverageLedger, ItemCoverage
+# The three routes a published quantity can come by (28-06). IMPORTED from the
+# layer that assigns them, never restated: this module only READS the value the
+# aggregator wrote, and a second spelling of `sheet_reading` here is how the
+# REPRODUCIBILITY section quietly stops matching any row. `aggregate_takeoff`
+# itself is still imported lazily at its call site, unchanged.
+from bobbytailor.pipeline.aggregator import (
+    QUANTITY_ROUTE_MEASURED,
+    QUANTITY_ROUTE_PRINTED_SCHEDULE,
+    QUANTITY_ROUTE_SHEET_READING,
+)
 from bobbytailor.pipeline.provenance import provenance_of_row
 
 logger = logging.getLogger(__name__)
@@ -1055,12 +1065,24 @@ def _takeoff_summary_csv_quantity(row: dict):
 def _write_takeoff_summary_csv(aggregated: list, path: Path):
     """StackCT-style consolidated takeoff summary.
 
-    ``provenance`` is appended LAST so every existing column keeps its position
-    for a consumer reading by index rather than by name.
+    ``provenance`` was appended LAST so every existing column kept its position
+    for a consumer reading by index rather than by name; ``quantity_route``
+    (28-06) is appended after it under the same contract.
+
+    The two columns answer different questions and a reader needs both.
+    ``provenance`` says what to make of the row — MEASURED, NEEDS REVIEW, NOT
+    MEASURED. ``quantity_route`` says how the number was PRODUCED, and therefore
+    whether a repeat run reproduces it. A row can be MEASURED and still be a
+    number the next run answers differently; Crow's ``Stairs`` was exactly that.
+
+    A row with no published number writes an EMPTY route cell, for the same
+    reason :func:`_takeoff_summary_csv_quantity` writes an empty quantity cell:
+    there is no number to characterise, and a pedigree printed beside a blank
+    would read as evidence that a number exists.
     """
     fields = ["item", "quantity", "unit", "confidence", "needs_review",
               "source", "review_notes", "source_sheets", "line_count",
-              "provenance"]
+              "provenance", "quantity_route"]
     with open(path, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
@@ -1072,6 +1094,8 @@ def _write_takeoff_summary_csv(aggregated: list, path: Path):
                 # a pre-23 row the aggregator never classified. ONE place
                 # decides this vocabulary (INV-08 §5).
                 "provenance": row.get("provenance") or provenance_of_row(row),
+                # Absent (a pre-28-06 row) and None (a blank) both write empty.
+                "quantity_route": row.get("quantity_route") or "",
                 "unit": row.get("unit"),
                 "confidence": row.get("confidence") or "",
                 "needs_review": "yes" if row.get("needs_review") else "",
@@ -1423,6 +1447,110 @@ def _provenance_breakdown_lines(report: dict) -> list:
     return lines
 
 
+#: How many reading-route rows are listed individually before the section
+#: switches to a "and N more" tail. The cap bounds the PAGE, never the account —
+#: same contract as :data:`_UNNAMED_GEOMETRY_LIST_CAP`.
+_REPRODUCIBILITY_LIST_CAP = 40
+
+
+def _reproducibility_lines(report: dict) -> list:
+    """REPRODUCIBILITY section: which published numbers a repeat run may move.
+
+    Returns an EMPTY list when no published row carries a ``quantity_route`` at
+    all, so a report produced before 28-06 renders byte-identically — the same
+    empty contract :func:`_coverage_lines` and :func:`_unnamed_geometry_lines`
+    keep. Saying "no row took the reading route" about a run that never
+    classified its rows would answer a question that run never asked.
+
+    When the field IS present the section always renders, including when
+    nothing took the reading route. An absent section and a clean run must not
+    look the same: a reader who sees nothing cannot tell "we checked and every
+    number is reproducible" from "nobody checked".
+
+    The prose states the fact and fences the two conclusions a reader would
+    otherwise draw, the way the unidentified-geometry section does when it says
+    a candidate's absence is an absence of a NAME and never of an object:
+
+    1. A number listed here is not thereby WRONG. It is not reproducible, which
+       is a different property; the app has no opinion here about its accuracy.
+    2. This section cannot see the other half of the variance. Whether a row is
+       produced AT ALL is decided in the same per-sheet reading, and a single
+       run has no way to know about its own absences — which is how Crow's
+       ``Door Frames-HM`` published 4 EA in one run and nothing in the next off
+       a row that was geometry-backed in the run that had it.
+    """
+    rows = [r for r in (report.get("takeoff_summary") or []) if isinstance(r, dict)]
+    if not any("quantity_route" in r for r in rows):
+        return []
+
+    reading = [r for r in rows
+               if r.get("quantity_route") == QUANTITY_ROUTE_SHEET_READING]
+
+    lines = [
+        "─" * 70,
+        "REPRODUCIBILITY  (which of these numbers a repeat run may answer",
+        "                  differently — this is not a claim that any one of",
+        "                  them is wrong)",
+        "─" * 70,
+        "{:<64}{:>5}".format(
+            "Published numbers that came from a model READING a sheet:",
+            len(reading),
+        ),
+        "",
+    ]
+
+    if not reading:
+        lines.extend([
+            "There are none — no published number came from a model reading a sheet.",
+            "Every quantity below was measured off the drawing's own geometry, read",
+            "verbatim out of the PDF's text, or copied out of a table printed on the",
+            "plans, and a repeat run over the same file reproduces all of them.",
+            "",
+            "This is stated rather than left out, because a section that disappeared",
+            "when it had nothing to report would read exactly like a run that never",
+            "asked the question.",
+            "",
+        ])
+    else:
+        lines.extend([
+            "Every other number below was measured off the drawing or copied out of a",
+            "table printed on the plans, and a repeat run reproduces it. These came",
+            "from a model reading a sheet image, and two identical runs of this",
+            "pipeline over one set of plans have read the same drawings as different",
+            "numbers. A number here may be exactly right; what it is not is settled.",
+            "",
+        ])
+        listed = reading[:_REPRODUCIBILITY_LIST_CAP]
+        for row in listed:
+            quantity = row.get("quantity_fmt")
+            if quantity in (None, ""):
+                quantity = row.get("quantity")
+            lines.append(
+                "  {:<34} {:>14}  {}".format(
+                    str(row.get("item") or "?")[:34],
+                    str(quantity),
+                    str(row.get("unit") or ""),
+                )
+            )
+        if len(reading) > len(listed):
+            # The cap bounds the page, never the account: a list that stops
+            # without saying it stopped is the same lie as a missing row.
+            lines.append(
+                "  ... and %d more, all of them in takeoff_summary.csv under "
+                "quantity_route" % (len(reading) - len(listed))
+            )
+        lines.append("")
+
+    lines.extend([
+        "What this section CANNOT tell you: whether the row appears at all in a",
+        "repeat run. That is decided in the same per-sheet reading, one layer",
+        "above any number, and a single run has no way to see its own absences.",
+        "Comparing two runs is the only thing that shows it.",
+        "",
+    ])
+    return lines
+
+
 def _write_summary(report: dict, path: Path):
     lines = [
         "═" * 70,
@@ -1490,6 +1618,12 @@ def _write_summary(report: dict, path: Path):
     lines.extend(_unnamed_geometry_lines(report))
     lines.extend(_scale_confidence_lines(report))
     lines.extend(_provenance_breakdown_lines(report))
+    # Immediately after PROVENANCE BREAKDOWN, whose question it extends. That
+    # section counts what each RAW item was tagged with; this says which
+    # PUBLISHED numbers a repeat run may answer differently — the fact the
+    # 3-of-51 quantity deltas between two identical Crow runs turned on, and one
+    # no other section of this file states (28-06).
+    lines.extend(_reproducibility_lines(report))
 
     def _s(val, default=""):
         """Coerce None / non-string values to a safe string for formatting."""
