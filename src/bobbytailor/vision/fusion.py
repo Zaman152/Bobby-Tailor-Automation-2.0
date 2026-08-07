@@ -1781,6 +1781,19 @@ _WALL_BINDING_HINTS = frozenset(
 )
 _WALL_THICKNESS_TOL_IN = 1.5
 
+# The largest share of a sheet's TOTAL wall linework a masonry object may bind.
+#
+# Masonry on a tilt-up or panelised shell is a room-scale exception — a pump
+# room, a trash enclosure, a stair or riser core — standing inside a building
+# whose enclosure is made of something else. One room's walls cannot be a
+# quarter of every wall line drawn on the sheet; a class at or beyond that
+# share is part of the building's primary wall construction, whatever rank it
+# holds among the classes. The value states that fact about what a masonry wall
+# IS. It is a dimensionless fraction: it is derived from no plan's footage, no
+# published quantity and no target, and a test asserts the guard reaches an
+# identical verdict when every length on the sheet is scaled.
+_MASONRY_MAX_LF_SHARE = 0.25
+
 # A tilt-up / precast / site-cast-concrete-panel exterior wall: its area is the
 # building PERIMETER × clear height (the panels wrap the footprint), never a
 # thickness-class linework length. Matched on the object's own printed naming.
@@ -1840,13 +1853,25 @@ def _masonry_bind_forbidden(
 ) -> bool:
     """True when a masonry object may not bind this wall class.
 
+    Two overlapping guards, and both are wanted:
+
+    * the RANK test — the dominant (most-LF) class is the exterior perimeter
+      wall. It still speaks on a sheet whose classes are all modest, where a
+      share test excludes nothing at all.
+    * the SHARE test — a class carrying more than ``_MASONRY_MAX_LF_SHARE`` of
+      all the wall linework on the sheet is primary construction, whatever rank
+      it holds. Crow carries thirteen thickness classes; the rank test can only
+      ever exclude one of them, which is how a masonry object came to hold a
+      class it was never the shape of.
+
     Non-masonry objects are never forbidden by this rule — it encodes what a
-    masonry wall IS, not a general binding restriction.
+    masonry wall IS, not a general restriction on binding large classes.
     """
     if not _is_masonry_object(obj):
         return False
-    # The dominant (most-LF) class is the exterior perimeter wall.
-    return cls == dominant_class
+    if cls == dominant_class:
+        return True
+    return float(lf_share.get(cls, 0.0)) > _MASONRY_MAX_LF_SHARE
 
 
 # A thickness token in inches: "8", "8\"", "7 5/8", "8 in".
@@ -2055,15 +2080,21 @@ def map_wall_classes_from_library(
         used_classes.add(cls)
         used_objs.add(obj_idx)
 
-    # Masonry by hint → the SMALLEST-LF non-dominant class (a CMU wall is a
-    # small interior wall, never the dominant perimeter class). Keying on LF
-    # (not just thickness) is what stops the giant perimeter class binding to
-    # CMU when several classes share a thickness.
+    # Masonry by hint → the SMALLEST-LF eligible class (a CMU wall is a small
+    # interior wall, never the dominant perimeter class and never a large share
+    # of the sheet's wall linework). Keying on LF (not just thickness) is what
+    # stops the giant perimeter class binding to CMU when several classes share
+    # a thickness — and the eligibility test is the SAME one pass 1 applies, so
+    # a bind the thickness route refuses cannot arrive by the hint route
+    # instead.
     if mas and remaining:
         thin = sorted(
             (
                 c for c in remaining
-                if c not in used_classes and c != dominant_class
+                if c not in used_classes
+                and not _masonry_bind_forbidden(
+                    wall_objects[mas[0]], c, dominant_class, lf_share
+                )
             ),
             key=lambda c: lf_by_class.get(c, 0.0),
         )
