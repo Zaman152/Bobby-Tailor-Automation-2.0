@@ -540,6 +540,213 @@ def test_a_non_masonry_object_is_untouched_by_the_share_rule():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Task 3 — the disagreement is recorded, not decided in silence
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _bundle(lf, thickness_in):
+    """One geometry bundle whose measured thicknesses ARE ``thickness_in``.
+
+    ``fpp = 1.0`` and ``thickness_pt`` in feet make
+    ``_wall_thickness_in_by_class`` reproduce the argument exactly, so the
+    fixture cannot claim a thickness its own geometry does not measure.
+    """
+    return {
+        "fpp": 1.0,
+        "walls": [
+            {
+                "thickness_class": cls,
+                "thickness_pt": thickness_in[cls] / 12.0,
+                "length_pt": lf[cls],
+            }
+            for cls in sorted(lf)
+        ],
+        "wall_lf_by_class": dict(lf),
+    }
+
+
+def _labels(mapping):
+    return {
+        "WALL-%s" % cls: {
+            "wall_class_id": "WALL-%s" % cls, "label": label, "confidence": "high",
+        }
+        for cls, label in mapping.items()
+    }
+
+
+def _fuse(bundle, vocabulary, labels=None, wall_height_ft=None):
+    """Drive the real fusion path and return everything it emitted."""
+    components, rejected, unnamed = [], [], []
+    contest = {}
+    lib = map_wall_classes_from_library(
+        bundle["wall_lf_by_class"],
+        F._wall_thickness_in_by_class(bundle),
+        vocabulary,
+        contested=contest,
+    )
+    F._fuse_wall_classes(
+        bundle,
+        labels or {},
+        components,
+        vocab_map={
+            str(o["name"]).strip().lower(): {"basis": o.get("basis")}
+            for o in vocabulary
+        },
+        wall_height_ft=wall_height_ft,
+        wall_height_source="plan" if wall_height_ft else None,
+        library_wall_map=lib,
+        rejected=rejected,
+        unnamed=unnamed,
+        contested_wall_classes=contest,
+    )
+    return {
+        "rows": {c["candidate_id"]: c for c in components},
+        "rejected": rejected,
+        "unnamed": {r["candidate_id"]: r for r in unnamed},
+        "contested": contest,
+    }
+
+
+# Two classes an 8" object cannot tell apart, plus one it does not reach.
+_CONTESTED_LF = {"TC1": 900.0, "TC2": 60.0, "TC3": 30.0}
+_CONTESTED_TH = {"TC1": 8.8, "TC2": 8.0, "TC3": 20.0}
+
+
+def _refusals(out):
+    return [
+        r for r in out["rejected"]
+        if r.get("reason") == F._WALL_THICKNESS_BIND_CONTESTED_REASON
+    ]
+
+
+def test_a_refused_bind_appends_one_record_naming_the_contesting_evidence():
+    out = _fuse(
+        _bundle(_CONTESTED_LF, _CONTESTED_TH),
+        [_precast("8")],
+        _labels({"TC2": "tilt-up concrete panel"}),
+    )
+    recs = [r for r in _refusals(out) if r["candidate_id"] == "WALL-TC2"]
+    assert len(recs) == 1, "expected exactly one refusal record, got %r" % (
+        [r["candidate_id"] for r in _refusals(out)],
+    )
+    rec = recs[0]
+    assert "Precast Panel" in (rec.get("contesting_objects") or [])
+    assert "TC1" in (rec.get("also_matched_classes") or [])
+    assert rec.get("class_thickness_in") == _CONTESTED_TH["TC2"]
+    assert "Precast Panel" in rec["detail"]
+
+
+def test_a_contested_class_with_a_vision_label_keeps_the_label_and_says_why():
+    out = _fuse(
+        _bundle(_CONTESTED_LF, _CONTESTED_TH),
+        [_precast("8")],
+        _labels({"TC2": "tilt-up concrete panel"}),
+    )
+    row = out["rows"]["WALL-TC2"]
+    assert row["name"] == "tilt-up concrete panel"
+    assert row["name_source"] == F._NAME_SOURCE_VISION
+    assert row["needs_review"] is True
+    assert "contested" in row["review_reason"]
+    assert "Precast Panel" in row["review_reason"]
+    # The record is on the row AND in the audit trail — never one without the
+    # other, or a reviewer reading either alone is misled.
+    assert [r["candidate_id"] for r in _refusals(out)].count("WALL-TC2") == 1
+
+
+def test_a_contested_class_with_no_label_says_contested_in_the_ledger():
+    out = _fuse(_bundle(_CONTESTED_LF, _CONTESTED_TH), [_precast("8")])
+    rec = out["unnamed"]["WALL-TC2"]
+    assert rec["reason"] == F.UNNAMED_WALL_CLASS_UNLABELED
+    assert "contested" in rec["detail"]
+    assert "Precast Panel" in rec["detail"]
+    assert rec["quantity"] == _CONTESTED_LF["TC2"]
+
+
+def test_an_unmatched_class_still_reads_as_unmatched_not_as_contested():
+    """Two different facts, owed to a reviewer as two different sentences.
+
+    Nothing claimed TC3 at all. Something claimed TC2 and could not prove it.
+    """
+    out = _fuse(_bundle(_CONTESTED_LF, _CONTESTED_TH), [_precast("8")])
+    rec = out["unnamed"]["WALL-TC3"]
+    assert "contested" not in rec["detail"]
+    assert "no printed-thickness match" in rec["detail"]
+
+
+def test_the_refusal_key_is_its_own_and_is_not_the_override_key():
+    assert (
+        F._WALL_THICKNESS_BIND_CONTESTED_REASON != F._WALL_LABEL_PRECEDENCE_REASON
+    ), "a refusal and an override must be tellable apart by key alone"
+
+
+def test_the_refusal_key_does_not_reuse_a_c3a_suppression_key():
+    """Phase 23's reinstatement pass acts on SUPPRESSION records. A refused
+    bind was never a supersession, and must not be un-rejected as one."""
+    assert "superseded" not in F._WALL_THICKNESS_BIND_CONTESTED_REASON
+
+
+def test_a_genuinely_unique_match_still_overrides_a_dissenting_label():
+    """24-02's precedence is not touched — only which matches earn it."""
+    lf = {"TC1": 900.0, "TC2": 60.0}
+    th = {"TC1": 12.0, "TC2": 8.0}
+    out = _fuse(
+        _bundle(lf, th),
+        [_tiltup("12"), _precast("8")],
+        _labels({"TC2": "something else entirely"}),
+    )
+    row = out["rows"]["WALL-TC2"]
+    assert row["name"] == "Precast Panel"
+    assert row["name_source"] == F._NAME_SOURCE_WALL_THICKNESS
+    overrides = [
+        r for r in out["rejected"]
+        if r.get("reason") == F._WALL_LABEL_PRECEDENCE_REASON
+    ]
+    assert [r["candidate_id"] for r in overrides] == ["WALL-TC2"]
+    assert _refusals(out) == [], "nothing was contested, so nothing was refused"
+
+
+def test_an_uncontested_silent_sheet_appends_nothing_at_all():
+    out = _fuse(
+        _bundle({"TC1": 900.0, "TC2": 60.0}, {"TC1": 12.0, "TC2": 8.0}),
+        [_tiltup("12"), _precast("8")],
+    )
+    assert out["rejected"] == []
+
+
+def test_the_thickness_name_source_still_ranks_with_the_naming_library():
+    """The precedence inversion's arbitration rank is not disturbed (T-28-18).
+
+    Changing which matches earn the authoritative source must not change what
+    that source is worth when two components claim one region.
+    """
+    assert (
+        F._NAME_AUTHORITY[F._NAME_SOURCE_WALL_THICKNESS]
+        == F._NAME_AUTHORITY[F._NAME_SOURCE_LIBRARY]
+    )
+
+
+def test_the_contested_argument_to_fusion_is_optional():
+    """A caller that does not pass the explanation gets the same names — only
+    the audit record is absent, so the trail can never become a correctness
+    dependency."""
+    bundle = _bundle(_CONTESTED_LF, _CONTESTED_TH)
+    lib = map_wall_classes_from_library(
+        bundle["wall_lf_by_class"],
+        F._wall_thickness_in_by_class(bundle),
+        [_precast("8")],
+    )
+    components, rejected = [], []
+    F._fuse_wall_classes(
+        bundle, _labels({"TC2": "tilt-up concrete panel"}), components,
+        library_wall_map=lib, rejected=rejected,
+    )
+    assert {c["candidate_id"]: c["name"] for c in components}["WALL-TC2"] == (
+        "tilt-up concrete panel"
+    )
+    assert rejected == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # This module's own contract
 # ─────────────────────────────────────────────────────────────────────────────
 
