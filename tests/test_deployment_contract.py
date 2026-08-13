@@ -325,6 +325,150 @@ def test_stackct_login_is_where_stackct_credentials_are_required():
     )
 
 
+# ─── B4: plain-HTTP login must be refusable, not silently impossible ────────
+
+@pytest.mark.parametrize("value", ["false", "False", "FALSE", "0", "no", "off"])
+def test_session_cookie_secure_can_be_turned_off_explicitly(value, monkeypatch):
+    from bobbytailor.web import app as web_app
+
+    monkeypatch.setenv("SESSION_COOKIE_SECURE", value)
+    monkeypatch.delenv("FLASK_ENV", raising=False)
+    assert web_app._session_cookie_secure() is False, (
+        "SESSION_COOKIE_SECURE=%r did not disable the Secure flag. Without an "
+        "obviously-named opt-out the only escape is FLASK_ENV=development, "
+        "which no operator would guess and nobody should set in production."
+        % value
+    )
+
+
+@pytest.mark.parametrize("value", ["true", "1", "yes", "anything-else"])
+def test_session_cookie_secure_stays_on_for_anything_but_an_explicit_no(
+    value, monkeypatch
+):
+    from bobbytailor.web import app as web_app
+
+    monkeypatch.setenv("SESSION_COOKIE_SECURE", value)
+    monkeypatch.delenv("FLASK_ENV", raising=False)
+    assert web_app._session_cookie_secure() is True
+
+
+def test_session_cookie_is_secure_by_default(monkeypatch):
+    """The default has to stay ON. A session cookie in clear text is a
+    hijackable credential, and this is the fix for a usability trap — not a
+    reason to weaken the default."""
+    from bobbytailor.web import app as web_app
+
+    monkeypatch.delenv("SESSION_COOKIE_SECURE", raising=False)
+    monkeypatch.delenv("FLASK_ENV", raising=False)
+    assert web_app._session_cookie_secure() is True
+
+
+def test_flask_env_development_still_works(monkeypatch):
+    """Existing local setups must not break on this change."""
+    from bobbytailor.web import app as web_app
+
+    monkeypatch.delenv("SESSION_COOKIE_SECURE", raising=False)
+    monkeypatch.setenv("FLASK_ENV", "development")
+    assert web_app._session_cookie_secure() is False
+
+
+def test_readme_does_not_call_the_tls_proxy_optional():
+    """The README headed its nginx section 'optional' and put Let's Encrypt
+    after it. Follow that literally on port 80 and login is impossible with no
+    error message anywhere — so the word has to go."""
+    text = README.read_text()
+    assert "### Nginx reverse proxy (optional)" not in text, (
+        "the README still calls the TLS-terminating proxy optional, while "
+        "session cookies are Secure-only by default"
+    )
+    assert re.search(r"###\s*Nginx reverse proxy \(required\)", text), (
+        "expected the nginx section to be marked required"
+    )
+
+
+def test_readme_warns_that_plain_http_login_loops_silently():
+    """The specific symptom has to be written down: 'login succeeds, then
+    every request redirects back to /login' is not something an operator can
+    reason their way to from 'cookies are Secure'."""
+    text = README.read_text().lower()
+    assert "session_cookie_secure" in text
+    assert "redirect" in text and "/login" in text, (
+        "the README does not describe the redirect loop that a Secure cookie "
+        "over plain HTTP produces"
+    )
+
+
+# ─── M3: behind a proxy, every client must not look like 127.0.0.1 ──────────
+
+WEB_APP_PY = REPO_ROOT / "src" / "bobbytailor" / "web" / "app.py"
+
+
+def test_the_app_is_wrapped_in_proxyfix():
+    src = WEB_APP_PY.read_text()
+    assert "ProxyFix(" in src, (
+        "no ProxyFix: behind the documented nginx proxy every request looks "
+        "like 127.0.0.1, so the login rate limit becomes global — one wrong "
+        "password locks out the only account on the box"
+    )
+
+
+def test_proxyfix_trusts_exactly_one_hop():
+    """More than one trusted hop lets a client forge X-Forwarded-For and walk
+    straight past the rate limit."""
+    src = WEB_APP_PY.read_text()
+    match = re.search(r"ProxyFix\((.*?)\)", src, re.DOTALL)
+    assert match, "ProxyFix call not found"
+    args = match.group(1)
+    assert "x_for=1" in args, "expected x_for=1, got: %s" % args.strip()
+    assert "x_proto=1" in args, "expected x_proto=1, got: %s" % args.strip()
+
+
+def test_the_client_ip_comes_from_the_forwarded_header(monkeypatch):
+    """End to end through the WSGI stack: a forwarded address must reach
+    get_remote_address, which is what the login limiter keys on.
+
+    A throwaway probe route rather than /login, deliberately — /login carries
+    the 5-per-minute limit this test exists to protect, and consuming a token
+    from a session-wide limiter to measure it would make the test a flake
+    source for everything else.
+    """
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-proxyfix")
+    monkeypatch.setenv("ADMIN_EMAIL", "admin@example.com")
+    monkeypatch.setenv("ADMIN_PASSWORD_HASH", "$2b$12$" + "x" * 53)
+
+    from bobbytailor.web import app as web_app
+
+    app = web_app.create_app()
+    seen = {}
+
+    @app.route("/__remote_addr_probe")
+    def _probe():
+        from flask_limiter.util import get_remote_address
+
+        seen["addr"] = get_remote_address()
+        return "ok"
+
+    # The global before_request gate would redirect an unauthenticated probe
+    # to /login before the view ever runs.
+    monkeypatch.setattr(
+        web_app, "PUBLIC_ENDPOINTS", web_app.PUBLIC_ENDPOINTS | {"_probe"}
+    )
+
+    client = app.test_client()
+    response = client.get(
+        "/__remote_addr_probe",
+        headers={"X-Forwarded-For": "203.0.113.7", "X-Forwarded-Proto": "https"},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert response.status_code == 200, (
+        "probe did not reach the view (status %s)" % response.status_code
+    )
+    assert seen.get("addr") == "203.0.113.7", (
+        "the rate limiter still sees the proxy's address (%r), so its "
+        "per-client limit is really a global one" % seen.get("addr")
+    )
+
+
 # ─── self-audit: this module costs nothing to run ───────────────────────────
 
 def test_this_module_spends_no_money():
@@ -363,8 +507,11 @@ def test_this_module_imports_nothing_that_could_reach_a_network():
             imported.add(node.module.split(".")[0])
     # subprocess is here to re-import config in a clean interpreter, never to
     # reach off the box; sys/os supply that child's argv and environment.
+    # subprocess is here to re-import config in a clean interpreter, never to
+    # reach off the box; sys/os supply that child's argv and environment.
+    # Flask's test client dispatches WSGI in memory — it opens no socket.
     allowed = {"ast", "os", "re", "subprocess", "sys", "pathlib", "pytest",
-               "bobbytailor"}
+               "flask_limiter", "bobbytailor"}
     assert imported <= allowed, (
         "this module must stay offline; unexpected imports %r"
         % sorted(imported - allowed)

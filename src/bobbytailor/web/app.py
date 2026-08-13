@@ -8,6 +8,7 @@ from flask import Flask, jsonify, redirect, request, url_for
 from flask_login import current_user
 from flask_wtf.csrf import CSRFProtect
 from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from bobbytailor.web.auth import bcrypt, init_admin, limiter, login_manager
 from bobbytailor.config import (
@@ -31,6 +32,34 @@ from bobbytailor.web.blueprints import (
 logger = logging.getLogger(__name__)
 
 PUBLIC_ENDPOINTS: frozenset = frozenset({"auth.login", "auth.logout", "static"})
+
+_FALSEY = frozenset({"0", "false", "no", "off"})
+
+
+def _session_cookie_secure() -> bool:
+    """Whether the session cookie is marked Secure (HTTPS-only).
+
+    Defaults to True, and that default is correct: a session cookie sent in
+    clear text is a hijackable credential.
+
+    But the failure mode when it is wrong is silent and total. Over plain HTTP
+    the browser accepts the Secure cookie and then never sends it back, so
+    /login reports success and every subsequent request redirects to /login
+    again — forever, with no error logged anywhere and nothing on screen to
+    explain it. The only escape used to be FLASK_ENV=development, a name no
+    operator would guess and nobody should set in production just to reach a
+    login form.
+
+    So: an explicit, obviously-named opt-out (SESSION_COOKIE_SECURE=false) for
+    the operator who genuinely controls the network path — an SSH tunnel to
+    127.0.0.1, a local dev box. FLASK_ENV=development still works so existing
+    setups do not break. TLS remains the documented, supported answer; see the
+    README "Production — TLS is REQUIRED" section.
+    """
+    explicit = os.getenv("SESSION_COOKIE_SECURE")
+    if explicit is not None and explicit.strip():
+        return explicit.strip().lower() not in _FALSEY
+    return os.getenv("FLASK_ENV") != "development"
 
 
 def create_app() -> Flask:
@@ -73,7 +102,7 @@ def create_app() -> Flask:
     app.config.update(
         SECRET_KEY=os.environ["SECRET_KEY"],
         SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SECURE=os.getenv("FLASK_ENV") != "development",
+        SESSION_COOKIE_SECURE=_session_cookie_secure(),
         SESSION_COOKIE_SAMESITE="Lax",
         PERMANENT_SESSION_LIFETIME=43200,
         WTF_CSRF_TIME_LIMIT=3600,
@@ -81,6 +110,21 @@ def create_app() -> Flask:
         # before they are read to disk/memory (resource-exhaustion guard).
         MAX_CONTENT_LENGTH=MAX_UPLOAD_MB * 1024 * 1024,
     )
+
+    # The supported deployment puts nginx in front of gunicorn, so without
+    # this every request appears to originate from 127.0.0.1. Two things break
+    # quietly as a result:
+    #
+    #   * the login rate limit keys on get_remote_address(), so "5 per minute;
+    #     20 per hour" becomes a GLOBAL limit — one attacker, or one operator
+    #     fat-fingering a password, locks out the only account on the box;
+    #   * Flask-Login's session_protection="strong" compares the client IP
+    #     between requests, and a constant 127.0.0.1 makes that check inert.
+    #
+    # x_for=1 / x_proto=1: trust exactly ONE hop, the nginx we document. Any
+    # larger number would let a client forge its own X-Forwarded-For and
+    # sidestep the rate limit entirely.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 
     csrf = CSRFProtect(app)
     login_manager.init_app(app)
