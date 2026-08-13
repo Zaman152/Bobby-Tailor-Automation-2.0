@@ -7,7 +7,22 @@ from dotenv import load_dotenv
 _env_path = Path(__file__).resolve().parents[2] / ".env"
 if not _env_path.exists():
     _env_path = Path.cwd() / ".env"
-load_dotenv(dotenv_path=_env_path, override=True)
+
+# override=False — .env fills GAPS in the environment, it does not outrank it.
+#
+# With override=True (the old behaviour) a `docker run -e OUTPUT_DIR=...` or a
+# systemd `Environment=` line was not merely lower priority, it was ERASED: any
+# variable whose name appeared in .env was overwritten, and because load_dotenv
+# writes through to os.environ, every later os.getenv in the process saw the
+# .env value too. That is unfixable from the outside — the operator sets the
+# variable the documented way and the app ignores it, silently.
+#
+# Consequence to state plainly (see README "Settings vs the process
+# environment"): a variable that is ALSO set in the process environment can no
+# longer be changed through the Settings page, because the process environment
+# now wins after a restart. The supported systemd unit sets only PATH, so this
+# affects nothing today.
+load_dotenv(dotenv_path=_env_path, override=False)
 
 # StackCT Credentials (set in .env file)
 STACKCT_EMAIL = os.getenv("STACKCT_EMAIL", "")

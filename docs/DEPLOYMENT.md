@@ -54,7 +54,25 @@ Raising `-w` on its own silently breaks the upload → run → poll flow.
 
 Names and sources only — values live exclusively in `.env` (never commit it;
 `.env.example` is the value template). `bobbytailor/config.py` is the single
-reader; it crash-fails at startup when a required variable is missing.
+reader.
+
+### Precedence: the process environment wins
+
+`config.py` loads `.env` with `override=False`, so **`.env` fills gaps in the
+environment; it does not outrank it.** A `docker run -e VAR=...` or a systemd
+`Environment="VAR=..."` line is authoritative even when `VAR` also appears in
+`.env`.
+
+Two consequences worth knowing before they cost someone an afternoon:
+
+1. **A variable set in the process environment cannot be changed through the
+   Settings page.** Settings writes to `.env`, and after a restart the process
+   environment wins again. The supported systemd unit sets only `PATH`, so
+   nothing is affected today — but if you add `Environment=` lines, those
+   variables become read-only from the UI.
+2. This was previously inverted (`override=True`), which silently *erased*
+   deployment-supplied values and mutated `os.environ` while doing it. If you
+   are carrying a local workaround that depended on `.env` winning, remove it.
 
 ### Required
 

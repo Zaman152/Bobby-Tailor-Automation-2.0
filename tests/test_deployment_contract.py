@@ -17,6 +17,10 @@ Concretely pinned here:
 * **gunicorn is invoked by the docs but was not a declared dependency.**
 * **nginx `client_max_body_size` vs `MAX_UPLOAD_MB`** — a mismatch is a bare
   413 that never reaches Flask, so no in-app error is ever shown.
+* **`.env` must not outrank the process environment.** `load_dotenv` with
+  `override=True` does not merely deprioritise a `docker run -e` or systemd
+  `Environment=` value, it erases it — and writes the `.env` value through to
+  `os.environ`, so every later `os.getenv` in the process sees it too.
 
 Everything here is FREE: no paid marker, no credential, no network, no golden
 comparison. The module audits itself for that at the bottom.
@@ -140,6 +144,50 @@ def test_nginx_body_size_matches_max_upload_mb():
         )
 
 
+# ─── B2: .env fills gaps in the environment, it does not outrank it ─────────
+
+CONFIG_PY = REPO_ROOT / "src" / "bobbytailor" / "config.py"
+
+
+def test_dotenv_does_not_override_the_process_environment():
+    """Read off the source, not off behaviour: by the time a test can observe
+    config, .env has already been loaded once and the damage (or its absence)
+    is indistinguishable from a value that was simply never set."""
+    calls = re.findall(r"load_dotenv\([^)]*\)", CONFIG_PY.read_text())
+    assert calls, "config.py no longer calls load_dotenv"
+    for call in calls:
+        assert "override=False" in call, (
+            "config.py loads .env as %r. With override=True a deployment "
+            "environment variable is not lower priority, it is ERASED — and "
+            "os.environ is mutated, so every later os.getenv sees the .env "
+            "value. Deployment env vars must win." % call
+        )
+
+
+def test_a_process_environment_variable_survives_a_fresh_config_import():
+    """The behaviour the source pin exists to protect, exercised end to end in
+    a child interpreter so this process's already-imported config is
+    irrelevant."""
+    import subprocess
+    import sys
+    import os
+
+    env = dict(os.environ)
+    # A name .env is overwhelmingly likely to define — the whole point is that
+    # a colliding name must still be won by the process environment.
+    env["OUTPUT_DIR"] = "/srv/bobby/data-from-the-deployment"
+    proc = subprocess.run(
+        [sys.executable, "-c",
+         "import bobbytailor.config as c; print(c.OUTPUT_DIR)"],
+        capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == "/srv/bobby/data-from-the-deployment", (
+        "a deployment-supplied OUTPUT_DIR was discarded in favour of .env; "
+        "got %r" % proc.stdout.strip()
+    )
+
+
 # ─── self-audit: this module costs nothing to run ───────────────────────────
 
 def test_this_module_spends_no_money():
@@ -169,7 +217,10 @@ def test_this_module_imports_nothing_that_could_reach_a_network():
             imported.update(a.name.split(".")[0] for a in node.names)
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
             imported.add(node.module.split(".")[0])
-    allowed = {"ast", "re", "pathlib", "pytest", "bobbytailor"}
+    # subprocess is here to re-import config in a clean interpreter, never to
+    # reach off the box; sys/os supply that child's argv and environment.
+    allowed = {"ast", "os", "re", "subprocess", "sys", "pathlib", "pytest",
+               "bobbytailor"}
     assert imported <= allowed, (
         "this module must stay offline; unexpected imports %r"
         % sorted(imported - allowed)

@@ -65,21 +65,26 @@ os.environ.setdefault("ENSEMBLE_N", "3")
 os.environ.setdefault("API_BUDGET_PER_RUN_USD", "10.0")
 
 # Phase 22 (Step 1b): isolate ALL session output writes away from the real repo
-# output/ tree. An env pin does NOT work here — config.py:10 calls
-# load_dotenv(dotenv_path=..., override=True) at import time and .env defines
-# OUTPUT_DIR, so override=True clobbers any os.environ.setdefault made in this
-# file. The working mechanism (proven in test_blueprint_parity.py:162-165) is a
-# module-attribute patch: import config, then overwrite the attributes
-# directly. SCREENSHOTS_DIR must ALSO be attr-patched — config.py:74 derives it
-# from OUTPUT_DIR at import time and it is not env-driven.
+# output/ tree. The mechanism is a module-attribute patch: import config, then
+# overwrite the attributes directly (proven in test_blueprint_parity.py:162-165).
+# An env pin alone is NOT sufficient — SCREENSHOTS_DIR is derived from
+# OUTPUT_DIR at import time and is not env-driven, so it must be attr-patched
+# regardless of what the environment says.
+#
+# (Historical note: this used to be the ONLY working mechanism, because
+# config.py called load_dotenv(override=True) and .env defines OUTPUT_DIR, so
+# .env clobbered every os.environ.setdefault made in this file. That precedence
+# inversion was a deployment blocker in its own right — it erased `docker run
+# -e` / systemd `Environment=` values — and config.py now loads .env with
+# override=False. An env pin would work for OUTPUT_DIR today; the attr-patch is
+# kept because it also covers the derived SCREENSHOTS_DIR.)
 #
 # Placement matters: this block runs BEFORE the _ensure_real pre-import loop
 # below, so bobbytailor.pipeline.reporter (imported there) captures the tmp
 # values by-value via `from ...config import OUTPUT_DIR`; pdf_analyzer is
 # imported lazily by the first test that needs it — always after conftest
-# finishes. The import is wrapped like _ensure_real because config crash-fails
-# on missing env vars in bare CI environments (no .env) — the stub configs in
-# the parity tests fill that gap and now carry explicit tmp-path dir attrs.
+# finishes. The import stays wrapped like _ensure_real so a bare CI environment
+# with no .env degrades to the parity stubs rather than erroring here.
 _TEST_OUTPUT_DIR = tempfile.mkdtemp(prefix="bt-test-output-")
 try:
     import bobbytailor.config as _config
