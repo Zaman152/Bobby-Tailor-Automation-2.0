@@ -364,6 +364,37 @@ function formatFileSize(bytes) {
   return mb >= 0.1 ? mb.toFixed(1) + ' MB' : (bytes / 1024).toFixed(0) + ' KB';
 }
 
+// The plans-only guard (INV-A §3). The server decides whether a filename reads
+// like a completed take-off; this only renders its verdict and holds the
+// Analyze button until the operator says the file really is a drawing set.
+//
+// A warning nobody has to answer is a warning nobody reads, and running a
+// take-off through a plans-only pipeline produces a confident report over
+// somebody else's quantities — the one failure mode this product exists to not
+// have. It is an acknowledgement, not a block: "Take-off Plaza - Plans.pdf" is
+// a legitimate upload and no filename rule can know that.
+function showPlansOnlyWarning(message) {
+  const box = document.getElementById('plansOnlyWarning');
+  const text = document.getElementById('plansOnlyWarningText');
+  const ack = document.getElementById('plansOnlyAck');
+  if (!box || !ack) return;
+  if (!message) {
+    box.style.display = 'none';
+    ack.checked = false;
+    return;
+  }
+  if (text) text.textContent = message;
+  ack.checked = false;
+  box.style.display = 'block';
+}
+
+function plansOnlyBlocksRun() {
+  const box = document.getElementById('plansOnlyWarning');
+  const ack = document.getElementById('plansOnlyAck');
+  if (!box || !ack) return false;
+  return box.style.display !== 'none' && !ack.checked;
+}
+
 async function uploadPdfFile(file) {
   selectedFile = file;
   currentPdfUpload = null;
@@ -376,6 +407,7 @@ async function uploadPdfFile(file) {
   metaEl.textContent = 'Uploading…';
   pageSel.style.display = 'none';
   runBtn.disabled = true;
+  showPlansOnlyWarning(null);
 
   const form = new FormData();
   form.append('file', file);
@@ -397,7 +429,8 @@ async function uploadPdfFile(file) {
     document.getElementById('totalPageCount').textContent = data.page_count;
     renderPdfPageList(data.pages || []);
     pageSel.style.display = 'block';
-    runBtn.disabled = false;
+    showPlansOnlyWarning(data.plans_only_warning || null);
+    runBtn.disabled = plansOnlyBlocksRun();
   } catch (e) {
     metaEl.textContent = 'Upload failed: ' + e.message;
   }
@@ -484,6 +517,13 @@ async function runPDF() {
     return;
   }
 
+  // Checked here as well as on the button: the button's disabled state is only
+  // as good as the last event that set it, and this run costs paid API calls.
+  if (plansOnlyBlocksRun()) {
+    alert('This file looks like a completed take-off. Confirm it is a set of plans, or upload the plans instead.');
+    return;
+  }
+
   const btn = document.getElementById('runPdfBtn');
   const name = document.getElementById('pdfProjectName').value || currentPdfUpload.filename.replace(/\.pdf$/i, '');
   btn.disabled = true;
@@ -542,6 +582,14 @@ function bindPdfEvents() {
 
   const runBtn = document.getElementById('runPdfBtn');
   if (runBtn) runBtn.addEventListener('click', runPDF);
+
+  // Plans-only acknowledgement gates Analyze, and only while the warning shows.
+  const plansAck = document.getElementById('plansOnlyAck');
+  if (plansAck) {
+    plansAck.addEventListener('change', () => {
+      if (runBtn && currentPdfUpload) runBtn.disabled = plansOnlyBlocksRun();
+    });
+  }
 
   document.getElementById('pdfSelectAllBtn')?.addEventListener('click', () => selectAllPdfPages(true));
   document.getElementById('pdfSelectNoneBtn')?.addEventListener('click', () => selectAllPdfPages(false));
@@ -1063,6 +1111,9 @@ function renderReportCard(r) {
           dl('raw_csv', 'Raw CSV') +
           dl('json', 'JSON') +
           dl('summary', 'TXT') +
+          // The record of what the run did NOT measure. Written by every run
+          // since phase 23 and reachable from no button until now.
+          dl('coverage_json', 'Coverage JSON') +
         '</div>' +
       '</div>' +
     '</div>' +

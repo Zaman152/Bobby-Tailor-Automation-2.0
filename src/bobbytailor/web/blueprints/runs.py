@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import re
 import threading
 import uuid
 from pathlib import Path
@@ -27,6 +28,65 @@ def _job_conflict_response(active_job_id: str):
         ),
         "active_job_id": active_job_id,
     }), 409
+
+
+#: A filename that reads like a completed take-off rather than a set of plans.
+#: Matches "takeoff", "take off", "take-off", "Take offs", in any case.
+_TAKEOFF_NAME_RE = re.compile(r"take[ _-]?offs?\b", re.IGNORECASE)
+
+#: The warning the operator sees. Stated as what the app WILL do with the file,
+#: not as a scolding — the pipeline cannot tell a take-off from a plan set by
+#: looking, and a take-off run through it produces confident, meaningless
+#: numbers with nothing on the report to say so.
+TAKEOFF_UPLOAD_WARNING = (
+    "This filename looks like a completed TAKE-OFF, not a set of plans. "
+    "Bobby Tailor measures plans; it has no way to tell a take-off apart from "
+    "a drawing set once it starts, and running one produces confident numbers "
+    "copied out of somebody else's quantities. Upload the PLANS instead — or "
+    "confirm below if this really is a drawing set whose name happens to match."
+)
+
+
+def looks_like_completed_takeoff(filename) -> bool:
+    """Does this uploaded filename read like a completed take-off?
+
+    A filename heuristic and nothing more, which is why the caller WARNS rather
+    than refuses: "Take-off Plaza - Plans.pdf" is a legitimate plan set and no
+    regex can know that. It exists because ``POST /api/pdf/upload`` accepted
+    ``Crow - Cass White Road-Take offs.pdf`` with a 200 and the operator got no
+    signal at all (INV-A §3).
+
+    The structural guard is elsewhere and unaffected: nothing scans the upload
+    folder, only the selected ``upload_id`` is opened, and
+    ``run_pdf_analysis`` passes ``allow_discovery=False``. This is the sign on
+    the door, not the lock.
+    """
+    return bool(_TAKEOFF_NAME_RE.search(str(filename or "")))
+
+
+def _plans_only_job_log(filename) -> list:
+    """Opening job-log entries for a run started over a take-off-shaped name.
+
+    Empty for every ordinary file. The warning travels onto the RUN and not
+    only onto the upload screen because a run started over the operator's "are
+    you sure" is a fact about that run, and a dialog leaves no record. Both PDF
+    entry points call this — ``/api/run/pdf`` uploads and starts in one step
+    and never sees the upload screen's warning at all.
+    """
+    if not looks_like_completed_takeoff(filename):
+        return []
+    from datetime import datetime as _dt
+    logger.warning("PDF run started over take-off-shaped filename: %s", filename)
+    return [{
+        "timestamp": _dt.now().isoformat(),
+        "type": "warning",
+        "message": (
+            "Started over a file whose name reads like a completed TAKE-OFF "
+            "(%s). Bobby Tailor is plans-only. If this is not a drawing set, "
+            "the numbers in this report are not a measurement of anything."
+            % filename
+        ),
+    }]
 
 
 def _safe_upload_name(filename, fallback: str = "upload.pdf") -> str:
@@ -137,9 +197,19 @@ def upload_pdf():
     from bobbytailor.pipeline.pdf_analyzer import get_pdf_metadata
     meta = get_pdf_metadata(save_path)
 
+    plans_only_warning = (
+        TAKEOFF_UPLOAD_WARNING if looks_like_completed_takeoff(f.filename) else None
+    )
+    if plans_only_warning:
+        logger.warning(
+            "Upload %s has a take-off-shaped filename (%s) — plans-only warning served",
+            upload_id, f.filename,
+        )
+
     uploads[upload_id] = {
         "save_path": save_path,
         "filename": f.filename,
+        "plans_only_warning": plans_only_warning,
         **meta,
     }
 
@@ -149,6 +219,7 @@ def upload_pdf():
         "page_count": meta["page_count"],
         "file_size_bytes": meta["file_size_bytes"],
         "pages": meta["pages"],
+        "plans_only_warning": plans_only_warning,
     })
 
 
@@ -187,7 +258,8 @@ def run_pdf_from_upload():
     job_id = str(uuid.uuid4())[:8]
     conflict = register_job(job_id, {
         "id": job_id, "type": "pdf", "status": "queued",
-        "progress": 0, "log": [], "result": None, "error": None,
+        "progress": 0, "log": _plans_only_job_log(upload.get("filename")),
+        "result": None, "error": None,
         "project": project_name,
         "file": upload.get("filename"),
         "started_at": None,
@@ -293,7 +365,8 @@ def run_pdf():
     job_id = str(uuid.uuid4())[:8]
     conflict = register_job(job_id, {
         "id": job_id, "type": "pdf", "status": "queued",
-        "progress": 0, "log": [], "result": None, "error": None,
+        "progress": 0, "log": _plans_only_job_log(f.filename),
+        "result": None, "error": None,
         "project": project_name, "file": f.filename,
         "started_at": None,
         "current_sheet": {"index": 0, "total": 0, "name": None, "phase": None},
@@ -311,5 +384,8 @@ def run_pdf():
         target=_pdf_job, args=(job_id, save_path, project_name), daemon=True
     )
     t.start()
-    return jsonify({"job_id": job_id})
+    resp = {"job_id": job_id}
+    if looks_like_completed_takeoff(f.filename):
+        resp["plans_only_warning"] = TAKEOFF_UPLOAD_WARNING
+    return jsonify(resp)
 

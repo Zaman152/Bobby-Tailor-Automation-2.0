@@ -221,7 +221,21 @@
               <p class="file-name" id="selectedFileName"></p>
             </div>
             <input type="file" id="fileInput" accept=".pdf" />
+            <p class="hint plans-only-hint">
+              Upload the <strong>PLANS</strong>. Bobby Tailor measures drawings —
+              it never reads a completed take-off, and cannot tell one apart from
+              a drawing set once it starts.
+            </p>
             <p class="pdf-upload-meta" id="pdfUploadMeta" style="display:none"></p>
+            <!-- Shown only when the uploaded filename looks like a take-off
+                 (server decides — /api/pdf/upload returns plans_only_warning). -->
+            <div class="plans-only-warning" id="plansOnlyWarning" style="display:none">
+              <p id="plansOnlyWarningText"></p>
+              <label class="plans-only-ack">
+                <input type="checkbox" id="plansOnlyAck">
+                I confirm this file is a set of <strong>plans</strong>, not a completed take-off.
+              </label>
+            </div>
           </div>
 
           <div class="page-selection" id="pageSelection" style="display:none">
