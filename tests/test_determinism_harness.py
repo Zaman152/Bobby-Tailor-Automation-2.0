@@ -448,17 +448,34 @@ def test_the_candidate_that_flipped_between_the_paid_runs_is_named_in_neither(
     """The phase's central defect, asserted end to end.
 
     The 56-EA cluster published as one name in the 14:19 run and another in the
-    18:13 run. It carries a recorded text absence, so it is excluded from the
-    symbol request entirely (24-07) and ledgered rather than named (24-04). It
-    must be ledgered in BOTH variants, and NEITHER of the two names the paid
-    runs gave it may appear in either published take-off.
+    18:13 run. NEITHER of the two names the paid runs gave it may appear in
+    either published take-off.
+
+    **What this test used to also assert, and why it no longer can.** It
+    required ``SYM-2`` to be present in the unnamed-geometry ledger in both
+    variants, on the reasoning that a candidate with a recorded text absence is
+    ledgered rather than named. That was the right containment for a candidate
+    nobody could explain — and ``SYM-2`` has since been EXPLAINED. Its 56
+    instances are 56 of the 120 structural column markers that
+    ``deterministic/grid_lattice.py`` now detects as one lattice at 100% grid
+    occupancy; ``cluster_symbols`` had shattered that lattice because a
+    gridline dash unions into each marker at 0.805 pt. The pipeline drops the
+    fragment so the same drawn objects are not published twice, so ``SYM-2`` is
+    no longer a candidate at all.
+
+    The invariant this file exists to defend is UNCHANGED and still asserted
+    below: the names the two paid runs disagreed about must not reach the
+    take-off. What changed is that the disagreement is now resolved by
+    measurement instead of contained by silence, which is strictly better.
+    Do NOT restore the ledger assertion by re-publishing the fragment.
     """
     for variant in VARIANTS:
         report = differential[variant][0]
         sets_ = _published_item_sets(report)
-        assert FLIPPED_CANDIDATE_ID in sets_.ledger_ids, (
-            "%s: %s is not in the unnamed-geometry ledger"
-            % (variant, FLIPPED_CANDIDATE_ID)
+        assert FLIPPED_CANDIDATE_ID not in sets_.ledger_ids, (
+            "%s: %s is in the unnamed-geometry ledger again — the lattice "
+            "suppression stopped working and the same geometry is now counted "
+            "twice" % (variant, FLIPPED_CANDIDATE_ID)
         )
         published = {n.lower() for n in sets_.summary_names}
         for flipped in FLIPPED_RUN_NAMES:
@@ -467,15 +484,52 @@ def test_the_candidate_that_flipped_between_the_paid_runs_is_named_in_neither(
                 "paid runs disagreed about is being named again"
                 % (variant, flipped)
             )
-        # Read the quantity off the record the producer wrote; never restate it.
-        record = next(
-            rec for rec in report["unnamed_geometry"]
-            if rec.get("candidate_id") == FLIPPED_CANDIDATE_ID
+        # The ledger must still be doing its job for everything else.
+        assert sets_.ledger_ids, (
+            "%s: the unnamed-geometry ledger is empty — containment for "
+            "candidates that genuinely have no name has stopped working"
+            % variant
         )
-        assert record.get("quantity") and record.get("unit"), (
-            "the ledger row states the candidate was MEASURED and not named; a "
-            "row with no quantity would read as 'this does not exist'"
+        for record in report["unnamed_geometry"]:
+            assert record.get("quantity") and record.get("unit"), (
+                "a ledger row states the candidate was MEASURED and not named; "
+                "a row with no quantity would read as 'this does not exist'"
+            )
+
+
+def test_the_geometry_that_was_the_flipped_candidate_is_now_measured_and_flagged(
+    differential,
+):
+    """The resolution of the flip, pinned so it cannot silently regress.
+
+    ``SYM-2``'s 56 instances were column markers. They are now part of a
+    120-marker lattice that IS published — and published flagged, because the
+    drawing does not say how many further columns are cast into the perimeter
+    panels. A measured number carrying its own review flag is the product;
+    silence was only ever the fallback.
+    """
+    for variant in VARIANTS:
+        report = differential[variant][0]
+        rows = [
+            r for r in report.get("takeoff_summary") or []
+            if "column" in str(r.get("item", "")).lower()
+        ]
+        assert rows, "%s: the 120 measured columns are not published at all" % variant
+        for row in rows:
+            assert row.get("needs_review") is True, (
+                "%s: %r is published unflagged — the end-of-grid columns are "
+                "undetermined and a reviewer must be told"
+                % (variant, row.get("item"))
+            )
+    # And it is the same number in both variants: a word never moved it.
+    quantities = {
+        variant: sorted(
+            r.get("quantity") for r in differential[variant][0]["takeoff_summary"]
+            if "column" in str(r.get("item", "")).lower()
         )
+        for variant in VARIANTS
+    }
+    assert quantities["variant_a"] == quantities["variant_b"]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -568,11 +622,20 @@ def test_the_gate_detects_a_naming_flip(differential):
 def test_the_gate_detects_a_candidate_named_in_one_variant_and_ledgered_in_the_other(
     differential,
 ):
-    """The same defect wearing its other hat, also demonstrated failing."""
+    """The same defect wearing its other hat, also demonstrated failing.
+
+    The victim is drawn from the ledger the run actually produced rather than
+    named as a constant. A hard-coded id silently stops probing anything the
+    day that candidate is explained and leaves the ledger — which is exactly
+    what happened to ``SYM-2`` when the grid lattice absorbed it.
+    """
     report = differential["variant_a"][0]
     baseline = _published_item_sets(report)
+    assert baseline.ledger_ids, "no ledgered candidate to poison — gate is vacuous"
+    victim = sorted(baseline.ledger_ids)[0]
+
     poisoned = _published_item_sets(
-        _with_candidate_named(report, FLIPPED_CANDIDATE_ID, "Dock Bumper")
+        _with_candidate_named(report, victim, "Dock Bumper")
     )
     diffs = _compare_published(baseline, poisoned)
     assert diffs, "the gate did NOT notice a ledgered candidate being published"

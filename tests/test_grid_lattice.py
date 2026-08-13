@@ -330,6 +330,69 @@ def test_shadowing_is_inert_without_a_lattice():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Pipeline wiring — the lattice has to reach the candidate registry.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _crow_bundle():
+    if "bundle" not in _CACHE:
+        from bobbytailor.pipeline.takeoff_pipeline import TakeoffPipeline
+
+        doc, _page = _crow_page0()
+        pipeline = TakeoffPipeline.__new__(TakeoffPipeline)
+        pipeline._project_footprint = None
+        pipeline._project_vocab_labels = []
+        pipeline._schedules_cache = {}
+        _CACHE["bundle"] = pipeline._deterministic_bundle(
+            doc[0], doc, str(CROW_PDF), 0, "A-101", "floor_plan"
+        )
+    return _CACHE["bundle"]
+
+
+@crow_only
+def test_the_lattice_reaches_the_candidate_registry_as_a_counted_candidate():
+    bundle = _crow_bundle()
+    groups = {g.candidate_id: g for g in bundle["symbol_groups"]}
+    assert "LAT-1" in groups, "the lattice never became a candidate"
+    lat = groups["LAT-1"]
+    assert lat.count == 120
+    assert len(lat.instance_bboxes_pt) == 120
+    assert lat.needs_review is True, "an undetermined grid end must stay flagged"
+    # Its name is NOT invented from the grid labels — an unnamed candidate with
+    # 120 positions is a flagged measurement, which is the honest outcome.
+    assert lat.contained_texts == []
+
+
+@crow_only
+def test_the_bundle_carries_the_lattice_evidence_and_no_completed_number():
+    lattices = _crow_bundle()["grid_lattices"]
+    assert len(lattices) == 1
+    lat = lattices[0]
+    assert lat["count"] == 120
+    assert lat["occupancy"] == 1.0
+    assert lat["completion_candidate"] is None
+    assert sorted(h["count"] for h in lat["completion_hypotheses"]) == [132, 160, 176]
+    assert lat["evidence"]["axis_x_labels"] == "1..22"
+    assert lat["evidence"]["axis_y_labels"] == "A..H"
+    assert len(lat["cell_ids"]) == 120
+
+
+@crow_only
+def test_the_false_56_bollards_fragment_no_longer_reaches_the_report():
+    """SYM-2's 56 instances are column markers the semantic pass named Bollards.
+
+    Once the lattice counts them properly the fragment must not ALSO be
+    published, or the same 56 drawn objects appear twice under two names.
+    """
+    ids = {g.candidate_id for g in _crow_bundle()["symbol_groups"]}
+    assert "SYM-2" not in ids
+    assert "LAT-1" in ids
+    # The 136-mark tick row is NOT suppressed — it is not a lattice marker and
+    # removing it would be a different (wrong) claim about the drawing.
+    assert "SYM-1" in ids
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # THE GATE — four plan sets, every page. A second fire is a rejection.
 # ─────────────────────────────────────────────────────────────────────────────
 

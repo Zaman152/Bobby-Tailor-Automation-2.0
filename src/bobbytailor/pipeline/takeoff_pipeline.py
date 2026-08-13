@@ -32,6 +32,7 @@ Phase notes:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -99,7 +100,11 @@ from bobbytailor.deterministic.scale_solver import (
     select_main_plan,
     solve_viewport_scale,
 )
-from bobbytailor.deterministic.symbols import cluster_symbols
+from bobbytailor.deterministic.grid_lattice import (
+    detect_grid_lattices,
+    lattice_shadowed_symbol_ids,
+)
+from bobbytailor.deterministic.symbols import SymbolGroup, cluster_symbols
 from bobbytailor.deterministic.tables import extract_schedules
 from bobbytailor.deterministic.text_anchor import anchors_for_candidates
 from bobbytailor.deterministic.viewports import segment_viewports
@@ -1026,6 +1031,47 @@ def _canonicalise_persisted_vocabulary(objects: list) -> list:
                 aliases.append(text)
         winner["aliases"] = aliases
     return folded
+
+
+def _lattice_as_symbol_group(lattice, fpp: float) -> SymbolGroup:
+    """Present a :class:`LatticeGroup` as a candidate the registry already knows.
+
+    Everything downstream — the candidate registry, the Set-of-Mark labelling
+    pass, the unnamed-geometry ledger — is written against ``SymbolGroup``, and
+    a lattice is a symbol candidate in every way that matters to them: a stable
+    id, a deterministic count, and an instance bbox for each thing counted.
+
+    Two properties are deliberate. ``needs_review`` is always True, because a
+    lattice can be complete on the drawing and still leave the end-of-grid
+    members undetermined (Crow: 120 drawn, and the drawing does not say whether
+    12, 40 or 56 more are cast into the perimeter panels). And
+    ``contained_texts`` stays EMPTY rather than being filled with the cell ids:
+    the cells are where the markers are, not what the drawing calls them, and
+    manufacturing an anchor out of a grid label is exactly the "name the shape"
+    move the anchored-only restriction exists to prevent. An unnamed candidate
+    with 120 positions and 100% grid occupancy is a good outcome — it is a
+    flagged measurement, not a guess.
+    """
+    boxes = list(lattice.instance_bboxes_pt)
+    rep = boxes[0] if boxes else (0.0, 0.0, 0.0, 0.0)
+    return SymbolGroup(
+        candidate_id=lattice.candidate_id,
+        count=lattice.count,
+        signature_hash=hashlib.sha1(
+            ("grid-lattice|%s|%dx%d" % (
+                lattice.marker_size_pt, lattice.n_cols, lattice.n_rows,
+            )).encode("utf-8")
+        ).hexdigest()[:16],
+        instance_bboxes_pt=boxes,
+        representative_bbox_pt=rep,
+        bbox_size_ft=(
+            round(lattice.marker_size_pt[0] * fpp, 3),
+            round(lattice.marker_size_pt[1] * fpp, 3),
+        ),
+        contained_texts=[],
+        confidence="high",
+        needs_review=True,
+    )
 
 
 def _build_symbol_count_hint(symbols) -> str:
@@ -3001,6 +3047,49 @@ class TakeoffPipeline:
                 page, fpp, exclude_rects=geometry_mask, doc=doc, page_index=page_index
             )
 
+        # ── Structural grid lattices (additive, never touches symbols.py) ────
+        #
+        # cluster_symbols SHATTERS a marker lattice it can physically see: the
+        # marker edges share a style class with the gridlines, and a gridline
+        # dash endpoint lands 0.805 pt from a marker corner — inside
+        # ENDPOINT_EPS_PT — so the dash unions into the component and the shape
+        # signature depends on how much dash happened to attach. Crow page 0's
+        # 120 column markers come back as SYM-2 (56) plus three fragments plus
+        # 53 clusters below MIN_INSTANCES.
+        #
+        # This asks the same primitives a different, position-first question,
+        # and it fires on exactly one page across all 83 pages of the four plan
+        # sets (see tests/test_grid_lattice.py).
+        #
+        # The suppression matters as much as the detection: SYM-2's 56
+        # instances ARE 56 of these markers, and the semantic pass named them
+        # "Bollards" — the whole of the reported "Bollards 56 vs 28" defect.
+        # Publishing the lattice AND the fragment would count the same drawn
+        # objects twice.
+        lattices: list = []
+        if resolved_type in _PLAN_SHEET_TYPES and fpp > 0:
+            lattices = detect_grid_lattices(
+                page, fpp, exclude_rects=geometry_mask, doc=doc,
+                page_index=page_index,
+            )
+            if lattices:
+                shadowed = set(lattice_shadowed_symbol_ids(symbols, lattices))
+                if shadowed:
+                    logger.info(
+                        "sheet %r: %d symbol group(s) %s are grid-lattice "
+                        "markers already counted by %s — dropped so the same "
+                        "geometry is not published twice",
+                        sheet_name, len(shadowed), sorted(shadowed),
+                        ", ".join(g.candidate_id for g in lattices),
+                    )
+                    symbols = [
+                        g for g in symbols
+                        if getattr(g, "candidate_id", None) not in shadowed
+                    ]
+                symbols = list(symbols) + [
+                    _lattice_as_symbol_group(g, fpp) for g in lattices
+                ]
+
         footprint = None
         if resolved_type in _PLAN_SHEET_TYPES:
             try:
@@ -3138,6 +3227,11 @@ class TakeoffPipeline:
 
         bundle = {
             "symbol_groups": symbols,
+            # Full lattice evidence — cell ids, occupancy, printed axis labels
+            # and the flagged completion hypotheses. The SymbolGroup above
+            # carries the COUNT; this carries why anyone should believe it, and
+            # what the drawing declines to say.
+            "grid_lattices": [g.to_dict() for g in lattices],
             "walls": walls,
             "wall_lf_by_class": wall_lf,
             "rooms": rooms,
