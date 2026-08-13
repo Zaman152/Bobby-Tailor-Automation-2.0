@@ -166,10 +166,23 @@ Bind to localhost when using nginx; bind to `0.0.0.0` only if exposing directly:
 
 ```bash
 source .venv/bin/activate
-gunicorn -w 2 -b 127.0.0.1:5050 app:app --timeout 300
+gunicorn -w 1 --threads 4 -b 127.0.0.1:5050 app:app --timeout 300
 ```
 
 Use `--timeout 300` (or higher) — StackCT runs and PDF analysis can exceed default worker timeouts.
+
+> **`-w 1` is mandatory. Do not raise the worker count.**
+> All live run state — `jobs`, `uploads`, `object_manifests` and the
+> single-active-job lock — lives in module-level dicts in one Python process
+> (`src/bobbytailor/web/jobs_runtime.py`). A second worker does not share them,
+> so an upload handled by worker A 404s when the follow-up `POST /api/pdf/run`
+> lands on worker B ("Upload not found or expired"), `GET /api/status/<id>`
+> returns 404 while a paid run completes invisibly, and the concurrency guard
+> that stops two runs corrupting each other's learned context becomes
+> per-worker. `--threads 4` gives all the concurrency this app needs: a takeoff
+> already runs in its own daemon thread and the request returns a `job_id`
+> immediately. If you ever need real multi-worker throughput, move that state
+> into `bobbytailor.stores.job_store` **first**.
 
 ### StackCT catalog database
 
@@ -189,7 +202,7 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/bobby-tailor
 Environment="PATH=/home/ubuntu/bobby-tailor/.venv/bin"
-ExecStart=/home/ubuntu/bobby-tailor/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5050 app:app --timeout 300
+ExecStart=/home/ubuntu/bobby-tailor/.venv/bin/gunicorn -w 1 --threads 4 -b 127.0.0.1:5050 app:app --timeout 300
 Restart=always
 RestartSec=5
 
@@ -206,9 +219,14 @@ sudo systemctl start bobby-tailor
 sudo systemctl status bobby-tailor
 ```
 
-### Nginx reverse proxy (optional)
+### Nginx reverse proxy (required)
 
-Serve on port 80/443 and proxy to Gunicorn:
+**Not optional.** Gunicorn binds to `127.0.0.1` and session cookies are
+`Secure`-only by default, so TLS termination in front of the app is part of the
+supported deployment — without it, login silently fails (see
+[Authentication](#authentication) step 4).
+
+Serve on port 443 (with 80 redirecting) and proxy to Gunicorn:
 
 ```nginx
 server {
@@ -224,11 +242,14 @@ server {
         proxy_connect_timeout 75s;
     }
 
-    client_max_body_size 100M;
+    # MUST match MAX_UPLOAD_MB in .env (config.py default: 500).
+    # If nginx is smaller, large plan sets fail with a bare 413 that never
+    # reaches Flask and shows no in-app error.
+    client_max_body_size 500M;
 }
 ```
 
-HTTPS with Let's Encrypt:
+HTTPS with Let's Encrypt — run this immediately, before the first login:
 
 ```bash
 sudo apt install certbot python3-certbot-nginx
@@ -315,21 +336,36 @@ python -c "import bcrypt; print(bcrypt.hashpw(b'newpassword', bcrypt.gensalt(rou
 
 **3. Local development:**
 
-Set `FLASK_ENV=development` so `SESSION_COOKIE_SECURE` is `False` over plain HTTP:
+Set either `FLASK_ENV=development` or `SESSION_COOKIE_SECURE=false` so the
+session cookie is not `Secure`-only over plain HTTP:
 
 ```env
-FLASK_ENV=development
+SESSION_COOKIE_SECURE=false
 ```
 
-**4. Production (HTTPS required):**
+**4. Production — TLS is REQUIRED, not optional:**
 
-Unset `FLASK_ENV` (or set to `production`). Session cookies are `Secure`-only; app will not work over plain HTTP.
+Session cookies default to `Secure`-only. **Over plain HTTP the browser never
+returns the session cookie: `/login` appears to succeed and then every request
+redirects back to `/login` forever, with no error message anywhere.** That is
+the intended default — a session cookie sent in clear text over a proxied LAN
+or the public internet is a hijackable credential.
 
-For multi-worker gunicorn, use a Redis-backed rate limiter to share state:
+So one of these two is mandatory before you can log in:
 
-```env
-RATE_LIMIT_STORAGE_URI=redis://127.0.0.1:6379
-```
+- **Recommended:** terminate TLS at nginx (see [Nginx reverse proxy](#nginx-reverse-proxy-required)
+  below) and run certbot. Leave `SESSION_COOKIE_SECURE` unset.
+- **Only if you fully control the network path** (e.g. an SSH tunnel to
+  `127.0.0.1`): set `SESSION_COOKIE_SECURE=false` explicitly. Do not do this on
+  anything reachable from another machine.
+
+`SESSION_COOKIE_SECURE` accepts `0` / `false` / `no` (case-insensitive) to
+disable; anything else, including unset, keeps `Secure` on.
+
+Rate limiting uses the in-process `memory://` store, which is correct for the
+supported single-worker deployment (see [Running with Gunicorn](#running-with-gunicorn)).
+A Redis-backed limiter (`RATE_LIMIT_STORAGE_URI=redis://127.0.0.1:6379`) only
+becomes relevant if the in-process job state is moved to a shared store first.
 
 ### Security checklist
 
@@ -355,7 +391,8 @@ RATE_LIMIT_STORAGE_URI=redis://127.0.0.1:6379
 
 **PDF upload fails:**
 
-- Ensure `client_max_body_size` is large enough in nginx (see above)
+- Ensure nginx `client_max_body_size` matches `MAX_UPLOAD_MB` (see above); a
+  mismatch produces a bare nginx 413 that never reaches Flask
 - Confirm `uploads/` directory exists and is writable
 
 ## Run

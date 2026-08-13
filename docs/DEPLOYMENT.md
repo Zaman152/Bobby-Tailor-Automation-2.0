@@ -10,7 +10,7 @@ restart discipline, error recovery, and data durability.
 
 | Surface | Command | Notes |
 |---------|---------|-------|
-| Web UI / API (production) | `gunicorn -w 2 -b 127.0.0.1:5050 app:app --timeout 300` | Root `app.py` is a 5-line wrapper: `from bobbytailor.web.app import create_app; app = create_app()` |
+| Web UI / API (production) | `gunicorn -w 1 --threads 4 -b 127.0.0.1:5050 app:app --timeout 300` | Root `app.py` is a 5-line wrapper: `from bobbytailor.web.app import create_app; app = create_app()`. **`-w 1` is mandatory — see below.** |
 | Web UI (local dev) | `python3 app.py` | Flask dev server on port 5050 |
 | CLI scrape run | `python3 main.py [--project-id N]` | StackCT scrape → analyze → report |
 | Admin seeding (once) | `ADMIN_SEED_PASSWORD='<strong password>' python -m bobbytailor.web.seed_admin` (or `--generate`) | Writes `ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH` to `.env`; the password is never stored in source |
@@ -23,6 +23,32 @@ pip install -r requirements.txt
 pip install -e .
 playwright install chromium && playwright install-deps chromium
 ```
+
+### Why `-w 1 --threads 4` — do NOT raise the worker count
+
+**Every piece of live run state is a module-level dict in a single Python
+process.** `src/bobbytailor/web/jobs_runtime.py` holds `jobs`, `uploads`,
+`object_manifests` and `job_lock` as in-process dicts. `blueprints/runs.py`
+looks up `uploads[upload_id]` and `blueprints/jobs.py` looks up `jobs[job_id]`.
+
+With two or more workers, gunicorn round-robins requests across processes that
+do not share those dicts. The consequences are not subtle:
+
+- An upload lands in worker A; the follow-up `POST /api/pdf/run` lands in
+  worker B → **"Upload not found or expired"** on roughly half of all uploads.
+- `GET /api/status/<job_id>` hits a worker that never registered the job →
+  **404 status polls** while a paid run completes invisibly.
+- `register_job`'s single-active-job guard — which exists specifically to stop
+  two overlapping runs swapping each other's learned context mid-run — becomes
+  per-worker, i.e. effectively absent.
+
+`--threads 4` covers concurrency: a takeoff already runs in its own daemon
+thread and the request returns a `job_id` immediately, so one worker never
+blocks the UI for the length of a run.
+
+**If you ever need more than one worker, move `jobs` / `uploads` /
+`object_manifests` into a shared store (`bobbytailor.stores.job_store`) FIRST.**
+Raising `-w` on its own silently breaks the upload → run → poll flow.
 
 ## Environment variables
 
@@ -78,7 +104,9 @@ reader; it crash-fails at startup when a required variable is missing.
 | `STACKCT_CACHE_TTL_HOURS` | `24` | Catalog re-sync interval |
 | `JOB_HISTORY_RETENTION_DAYS` | `90` | Job history pruning (0 = keep forever) |
 | `MAX_PREVIEW_ROWS` | `500` | CSV preview cap in UI |
-| `RATE_LIMIT_STORAGE_URI` | `memory://` | Use `redis://127.0.0.1:6379` for multi-worker gunicorn |
+| `RATE_LIMIT_STORAGE_URI` | `memory://` | `memory://` is correct for the supported `-w 1` deployment. Redis is only relevant if the in-process job state is moved to a shared store first (see "Why `-w 1`") |
+| `MAX_UPLOAD_MB` | `500` | Request-body cap (Flask `MAX_CONTENT_LENGTH`). **Keep nginx `client_max_body_size` at the same number** or uploads fail with a silent 413 |
+| `SESSION_COOKIE_SECURE` | `true` | `false` allows session cookies over plain HTTP. Only set it for local dev — see the README TLS section |
 | `FLASK_ENV` | (unset) | `development` disables Secure-only cookies for plain-HTTP local dev |
 | `RUN_SCHEDULE` | `0 8 * * *` | Cron for scheduled CLI runs |
 

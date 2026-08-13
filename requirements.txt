@@ -5,6 +5,10 @@ anthropic>=0.28.0
 apscheduler>=3.10.0
 python-dotenv>=1.0.0
 flask>=3.0.0
+# Production WSGI server — both deployment docs and the systemd unit invoke it.
+# Run it as `-w 1 --threads 4`: all live job/upload state is in-process
+# (web/jobs_runtime.py). See docs/DEPLOYMENT.md "Why -w 1".
+gunicorn>=21.2
 flask-login>=0.6.3
 flask-bcrypt>=1.0.1
 flask-wtf>=1.2.0
