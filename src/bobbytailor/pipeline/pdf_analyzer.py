@@ -14,7 +14,11 @@ from PIL import Image
 
 from bobbytailor.pipeline.calculator import resolve_spec_lookups
 from bobbytailor.pipeline.coverage import ERRORED, NOT_APPLICABLE, CoverageLedger
-from bobbytailor.pipeline.cross_references import resolve_cross_references
+from bobbytailor.pipeline.cross_references import (
+    missing_referenced_sheets,
+    resolve_cross_references,
+    sheet_ids_in_text,
+)
 from bobbytailor.pipeline.reporter import generate_report
 from bobbytailor.pipeline.takeoff_pipeline import (
     RunSettings,
@@ -379,6 +383,35 @@ def run_pdf_analysis(
                 disposition=NOT_APPLICABLE,
                 reason="not selected for analysis",
             )
+
+    # ----------------------------------------------------------------
+    # Sheet-set completeness. A set that CITES a sheet it does not
+    # CONTAIN has a hole in it, and everything drawn only on the missing
+    # sheet is UNKNOWN — not zero, and not an engine failure. Crow's 10
+    # stairs are the case: its 4-page upload defers three times to
+    # enlarged plans A-111/112/113 that are not in the file, so no
+    # detector of any kind can count them. Recorded here, before any
+    # measurement, so the run can say so instead of publishing a number.
+    # Zero API, pure text.
+    # ----------------------------------------------------------------
+    try:
+        with fitz.open(pdf_path) as _ref_doc:
+            _present = [
+                sid
+                for i in range(_ref_doc.page_count)
+                for sid in sheet_ids_in_text(get_title_block_text(_ref_doc, i))
+            ]
+            ledger.missing_sheets = missing_referenced_sheets(
+                _present, [p.get_text() for p in _ref_doc]
+            )
+        if ledger.missing_sheets:
+            logger.info(
+                "sheet set cites %d sheet(s) it does not contain: %s",
+                len(ledger.missing_sheets),
+                ", ".join(m["sheet_id"] for m in ledger.missing_sheets),
+            )
+    except Exception as exc:  # noqa: BLE001 — additive; never break a run
+        logger.debug("sheet-set completeness check failed: %s", exc)
 
     # ----------------------------------------------------------------
     # Pass 1 — Convert PDF pages to images

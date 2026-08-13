@@ -88,3 +88,65 @@ def resolve_cross_references(all_extracted: List[dict]) -> List[dict]:
             resolved_list.append(entry)
 
     return resolved_list
+
+
+# ---------------------------------------------------------------------------
+# Sheet-set completeness (deterministic, zero API)
+# ---------------------------------------------------------------------------
+#
+# A plan set that CITES a sheet it does not CONTAIN has a hole in it, and every
+# quantity that lives on the missing sheet is unknowable — not zero, not
+# missing because the engine failed, but absent from the input.
+#
+# Crow is the case that forced this. Its golden take-off lists 10 stairs. The
+# uploaded 4-page PDF contains A-101, A-201, A-401 and A-601, and it defers
+# three times — "SEE 1/A-111", "SEE 1/A-112", "SEE 1/A-113" — to enlarged plans
+# that are not in the file. A-401 (page 2) draws a STAIR PLAN, a STAIR SECTION
+# and a STAIR RAIL, so the set shows what a stair looks like; the sheets that
+# would say how many are installed and where are the ones missing. There is no
+# detector — deterministic, ML or vision — that can count objects that are not
+# in the file, and any number printed there is a fabrication.
+#
+# (Correcting INV-B on a point of fact: it reports the stairs as living on
+# "A-401 details and the A-111/112/113 enlarged plans, which are not in the
+# uploaded PDF". A-401 IS in the uploaded PDF — it is page 2. Only A-111, A-112
+# and A-113 are absent, along with A-002 and A-501.)
+
+import re as _re
+
+_SHEET_ID_RE = _re.compile(r"\b([A-Z]{1,2}-\d{3}[A-Z]?)\b")
+
+
+def sheet_ids_in_text(text: str) -> List[str]:
+    """Every drawing-sheet identifier cited in *text* (``A-401``, ``M-101``)."""
+    return _SHEET_ID_RE.findall((text or "").upper())
+
+
+def missing_referenced_sheets(
+    sheets_present: List[str],
+    page_texts: List[str],
+) -> List[Dict[str, Any]]:
+    """Sheets the drawing set cites but does not contain.
+
+    ``sheets_present`` are the sheet ids read from each page's own title block;
+    ``page_texts`` is the full text of each page, in the same page order.
+
+    Returns one record per missing sheet id, with the page indices that cite it
+    and how many times — evidence a human can check against the drawing. Pure
+    string work: no fitz, no I/O, no API.
+    """
+    present = {str(s).strip().upper() for s in sheets_present if str(s).strip()}
+    cited: Dict[str, List[int]] = {}
+    for index, text in enumerate(page_texts):
+        for sheet_id in sheet_ids_in_text(text):
+            if sheet_id in present:
+                continue
+            cited.setdefault(sheet_id, []).append(index)
+    return [
+        {
+            "sheet_id": sheet_id,
+            "cited_on_pages": sorted(set(pages)),
+            "citations": len(pages),
+        }
+        for sheet_id, pages in sorted(cited.items())
+    ]

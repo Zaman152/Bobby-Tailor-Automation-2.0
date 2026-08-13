@@ -500,6 +500,10 @@ def _coverage_for_report(coverage: Optional[CoverageLedger],
         pages_in_source=coverage.pages_in_source,
         sheets=coverage.sheets,
         items=[],
+        # Carried, not recomputed: the sheets a set cites but does not contain
+        # are read once, before any measurement. Dropping them here would lose
+        # the run's only statement that its INPUT was incomplete.
+        missing_sheets=list(getattr(coverage, "missing_sheets", ()) or ()),
     )
 
     seen = set()

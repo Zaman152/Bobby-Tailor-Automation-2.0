@@ -68,6 +68,17 @@ SHEET_DISPOSITIONS = (
 # "dropped because it had no scale of its own".
 EXCLUDED_OFF_SCALE = "excluded_off_scale"
 
+# The gap is in the INPUT, not the engine. A drawing set that cites a sheet it
+# does not contain cannot be measured for whatever lives on that sheet, and no
+# detector — deterministic, ML or vision — can count objects that are not in
+# the file. Crow's golden lists 10 stairs; the uploaded 4-page PDF holds
+# A-101/A-201/A-401/A-601 and defers three times to enlarged plans A-111,
+# A-112 and A-113 that are not in it. A-401 draws a STAIR PLAN and a STAIR
+# SECTION, so the set shows what a stair looks like — it never says how many
+# are installed. Reporting this as an engine miss sends someone to fix a
+# detector; reporting it as a missing sheet gets the sheet uploaded.
+NOT_IN_UPLOADED_SET = "not_in_uploaded_set"
+
 # The set of dispositions that mean "this page produced no measurement".
 # is_silent_loss fires when one of these coincides with measurable signal.
 _NOT_MEASURED_DISPOSITIONS = (SKIPPED_CLASSIFIER, SKIPPED_NO_SCALE, NOT_APPLICABLE)
@@ -247,6 +258,11 @@ class CoverageLedger:
     pages_in_source: int = 0
     sheets: List[SheetCoverage] = field(default_factory=list)
     items: List[ItemCoverage] = field(default_factory=list)
+    # Sheet ids the drawing set CITES but does not CONTAIN, as produced by
+    # cross_references.missing_referenced_sheets: one dict per sheet, with the
+    # pages that cite it. This is an INPUT gap (see NOT_IN_UPLOADED_SET) and it
+    # closes by uploading the sheet, never by more detector work.
+    missing_sheets: List[Dict[str, Any]] = field(default_factory=list)
 
     # -- registration -------------------------------------------------------
     def register_page(self, page_index: int, **kw: Any) -> SheetCoverage:
@@ -350,6 +366,10 @@ class CoverageLedger:
             "drawings_measured": self._count_drawings(MEASURED, MEASURED_PARTIAL),
             "drawings_excluded_off_scale": self._count_drawings(EXCLUDED_OFF_SCALE),
             "drawings_dropped_no_scale": self._count_drawings(SKIPPED_NO_SCALE),
+            "drawings_not_in_uploaded_set": self._count_drawings(NOT_IN_UPLOADED_SET),
+            "sheets_referenced_but_missing": [
+                str(m.get("sheet_id", "")) for m in self.missing_sheets
+            ],
             "silent_loss_pages": self.silent_loss_pages(),
             "items_measured": items_measured,
             "items_needs_review": items_needs_review,
@@ -436,6 +456,28 @@ class CoverageLedger:
                 % dropped
             )
 
+        if self.missing_sheets:
+            named = ", ".join(
+                "%s (cited %dx)" % (m.get("sheet_id"), m.get("citations", 0))
+                for m in self.missing_sheets
+            )
+            out.append(
+                "this drawing set CITES %d sheet(s) it does not CONTAIN — %s. "
+                "Anything drawn only on those sheets cannot be measured from "
+                "what was uploaded, and its quantity is UNKNOWN, not zero. This "
+                "is a gap in the INPUT: it closes by uploading the missing "
+                "sheets, never by more detector work"
+                % (len(self.missing_sheets), named)
+            )
+
+        not_in_set = self._count_drawings(NOT_IN_UPLOADED_SET)
+        if not_in_set:
+            out.append(
+                "%d expected drawing(s) are NOT IN THE UPLOADED SET — they are "
+                "cross-referenced by the sheets provided but absent from the "
+                "file" % not_in_set
+            )
+
         not_measured = self._count_items(ITEM_NOT_MEASURED)
         if not_measured:
             out.append(
@@ -452,4 +494,5 @@ class CoverageLedger:
             "warnings": self.warnings(),
             "sheets": [row.to_dict() for row in self.sheets],
             "items": [it.to_dict() for it in self.items],
+            "missing_sheets": [dict(m) for m in self.missing_sheets],
         }
