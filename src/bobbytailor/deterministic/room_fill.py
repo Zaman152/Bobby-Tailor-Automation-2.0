@@ -281,22 +281,45 @@ _DATUM_PAIR_GAP_PT = 20.0
 # sixteen-times misparse (INV-03 §3.5).
 DATUM_SCALE_TOLERANCE = 0.30
 
-# Keynote legends (23-14 Task 4). A sheet's keyed notes pair a lone TWO-digit
-# number block with the note text beside it, under a legend header — and one
-# real sheet carries TWO legends (KEYED NOTES and DEMO KEYED NOTES) whose
-# numbers collide: Bob's '03' means NEW EIFS SCRATCH COAT in one and REMOVE
-# EXISTING LIGHT SCONCE in the other, so an entry must stay grouped under its
-# own header and a tag must resolve through the legend belonging to the
-# DRAWING it sits in.
+# Keynote legends (23-14 Task 4). A sheet's keyed notes pair a lone number
+# block with the note text beside it, under a legend header — and one real
+# sheet carries TWO legends (KEYED NOTES and DEMO KEYED NOTES) whose numbers
+# collide: Bob's '03' means NEW EIFS SCRATCH COAT in one and REMOVE EXISTING
+# LIGHT SCONCE in the other, so an entry must stay grouped under its own
+# header and a tag must resolve through the legend belonging to the DRAWING it
+# sits in.
 KEYNOTE_HEADER_RE = re.compile(
     r"\bKEY(?:ED)?\s*NOTES\b|\bKEYNOTES\b", re.IGNORECASE
 )
-_KEYNOTE_NUM_RE = re.compile(r"^(\d{2})\.?$")
+# ONE or two digits. This was `\d{2}` and that single character was starving
+# the whole text-anchored route: keynotes 1-9 were structurally invisible to
+# keynote_legend() and keynote_tags(). Crow page 0 read 3 of its 12 keynotes,
+# and keynote 1 — "ACCESS LADDER TO CONCRETE ROOF OF ELECTRICAL ROOM", the
+# entire evidence for the Ladder line item — never entered the pipeline at all.
+# Measured over all four plan sets, widening it is purely ADDITIVE: 24 legend
+# blocks -> 25, +49 recovered entries, ZERO entries lost and ZERO changed.
+_KEYNOTE_NUM_RE = re.compile(r"^(\d{1,2})\.?$")
 _KEYNOTE_HEADER_MAX_CHARS = 30
 # A legend entry's number block shares its header's column; the general notes
 # higher on the sheet have no keynote header above them and join nothing.
 _KEYNOTE_COLUMN_TOL_PT = 300.0
 _KEYNOTE_PAIR_GAP_PT = 40.0
+# A legend is a CONTIGUOUS STACK, and that is what tells it apart from a
+# drawing-title bubble that happens to sit in the same column far below.
+#
+# The nearest-header-above rule had no vertical bound at all. With single
+# digits admitted that became visible: Crow page 1's four "1 OVERALL NORTH
+# ELEVATION"-style view titles, 1900 pt below the header, joined KEYNOTES as
+# entries 1-4, and Bob's page 3 absorbed three roof detail titles the same way.
+#
+# The header-to-entry GAP does not separate them — real Moxy entries sit 918 pt
+# below their header while a spurious Bob's title sits 890 pt below. The STEP
+# from the previous element of the stack does, and it is sharply bimodal:
+# measured over all four sets, 394 real entries step at most 92.8 pt from the
+# element above them, and all 8 spurious ones step at least 298.1 pt. 150.0
+# sits in that empty band. If this constant ever needs to move, RE-MEASURE the
+# band — do not nudge it.
+_KEYNOTE_STACK_STEP_PT = 150.0
 
 # Render resolution for facade silhouettes. Elevations are wide-format —
 # Crow's south facade band is 2,441 x 335 pt — so the room-fill 160 DPI would
@@ -1641,23 +1664,17 @@ def datum_scale_check(
     return (1.0 - tolerance) <= ratio <= (1.0 + tolerance)
 
 
-def keynote_legend(page) -> dict:
-    """``{header_text: {number: note_text}}`` — keynote legends BY HEADER.
+def keynote_legend_rows(page) -> dict:
+    """``{header: [(number, note_text, number_block_box), ...]}`` — the legend
+    with each entry's own PAGE-SPACE number-block rectangle kept.
 
-    Pairing a number block with its note text reuses THE pairing primitive
-    from plan 23-05 (:func:`tag_pairing.pair_two_token_tags`): same reading
-    frame, bounded gap, one-to-one. Each paired entry then joins the nearest
-    :data:`KEYNOTE_HEADER_RE` header ABOVE it (page space) within its column
-    (:data:`_KEYNOTE_COLUMN_TOL_PT`); an entry with no keynote header above
-    it — a numbered general note — joins nothing.
-
-    Grouping by header is the whole point: the same number means different
-    things in the new-work legend and the demolition legend, and the correct
-    one is chosen by which DRAWING the tag sits in
-    (:func:`keynote_tags` + the caller's demo flag). Never raises.
+    The reader :func:`keynote_legend` builds on this and throws the boxes away.
+    Anything that has to tell a legend entry apart from a placed callout of the
+    same keynote needs them: on Crow page 0 keynote ``1`` is drawn in exactly
+    two bubbles, one of which is the legend's own, and the difference between
+    "1 ladder" and "2 ladders" is knowing which. Never raises.
     """
     try:
-        import fitz  # noqa: PLC0415
         from bobbytailor.deterministic.tag_pairing import (  # noqa: PLC0415
             page_tag_lines,
             pair_two_token_tags,
@@ -1689,24 +1706,284 @@ def keynote_legend(page) -> dict:
     except Exception:  # noqa: BLE001
         return {}
 
-    out: dict = {}
+    # Assign each paired entry to the nearest keynote header above it in its
+    # column, then keep only those that CHAIN down from that header as a
+    # contiguous stack (see _KEYNOTE_STACK_STEP_PT).
+    grouped: dict = {}
     for num_line, text_line in pairs:
         nbox = _rect(to_page_space(page, _rect(num_line.bbox_pt)))
         if nbox is None:
             continue
         best = None
         best_gap = float("inf")
+        best_box = None
         for header_text, hbox in headers:
             gap = nbox.y0 - hbox.y1
             if gap < -2.0 or abs(nbox.x0 - hbox.x0) > _KEYNOTE_COLUMN_TOL_PT:
                 continue
             if gap < best_gap:
-                best, best_gap = header_text, gap
+                best, best_gap, best_box = header_text, gap, hbox
         if best is None:
             continue
         number = _KEYNOTE_NUM_RE.match(num_line.text.strip()).group(1)
-        out.setdefault(best, {}).setdefault(number, text_line.text.strip())
+        entry = grouped.setdefault(best, {"bottom": best_box.y1, "rows": []})
+        entry["rows"].append(
+            (nbox.y0, number, text_line.text.strip(),
+             (nbox.x0, nbox.y0, nbox.x1, nbox.y1))
+        )
+
+    out: dict = {}
+    for header_text, entry in grouped.items():
+        previous = entry["bottom"]
+        highest = 0
+        for y0, number, text, box in sorted(entry["rows"]):
+            if y0 - previous > _KEYNOTE_STACK_STEP_PT:
+                # The stack ended here. Anything further down is other content
+                # that merely shares the column — a view title, a detail label.
+                break
+            # A legend numbers its entries UPWARD as it goes down the page.
+            # A restart is a DIFFERENT list that happens to sit directly below:
+            # Bob's page 4 runs KEYED NOTES 01..16 and is immediately followed,
+            # 93 pt lower, by an unheaded two-line paint-colour list numbered
+            # 1, 2. Requiring an increase separates them with no constant at
+            # all. (A legend printed in two side-by-side columns would be
+            # truncated here rather than mis-merged — fewer entries, never
+            # wrong ones.)
+            if int(number) <= highest:
+                break
+            previous, highest = y0, int(number)
+            out.setdefault(header_text, []).append((number, text, box))
+
+    return {h: _rejoin_wrapped_notes(page, rows, lines) for h, rows in out.items()}
+
+
+def _rejoin_wrapped_notes(page, rows: List[tuple], lines) -> List[tuple]:
+    """Give each entry its WHOLE note, not the one line nearest the number.
+
+    A keynote's number block is drawn vertically CENTRED on its note, and the
+    note wraps. ``pair_two_token_tags`` pairs one line with one number, so a
+    four-line note hands back whichever line happens to sit level with the
+    digit. Crow keynote 2 is "3'-0" X 3'-0" ROOF HATCH WITH ACCESS LADDER FROM
+    CONCRETE ROOF AT ELECTRICAL ROOF BELOW..." and the pairing returned its
+    SECOND line, "CONCRETE ROOF AT ELECTRICAL ROOF BELOW. G.C. TO" — a note
+    about a roof hatch reading as a note about a roof. Labels are decided off
+    this text, so a half-sentence is a confidently wrong label.
+
+    The reassembly needs no new constant. Numbers are centred on their notes,
+    so a note line belongs to the entry whose centre is nearest — resolved by
+    splitting the column at the MIDPOINT between consecutive entry centres, and
+    clamping the first and last entry to half a spacing so unrelated text above
+    and below the legend cannot be swept in. Entries whose text cannot be
+    reassembled keep exactly what they had.
+    """
+    if len(rows) < 2:
+        return rows
+    centres = [((box[1] + box[3]) / 2.0, i) for i, (_n, _t, box) in enumerate(rows)]
+    centres.sort()
+    spacings = [
+        centres[i + 1][0] - centres[i][0] for i in range(len(centres) - 1)
+    ]
+    half = (sorted(spacings)[len(spacings) // 2]) / 2.0
+    if half <= 0:
+        return rows
+
+    bounds = []
+    for k, (c, idx) in enumerate(centres):
+        lo = (centres[k - 1][0] + c) / 2.0 if k else c - half
+        hi = (c + centres[k + 1][0]) / 2.0 if k + 1 < len(centres) else c + half
+        bounds.append((lo, hi, idx))
+
+    # The note column: to the right of the numbers, sharing their band.
+    number_right = max(box[2] for _n, _t, box in rows)
+    collected: dict = {}
+    for line in lines:
+        text = line.text.strip()
+        if len(text) <= 8 or _KEYNOTE_NUM_RE.match(text):
+            continue
+        box = _rect(to_page_space(page, _rect(line.bbox_pt)))
+        if box is None or box.x0 < number_right:
+            continue
+        if box.x0 - number_right > _KEYNOTE_PAIR_GAP_PT:
+            continue
+        centre = (box.y0 + box.y1) / 2.0
+        for lo, hi, idx in bounds:
+            if lo <= centre < hi:
+                collected.setdefault(idx, []).append((box.y0, box.x0, text))
+                break
+
+    out: List[tuple] = []
+    for i, (number, text, box) in enumerate(rows):
+        parts = collected.get(i)
+        if not parts:
+            out.append((number, text, box))
+            continue
+        joined = " ".join(t for _y, _x, t in sorted(parts))
+        # Only ever ADD to what the validated pairing already found.
+        out.append((number, joined if text in joined else text, box))
     return out
+
+
+def keynote_legend(page) -> dict:
+    """``{header_text: {number: note_text}}`` — keynote legends BY HEADER.
+
+    Pairing a number block with its note text reuses THE pairing primitive
+    from plan 23-05 (:func:`tag_pairing.pair_two_token_tags`): same reading
+    frame, bounded gap, one-to-one. Each paired entry then joins the nearest
+    :data:`KEYNOTE_HEADER_RE` header ABOVE it (page space) within its column
+    (:data:`_KEYNOTE_COLUMN_TOL_PT`); an entry with no keynote header above
+    it — a numbered general note — joins nothing.
+
+    Grouping by header is the whole point: the same number means different
+    things in the new-work legend and the demolition legend, and the correct
+    one is chosen by which DRAWING the tag sits in
+    (:func:`keynote_tags` + the caller's demo flag). Never raises.
+
+    The reading itself lives in :func:`keynote_legend_rows`; this is that
+    result with each entry's number-block rectangle dropped.
+    """
+    return {
+        header: {number: text for number, text, _box in rows}
+        for header, rows in keynote_legend_rows(page).items()
+    }
+
+
+@dataclass
+class KeynoteCallout:
+    """One keynote, its printed note, and how many times it is PLACED.
+
+    The count is deterministic — it is a number of drawn bubbles, never an
+    eye-count and never a model's answer. The note text is evidence for a
+    LABELLING decision only: which manifest item this keynote is an item OF is
+    a pure semantic judgement with zero numeric content, and it stays that way.
+
+    That distinction is load-bearing on the very first case it was built for.
+    Crow keynote 1 is "ACCESS LADDER TO CONCRETE ROOF OF ELECTRICAL ROOM" and
+    keynote 2 is "3'-0" X 3'-0" ROOF HATCH WITH ACCESS LADDER FROM CONCRETE
+    ROOF". Both contain "ACCESS LADDER", so a naive alias match on a manifest's
+    ["ladder", "ship ladder", "roof ladder"] returns 2 where the answer is 1.
+    Geometry supplies the counts; deciding that keynote 1 is the ladder and
+    keynote 2 is a hatch is the head-noun question the semantic pass exists for.
+    """
+
+    number: str
+    note_text: str
+    header: str
+    callout_count: int
+    instance_bboxes_pt: List[tuple] = field(default_factory=list)
+    legend_bbox_pt: Optional[tuple] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "number": self.number,
+            "note_text": self.note_text,
+            "header": self.header,
+            "callout_count": self.callout_count,
+            "instance_bboxes_pt": [tuple(b) for b in self.instance_bboxes_pt],
+            "legend_bbox_pt": self.legend_bbox_pt,
+        }
+
+
+def _encloses(outer, inner, pad: float = 1.0) -> bool:
+    return (
+        outer[0] - pad <= inner[0]
+        and outer[1] - pad <= inner[1]
+        and inner[2] <= outer[2] + pad
+        and inner[3] <= outer[3] + pad
+    )
+
+
+def keynote_callout_counts(page, symbol_groups) -> List[KeynoteCallout]:
+    """How many times each legend keynote is actually PLACED on the drawing.
+
+    A keynote bubble is a repeated CAD block, so ``cluster_symbols`` already
+    isolates it as one group with a per-text subcount; on Crow page 0 that is
+    ``SYM-4``, 54 instances, subcounts spanning exactly the legend's 1..12. The
+    only thing that group cannot say is which of its instances is the LEGEND's
+    own bubble rather than a callout — and for a keynote drawn twice, that is
+    the whole difference between 1 and 2.
+
+    So the bubble group is identified by the legend rather than assumed: it is
+    the group that encloses the most of the legend's own number blocks, which
+    on Crow distinguishes the keynote bubble (12 of 12) from the gridline
+    bubbles (which carry 1..9 and A..H and enclose none of them). Each legend
+    entry's own bubble is then subtracted from that number's instance count.
+
+    Zero API, never raises. Returns ``[]`` when the page has no keynote legend
+    or no symbol group that matches it.
+    """
+    try:
+        rows_by_header = keynote_legend_rows(page)
+        if not rows_by_header or not symbol_groups:
+            return []
+        try:
+            words = page.get_text("words")
+        except Exception:  # noqa: BLE001
+            return []
+
+        legend_boxes = [
+            (header, number, box)
+            for header, rows in rows_by_header.items()
+            for number, _text, box in rows
+        ]
+
+        def _instance_text(bbox) -> str:
+            hits = [
+                str(w[4]).strip()
+                for w in words
+                if bbox[0] - 0.5 <= (w[0] + w[2]) / 2.0 <= bbox[2] + 0.5
+                and bbox[1] - 0.5 <= (w[1] + w[3]) / 2.0 <= bbox[3] + 0.5
+            ]
+            return hits[0] if len(hits) == 1 else ""
+
+        best_group = None
+        best_cover = 0
+        cache: dict = {}
+        for grp in symbol_groups:
+            boxes = list(getattr(grp, "instance_bboxes_pt", ()) or ())
+            if not boxes:
+                continue
+            texts = [_instance_text(b) for b in boxes]
+            cache[id(grp)] = texts
+            cover = sum(
+                1
+                for _h, number, lbox in legend_boxes
+                if any(
+                    t == number and _encloses(b, lbox)
+                    for b, t in zip(boxes, texts)
+                )
+            )
+            if cover > best_cover:
+                best_group, best_cover = grp, cover
+        if best_group is None or best_cover == 0:
+            return []
+
+        boxes = list(best_group.instance_bboxes_pt)
+        texts = cache[id(best_group)]
+        out: List[KeynoteCallout] = []
+        for header, rows in rows_by_header.items():
+            for number, text, lbox in rows:
+                placed, legend_box = [], None
+                for b, t in zip(boxes, texts):
+                    if t != number:
+                        continue
+                    if legend_box is None and _encloses(b, lbox):
+                        legend_box = tuple(b)   # the legend's own bubble
+                        continue
+                    placed.append(tuple(b))
+                out.append(
+                    KeynoteCallout(
+                        number=number,
+                        note_text=text,
+                        header=header,
+                        callout_count=len(placed),
+                        instance_bboxes_pt=placed,
+                        legend_bbox_pt=legend_box,
+                    )
+                )
+        return out
+    except Exception as exc:  # noqa: BLE001 — additive: never break a run
+        logger.debug("keynote_callout_counts failed: %s", exc)
+        return []
 
 
 def keynote_tags(page, clip) -> List[tuple]:
