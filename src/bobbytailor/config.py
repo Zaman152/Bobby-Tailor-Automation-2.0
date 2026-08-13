@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+from typing import List, Optional, Sequence
+
 from dotenv import load_dotenv
 
 # Load .env from the repo root (two levels up from src/bobbytailor/).
@@ -128,28 +130,72 @@ ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "")
 ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", "")
 RATE_LIMIT_STORAGE_URI = os.getenv("RATE_LIMIT_STORAGE_URI", "memory://")
 
-# Environment validation
-REQUIRED_ENV_VARS = [
-    "STACKCT_EMAIL",
-    "STACKCT_PASSWORD",
-    "ANTHROPIC_API_KEY",
+# ---------------------------------------------------------------------------
+# Environment validation — scoped to the surface that actually needs a value
+# ---------------------------------------------------------------------------
+#
+# This used to be one flat list validated AT IMPORT TIME, which made every one
+# of these variables a precondition for `import bobbytailor.config` — and
+# config is imported by essentially the whole package. The product we ship is
+# plans-only: StackCT is not part of it. So a plans-only operator had to invent
+# two fake StackCT passwords before the package would import at all, including
+# for a pure offline deterministic run that makes zero API calls, and the
+# failure arrived as an unexplained container-start crash. The blast radius was
+# already visible in the codebase as "config stubbed (tests)" guards written to
+# survive that import.
+#
+# The rule now: a variable is required by the SURFACE that reads it, checked
+# when that surface starts, not by the act of importing a constants module.
+
+# The web app cannot serve a single authenticated request without these:
+# SECRET_KEY signs the session, and the admin pair IS the only account.
+WEB_REQUIRED_ENV_VARS = [
     "SECRET_KEY",
     "ADMIN_EMAIL",
     "ADMIN_PASSWORD_HASH",
 ]
 
-def validate_required_env() -> None:
-    """Validate that all required environment variables are set.
-    
+# Only the scrape/ surface logs into StackCT. Checked at login, not at import.
+SCRAPE_REQUIRED_ENV_VARS = [
+    "STACKCT_EMAIL",
+    "STACKCT_PASSWORD",
+]
+
+# Checked at the first vision call. Deliberately NOT a hard precondition for
+# booting the web app: the deterministic offline path is a legitimate way to
+# run this product, and refusing to start would take it away.
+VISION_REQUIRED_ENV_VARS = [
+    "ANTHROPIC_API_KEY",
+]
+
+# Retained as the union for callers that genuinely want every surface at once
+# (e.g. a pre-flight check on a box that will both scrape and analyze).
+REQUIRED_ENV_VARS = (
+    SCRAPE_REQUIRED_ENV_VARS + VISION_REQUIRED_ENV_VARS + WEB_REQUIRED_ENV_VARS
+)
+
+
+def missing_env(required: Optional[Sequence[str]] = None) -> List[str]:
+    """Names from *required* that are unset or empty. Never raises."""
+    names = REQUIRED_ENV_VARS if required is None else required
+    return [var for var in names if not os.getenv(var)]
+
+
+def validate_required_env(required: Optional[Sequence[str]] = None) -> None:
+    """Raise unless every variable in *required* is set to a non-empty value.
+
+    Args:
+        required: The scoped list for the surface being started — one of
+            WEB_REQUIRED_ENV_VARS / SCRAPE_REQUIRED_ENV_VARS /
+            VISION_REQUIRED_ENV_VARS. Defaults to the union of all three,
+            which is almost never what a single surface wants.
+
     Raises:
-        ValueError: If any required environment variable is missing or empty.
+        ValueError: naming exactly the missing variables.
     """
-    missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
+    missing_vars = missing_env(required)
     if missing_vars:
         raise ValueError(
             f"Missing required environment variables: {', '.join(missing_vars)}\n"
             f"Please set them in .env file at project root."
         )
-
-# Validate on import
-validate_required_env()

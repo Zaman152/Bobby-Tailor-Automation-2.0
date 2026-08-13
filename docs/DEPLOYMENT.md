@@ -74,14 +74,24 @@ Two consequences worth knowing before they cost someone an afternoon:
    deployment-supplied values and mutated `os.environ` while doing it. If you
    are carrying a local workaround that depended on `.env` winning, remove it.
 
-### Required
+### Required — by surface, not globally
 
-| Variable | Purpose |
-|----------|---------|
-| `STACKCT_EMAIL` / `STACKCT_PASSWORD` | StackCT login (Auth0) |
-| `ANTHROPIC_API_KEY` | Claude API key (console.anthropic.com) |
-| `SECRET_KEY` | Flask session signing — `python -c "import secrets; print(secrets.token_hex(32))"` |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH` | Web login (bcrypt hash) — seed via `ADMIN_SEED_PASSWORD='<strong password>' python -m bobbytailor.web.seed_admin` (or `--generate` for a random, printed-once password) |
+Each variable is required by the surface that reads it, and is checked when
+that surface starts. **Importing the package requires nothing.** A plans-only
+install never needs StackCT credentials.
+
+| Variable | Required by | Checked when |
+|----------|-------------|--------------|
+| `SECRET_KEY` | Web app — Flask session signing. `python -c "import secrets; print(secrets.token_hex(32))"` | `create_app()`; refuses to start |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD_HASH` | Web app — the only login. Seed via `ADMIN_SEED_PASSWORD='<strong password>' python -m bobbytailor.web.seed_admin` (or `--generate` for a random, printed-once password) | `create_app()`; refuses to start |
+| `ANTHROPIC_API_KEY` | Any vision pass — Claude API key (console.anthropic.com) | `create_app()` logs a **warning**; the failure is at the first vision call |
+| `STACKCT_EMAIL` / `STACKCT_PASSWORD` | `scrape/` only — StackCT login (Auth0) | `StackCTBrowser.login()`. **Not needed for a plans-only deployment** |
+
+`ANTHROPIC_API_KEY` is a warning rather than a hard stop on purpose: the
+deterministic offline path is a supported way to run this product, and
+refusing to boot would take it away from an operator who has not bought API
+credit yet. The trade-off is that a missing key surfaces mid-run — the startup
+warning is what makes that later failure diagnosable.
 
 ### Cost & accuracy controls
 

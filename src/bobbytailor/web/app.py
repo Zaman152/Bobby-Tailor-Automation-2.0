@@ -10,7 +10,14 @@ from flask_wtf.csrf import CSRFProtect
 from werkzeug.exceptions import HTTPException
 
 from bobbytailor.web.auth import bcrypt, init_admin, limiter, login_manager
-from bobbytailor.config import MAX_UPLOAD_MB, OUTPUT_DIR
+from bobbytailor.config import (
+    MAX_UPLOAD_MB,
+    OUTPUT_DIR,
+    VISION_REQUIRED_ENV_VARS,
+    WEB_REQUIRED_ENV_VARS,
+    missing_env,
+    validate_required_env,
+)
 from bobbytailor.web.blueprints import (
     auth_bp,
     jobs_bp,
@@ -35,6 +42,33 @@ def create_app() -> Flask:
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
+
+    # Env validation is scoped to the surface being started, and this is the
+    # web surface. It used to run at `import bobbytailor.config`, which made
+    # StackCT credentials a precondition for importing the package on a
+    # plans-only install (see config.py). Checked HERE the failure is named,
+    # attributable, and confined to the app that actually needs the values —
+    # rather than an unexplained crash on the first import in a container.
+    #
+    # These three are hard requirements: os.environ[...] below would raise a
+    # bare KeyError naming one variable at a time; this names all of them at
+    # once and says where to put them.
+    validate_required_env(WEB_REQUIRED_ENV_VARS)
+
+    # ANTHROPIC_API_KEY is deliberately a WARNING, not a refusal to boot. The
+    # deterministic offline path is a legitimate way to run this product, and
+    # crash-failing here would take it away from anyone who has not yet bought
+    # API credit. The cost of the softer check is that a missing key surfaces
+    # as a failed vision call mid-run instead of at startup — hence the log
+    # line, which is what makes that later failure diagnosable.
+    absent = missing_env(VISION_REQUIRED_ENV_VARS)
+    if absent:
+        logger.warning(
+            "%s not set — deterministic/offline analysis will still run, but "
+            "any vision pass will fail mid-run. Set it in .env or through "
+            "Settings before starting a paid run.",
+            ", ".join(absent),
+        )
 
     app.config.update(
         SECRET_KEY=os.environ["SECRET_KEY"],

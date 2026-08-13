@@ -11,6 +11,7 @@ from bobbytailor.config import (
     STACKCT_LOGIN_URL, STACKCT_PROJECTS_URL,
     HEADLESS, PAGE_LOAD_TIMEOUT,
     CANVAS_STABILITY_TIMEOUT, CANVAS_STABILITY_CHECKS,
+    SCRAPE_REQUIRED_ENV_VARS, validate_required_env,
 )
 
 logger = logging.getLogger(__name__)
@@ -145,6 +146,13 @@ class StackCTBrowser:
         return f"StackCT login failed: {msg}"
 
     async def login(self) -> bool:
+        # StackCT credentials are required HERE and nowhere else. They are not
+        # a precondition for importing the package or for booting the web app
+        # — this product ships plans-only, and an operator who never scrapes
+        # should never have to invent a StackCT password. Checked at the point
+        # of use, a missing credential names itself instead of surfacing as an
+        # Auth0 form that silently fails to submit.
+        validate_required_env(SCRAPE_REQUIRED_ENV_VARS)
         logger.info("Logging into StackCT...")
         try:
             # Use "load" — StackCT uses SignalR WebSockets that never reach networkidle

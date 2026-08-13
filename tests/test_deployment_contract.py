@@ -188,20 +188,164 @@ def test_a_process_environment_variable_survives_a_fresh_config_import():
     )
 
 
+# ─── B3: importing a constants module is not a reason to demand secrets ─────
+
+def _child_python(code: str, env_overrides: dict):
+    """Run *code* in a clean interpreter with *env_overrides* applied.
+
+    A subprocess is the only honest way to test import-time behaviour: this
+    process imported config long ago and cannot un-import it.
+    """
+    import subprocess
+    import sys
+    import os
+
+    env = dict(os.environ)
+    env.update(env_overrides)
+    return subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True, text=True, env=env, cwd=str(REPO_ROOT),
+    )
+
+
+# A .env in the repo root would refill these behind our back, so the child is
+# pointed at an empty cwd-relative path by running from a directory with no
+# .env AND by clearing the names outright. `_env_path` falls back to
+# Path.cwd()/".env" only if the repo-root file is missing, so we clear rather
+# than relocate.
+_PLANS_ONLY_ENV = {
+    "STACKCT_EMAIL": "",
+    "STACKCT_PASSWORD": "",
+}
+
+
+def test_config_imports_without_stackct_credentials():
+    """The plans-only operator's actual situation. This product does not ship
+    StackCT; requiring two fake passwords to import a constants module was a
+    container-start failure with no discoverable cause."""
+    proc = _child_python(
+        "import bobbytailor.config as c; print('IMPORTED', c.CLAUDE_MODEL)",
+        _PLANS_ONLY_ENV,
+    )
+    assert proc.returncode == 0, (
+        "importing bobbytailor.config without StackCT credentials failed:\n%s"
+        % proc.stderr
+    )
+    assert "IMPORTED" in proc.stdout
+
+
+def test_importing_config_validates_nothing():
+    """Stronger than the import test above: even with EVERY required variable
+    absent, importing the module must not raise. Import-time validation is what
+    forced the fake credentials, so the absence of it is the actual fix."""
+    blanked = {name: "" for name in (
+        "STACKCT_EMAIL", "STACKCT_PASSWORD", "ANTHROPIC_API_KEY",
+        "SECRET_KEY", "ADMIN_EMAIL", "ADMIN_PASSWORD_HASH",
+    )}
+    proc = _child_python("import bobbytailor.config; print('IMPORTED')", blanked)
+    assert proc.returncode == 0, (
+        "bobbytailor.config still crash-fails at import on missing env "
+        "vars:\n%s" % proc.stderr
+    )
+    assert "IMPORTED" in proc.stdout
+
+
+def test_config_source_has_no_import_time_validate_call():
+    """A module-level call is what made this an import-time precondition.
+    Checked over the parsed module body so a mention inside a function or a
+    docstring does not trip it."""
+    import ast
+
+    tree = ast.parse(CONFIG_PY.read_text())
+    top_level_calls = [
+        node.value.func.id
+        for node in tree.body
+        if isinstance(node, ast.Expr)
+        and isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Name)
+    ]
+    assert "validate_required_env" not in top_level_calls, (
+        "config.py calls validate_required_env() at module level again — that "
+        "makes every listed secret a precondition for importing the package"
+    )
+
+
+def test_the_web_surface_validates_only_what_it_needs():
+    from bobbytailor import config
+
+    assert set(config.WEB_REQUIRED_ENV_VARS) == {
+        "SECRET_KEY", "ADMIN_EMAIL", "ADMIN_PASSWORD_HASH",
+    }
+    # StackCT is not part of the plans-only web surface.
+    assert not set(config.WEB_REQUIRED_ENV_VARS) & set(
+        config.SCRAPE_REQUIRED_ENV_VARS
+    )
+    # A missing API key must not be a refusal to boot — the deterministic
+    # offline path is a supported way to run this product.
+    assert "ANTHROPIC_API_KEY" not in config.WEB_REQUIRED_ENV_VARS
+
+
+def test_validate_required_env_names_every_missing_variable_at_once():
+    from bobbytailor.config import validate_required_env
+
+    with pytest.raises(ValueError) as excinfo:
+        validate_required_env(["__BT_ABSENT_A__", "__BT_ABSENT_B__"])
+    message = str(excinfo.value)
+    assert "__BT_ABSENT_A__" in message and "__BT_ABSENT_B__" in message, (
+        "one variable at a time turns a config error into a guessing game"
+    )
+
+
+def test_create_app_refuses_to_start_without_a_session_secret():
+    """The web-scoped check has to actually fire, and it has to say what is
+    missing — the bare os.environ[...] it replaces raised a KeyError naming a
+    single variable with no remedy attached."""
+    proc = _child_python(
+        "from bobbytailor.web.app import create_app; create_app()",
+        {"SECRET_KEY": "", "ADMIN_EMAIL": "", "ADMIN_PASSWORD_HASH": ""},
+    )
+    assert proc.returncode != 0, "create_app() started with no SECRET_KEY"
+    assert "SECRET_KEY" in proc.stderr and "ADMIN_EMAIL" in proc.stderr, (
+        "create_app() failed without naming the missing variables:\n%s"
+        % proc.stderr
+    )
+
+
+def test_stackct_login_is_where_stackct_credentials_are_required():
+    """Checked on the source rather than by driving Playwright: the assertion
+    is about WHERE the requirement lives, and browser.login() cannot be
+    called offline."""
+    browser_src = (
+        REPO_ROOT / "src" / "bobbytailor" / "scrape" / "browser.py"
+    ).read_text()
+    assert "validate_required_env(SCRAPE_REQUIRED_ENV_VARS)" in browser_src, (
+        "StackCT credentials are no longer validated at login; if they are "
+        "not checked here they are checked nowhere, and a blank password "
+        "becomes an Auth0 form that silently fails to submit"
+    )
+
+
 # ─── self-audit: this module costs nothing to run ───────────────────────────
 
 def test_this_module_spends_no_money():
     source = Path(__file__).read_text()
     # Assembled from halves so the check cannot find itself.
     forbidden = [
-        "ANTHRO" + "PIC",
         "vision_only" + "_benchmark",
         "accuracy" + "_gate",
         "mark." + "golden",
+        "sk-" + "ant-",
     ]
     for token in forbidden:
         assert token not in source, (
             "this module must stay free; found %r" % token
+        )
+    # The API key NAME appears here on purpose — every occurrence blanks it or
+    # asserts it is absent, which is the opposite of spending. What must never
+    # appear is an assignment of a real-looking value to it.
+    for match in re.finditer(r'ANTHROPIC_API_KEY"?\s*:\s*"([^"]*)"', source):
+        assert match.group(1) == "", (
+            "this module assigns a value to the API key: %r" % match.group(1)
         )
 
 
