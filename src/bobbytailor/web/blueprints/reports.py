@@ -17,6 +17,21 @@ reports_bp = Blueprint("reports", __name__)
 
 ALLOWED_PREVIEW_EXTENSIONS = {'.csv', '.json', '.txt'}
 
+#: The artifacts a run publishes, and the key each is offered under. ONE list,
+#: because there were two — ``list_reports`` and ``get_report`` each carried
+#: their own copy and both had to be edited to add a file. ``coverage.json``
+#: shows what that cost: it has been written by every run since phase 23 and
+#: was in neither list, so the record of what a run did NOT measure was
+#: fetchable by URL and reachable from no button on the page.
+RUN_ARTIFACTS = (
+    ("takeoff.json",        "json"),
+    ("takeoff_summary.csv", "takeoff_summary_csv"),
+    ("raw_items.csv",       "raw_csv"),
+    ("calculations.csv",    "calculated_csv"),
+    ("summary.txt",         "summary"),
+    ("coverage.json",       "coverage_json"),
+)
+
 
 def _output_root() -> Path:
     """Absolute OUTPUT_DIR — required because Flask resolves relative send_file paths against app.root_path (src/bobbytailor/web/), not cwd."""
@@ -122,13 +137,7 @@ def list_reports():
             continue
 
         files = {}
-        for filename, key in [
-            ("takeoff.json",     "json"),
-            ("takeoff_summary.csv", "takeoff_summary_csv"),
-            ("raw_items.csv",    "raw_csv"),
-            ("calculations.csv", "calculated_csv"),
-            ("summary.txt",      "summary"),
-        ]:
+        for filename, key in RUN_ARTIFACTS:
             f = sub / filename
             if f.exists():
                 files[key] = {"filename": filename, "size": f.stat().st_size}
@@ -192,13 +201,7 @@ def get_report(run_folder: str):
         return jsonify({"error": "Not found"}), 404
 
     files = {}
-    for filename, key in [
-        ("takeoff.json",        "json"),
-        ("takeoff_summary.csv", "takeoff_summary_csv"),
-        ("raw_items.csv",       "raw_csv"),
-        ("calculations.csv",    "calculated_csv"),
-        ("summary.txt",         "summary"),
-    ]:
+    for filename, key in RUN_ARTIFACTS:
         f = sub / filename
         if f.exists():
             files[key] = {"filename": filename, "size": f.stat().st_size}
