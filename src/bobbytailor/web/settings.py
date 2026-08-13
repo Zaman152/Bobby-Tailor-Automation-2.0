@@ -21,7 +21,29 @@ SENSITIVE_FIELDS = {"STACKCT_PASSWORD", "ANTHROPIC_API_KEY"}
 
 RESTART_REQUIRED_FIELDS = {"STACKCT_EMAIL", "STACKCT_PASSWORD", "ANTHROPIC_API_KEY"}
 
-VALID_MODELS = ["claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-7"]
+# Generated from config.py, never retyped. A hardcoded copy here shipped
+# ["claude-haiku-4-5","claude-sonnet-4-6","claude-opus-4-7"] while .env
+# resolved CLAUDE_MODEL_SCHEDULES to a slug that list did not contain — and a
+# <select> cannot hold a value with no matching <option>, so the form read
+# back "" and Save wrote it. See config.MODEL_CHOICES for the full chain.
+#
+# Imported as a module attribute rather than by-value so a test (or a reload
+# after a Settings write) sees the current catalogue.
+def _valid_models() -> List[str]:
+    from bobbytailor import config
+
+    return list(config.VALID_MODEL_SLUGS)
+
+
+# Kept as a module-level name for callers that read it directly; the function
+# above is what validate_settings uses, so a change in config is picked up.
+VALID_MODELS = _valid_models()
+
+# Fields where writing an empty string is destructive rather than meaningful.
+# `os.getenv(key, DEFAULT)` does NOT fall back for a key that is set-but-empty,
+# so blanking any of these silently disables the thing it configures — a blank
+# CLAUDE_MODEL_SCHEDULES calls the API with model="".
+MODEL_FIELDS = {"CLAUDE_MODEL", "CLAUDE_MODEL_SCHEDULES"}
 
 ALLOWED_FIELDS = {
     "STACKCT_EMAIL",
@@ -95,10 +117,11 @@ def validate_settings(data: Dict) -> Tuple[bool, List[str]]:
     if api_key and not api_key.startswith("sk-ant-"):
         errors.append("ANTHROPIC_API_KEY must start with sk-ant-")
 
-    for model_key in ("CLAUDE_MODEL", "CLAUDE_MODEL_SCHEDULES"):
+    valid_models = _valid_models()
+    for model_key in sorted(MODEL_FIELDS):
         model = data.get(model_key, "")
-        if model and model not in VALID_MODELS:
-            errors.append(f"{model_key} must be one of: {', '.join(VALID_MODELS)}")
+        if model and model not in valid_models:
+            errors.append(f"{model_key} must be one of: {', '.join(valid_models)}")
 
     for int_key in ("CANVAS_STABILITY_TIMEOUT", "CANVAS_STABILITY_CHECKS"):
         val = data.get(int_key, "")
@@ -116,6 +139,18 @@ def validate_settings(data: Dict) -> Tuple[bool, List[str]]:
     return (len(errors) == 0, errors)
 
 
+def _current_values() -> Dict[str, str]:
+    """Raw (unredacted) current .env values, for comparison only."""
+    try:
+        from dotenv import dotenv_values
+
+        return dict(dotenv_values(str(ENV_PATH))) if ENV_PATH.exists() else {}
+    except ImportError:  # pragma: no cover — python-dotenv is a hard dep
+        import os
+
+        return {k: os.getenv(k, "") for k in ALLOWED_FIELDS}
+
+
 def update_settings(data: Dict) -> Tuple[bool, str, bool]:
     """Write validated settings to .env file.
 
@@ -125,6 +160,13 @@ def update_settings(data: Dict) -> Tuple[bool, str, bool]:
     Returns:
         Tuple of (success, message, restart_required).
         Empty string for sensitive fields means 'leave unchanged'.
+
+    An empty string is NEVER written over an existing non-empty value. That
+    write is what turned one Settings visit into a broken run: the page PUTs
+    every field on every Save, so a field the form could not represent arrived
+    as "" and overwrote a working configuration. Because `os.getenv(key,
+    DEFAULT)` does not fall back for a set-but-empty key, the result was not
+    "reverted to default" — it was model="" on every floor-plan pass.
     """
     is_valid, errors = validate_settings(data)
     if not is_valid:
@@ -139,6 +181,31 @@ def update_settings(data: Dict) -> Tuple[bool, str, bool]:
     if not ENV_PATH.exists():
         ENV_PATH.touch()
 
+    existing = _current_values()
+
+    # Refuse LOUDLY when a blank would destroy a configured value. Refusing the
+    # whole write rather than skipping the one field is deliberate: this defect
+    # was invisible for as long as it was because every layer failed quietly,
+    # and an operator who is told "your model selection would have been erased"
+    # can fix the form; one who is told nothing cannot.
+    destructive = sorted(
+        key
+        for key, value in data.items()
+        if key in ALLOWED_FIELDS
+        and key not in SENSITIVE_FIELDS
+        and not str(value).strip()
+        and str(existing.get(key, "")).strip()
+    )
+    if destructive:
+        return (
+            False,
+            "Refusing to erase configured value(s): %s. A blank is not a "
+            "reset — an empty variable disables the setting rather than "
+            "restoring its default. Clear it in .env directly if that is "
+            "really what you want." % ", ".join(destructive),
+            False,
+        )
+
     restart_required = False
     written_count = 0
 
@@ -148,6 +215,12 @@ def update_settings(data: Dict) -> Tuple[bool, str, bool]:
         # Skip empty-string updates for sensitive fields (preserve existing value)
         if key in SENSITIVE_FIELDS and not str(value).strip():
             logger.debug(f"Skipping empty update for sensitive field: {key}")
+            continue
+        # A blank for a field that is already blank is a no-op, not an error —
+        # the form PUTs every field, and refusing here would make Settings
+        # unusable on a fresh install where most values are unset.
+        if not str(value).strip() and not str(existing.get(key, "")).strip():
+            logger.debug(f"Skipping no-op empty update: {key}")
             continue
 
         try:

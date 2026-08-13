@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Tuple
 
 from dotenv import load_dotenv
 
@@ -55,6 +55,82 @@ CLAUDE_MODEL_DENSE = os.getenv("CLAUDE_MODEL_DENSE", "claude-opus-4-8")
 CLAUDE_MODEL_ESCALATION = os.getenv("CLAUDE_MODEL_ESCALATION", "claude-fable-5")
 # Cheap classification passes (sheet-type triage).
 CLAUDE_MODEL_CLASSIFY = os.getenv("CLAUDE_MODEL_CLASSIFY", "claude-haiku-4-5")
+
+# Every model slug this process routes a pass through, in one place. Anything
+# that needs to know "which models is this run using" reads THIS, so the answer
+# cannot drift between the routing table, the Settings UI and the saved report.
+MODEL_ENV_VARS = (
+    "CLAUDE_MODEL",
+    "CLAUDE_MODEL_SCHEDULES",
+    "CLAUDE_MODEL_SEMANTIC",
+    "CLAUDE_MODEL_DENSE",
+    "CLAUDE_MODEL_ESCALATION",
+    "CLAUDE_MODEL_CLASSIFY",
+)
+
+# ---------------------------------------------------------------------------
+# Selectable models for the Settings UI
+# ---------------------------------------------------------------------------
+#
+# This list is the single source of truth for what the Settings page may
+# offer, and it is derived here rather than retyped in web/settings.py and
+# again in templates/settings.html. Those three copies had already drifted,
+# and the drift silently destroyed a run:
+#
+#   web/settings.py shipped ["claude-haiku-4-5","claude-sonnet-4-6",
+#   "claude-opus-4-7"], while .env resolved CLAUDE_MODEL_SCHEDULES to a slug
+#   not on that list. The <select> cannot hold a value with no matching
+#   <option>, so it read back as "". validate_settings passed it (`if model
+#   and model not in VALID_MODELS` — an empty string is falsey), update_settings
+#   wrote it, and os.getenv(key, DEFAULT) does NOT fall back for a key that is
+#   set-but-empty. One visit to Settings and one Save, and every floor-plan
+#   count and measure pass on the next run called the API with model="".
+#
+# Two rules follow, and both are load-bearing:
+#   1. the UI list is GENERATED from here (no third copy to drift), and
+#   2. whatever the live environment currently resolves is ALWAYS selectable,
+#      even if it is a slug this catalogue has never heard of — so upgrading a
+#      model in .env can never again make it unrepresentable in the UI.
+_MODEL_CATALOGUE = (
+    ("claude-haiku-4-5", "Claude Haiku 4.5 — fastest, cheapest ($1/$5 per 1M tokens)"),
+    ("claude-sonnet-4-6", "Claude Sonnet 4.6 — balanced ($3/$15 per 1M tokens)"),
+    ("claude-sonnet-5", "Claude Sonnet 5 — workhorse ($2/$10 per 1M tokens)"),
+    ("claude-opus-4-7", "Claude Opus 4.7 — most capable ($5/$25 per 1M tokens)"),
+    ("claude-opus-4-8", "Claude Opus 4.8 — high-res vision ($5/$25 per 1M tokens)"),
+    ("claude-fable-5", "Claude Fable 5 — frontier, escalation only ($10/$50 per 1M tokens)"),
+)
+
+
+def model_choices() -> List[Tuple[str, str]]:
+    """(slug, label) pairs the Settings UI may offer, live values included.
+
+    Rule 2 above: a slug that is currently configured but absent from the
+    catalogue is appended rather than dropped. Dropping it is precisely how a
+    working configuration got blanked.
+    """
+    choices = list(_MODEL_CATALOGUE)
+    known = {slug for slug, _ in choices}
+    for var in MODEL_ENV_VARS:
+        slug = (globals().get(var) or "").strip()
+        if slug and slug not in known:
+            known.add(slug)
+            choices.append((slug, "%s — configured in .env" % slug))
+    return choices
+
+
+MODEL_CHOICES = model_choices()
+# Flat allowlist for validators that only need membership.
+VALID_MODEL_SLUGS = [slug for slug, _ in MODEL_CHOICES]
+
+
+def active_models() -> Dict[str, str]:
+    """The model slug each routing variable currently resolves to.
+
+    Recorded into every report's ``run_settings`` so "which model produced
+    this number" is answerable from the artifact alone — the exact question
+    24-RESEARCH Open Question 1 could not answer for the two saved paid runs.
+    """
+    return {var: globals().get(var, "") for var in MODEL_ENV_VARS}
 
 # Escalation gate: Fable 5 is budget-gated OFF by default (cost abuse guard).
 ESCALATION_ENABLED = os.getenv("ESCALATION_ENABLED", "false").lower() in ("1", "true", "yes")

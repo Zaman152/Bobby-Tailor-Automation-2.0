@@ -549,6 +549,167 @@ def test_the_dev_entry_point_does_not_hardcode_debug():
         ), "app.py hardcodes debug=True"
 
 
+# ─── B5: one Settings save must not blank the model that routes every pass ──
+#
+# The chain, proven end to end before the fix: web/settings.py hardcoded a
+# three-slug VALID_MODELS that .env had outgrown; settings.html hardcoded the
+# same three as the only <option>s; settings.js does `el.value = value` on the
+# <select>, and a value with no matching option sets the select to ""; the form
+# PUTs every field on Save; validate_settings passed the blank (`if model and
+# model not in VALID_MODELS` — "" is falsey); update_settings wrote it; and
+# `os.getenv(key, DEFAULT)` does NOT fall back for a set-but-empty key. Net
+# effect: every floor-plan count and measure pass called the API with model="".
+
+SETTINGS_PY = REPO_ROOT / "src" / "bobbytailor" / "web" / "settings.py"
+SETTINGS_HTML = (
+    REPO_ROOT / "src" / "bobbytailor" / "web" / "templates" / "settings.html"
+)
+
+
+def test_the_settings_allowlist_is_generated_from_config():
+    from bobbytailor import config
+    from bobbytailor.web import settings as web_settings
+
+    assert web_settings._valid_models() == list(config.VALID_MODEL_SLUGS), (
+        "the Settings allowlist has drifted from config again"
+    )
+
+
+def test_the_settings_template_hardcodes_no_model_slugs():
+    """A third copy of the list is a third thing that can go stale."""
+    html = SETTINGS_HTML.read_text()
+    hardcoded = re.findall(r'<option value="(claude-[^"]+)"', html)
+    assert not hardcoded, (
+        "settings.html hardcodes model <option>s %r — they must come from "
+        "config.MODEL_CHOICES, or the list goes stale against .env and the "
+        "<select> silently reads back an empty string" % hardcoded
+    )
+    assert "model_choices" in html, (
+        "settings.html no longer renders the config-supplied model_choices"
+    )
+
+
+def test_every_configured_model_slug_is_selectable():
+    """The guarantee that actually prevents the blanking: whatever the live
+    environment resolves must be representable in the <select>, even if this
+    build's catalogue has never heard of it."""
+    from bobbytailor import config
+
+    selectable = set(config.VALID_MODEL_SLUGS)
+    for var, slug in config.active_models().items():
+        if slug:
+            assert slug in selectable, (
+                "%s resolves to %r, which the Settings page cannot offer as "
+                "an option — so the <select> reads back '' and one Save "
+                "erases it" % (var, slug)
+            )
+
+
+def test_the_stale_three_slug_list_no_longer_appears_anywhere():
+    """The specific list that shipped, named so a copy-paste revival fails."""
+    stale = ['"claude-haiku-4-5", "claude-sonnet-4-6", "claude-opus-4-7"']
+    src = SETTINGS_PY.read_text()
+    for literal in stale:
+        assert literal not in src, (
+            "web/settings.py hardcodes the stale model list again: %s" % literal
+        )
+
+
+def test_update_settings_refuses_to_erase_a_configured_value(tmp_path, monkeypatch):
+    from bobbytailor.web import settings as web_settings
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("CLAUDE_MODEL_SCHEDULES=claude-sonnet-5\n")
+    monkeypatch.setattr(web_settings, "ENV_PATH", env_file)
+
+    ok, message, _ = web_settings.update_settings({"CLAUDE_MODEL_SCHEDULES": ""})
+
+    assert ok is False, "an empty write over a configured model was accepted"
+    assert "CLAUDE_MODEL_SCHEDULES" in message
+    assert "claude-sonnet-5" in env_file.read_text(), (
+        "the configured slug was erased from .env despite the refusal"
+    )
+
+
+def test_the_refusal_covers_every_non_sensitive_allowlisted_field(
+    tmp_path, monkeypatch
+):
+    """Not just the model fields. `os.getenv(key, DEFAULT)` returns "" for any
+    set-but-empty key, so blanking OUTPUT_DIR or RUN_SCHEDULE is the same bug
+    wearing a different name."""
+    from bobbytailor.web import settings as web_settings
+
+    for field_name, configured in (
+        ("OUTPUT_DIR", "/srv/bobby/output"),
+        ("RUN_SCHEDULE", "0 8 * * *"),
+        ("HEADLESS", "true"),
+    ):
+        env_file = tmp_path / (".env-%s" % field_name)
+        env_file.write_text("%s=%s\n" % (field_name, configured))
+        monkeypatch.setattr(web_settings, "ENV_PATH", env_file)
+
+        ok, message, _ = web_settings.update_settings({field_name: ""})
+        assert ok is False, "%s was allowed to be blanked" % field_name
+        assert configured in env_file.read_text()
+
+
+def test_a_blank_for_an_already_blank_field_is_a_no_op_not_an_error(
+    tmp_path, monkeypatch
+):
+    """The Settings form PUTs every field on every Save. Erroring on a field
+    that is legitimately unset would make the page unusable on a fresh
+    install — the refusal must target destruction, not emptiness."""
+    from bobbytailor.web import settings as web_settings
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("CLAUDE_MODEL=claude-haiku-4-5\n")
+    monkeypatch.setattr(web_settings, "ENV_PATH", env_file)
+
+    ok, message, _ = web_settings.update_settings({
+        "RUN_SCHEDULE": "",              # never set — blank is meaningless
+        "CLAUDE_MODEL": "claude-sonnet-5",  # a real change alongside it
+    })
+    assert ok is True, "a legitimate save was refused: %s" % message
+    assert "claude-sonnet-5" in env_file.read_text()
+
+
+def test_sensitive_fields_keep_their_leave_unchanged_semantics(
+    tmp_path, monkeypatch
+):
+    """The redacted UI sends "" for a secret the user did not retype. That has
+    always meant 'leave it alone', and must not become an error."""
+    from bobbytailor.web import settings as web_settings
+
+    env_file = tmp_path / ".env"
+    env_file.write_text("STACKCT_PASSWORD=hunter2\n")
+    monkeypatch.setattr(web_settings, "ENV_PATH", env_file)
+
+    ok, message, _ = web_settings.update_settings({"STACKCT_PASSWORD": ""})
+    assert ok is True, "an untouched secret field broke the save: %s" % message
+    assert "hunter2" in env_file.read_text()
+
+
+def test_run_settings_records_the_model_slugs_the_run_used():
+    """'Which model produced this number' must be answerable from the saved
+    artifact alone. run_settings recorded the ensemble size, the budget and
+    every boolean toggle — and not one model name."""
+    from bobbytailor.pipeline.takeoff_pipeline import RunSettings
+
+    recorded = RunSettings.from_env().to_dict()
+    assert "models" in recorded, "run_settings still records no model slugs"
+
+    from bobbytailor import config
+
+    for var in config.MODEL_ENV_VARS:
+        assert var in recorded["models"], (
+            "%s routes passes but is absent from the run record" % var
+        )
+        assert recorded["models"][var], (
+            "%s recorded as empty — an empty slug is the exact defect this "
+            "records against" % var
+        )
+
+
 # ─── self-audit: this module costs nothing to run ───────────────────────────
 
 def test_this_module_spends_no_money():

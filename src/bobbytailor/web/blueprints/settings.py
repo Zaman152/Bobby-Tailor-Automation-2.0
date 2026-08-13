@@ -9,8 +9,15 @@ settings_bp = Blueprint("settings", __name__)
 
 @settings_bp.route("/settings")
 def settings_page():
-    """Settings management page."""
-    return render_template("settings.html")
+    """Settings management page.
+
+    ``model_choices`` is passed in rather than hardcoded in the template: a
+    <select> whose value has no matching <option> silently reads back "", and
+    a Save then writes that blank over a working model slug.
+    """
+    from bobbytailor import config
+
+    return render_template("settings.html", model_choices=config.MODEL_CHOICES)
 
 
 @settings_bp.route("/api/settings", methods=["GET"])

@@ -79,19 +79,22 @@
     </div>
     <div class="field">
       <label for="CLAUDE_MODEL">Default Model</label>
+      {# Options come from config.MODEL_CHOICES — a hardcoded list here went
+         stale against .env, and a <select> silently reads back "" when its
+         value has no matching <option>. #}
       <select id="CLAUDE_MODEL" name="CLAUDE_MODEL">
-        <option value="claude-haiku-4-5">Claude Haiku 4.5 — Fast &amp; cheap ($1/$5 per 1M tokens)</option>
-        <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — Balanced ($3/$15 per 1M tokens)</option>
-        <option value="claude-opus-4-7">Claude Opus 4.7 — Most capable ($5/$25 per 1M tokens)</option>
+        {% for slug, label in model_choices %}
+        <option value="{{ slug }}">{{ label }}</option>
+        {% endfor %}
       </select>
       <p class="help-text">Used for most drawing sheets. Haiku recommended for general takeoffs.</p>
     </div>
     <div class="field">
       <label for="CLAUDE_MODEL_SCHEDULES">Schedule Sheet Model</label>
       <select id="CLAUDE_MODEL_SCHEDULES" name="CLAUDE_MODEL_SCHEDULES">
-        <option value="claude-haiku-4-5">Claude Haiku 4.5 — Fast &amp; cheap</option>
-        <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — Better for complex tables</option>
-        <option value="claude-opus-4-7">Claude Opus 4.7 — Most capable</option>
+        {% for slug, label in model_choices %}
+        <option value="{{ slug }}">{{ label }}</option>
+        {% endfor %}
       </select>
       <p class="help-text">Used for schedule and panel sheets with dense tabular text. Sonnet recommended.</p>
     </div>

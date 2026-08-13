@@ -38,7 +38,7 @@ import os
 import re
 import sys
 import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Callable, List, Optional, Sequence
 
 import fitz
@@ -229,6 +229,14 @@ class RunSettings:
     single ``ensemble_settings()`` reader (21-11 decision — env
     ``ENSEMBLE_N`` / ``API_BUDGET_PER_RUN_USD``); the boolean toggles are
     env-driven flags.
+
+    ``models`` records the slug each routing variable resolved to. It is here
+    because the two saved paid runs recorded the ensemble size, the budget and
+    every boolean toggle — and not one model name, which made "which model
+    produced this number" unanswerable from the artifact. That is the same
+    class of question 24-RESEARCH Open Question 1 was already burned by, and
+    the environment is not an artifact: a slug changed in .env between two runs
+    leaves no trace in either report.
     """
 
     deterministic_enabled = True
@@ -237,6 +245,7 @@ class RunSettings:
     budget_usd = 10.0
     verify_retry_enabled = True
     raster_force = False
+    models = field(default_factory=dict)
 
     @classmethod
     def from_env(cls) -> "RunSettings":
@@ -247,6 +256,13 @@ class RunSettings:
             budget = float(settings["budget_usd"])
         except Exception:  # noqa: BLE001 — config stubbed (tests) → defaults
             logger.debug("RunSettings.from_env: config unavailable — defaults used")
+        try:
+            from bobbytailor import config as _config
+
+            models = _config.active_models()
+        except Exception:  # noqa: BLE001 — config stubbed (tests) → no slugs
+            logger.debug("RunSettings.from_env: model slugs unavailable")
+            models = {}
         return cls(
             deterministic_enabled=_env_flag("DETERMINISTIC_ENABLED", True),
             ensemble_n=n,
@@ -254,6 +270,7 @@ class RunSettings:
             budget_usd=budget,
             verify_retry_enabled=_env_flag("VERIFY_RETRY_ENABLED", True),
             raster_force=_env_flag("RASTER_FORCE", False),
+            models=models,
         )
 
     def to_dict(self) -> dict:
@@ -273,6 +290,7 @@ RunSettings.__annotations__ = {
     "budget_usd": float,
     "verify_retry_enabled": bool,
     "raster_force": bool,
+    "models": dict,
 }
 RunSettings = dataclass(RunSettings)
 
