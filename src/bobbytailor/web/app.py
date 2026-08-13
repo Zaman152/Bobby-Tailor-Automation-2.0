@@ -11,6 +11,10 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from bobbytailor.web.auth import bcrypt, init_admin, limiter, login_manager
+# Imported as a MODULE, not by-value: whether this box scrapes at all is a
+# runtime decision made below, and `from ... import STACKCT_EMAIL` would freeze
+# the answer at import time and make it untestable.
+from bobbytailor import config
 from bobbytailor.config import (
     MAX_UPLOAD_MB,
     OUTPUT_DIR,
@@ -148,30 +152,47 @@ def create_app() -> Flask:
     stackct_store.init_db()
     job_store.init_schema()
 
-    from bobbytailor.stores.project_cache import prefetch_in_background
+    # Both of these exist to keep the StackCT project catalog warm, and both
+    # reach StackCT over the network: prefetch_in_background() spawns a
+    # Playwright/Chromium Auth0 login whenever the catalog DB is empty, and
+    # the scheduler repeats that every STACKCT_CACHE_TTL_HOURS.
+    #
+    # On a plans-only install there is no StackCT account, so what they
+    # actually produce is a recurring failed third-party login from the
+    # operator's box — plus a `playwright install chromium` that the install
+    # docs demand for a deployment that never scrapes. Gate both on the
+    # credential that decides whether this box scrapes at all.
+    if config.STACKCT_EMAIL:
+        from bobbytailor.stores.project_cache import prefetch_in_background
 
-    prefetch_in_background()
+        prefetch_in_background()
 
-    try:
-        from apscheduler.schedulers.background import BackgroundScheduler
-        from bobbytailor.config import STACKCT_CACHE_TTL_HOURS
-        from bobbytailor.scrape.stackct_sync import sync_projects_if_stale
+        try:
+            from apscheduler.schedulers.background import BackgroundScheduler
+            from bobbytailor.config import STACKCT_CACHE_TTL_HOURS
+            from bobbytailor.scrape.stackct_sync import sync_projects_if_stale
 
-        scheduler = BackgroundScheduler(daemon=True)
-        scheduler.add_job(
-            sync_projects_if_stale,
-            "interval",
-            hours=STACKCT_CACHE_TTL_HOURS,
-            id="stackct_projects_sync",
-            replace_existing=True,
-        )
-        scheduler.start()
+            scheduler = BackgroundScheduler(daemon=True)
+            scheduler.add_job(
+                sync_projects_if_stale,
+                "interval",
+                hours=STACKCT_CACHE_TTL_HOURS,
+                id="stackct_projects_sync",
+                replace_existing=True,
+            )
+            scheduler.start()
+            logger.info(
+                "StackCT catalog scheduler started (interval=%sh)",
+                STACKCT_CACHE_TTL_HOURS,
+            )
+        except Exception as e:
+            logger.warning("APScheduler catalog sync not started: %s", e)
+    else:
         logger.info(
-            "StackCT catalog scheduler started (interval=%sh)",
-            STACKCT_CACHE_TTL_HOURS,
+            "STACKCT_EMAIL not set — skipping StackCT catalog prefetch and "
+            "the periodic sync. This is the expected plans-only "
+            "configuration; PDF upload and analysis are unaffected."
         )
-    except Exception as e:
-        logger.warning("APScheduler catalog sync not started: %s", e)
 
     @app.errorhandler(HTTPException)
     def handle_http_exception(e: HTTPException):

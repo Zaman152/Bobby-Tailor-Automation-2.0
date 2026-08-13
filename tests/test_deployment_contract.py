@@ -469,6 +469,86 @@ def test_the_client_ip_comes_from_the_forwarded_header(monkeypatch):
     )
 
 
+# ─── M4: a plans-only box must not log into StackCT on boot ─────────────────
+
+def _create_app_with_stackct_email(monkeypatch, email):
+    """create_app() with the StackCT credential set to *email*, with the two
+    StackCT boot side-effects replaced by recorders."""
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-for-stackct-gate")
+    monkeypatch.setenv("ADMIN_EMAIL", "admin@example.com")
+    monkeypatch.setenv("ADMIN_PASSWORD_HASH", "$2b$12$" + "x" * 53)
+
+    from bobbytailor import config as bt_config
+    from bobbytailor.stores import project_cache
+    from bobbytailor.web import app as web_app
+
+    monkeypatch.setattr(bt_config, "STACKCT_EMAIL", email)
+
+    calls = []
+    monkeypatch.setattr(
+        project_cache, "prefetch_in_background",
+        lambda *a, **k: calls.append("prefetch"),
+    )
+    try:
+        from apscheduler.schedulers import background as aps_background
+
+        monkeypatch.setattr(
+            aps_background.BackgroundScheduler, "start",
+            lambda self, *a, **k: calls.append("scheduler"),
+        )
+    except ImportError:  # pragma: no cover — apscheduler is a hard dependency
+        pass
+
+    web_app.create_app()
+    return calls
+
+
+def test_no_stackct_login_is_attempted_without_a_stackct_account(monkeypatch):
+    """prefetch_in_background() spawns a Playwright/Chromium Auth0 login when
+    the catalog DB is empty, and the scheduler repeats it every 24h. On a
+    plans-only install that is a recurring failed third-party login from the
+    operator's box, for a catalog nothing will ever read."""
+    calls = _create_app_with_stackct_email(monkeypatch, "")
+    assert calls == [], (
+        "booting a plans-only install still kicks off StackCT work: %r" % calls
+    )
+
+
+def test_stackct_prefetch_still_runs_when_the_box_does_scrape(monkeypatch):
+    """The gate must be a gate, not a removal — a StackCT deployment still
+    needs its catalog warmed."""
+    calls = _create_app_with_stackct_email(monkeypatch, "operator@example.com")
+    assert "prefetch" in calls, (
+        "STACKCT_EMAIL is set but the catalog prefetch did not run: %r" % calls
+    )
+
+
+# ─── M1: the dev server must not ship an interactive console ────────────────
+
+def test_the_dev_entry_point_does_not_hardcode_debug():
+    """`python3 app.py` is a documented entry point. With debug=True the
+    Werkzeug console — arbitrary Python from the browser, behind a PIN — is
+    live on port 5050, which nginx is proxying."""
+    import ast
+
+    tree = ast.parse((REPO_ROOT / "app.py").read_text())
+    runs = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "run"
+    ]
+    assert runs, "app.py no longer calls app.run()"
+    for call in runs:
+        debug = [kw for kw in call.keywords if kw.arg == "debug"]
+        assert debug, "app.run() has no explicit debug argument"
+        value = debug[0].value
+        assert not (
+            isinstance(value, ast.Constant) and value.value is True
+        ), "app.py hardcodes debug=True"
+
+
 # ─── self-audit: this module costs nothing to run ───────────────────────────
 
 def test_this_module_spends_no_money():
@@ -507,11 +587,11 @@ def test_this_module_imports_nothing_that_could_reach_a_network():
             imported.add(node.module.split(".")[0])
     # subprocess is here to re-import config in a clean interpreter, never to
     # reach off the box; sys/os supply that child's argv and environment.
-    # subprocess is here to re-import config in a clean interpreter, never to
-    # reach off the box; sys/os supply that child's argv and environment.
     # Flask's test client dispatches WSGI in memory — it opens no socket.
+    # apscheduler is imported only to REPLACE its start() with a recorder,
+    # which is what stops the periodic StackCT sync from firing here.
     allowed = {"ast", "os", "re", "subprocess", "sys", "pathlib", "pytest",
-               "flask_limiter", "bobbytailor"}
+               "apscheduler", "flask_limiter", "bobbytailor"}
     assert imported <= allowed, (
         "this module must stay offline; unexpected imports %r"
         % sorted(imported - allowed)
