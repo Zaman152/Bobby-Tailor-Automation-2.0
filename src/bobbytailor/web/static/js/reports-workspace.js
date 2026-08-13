@@ -10,6 +10,17 @@
  */
 
 import { animate } from 'https://cdn.jsdelivr.net/npm/motion@11.13.5/+esm';
+import {
+  coverageFacts,
+  hasProvenance,
+  hasQuantityRoutes,
+  reproducibilityRows,
+  routeLabel,
+  rowIsConfirmableEstimate,
+  rowNeedsVerification,
+  rowQtyNum,
+  rowStatus,
+} from './report-provenance.js';
 
 let activeWorkspace = null;
 let currentRun = null;
@@ -167,6 +178,13 @@ export async function openReportWorkspace(runFolder) {
               </svg>
               <span>Summary TXT</span>
             </button>
+            ${report.files?.coverage_json ? `
+            <button type="button" class="export-btn" data-type="coverage" title="The record of what this run did NOT measure — the ledger the coverage figures on the Takeoff Summary are read from.">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span>Coverage JSON</span>
+            </button>` : ''}
           </div>
         </aside>
       </div>
@@ -291,9 +309,17 @@ async function loadTabContent(tabId) {
   }
 }
 
-// Takeoff Summary is an interactive VERIFICATION WORKSHEET: every quantity can
-// be edited or confirmed; verified lines lock to exact. Progress → 100%.
+// Takeoff Summary is an interactive VERIFICATION WORKSHEET: every quantity the
+// app measured can be edited or confirmed, and confirmed lines lock to exact.
+//
+// What it is NOT is a progress bar to 100%. The run's own ledger decides how
+// much of the expected set was measured; a worksheet that counted its way to
+// "100% verified" over a run that measured 15.7% of its items was reporting a
+// different quantity under the ledger's name.
 let takeoffRows = [];
+let takeoffCoverage = null;      // coverage.json's summary block, verbatim
+let takeoffCoverageWarnings = [];
+let takeoffUnnamedGeometry = [];
 
 async function loadTakeoffTab(container) {
   // Pull the structured summary from takeoff.json (richer than the CSV preview).
@@ -303,6 +329,26 @@ async function loadTakeoffTab(container) {
   if (data.error) throw new Error(data.error);
   const report = data.data ?? data;
   takeoffRows = report.takeoff_summary || [];
+  takeoffUnnamedGeometry = Array.isArray(report.unnamed_geometry) ? report.unnamed_geometry : [];
+  // takeoff.json carries the same coverage block coverage.json does; the
+  // separate file is fetched because it is the artifact the operator can
+  // download, and a screen that disagrees with a downloadable file is the
+  // defect this whole change is about. takeoff.json is the fallback so a run
+  // that failed to write coverage.json still gets an honest banner.
+  takeoffCoverage = (report.coverage && typeof report.coverage === 'object') ? report.coverage : null;
+  takeoffCoverageWarnings = Array.isArray(report.coverage_warnings) ? report.coverage_warnings : [];
+  try {
+    const cresp = await fetch(`/api/reports/${encodeURIComponent(currentRun)}/preview/coverage.json`, { credentials: 'same-origin' });
+    if (cresp.ok) {
+      const cdata = await cresp.json();
+      const cov = cdata.data ?? cdata;
+      if (cov && typeof cov.summary === 'object') takeoffCoverage = cov.summary;
+      if (Array.isArray(cov?.warnings) && cov.warnings.length) takeoffCoverageWarnings = cov.warnings;
+    }
+  } catch (err) {
+    // A missing coverage.json is a pre-23 run, not an error worth a red tab.
+    console.warn('coverage.json unavailable for this run', err);
+  }
   ingestSheetAssets(report.sheet_assets || {});
   renderTakeoffWorksheet(container);
 }
@@ -358,34 +404,14 @@ function resolveSheetContext(token) {
   return { imageRel: '', sheet: raw, focusSheet: raw };
 }
 
-function rowStatus(r) {
-  const src = String(r.source || '').toLowerCase();
-  const qtyMissing = r.quantity === null || r.quantity === undefined ||
-                     r.quantity_fmt === '—' || r.quantity === '—';
-  if (src === 'user_verified') return { cls: 'verified', label: 'Verified', icon: '✓' };
-  // Auto-accepted by the pipeline from a high-confidence (cleanly read) scale.
-  if (!qtyMissing && !r.needs_review && (r.auto_verified || src === 'measured_auto'))
-    return { cls: 'auto', label: 'Auto', icon: '⚡' };
-  if (src === 'measured_verified') return { cls: 'measured', label: 'Measured', icon: '▣' };
-  if (r.needs_review || qtyMissing) return { cls: 'review', label: 'Needs review', icon: '!' };
-  return { cls: 'ok', label: 'Confirmed', icon: '✓' };
-}
-
-function isVerifiedRow(r) {
-  const s = rowStatus(r);
-  return s.cls === 'verified' || s.cls === 'measured' || s.cls === 'auto' || s.cls === 'ok';
-}
-
-// A line is unproven when it still needs review or has no usable quantity.
-function rowNeedsVerification(r) {
-  return rowStatus(r).cls === 'review';
-}
-function rowQtyNum(r) {
-  const q = r.quantity;
-  if (q === null || q === undefined || q === '—' || q === '') return null;
-  const n = parseFloat(String(q).replace(/,/g, ''));
-  return Number.isFinite(n) ? n : null;
-}
+// rowStatus / rowNeedsVerification / rowQtyNum now live in report-provenance.js
+// — imported at the top of this file. They moved because they are the rules
+// that decide what a bidder believes about a blank, and a rule that can only
+// be exercised through this module cannot be tested. See tests/js.
+//
+// `isVerifiedRow` went with them. It had no call site (it was already dead at
+// HEAD) and its definition of "verified" — measured OR auto OR ok — is exactly
+// the conflation this change exists to end.
 
 // View state: focus on only the lines that still need attention.
 let wsFocusNeedsReview = false;
@@ -393,11 +419,9 @@ let wsFocusNeedsReview = false;
 function renderTakeoffWorksheet(container) {
   const total = takeoffRows.length;
   const needs = takeoffRows.filter(rowNeedsVerification);
-  const verified = total - needs.length;
-  const needsValue = needs.filter(r => rowQtyNum(r) === null).length;
-  const estimatesPending = needs.length - needsValue;  // have a number, just unconfirmed
-  const pct = total ? Math.round((verified / total) * 100) : 100;
-  const done = needs.length === 0;
+  const confirmable = takeoffRows.filter(rowIsConfirmableEstimate);
+  const humanConfirmed = takeoffRows.filter(r => rowStatus(r).cls === 'verified').length;
+  const showRoutes = hasQuantityRoutes(takeoffRows);
 
   // Rows to show: all, or only unproven (sorted by impact — biggest numbers first).
   let pairs = takeoffRows.map((r, i) => ({ r, i }));
@@ -408,33 +432,26 @@ function renderTakeoffWorksheet(container) {
 
   container.innerHTML = `
     <div class="worksheet">
-      <div class="ws-banner ${done ? 'ws-done' : ''}">
-        <div class="ws-progress-text">
-          <strong>${verified} / ${total} line items verified</strong>
-          <span>${done ? '✓ Takeoff is 100% verified — every line is exact or human-confirmed'
-                       : `${needs.length} still need review${needsValue ? ` · ${needsValue} need a value entered` : ''}`}</span>
-        </div>
-        <div class="ws-progress-bar"><div class="ws-progress-fill" style="width:${pct}%"></div></div>
-        <span class="ws-progress-pct">${pct}%</span>
-      </div>
+      ${renderCoverageBanner()}
       <div class="ws-toolbar">
         <label class="ws-toggle">
           <input type="checkbox" class="ws-focus-toggle" ${wsFocusNeedsReview ? 'checked' : ''}>
-          Show only lines that need verification${needs.length ? ` (${needs.length})` : ''}
+          Show only flagged lines a human can resolve${needs.length ? ` (${needs.length})` : ''}
         </label>
         <div class="ws-toolbar-actions">
-          ${estimatesPending ? `<button type="button" class="ws-confirm-all">Confirm ${estimatesPending} remaining estimate${estimatesPending > 1 ? 's' : ''} → 100%</button>` : ''}
-          ${verified > 0 ? `<button type="button" class="ws-reset-all" title="Remove all your manual confirmations and restore the original auto values">Reset my edits</button>` : ''}
+          ${confirmable.length ? `<button type="button" class="ws-confirm-flagged" title="Accepts the number already on each flagged line. It measures nothing and changes no line the app could not measure.">Confirm ${confirmable.length} flagged estimate${confirmable.length > 1 ? 's' : ''} at their current value</button>` : ''}
+          ${humanConfirmed > 0 ? `<button type="button" class="ws-reset-all" title="Remove all your manual confirmations and restore the original auto values">Reset my edits</button>` : ''}
         </div>
       </div>
-      <p class="ws-help">Click a quantity to edit it, or press <strong>Verify</strong> to confirm the value. <strong>Confirm remaining</strong> accepts every estimated line at once. Verified lines are exact and locked. Use the <strong>sheet link</strong> to trace a number back to its drawing, or <strong>Scale &amp; Verify</strong> to measure areas/lengths.</p>
+      <p class="ws-help">Click a quantity to edit it, or press <strong>Verify</strong> to confirm the value. A confirmed line is recorded as <strong>HUMAN INPUT</strong> — your number, not a measurement. Lines marked <strong>Not measured</strong> have no measurement path on these drawings; typing a value there is your estimate and the take-off will say so. Use the <strong>sheet link</strong> to trace a number back to its drawing, or <strong>Scale &amp; Verify</strong> to measure areas/lengths.</p>
       ${wsFocusNeedsReview && pairs.length === 0
-        ? `<p class="ws-empty">✓ Nothing left to verify — this takeoff is 100% confirmed.</p>`
+        ? `<p class="ws-empty">No flagged line is waiting on you. That is not the same as a complete take-off — read the coverage figures above.</p>`
         : `
       <div class="ws-table-wrap">
       <table class="ws-table data-table">
         <thead><tr>
           <th>Status</th><th>Item</th><th>Quantity</th><th>Unit</th>
+          ${showRoutes ? '<th title="How the number was produced — plan 28-06">Route</th>' : ''}
           <th>Source</th><th>Sheet</th><th>Action</th>
         </tr></thead>
         <tbody>
@@ -442,12 +459,14 @@ function renderTakeoffWorksheet(container) {
             const st = rowStatus(r);
             const qty = (r.quantity_fmt ?? r.quantity ?? '—');
             const noVal = rowQtyNum(r) === null;
+            const route = routeLabel(r.quantity_route);
             return `
             <tr class="ws-row ws-${st.cls}" data-idx="${i}" data-item="${escapeHtml(r.item)}">
-              <td><span class="ws-badge ws-badge-${st.cls}" title="${st.label}">${st.icon} ${st.label}</span></td>
+              <td><span class="ws-badge ws-badge-${st.cls}" title="${escapeHtml(st.title || st.label)}">${st.icon} ${st.label}</span></td>
               <td class="ws-item">${escapeHtml(r.item)}</td>
-              <td class="ws-qty ${noVal ? 'ws-qty-empty' : ''}" data-idx="${i}" title="Click to edit">${noVal ? 'enter value' : escapeHtml(String(qty))}</td>
+              <td class="ws-qty ${noVal ? 'ws-qty-empty' : ''}" data-idx="${i}" title="${noVal ? escapeHtml(st.title || '') : 'Click to edit'}">${noVal ? escapeHtml(st.blankText) : escapeHtml(String(qty))}</td>
               <td>${escapeHtml(r.unit || '')}</td>
+              ${showRoutes ? `<td class="ws-route ${route && !route.reproducible ? 'ws-route-reading' : ''}" title="${route ? escapeHtml(route.title) : ''}">${route ? escapeHtml(route.label) : '—'}</td>` : ''}
               <td class="ws-src">${escapeHtml(r.source || 'vision')}</td>
               <td>${renderSourceLinks((r.source_sheets || []).join(', '))}</td>
               <td class="ws-actions">
@@ -458,9 +477,142 @@ function renderTakeoffWorksheet(container) {
         </tbody>
       </table>
       </div>`}
+      ${renderReproducibilityPanel()}
+      ${renderUnnamedGeometryPanel()}
     </div>`;
 
   bindWorksheetEvents(container);
+}
+
+// ── The coverage banner ─────────────────────────────────────────────────────
+//
+// This replaces "N / M line items verified" plus a progress bar to 100%. Two
+// separate things were wrong with that pair, and both mattered:
+//
+//   1. It counted rows the run had explicitly recorded as having NO
+//      measurement path among the ones "still needing review", so the Crow run
+//      read "9 / 51 verified · 42 still need review" against its own ledger's
+//      MEASURED 8 / NEEDS REVIEW 11 / NOT MEASURED 31.
+//   2. The percentage was verified-rows-over-published-rows, which is not
+//      coverage. `coverage_pct_items` is measured-items over EXPECTED items —
+//      15.7% on the same run — and it is the number the summary, the CSV and
+//      coverage.json all publish.
+//
+// So the headline is the ledger's own figure, rendered verbatim, and every
+// count beside it comes from the same block.
+function renderCoverageBanner() {
+  const facts = coverageFacts(takeoffCoverage, takeoffRows);
+
+  if (facts.derived && !hasProvenance(takeoffRows)) {
+    // A pre-23 report: it recorded no coverage and classified no row. Saying
+    // "0 measured" about it would be inventing a finding.
+    return `
+      <div class="ws-banner ws-banner-legacy">
+        <div class="ws-cov-head">
+          <strong>${takeoffRows.length} line items</strong>
+          <span>This run predates coverage tracking, so it carries no record of
+          what it could not measure. Do not read a blank quantity here as a zero.</span>
+        </div>
+      </div>`;
+  }
+
+  const chip = (n, cls, label, title) =>
+    `<span class="ws-cov-chip ws-cov-${cls}" title="${escapeHtml(title)}"><strong>${n}</strong> ${label}</span>`;
+
+  const headline = facts.pct === null
+    ? `${facts.measured} of ${facts.total} published lines were measured`
+    : `${facts.pct}% of the expected line items were measured`;
+
+  const blanks = facts.notMeasured;
+
+  return `
+    <div class="ws-banner ws-coverage ${blanks ? 'ws-coverage-gap' : ''}">
+      <div class="ws-cov-head">
+        <strong>${escapeHtml(headline)}</strong>
+        <span>${facts.derived
+          ? 'Counted from the published rows — this run wrote no coverage ledger.'
+          : 'From this run&rsquo;s own coverage ledger (coverage.json), not from the rows on screen.'}</span>
+      </div>
+      <div class="ws-cov-chips">
+        ${chip(facts.measured, 'measured', 'measured', 'the app measured these off the drawings')}
+        ${chip(facts.needsReview, 'review', 'need review', 'measured but flagged — a human must confirm before use')}
+        ${chip(facts.notMeasured, 'notmeasured', 'not measured', 'no measurement path on these drawings. A blank is NOT a zero.')}
+        ${facts.humanInput ? chip(facts.humanInput, 'human', 'human input', 'a human supplied these') : ''}
+        ${facts.standard ? chip(facts.standard, 'standard', 'standard', 'estimating conventions the app injects') : ''}
+        ${facts.notApplicable ? chip(facts.notApplicable, 'na', 'not applicable', 'the drawing set genuinely has none') : ''}
+      </div>
+      ${blanks ? `<p class="ws-cov-blank"><strong>${blanks} line item${blanks > 1 ? 's have' : ' has'} no measurement path.</strong>
+        Do not read those blanks as zero, and no button on this screen can turn one
+        into a measured quantity. You can type your own estimate into any of them —
+        it will publish as HUMAN INPUT.</p>` : ''}
+      ${takeoffCoverageWarnings.length ? `
+      <details class="ws-cov-warnings">
+        <summary>${takeoffCoverageWarnings.length} coverage warning${takeoffCoverageWarnings.length > 1 ? 's' : ''} from this run</summary>
+        <ul>${takeoffCoverageWarnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>
+      </details>` : ''}
+    </div>`;
+}
+
+// ── Reproducibility (plan 28-06) ────────────────────────────────────────────
+// Mirrors summary.txt's REPRODUCIBILITY section on screen, including its two
+// fences: a listed number is not thereby wrong, and this cannot see whether a
+// row appears AT ALL in a repeat run.
+function renderReproducibilityPanel() {
+  if (!hasQuantityRoutes(takeoffRows)) return '';   // pre-28-06 run
+  const reading = reproducibilityRows(takeoffRows);
+  return `
+    <details class="ws-panel ws-repro" ${reading.length ? 'open' : ''}>
+      <summary><strong>${reading.length}</strong> published number${reading.length === 1 ? '' : 's'} a repeat run may answer differently</summary>
+      ${reading.length ? `
+      <p>These came from a model reading a sheet image. Every other number was
+      measured off the drawing or copied out of a table printed on the plans, and
+      a repeat run reproduces it. A number here may be exactly right; what it is
+      not is settled.</p>
+      <ul class="ws-repro-list">
+        ${reading.map(r => `<li><span>${escapeHtml(r.item)}</span> <em>${escapeHtml(String(r.quantity_fmt ?? r.quantity ?? '—'))} ${escapeHtml(r.unit || '')}</em></li>`).join('')}
+      </ul>` : `
+      <p>None — every published number was measured off the drawing, read out of
+      the PDF's text, or copied out of a table printed on the plans. This is said
+      rather than left out, because a section that vanished when it had nothing to
+      report would look exactly like a run that never asked.</p>`}
+      <p class="ws-panel-foot">This cannot tell you whether a row appears at all in
+      a repeat run. That is decided one layer above any number, and a single run
+      has no way to see its own absences.</p>
+    </details>`;
+}
+
+// ── Unidentified geometry (plan 2.4) ────────────────────────────────────────
+// Real geometry the run MEASURED and could not name. It is in takeoff.json and
+// was rendered nowhere. Naming one of these is the single highest-value thing
+// an estimator can do for the next run, and it is also the honest account of
+// what the app saw and did not publish.
+function renderUnnamedGeometryPanel() {
+  const items = takeoffUnnamedGeometry;
+  if (!items.length) return '';
+  return `
+    <details class="ws-panel ws-unnamed">
+      <summary><strong>${items.length}</strong> measured shape${items.length === 1 ? '' : 's'} the app could not name</summary>
+      <p>Each of these was measured on the drawings. None is published as a line
+      item, because nothing on the sheet says what it is — an absence of a NAME,
+      never an absence of an object. If you recognise one, add it to your object
+      manifest and the next run will name it.</p>
+      <div class="ws-table-wrap">
+        <table class="ws-table data-table">
+          <thead><tr><th>ID</th><th>Kind</th><th>Qty</th><th>Unit</th><th>Sheet</th><th>Why it has no name</th></tr></thead>
+          <tbody>
+            ${items.map(g => `
+            <tr>
+              <td>${escapeHtml(g.candidate_id || '')}</td>
+              <td>${escapeHtml(String(g.kind || '').replace(/_/g, ' '))}</td>
+              <td>${escapeHtml(String(g.quantity ?? '—'))}</td>
+              <td>${escapeHtml(g.unit || '')}</td>
+              <td>${renderSourceLinks(g.sheet || '')}</td>
+              <td class="ws-unnamed-why" title="${escapeHtml(g.detail || '')}">${escapeHtml(String(g.reason || '').replace(/_/g, ' '))}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </details>`;
 }
 
 function bindWorksheetEvents(container) {
@@ -492,12 +644,23 @@ function bindWorksheetEvents(container) {
       renderTakeoffWorksheet(container);
     });
   }
-  // Confirm-all: accept every remaining estimate in one click → 100%.
-  const confirmAll = container.querySelector('.ws-confirm-all');
-  if (confirmAll) {
-    confirmAll.addEventListener('click', () => {
-      confirmAll.disabled = true;
-      confirmAll.textContent = 'Confirming…';
+  // Bulk confirm, scoped and named for what it does: it accepts the number
+  // already sitting on each FLAGGED line. It cannot reach a line the app could
+  // not measure — those carry no number for it to accept — and it makes no
+  // claim about completeness. The control it replaced was labelled
+  // "Confirm N remaining estimates → 100%", a destination one click could not
+  // reach and that the run's coverage did not support.
+  const confirmFlagged = container.querySelector('.ws-confirm-flagged');
+  if (confirmFlagged) {
+    confirmFlagged.addEventListener('click', () => {
+      const n = takeoffRows.filter(rowIsConfirmableEstimate).length;
+      const blanks = takeoffRows.filter(r => rowStatus(r).thirdState).length;
+      const msg = `Confirm ${n} flagged line${n > 1 ? 's' : ''} at the number already shown?\n\n` +
+        `Each becomes HUMAN INPUT — your confirmation, recorded as yours.\n` +
+        (blanks ? `\nThis does NOT touch the ${blanks} line${blanks > 1 ? 's' : ''} the app had no measurement path for. Those stay blank.` : '');
+      if (!confirm(msg)) return;
+      confirmFlagged.disabled = true;
+      confirmFlagged.textContent = 'Confirming…';
       postVerifyBatch(container, { accept_all_estimates: true });
     });
   }
@@ -1332,6 +1495,7 @@ async function exportReport(runFolder, type) {
     calculations: 'calculations.csv',
     raw: 'raw_items.csv',
     takeoff: 'takeoff_summary.csv',
+    coverage: 'coverage.json',
   };
   const filename = fileMap[type] || `${type}.csv`;
   const url = `/api/reports/${encodeURIComponent(runFolder)}/${encodeURIComponent(filename)}`;
