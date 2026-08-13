@@ -12,10 +12,12 @@ store and applied automatically on future runs.
 ```bash
 pip install -r requirements.txt
 pip install -e .            # installs the src/bobbytailor package (required)
-playwright install chromium
+playwright install chromium # only if you scrape StackCT
 
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY + StackCT login
+# Edit .env: ANTHROPIC_API_KEY for vision passes, plus SECRET_KEY and the admin
+# seed for the web app. StackCT credentials are OPTIONAL — a plans-only install
+# leaves them empty. See "Environment variables" under VPS Deployment.
 ```
 
 ## Package layout
@@ -124,21 +126,39 @@ source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e .
 
+# Only needed if you scrape StackCT. A plans-only install can skip both.
 playwright install chromium
 playwright install-deps chromium
 
 cp .env.example .env
-# Edit .env with StackCT and Anthropic credentials
+# Edit .env — see "Environment variables" below for what is actually required.
 mkdir -p uploads output output/screenshots
 ```
 
 ### Environment variables
 
+**Required to start the web app.** `create_app()` refuses to boot without these
+three and names every one that is missing:
+
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `STACKCT_EMAIL` | StackCT login email | (required) |
-| `STACKCT_PASSWORD` | StackCT login password | (required) |
-| `ANTHROPIC_API_KEY` | Anthropic API key (`sk-ant-...`) | (required) |
+| `SECRET_KEY` | Flask session signing — generate it as shown in [Security notes](#security-notes) | **(required)** |
+| `ADMIN_EMAIL` | The only login — written by the admin seeder | **(required)** |
+| `ADMIN_PASSWORD_HASH` | bcrypt hash of the admin password — written by the admin seeder | **(required)** |
+
+**Everything else is optional, and "optional" is meant literally.** StackCT
+credentials are needed *only* if you scrape StackCT. A plans-only install — the
+supported way to run this product against uploaded drawings — leaves them empty
+and never launches a browser. They are validated inside `scrape/`, at login,
+not at import: you do not need to invent values to start the app.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ANTHROPIC_API_KEY` | Anthropic API key (`sk-ant-...`). Needed for any vision pass. Missing it logs a warning at startup rather than refusing to boot, because the deterministic offline path is a supported way to run — but any vision pass will then fail mid-run | (required for vision) |
+| `STACKCT_EMAIL` | StackCT login email — **only** for StackCT scraping. Empty disables the catalog prefetch and the 24 h scheduler | (optional) |
+| `STACKCT_PASSWORD` | StackCT login password — **only** for StackCT scraping | (optional) |
+| `SESSION_COOKIE_SECURE` | `false` allows session cookies over plain HTTP. Read [Nginx reverse proxy (required)](#nginx-reverse-proxy-required) before setting it — TLS is mandatory, and a Secure cookie over plain HTTP loops `/login` forever with no error | `true` |
+| `MAX_UPLOAD_MB` | Request-body cap. Keep nginx `client_max_body_size` at the same number | `500` |
 | `CLAUDE_MODEL` | Model for general drawings | `claude-haiku-4-5` |
 | `CLAUDE_MODEL_SCHEDULES` | Model for schedule/panel sheets | falls back to `CLAUDE_MODEL` |
 | `HEADLESS` | Run browser headless | `true` |
