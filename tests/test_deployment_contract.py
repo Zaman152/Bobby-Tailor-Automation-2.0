@@ -710,6 +710,130 @@ def test_run_settings_records_the_model_slugs_the_run_used():
         )
 
 
+# ─── 1.6: a failed status poll must reach the user, not be swallowed ────────
+#
+# `if (!res.ok) return;` discarded every non-OK response. A 404 — the job was
+# registered in another gunicorn worker, or the server restarted and lost the
+# in-process job dict — left the progress bar at 0% and the badge on QUEUED
+# while a PAID run either finished invisibly or never began. The only signal
+# available to the user was a bar that did not move, which looks exactly like
+# a slow sheet.
+#
+# Driven through the real app.js in a node vm rather than asserted as text:
+# the claim is about what the user ends up seeing, and a string match cannot
+# tell a surfaced error from a dead one.
+
+APP_JS = REPO_ROOT / "src" / "bobbytailor" / "web" / "static" / "app.js"
+POLL_HARNESS = REPO_ROOT / "tests" / "js" / "poll_job_monitor_harness.js"
+
+
+def _run_poll_scenario(responses):
+    import json
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed — browser-behaviour test skipped")
+
+    proc = subprocess.run(
+        [node, str(POLL_HARNESS), str(APP_JS), json.dumps({"responses": responses})],
+        capture_output=True, text=True, cwd=str(REPO_ROOT), timeout=60,
+    )
+    assert proc.returncode == 0, (
+        "poll harness failed:\n%s\n%s" % (proc.stdout, proc.stderr)
+    )
+    return json.loads(proc.stdout)
+
+
+def test_a_persistent_404_poll_is_surfaced_and_polling_stops():
+    result = _run_poll_scenario([{"status": 404}] * 3)
+
+    assert result["banner_shown"], (
+        "the progress bar sat at 0%% with nothing on screen while every poll "
+        "404'd — the exact condition under which a paid run completes "
+        "invisibly. Status text was %r" % result["status_text"]
+    )
+    assert not result["polling_still_live"], (
+        "polling continued forever against a job the server does not have"
+    )
+    assert "404" in result["banner_text"]
+
+
+def test_the_404_message_names_the_multi_worker_cause():
+    """A 404 here has one overwhelmingly likely cause on a real deployment,
+    and it is the one an operator can act on."""
+    result = _run_poll_scenario([{"status": 404}] * 3)
+    text = result["banner_text"].lower()
+    assert "worker" in text, (
+        "the message does not mention the worker count, which is the cause "
+        "an operator can actually fix: %r" % result["banner_text"]
+    )
+
+
+def test_a_single_failed_poll_is_tolerated():
+    """A worker restart or one dropped packet must not throw an alarm. The
+    rule is 'surface a pattern', not 'panic on a blip'."""
+    result = _run_poll_scenario([{"status": 404}, {"status": 200}, {"status": 200}])
+
+    assert not result["banner_shown"], (
+        "one transient failure produced a user-facing error: %r"
+        % result["banner_text"]
+    )
+    assert result["polling_still_live"], "polling stopped after a single blip"
+
+
+def test_an_unreachable_server_is_surfaced_too():
+    """The bare `catch (e) { /* ignore */ }` swallowed this path entirely."""
+    result = _run_poll_scenario([None, None, None])
+
+    assert result["banner_shown"], (
+        "the server was unreachable for every poll and the UI said nothing"
+    )
+    assert not result["polling_still_live"]
+
+
+def test_an_expired_session_says_so_immediately():
+    """401 needs no failure budget — it will not fix itself, and a bar frozen
+    at 40%% is not a login prompt."""
+    result = _run_poll_scenario([{"status": 401}])
+
+    assert result["banner_shown"]
+    assert "session" in result["banner_text"].lower()
+    assert not result["polling_still_live"]
+
+
+def test_a_healthy_run_still_completes_normally():
+    """The guard must not disturb the path that works."""
+    result = _run_poll_scenario(
+        [{"status": 200, "body": {"status": "done", "progress": 100}}]
+    )
+
+    assert not result["banner_shown"], (
+        "a successful run showed an error banner: %r" % result["banner_text"]
+    )
+    assert "COMPLETED" in result["status_text"]
+
+
+def test_poll_job_monitor_no_longer_discards_a_non_ok_response():
+    """Source-level backstop for the specific line, so the behavioural tests
+    above cannot be satisfied by an accident elsewhere in the file."""
+    src = APP_JS.read_text()
+    match = re.search(
+        r"async function pollJobMonitor\(.*?\n\}\n", src, re.DOTALL
+    )
+    assert match, "pollJobMonitor not found in app.js"
+    # Strip // comments first: the function's own comment quotes the removed
+    # line in order to explain what it used to do, and a naive scan reads that
+    # explanation as the defect.
+    body = "\n".join(
+        re.sub(r"//.*$", "", line) for line in match.group(0).splitlines()
+    )
+    assert not re.search(r"if\s*\(!res\.ok\)\s*return;", body), (
+        "pollJobMonitor discards a non-OK poll again"
+    )
+
+
 # ─── self-audit: this module costs nothing to run ───────────────────────────
 
 def test_this_module_spends_no_money():
@@ -751,8 +875,9 @@ def test_this_module_imports_nothing_that_could_reach_a_network():
     # Flask's test client dispatches WSGI in memory — it opens no socket.
     # apscheduler is imported only to REPLACE its start() with a recorder,
     # which is what stops the periodic StackCT sync from firing here.
-    allowed = {"ast", "os", "re", "subprocess", "sys", "pathlib", "pytest",
-               "apscheduler", "flask_limiter", "bobbytailor"}
+    allowed = {"ast", "json", "os", "re", "shutil", "subprocess", "sys",
+               "pathlib", "pytest", "apscheduler", "flask_limiter",
+               "bobbytailor"}
     assert imported <= allowed, (
         "this module must stay offline; unexpected imports %r"
         % sorted(imported - allowed)

@@ -593,6 +593,11 @@ function resumeJobMonitor(jobId, projectName) {
   const card = document.getElementById('progressCard');
   if (card) card.classList.remove('visible');
 
+  // Fresh attachment — a previous job's failures must not count against this
+  // one, and a stale "not responding" banner must not survive into it.
+  monitorPollFailures = 0;
+  clearMonitorPollError();
+
   pollJobMonitor(jobId);
   monitorPollInterval = setInterval(() => pollJobMonitor(jobId), 1500);
 }
@@ -613,10 +618,55 @@ function stopJobPolling() {
   }
 }
 
+// How many consecutive failed polls to tolerate before telling the user.
+// One or two is normal — a worker restart, a dropped packet, a laptop lid.
+// Anything past that is not a blip and must not be hidden.
+const MONITOR_POLL_FAILURE_LIMIT = 3;
+let monitorPollFailures = 0;
+
 async function pollJobMonitor(jobId) {
+  // A poll that fails must SAY SO. `if (!res.ok) return;` swallowed every
+  // non-OK response, so a 404 (job registered in another gunicorn worker, or
+  // a restarted server that lost the in-process job dict) left the progress
+  // bar sitting at 0% with the status stuck on QUEUED — while a PAID run
+  // either completed invisibly or never started. The user's only signal that
+  // anything was wrong was a bar that never moved, which is indistinguishable
+  // from a slow sheet.
   try {
     const res = await apiFetch('/api/status/' + jobId);
-    if (!res.ok) return;
+
+    if (res.status === 401) {
+      // The session expired mid-run. Polling forever produces a bar frozen at
+      // whatever it last reached; say it, and stop.
+      stopJobPolling();
+      showMonitorPollError(
+        'Your session expired. The run may still be going — sign in again to '
+        + 'reattach to job ' + jobId + '.'
+      );
+      return;
+    }
+
+    if (!res.ok) {
+      monitorPollFailures += 1;
+      if (monitorPollFailures >= MONITOR_POLL_FAILURE_LIMIT) {
+        stopJobPolling();
+        showMonitorPollError(
+          res.status === 404
+            ? 'Job ' + jobId + ' is not known to the server (HTTP 404). It was '
+              + 'either lost in a restart, or the server is running more than '
+              + 'one worker — job state lives in a single process, so only '
+              + '`gunicorn -w 1` can serve it. Check the run log before '
+              + 'starting another paid run.'
+            : 'Lost contact with the server while tracking job ' + jobId
+              + ' (HTTP ' + res.status + '). The run may still be in progress; '
+              + 'reload this page to reattach.'
+        );
+      }
+      return;
+    }
+
+    monitorPollFailures = 0;
+    clearMonitorPollError();
     const job = await res.json();
 
     updateMonitorUI(job);
@@ -625,7 +675,49 @@ async function pollJobMonitor(jobId) {
       stopJobPolling();
       handleJobCompletion(job);
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    // Network-level failure (offline, DNS, server down). Same rule: tolerate
+    // a blip, surface a pattern. Never silently continue forever.
+    monitorPollFailures += 1;
+    if (monitorPollFailures >= MONITOR_POLL_FAILURE_LIMIT) {
+      stopJobPolling();
+      showMonitorPollError(
+        'Cannot reach the server while tracking job ' + jobId + ' ('
+        + (e && e.message ? e.message : 'network error')
+        + '). The run may still be in progress; reload this page to reattach.'
+      );
+    }
+  }
+}
+
+function showMonitorPollError(message) {
+  const statusEl = document.getElementById('monitorStatus');
+  if (statusEl) {
+    statusEl.textContent = '✗ NOT RESPONDING';
+    statusEl.className = 'status-badge badge-error';
+  }
+  let banner = document.getElementById('monitorPollError');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'monitorPollError';
+    // Same treatment the monitor already gives a run-level error — this IS a
+    // run-level error from the user's point of view.
+    banner.className = 'monitor-error-banner';
+    const anchor = document.getElementById('monitorStatus');
+    const parent = anchor && anchor.parentNode;
+    if (parent) {
+      parent.insertBefore(banner, anchor.nextSibling);
+    } else {
+      document.body.appendChild(banner);
+    }
+  }
+  banner.textContent = message;
+  banner.style.display = '';
+}
+
+function clearMonitorPollError() {
+  const banner = document.getElementById('monitorPollError');
+  if (banner) banner.style.display = 'none';
 }
 
 function updateMonitorUI(job) {
