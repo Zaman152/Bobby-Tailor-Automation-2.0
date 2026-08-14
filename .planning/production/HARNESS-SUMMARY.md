@@ -143,20 +143,43 @@ each of which publishes a confidently wrong LABEL, all fixed structurally:
 2. **Two adjacent lists merged.** Bob's KEYED NOTES runs 01..16, and an unheaded
    paint-colour list restarts at 1, 2 just 93 pt below. A legend numbers upward, so
    a restart ends the stack — no constant needed.
-3. **Wrapped notes returned the wrong line.** The number block is drawn vertically
-   *centred* on its note, so one-line pairing returned whichever line sat level with
-   the digit. Crow keynote 2 came back as "CONCRETE ROOF AT ELECTRICAL ROOF BELOW.
-   G.C. TO" — its second line — turning a note about a roof *hatch* into a note
-   about a roof. Notes are now reassembled by splitting the column at the midpoint
-   between consecutive entry centres: **260 entries gained their full text, 130
-   unchanged, zero replaced.**
+A third fix was **built, measured and REJECTED** — recorded here because the
+measurement is the useful part. Wrapped notes return only the one line level with
+the number block (Crow keynote 2 comes back as its second line, "CONCRETE ROOF AT
+ELECTRICAL ROOF BELOW. G.C. TO", turning a note about a roof *hatch* into a note
+about a roof). Reassembling by splitting the note column at the midpoint between
+consecutive entry centres fixed all of Crow — 260 entries across the four sets
+gained their full text, 130 unchanged, none replaced — **but the midpoint is only
+the true boundary when adjacent notes have the same line count.** On Bob's page 4
+it moved one wrapped line across the 07/08 boundary, so note 07 ended "...DO NOT
+INSTALL TO THE STOREFRONT" and note 08 began "SYSTEM/GLAZING MULLIONS.". That put
+the word STOREFRONT into an awning note, flipped the front facade's dominant
+material from CMU to Storefront, and cost a real published quantity.
+
+Helped one plan set, hurt another → rejected, exactly like the title-block window.
+Doing it properly means grouping note lines into **contiguous blocks** first and
+matching each block to the nearest number centre, rather than slicing the column by
+number positions alone. That is its own piece of work with its own four-set
+measurement. Until then the reader returns *less* text rather than *wrong* text,
+and `tests/test_keynote_callouts.py` asserts the current truncation out loud so the
+limitation stays visible.
 
 `keynote_callout_counts()` then converts a keynote into a count: the bubble group is
 identified as the one enclosing the most of the legend's own number blocks, and each
 entry's own legend bubble is subtracted. Crow keynote 1 is drawn exactly twice —
 legend plus one plan callout — so **Ladder = 1**.
 
-Keynotes 1 **and** 2 both contain "ACCESS LADDER" (2 is a roof hatch). The count is
+One more thing the widening broke and the four-set gate caught: `keynote_tags()`
+shares the regex, and a *tag* has none of the header/stack/ordering context that
+makes a legend entry recognisable — it is just a lone number in a drawing. Bob's
+page 4 started returning twenty bare `1` tags that are general-note indices and
+dimension text, and the front facade lost its CMU row. The two-digit regex had been
+supplying that constraint by accident. It is now stated: **a keynote tag is a number
+the sheet's own legend defines.** Bob's tag census is byte-identical to before;
+Crow's single-digit keynotes now resolve.
+
+Keynotes 1 **and** 2 both contain "ACCESS LADDER" on the sheet (2 is a roof hatch).
+The count is
 deterministic; which keynote *is* the Ladder stays a head-noun judgement for the
 semantic pass, and a test pins the ambiguity so nobody "fixes" it with a substring
 match. Zero numeric fields entered any vision schema.

@@ -1754,72 +1754,31 @@ def keynote_legend_rows(page) -> dict:
             previous, highest = y0, int(number)
             out.setdefault(header_text, []).append((number, text, box))
 
-    return {h: _rejoin_wrapped_notes(page, rows, lines) for h, rows in out.items()}
-
-
-def _rejoin_wrapped_notes(page, rows: List[tuple], lines) -> List[tuple]:
-    """Give each entry its WHOLE note, not the one line nearest the number.
-
-    A keynote's number block is drawn vertically CENTRED on its note, and the
-    note wraps. ``pair_two_token_tags`` pairs one line with one number, so a
-    four-line note hands back whichever line happens to sit level with the
-    digit. Crow keynote 2 is "3'-0" X 3'-0" ROOF HATCH WITH ACCESS LADDER FROM
-    CONCRETE ROOF AT ELECTRICAL ROOF BELOW..." and the pairing returned its
-    SECOND line, "CONCRETE ROOF AT ELECTRICAL ROOF BELOW. G.C. TO" — a note
-    about a roof hatch reading as a note about a roof. Labels are decided off
-    this text, so a half-sentence is a confidently wrong label.
-
-    The reassembly needs no new constant. Numbers are centred on their notes,
-    so a note line belongs to the entry whose centre is nearest — resolved by
-    splitting the column at the MIDPOINT between consecutive entry centres, and
-    clamping the first and last entry to half a spacing so unrelated text above
-    and below the legend cannot be swept in. Entries whose text cannot be
-    reassembled keep exactly what they had.
-    """
-    if len(rows) < 2:
-        return rows
-    centres = [((box[1] + box[3]) / 2.0, i) for i, (_n, _t, box) in enumerate(rows)]
-    centres.sort()
-    spacings = [
-        centres[i + 1][0] - centres[i][0] for i in range(len(centres) - 1)
-    ]
-    half = (sorted(spacings)[len(spacings) // 2]) / 2.0
-    if half <= 0:
-        return rows
-
-    bounds = []
-    for k, (c, idx) in enumerate(centres):
-        lo = (centres[k - 1][0] + c) / 2.0 if k else c - half
-        hi = (c + centres[k + 1][0]) / 2.0 if k + 1 < len(centres) else c + half
-        bounds.append((lo, hi, idx))
-
-    # The note column: to the right of the numbers, sharing their band.
-    number_right = max(box[2] for _n, _t, box in rows)
-    collected: dict = {}
-    for line in lines:
-        text = line.text.strip()
-        if len(text) <= 8 or _KEYNOTE_NUM_RE.match(text):
-            continue
-        box = _rect(to_page_space(page, _rect(line.bbox_pt)))
-        if box is None or box.x0 < number_right:
-            continue
-        if box.x0 - number_right > _KEYNOTE_PAIR_GAP_PT:
-            continue
-        centre = (box.y0 + box.y1) / 2.0
-        for lo, hi, idx in bounds:
-            if lo <= centre < hi:
-                collected.setdefault(idx, []).append((box.y0, box.x0, text))
-                break
-
-    out: List[tuple] = []
-    for i, (number, text, box) in enumerate(rows):
-        parts = collected.get(i)
-        if not parts:
-            out.append((number, text, box))
-            continue
-        joined = " ".join(t for _y, _x, t in sorted(parts))
-        # Only ever ADD to what the validated pairing already found.
-        out.append((number, joined if text in joined else text, box))
+    # NOTE — a wrapped note still yields only the ONE line the pairing chose.
+    #
+    # The number block is drawn vertically CENTRED on its note, so a four-line
+    # note hands back whichever line sits level with the digit: Crow keynote 2
+    # returns "CONCRETE ROOF AT ELECTRICAL ROOF BELOW. G.C. TO", the second
+    # line of "3'-0" X 3'-0" ROOF HATCH WITH ACCESS LADDER FROM CONCRETE ROOF
+    # AT ELECTRICAL ROOF BELOW...".
+    #
+    # A reassembly was built and MEASURED, and it is not here because it failed
+    # the four-plan-set rule. Splitting the note column at the midpoint between
+    # consecutive entry centres gave all four Crow notes their full text (260
+    # entries across the four sets gained text, 130 unchanged, none replaced) —
+    # but the midpoint is only the true boundary when adjacent notes have the
+    # same line count. On Bob's page 4 it moved one wrapped line across the
+    # 07/08 boundary, so note 07 ended "...DO NOT INSTALL TO THE STOREFRONT"
+    # and note 08 began "SYSTEM/GLAZING MULLIONS." — which put the word
+    # STOREFRONT into an awning note, flipped the front facade's dominant
+    # material from CMU to Storefront, and cost a real published quantity.
+    #
+    # Doing this properly means grouping the note lines into CONTIGUOUS BLOCKS
+    # first (line pitch within a note vs the step between notes) and matching
+    # each block to the nearest number centre — not slicing the column by
+    # number positions alone. That is a separate piece of work with its own
+    # four-set measurement. Until then the reader returns less text rather than
+    # wrong text.
     return out
 
 
@@ -1986,16 +1945,43 @@ def keynote_callout_counts(page, symbol_groups) -> List[KeynoteCallout]:
         return []
 
 
-def keynote_tags(page, clip) -> List[tuple]:
+def keynote_tags(page, clip, numbers=None) -> List[tuple]:
     """``[(number, x_pt, y_pt), ...]`` — positioned keynote tags inside *clip*.
 
-    The lone two-digit number blocks inside a drawing's clip (PAGE space,
-    like every elevation clip) — the markers whose meaning
-    :func:`keynote_legend` holds. Positions are page-space centres so a tag
-    can be tested against a facade sub-component's bbox. Never raises.
+    The lone number blocks inside a drawing's clip (PAGE space, like every
+    elevation clip) — the markers whose meaning :func:`keynote_legend` holds.
+    Positions are page-space centres so a tag can be tested against a facade
+    sub-component's bbox. Never raises.
+
+    **A keynote tag is a number the sheet's own legend defines.** Nothing else
+    tells a callout apart from a dimension, a detail number or a note index: a
+    tag has none of the header/stack/ordering context that makes a legend entry
+    recognisable, it is just a lone number sitting in a drawing.
+
+    That constraint used to be supplied accidentally by ``_KEYNOTE_NUM_RE``
+    demanding two digits, which happened to match Bob's zero-padded 01..16 and
+    happened to exclude everything else on that sheet. It also excluded every
+    single-digit keynote on every other sheet — Crow's ladder among them. With
+    the regex widened, Bob's page 4 returned twenty bare ``1`` tags that are
+    general-note indices and dimension text, and the front facade lost its CMU
+    row entirely.
+
+    So the restriction is now stated instead of implied. ``numbers`` defaults
+    to the keys of this page's own legend; pass an explicit set when the legend
+    lives on another sheet. A page with no legend has nothing to resolve a tag
+    against and yields none.
     """
     box = _rect(clip)
     if box is None:
+        return []
+    if numbers is None:
+        numbers = {
+            number
+            for rows in keynote_legend_rows(page).values()
+            for number, _text, _box in rows
+        }
+    numbers = {str(n).strip() for n in numbers}
+    if not numbers:
         return []
     try:
         from bobbytailor.deterministic.tag_pairing import (  # noqa: PLC0415
@@ -2008,7 +1994,7 @@ def keynote_tags(page, clip) -> List[tuple]:
     out: List[tuple] = []
     for line in lines:
         m = _KEYNOTE_NUM_RE.match(line.text.strip())
-        if not m:
+        if not m or m.group(1) not in numbers:
             continue
         pbox = _rect(to_page_space(page, _rect(line.bbox_pt)))
         if pbox is None:
