@@ -752,12 +752,33 @@ def _module_source_under_audit() -> str:
 
 
 def test_this_module_runs_free():
-    """No paid marker, no credential, no network, no golden comparison."""
+    """No paid marker, no credential, no network, no golden comparison.
+
+    The tokens are ASSEMBLED FROM HALVES as well as excised from the scanned
+    source. Either alone would keep this check honest about its own body, but
+    only assembly keeps the file honest about itself to an OUTSIDE scanner:
+    ``tests/test_phase28_acceptance.py`` reads every module of this phase off
+    disk whole, and a literal here would have been a paid token in the free
+    acceptance path with nothing actually wrong. Assembly is the phase-wide
+    idiom (24-09, 24-10, 28-01, 28-02); this module was the one that had not
+    adopted it.
+    """
     source = _module_source_under_audit()
-    for forbidden in ("ANTHROPIC_API_KEY", "mark.golden", "accuracy_gate",
-                      "vision_only_benchmark", "golden_convergence",
-                      "requests.", "httpx.", "urllib"):
-        assert forbidden not in source, forbidden
+    forbidden = (
+        "ANTHROPIC" + "_API_KEY",
+        "mark." + "gold" + "en",
+        "accur" + "acy_gate",
+        "vision_only" + "_benchmark",
+        "gold" + "en_convergence",
+        "requests.",
+        "httpx.",
+        "urllib",
+    )
+    # Non-vacuity: a token that cannot be found even when present scans nothing.
+    for token in forbidden:
+        assert token in ("prefix " + token + " suffix"), token
+    for token in forbidden:
+        assert token not in source, token
 
 
 def test_this_module_asserts_no_golden_total():
