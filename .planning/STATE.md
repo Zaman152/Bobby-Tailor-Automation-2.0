@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: milestone
-current_phase: 24
-current_phase_name: binding-determinism-text-anchored-labeling
+current_phase: 28
+current_phase_name: accuracy-remediation-crow-defects
 status: complete
-stopped_at: "Completed 28-05-PLAN.md (5 of 7 plans, wave 3). One measured region now backs one published row per building layer: region_ref is threaded fusion → calculator → aggregator, and a row whose NAME is a hypothesis may not claim a layer of a region an evidence-named row already holds. Phase 23's D1 three-layer share is proved intact by a dedicated test. Next: 28-06-PLAN.md (wave 4)."
-last_updated: "2026-08-07T07:05:39.463Z"
-last_activity: 2026-08-07
-last_activity_desc: "28-05 stopped the 397,600 SF footprint publishing three times — the fan-out is arbitrated by recorded region identity, never by two numbers being equal"
+stopped_at: "Phase 28 COMPLETE — 7 of 7 plans. 28-07 landed the acceptance gate (`python3 -m pytest -q tests/test_phase28_acceptance.py`, 14 checks, 6:42, free). THREE of five requirements are closed (V4-FIX-02, V4-FIX-04, V4-FIX-05-as-narrowed); V4-FIX-01 and V4-FIX-03 are ADVANCED and deliberately NOT ticked, each pinned by a tripwire that fails the day it is closed. Two limits this phase declared for itself were re-measured FALSE at gate-writing time: Columns and Ladder are no longer unmeasured, closed by post-phase-28 detection work rather than by Phase 25 — so PHASE 25 MUST BE RE-PLANNED before it is executed."
+last_updated: "2026-08-14T07:30:00.000Z"
+last_activity: 2026-08-14
+last_activity_desc: "28-07 made the phase's acceptance re-runnable, and refused to tick the two requirements the phase measured to be still open"
 progress:
   total_phases: 29
-  completed_phases: 21
+  completed_phases: 22
   total_plans: 138
-  completed_plans: 130
-  percent: 72
+  completed_plans: 132
+  percent: 76
 ---
 
 # Project State
@@ -25,9 +25,50 @@ See: `.planning/PROJECT.md` (updated 2026-05-26)
 
 **Core value:** End-to-end automated take-off from StackCT drawings (or PDFs) producing traceable, formula-backed quantity calculations estimators can trust and export.
 
-**Current focus:** Phase 24 is COMPLETE. Next: Phase 25 — deterministic symbol detection.
+**Current focus:** Phase 28 is COMPLETE. Next: **Phase 25 must be RE-PLANNED before it is executed** —
+two of its three stated subjects were detected by work that landed outside it.
 
 ## Current Position
+
+Phase: 28 (accuracy-remediation-crow-defects) — **COMPLETE (2026-08-14)**
+Plan: 7 of 7 complete (5 waves)
+Status: **the phase's acceptance is one free command** —
+`python3 -m pytest -q tests/test_phase28_acceptance.py` (14 checks, 6:42, zero API). Full offline
+suite at close: **2529 passed, 1 skipped, 2 deselected (1:11:51)**.
+
+**Three requirements closed, two ADVANCED and deliberately NOT ticked.** `V4-FIX-02` (the Bollards
+mis-binding, diagnosed and fixed at its cause, nothing halved), `V4-FIX-04` (one measured region
+backs one published row per building layer, D1's three-layer exception proved intact) and
+`V4-FIX-05` (every published quantity states the route it came by; `summary.txt` names the ones a
+re-run may answer differently) are complete. `V4-FIX-01` is not — two calculator producers still emit
+EA counts stamping no corroboration verdict. `V4-FIX-03` is not — the mis-bind is removed and
+audited, but `CMU Wall` now takes a FLAGGED masonry-by-hint bind and "binds the correct class" is not
+proved and cannot be offline. Both residuals are runnable tripwires that fail the day they are
+closed; shorten them deliberately, never delete.
+
+**Four plan premises were falsified during execution and each is a committed assertion, not a
+paragraph.** The 56-vs-56 tie never existed (`SYM-3` is excluded before candidacy, so the shortlist's
+maximum was already unique — the gate asserts that positively, and no test claims the tie rule fixed
+Crow). The plan's own ring fix alone would have swapped one wrong name for another, because a
+25%-inset box lets a sparse scatter clear hollowness vacuously. The wall-class contest is ONE object
+against THREE classes, and the LF-share masonry guard excludes nothing the pre-existing rank test had
+not already excluded — it is not credited with the fix. And `Door Frames-HM` moved between the two
+saved runs because a geometry-backed ROW VANISHED, not because a number moved: a row-PRESENCE axis no
+per-run route classification can see, asserted by name.
+
+**⚠ TWO OF THIS PHASE'S OWN LIMITS WERE RE-MEASURED FALSE, AND PHASE 25 IS AFFECTED.** Phase 28
+declared that Crow's `Columns` and `Ladder` remain unmeasured and that supplying them is Phase 25's
+detection work. Measured on 2026-08-14, on a tree carrying twenty-two later commits: the plan page now
+yields a lattice candidate the deterministic namer calls `Columns` (`4e6382f` / `7390f09`), and the
+keynote reader was widened past two digits so the access-ladder keynote reaches the pipeline
+(`9276d00`). Both closures are ASSERTED in the phase-28 gate, so the record cannot rot back. **Phase
+25's scope fence has moved: plan it from what the detection harness measured, not from the ROADMAP's
+Phase 25 text.**
+
+**⚠ The GitNexus index is stale** (last indexed `5fab264`, ~24 commits behind). Re-analyse before the
+next plan that edits `fusion.py`, `aggregator.py` or `calculator.py`.
+
+---
 
 Phase: 24 (binding-determinism-text-anchored-labeling) — **COMPLETE (2026-08-06)**
 Plan: 10 of 10 complete (all six waves done)

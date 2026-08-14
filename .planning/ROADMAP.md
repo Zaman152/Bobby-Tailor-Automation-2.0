@@ -1170,7 +1170,25 @@ Plans:
 
 **Non-goals:** symbol DETECTION for Columns/Ladder/Stairs is Phase 25's, not this phase's. Do not chase the count 132, 28, or 10 here — flag honestly and hand them on.
 
-**Plans:** 6/7 plans executed (5 waves)
+**Plans:** 7/7 plans executed (5 waves) — **PHASE COMPLETE (2026-08-14)**
+
+**Acceptance is one free command:** `python3 -m pytest -q tests/test_phase28_acceptance.py`
+(14 checks, 6:42, zero API).
+
+**Three of five requirements are CLOSED; two are ADVANCED and deliberately NOT ticked.**
+`V4-FIX-02`, `V4-FIX-04` and `V4-FIX-05` are complete (the last as narrowed — see 28-06).
+`V4-FIX-01` is not: two calculator producers (`_calculate_from_measurement`'s whole-EA path and
+`_calculate_from_civil_structures`) still emit EA counts stamping no corroboration verdict, so the
+requirement's universal claim is not yet true app-wide. `V4-FIX-03` is not: the mis-binding is
+removed and audited, but `CMU Wall` now reaches pass 2's masonry-by-hint rule and takes a FLAGGED,
+unevidenced bind — "binds the correct class" is not proved and cannot be offline. Each residual is
+pinned by a tripwire test that fails the day it is closed; shorten those deliberately, never delete.
+
+**Two of this phase's declared limits were CLOSED by later work, not by Phase 25.** Re-measured on
+2026-08-14: Crow's `Columns` are now detected (the lattice detector, `4e6382f` / `7390f09`) and the
+`Ladder` keynote route exists (`9276d00` widened `_KEYNOTE_NUM_RE` past two digits). The phase-28
+gate asserts both closures. **Phase 25's scope fence has moved and Phase 25 must be re-planned
+before it is executed.**
 
 Plans:
 
@@ -1180,7 +1198,7 @@ Plans:
 - [x] 28-04-PLAN.md — A printed thickness two objects both claim identifies neither: uniqueness test, LF-share masonry guard, refusal audit record (wave 2, V4-FIX-03)
 - [x] 28-05-PLAN.md — Thread `region_ref` fusion→report; a hypothesis-named row may not claim a layer it inherited, while D1's real layer sharing survives (wave 3, V4-FIX-04)
 - [x] 28-06-PLAN.md — Every quantity states the route it came by, and `summary.txt` names the ones a repeat run may answer differently. **Wording narrowed against the evidence:** the classification is proved to explain every quantity that moved between the two saved runs EXCEPT one — `Door Frames-HM` moved because a geometry-backed ROW vanished between extraction passes, a row-PRESENCE axis no per-run route classification can see. That falsification is asserted by name rather than scoped around, in the gate and in `summary.txt`'s own stated limit (wave 4, V4-FIX-05)
-- [ ] 28-07-PLAN.md — The phase acceptance gate: one check per requirement, the phase's limits as assertions, free and self-auditing (wave 5, all five)
+- [x] 28-07-PLAN.md — The phase acceptance gate: one check per requirement, the phase's limits as assertions, free and self-auditing. **Two of the plan's own stated limits were measured FALSE at gate-writing time** — `Columns` and `Ladder` are no longer unmeasured, having been closed by post-phase-28 detection work rather than by Phase 25 — so the gate asserts the closures instead of the plan's wording. No check claims the 28-02 tie refusal fixed Crow, and the 28-04 LF-share guard is measured to exclude nothing the pre-existing rank test had not already excluded (wave 5, all five)
 
 ---
 *Roadmap created: 2026-05-26*  
