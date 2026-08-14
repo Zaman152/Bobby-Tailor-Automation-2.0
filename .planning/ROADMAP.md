@@ -1170,7 +1170,7 @@ Plans:
 
 **Non-goals:** symbol DETECTION for Columns/Ladder/Stairs is Phase 25's, not this phase's. Do not chase the count 132, 28, or 10 here — flag honestly and hand them on.
 
-**Plans:** 5/7 plans executed (5 waves)
+**Plans:** 6/7 plans executed (5 waves)
 
 Plans:
 
@@ -1179,7 +1179,7 @@ Plans:
 - [x] 28-03-PLAN.md — An uncorroborated count cannot publish MEASURED; a detail-sheet-only count publishes a blank quoting its withheld reading (wave 2, V4-FIX-01)
 - [x] 28-04-PLAN.md — A printed thickness two objects both claim identifies neither: uniqueness test, LF-share masonry guard, refusal audit record (wave 2, V4-FIX-03)
 - [x] 28-05-PLAN.md — Thread `region_ref` fusion→report; a hypothesis-named row may not claim a layer it inherited, while D1's real layer sharing survives (wave 3, V4-FIX-04)
-- [ ] 28-06-PLAN.md — Every quantity states the route it came by; the classification is proved to cover every number that moved between the two saved runs (wave 4, V4-FIX-05)
+- [x] 28-06-PLAN.md — Every quantity states the route it came by, and `summary.txt` names the ones a repeat run may answer differently. **Wording narrowed against the evidence:** the classification is proved to explain every quantity that moved between the two saved runs EXCEPT one — `Door Frames-HM` moved because a geometry-backed ROW vanished between extraction passes, a row-PRESENCE axis no per-run route classification can see. That falsification is asserted by name rather than scoped around, in the gate and in `summary.txt`'s own stated limit (wave 4, V4-FIX-05)
 - [ ] 28-07-PLAN.md — The phase acceptance gate: one check per requirement, the phase's limits as assertions, free and self-auditing (wave 5, all five)
 
 ---
