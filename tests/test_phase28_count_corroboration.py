@@ -50,6 +50,7 @@ for _p in (ROOT, ROOT / "src"):
 from bobbytailor.pipeline import calculator  # noqa: E402
 from bobbytailor.pipeline.calculator import (  # noqa: E402
     _DETAIL_SHEET_NOT_AN_INSTALL_COUNT,
+    _calculate_from_civil_structures,
     _calculate_from_component,
     _calculate_from_measurement,
     _calculate_from_schedule,
@@ -405,6 +406,230 @@ def test_the_verdict_survives_normalisation_into_the_report_layer():
     ])
     assert rows[0]["count_corroboration"] == "detail_sheet_only"
     assert rows[0]["count_evidence_sheet_kind"] == "detail"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 29-04 — the two producers 28-03 measured and could not stamp
+#
+# 28-03's deviation 3: `_calculate_from_measurement` emits an EA row whenever a
+# dimension annotation resolves to a whole quantity >= 1, and
+# `_calculate_from_civil_structures` emits catch basins / manholes / headwalls
+# in EA unconditionally. Neither recorded a verdict, so the aggregator — which
+# reads an ABSENT verdict as "not a count", on purpose — could publish either
+# MEASURED with nothing behind it. These checks pin both stamps, and pin the
+# absence that must SURVIVE on the same path: an area or a length off the
+# measurement route still carries no verdict, because stamping those is the
+# widening 28-03 refused.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def _bollard_annotation(**extra):
+    """A dimension annotation that resolves to a whole EA quantity — a COUNT."""
+    m = {"value": "6", "unit": "ea", "description": "Bollard",
+         "raw_text": "6 BOLLARDS"}
+    m.update(extra)
+    return m
+
+
+def test_a_whole_ea_dimension_annotation_now_records_what_backed_it():
+    """The measurement route's count rows carry a verdict like every other count.
+
+    Same vocabulary, same helper, same two fields as
+    ``_calculate_from_component`` — not a parallel scheme that happens to agree.
+    """
+    row = _calculate_from_measurement(_bollard_annotation(), "A-101", "floor_plan")
+    assert row is not None and row["unit"] == "ea", (
+        "the probe stopped being a count row; this check no longer tests anything"
+    )
+    assert row["count_corroboration"] == "none"
+    assert row["count_evidence_sheet_kind"] == "floor_plan"
+
+
+def test_a_geometry_backed_dimension_count_is_corroborated_by_geometry():
+    """``provenance == "geometry"`` is the corroboration test on this path too."""
+    row = _calculate_from_measurement(
+        _bollard_annotation(provenance="geometry"), "A-101", "floor_plan")
+    assert row["count_corroboration"] == "geometry"
+
+
+def test_a_schedule_sourced_dimension_count_is_corroborated_by_the_schedule():
+    """A number carried off a table printed on the plans keeps that backing.
+
+    Checked through the shared helper's ``qty_source`` argument, so this path
+    cannot drift away from the one the schedule producer already uses.
+    """
+    row = _calculate_from_measurement(
+        _bollard_annotation(qty_source="plan_schedule_legend"), "A-101", "floor_plan")
+    assert row["count_corroboration"] == "schedule"
+
+
+def test_a_measured_area_or_length_still_records_no_verdict_at_all():
+    """The absence 28-03's rule depends on, pinned so the stamp cannot widen.
+
+    An area with a verdict of ``none`` would be flagged by the aggregator, and
+    every area and length in the take-off would follow it. The key must be
+    ABSENT, not empty — the aggregator's two-state test reads a blank string the
+    same way it reads a missing key, but a row that says ``""`` has made a claim
+    about a count where there is no count.
+    """
+    area = _calculate_from_measurement(
+        {"value": "250", "unit": "sf", "description": "Concrete slab",
+         "raw_text": "250 SF SLAB"}, "A-101", "floor_plan")
+    assert area is not None and area["unit"] != "ea", (
+        "the probe became a count row; this check no longer tests anything"
+    )
+    assert "count_corroboration" not in area
+    assert "count_evidence_sheet_kind" not in area
+
+
+def test_the_dimension_stamp_moves_no_quantity_no_unit_and_no_flag():
+    """29-04 records. It publishes nothing and withholds nothing.
+
+    The whole-EA gate above this stamp already decided which rows exist; the
+    verdict is added beside the number and never instead of it.
+    """
+    row = _calculate_from_measurement(_bollard_annotation(), "A-101", "floor_plan")
+    assert row["quantity"] == float(_bollard_annotation()["value"])
+    assert row["unit"] == "ea"
+    assert row["needs_review"] is False, (
+        "the stamp flagged the row at the recording layer — the publish "
+        "decision belongs to the aggregator (28-03), not here"
+    )
+    assert row["review_reason"] == ""
+
+
+def test_every_civil_structure_row_records_a_verdict():
+    """This producer emits nothing but counts, so it stamps unconditionally.
+
+    ``catch_basin``, ``manhole`` and ``headwall`` all carry ``unit_out: "ea"``,
+    so there is no measured row here for an absent verdict to protect.
+    """
+    rows = _calculate_from_civil_structures(
+        [{"type": "catch_basin", "id": "CB-1", "quantity": 2},
+         {"type": "manhole", "id": "MH-1", "quantity": 1},
+         {"type": "headwall", "id": "HW-1", "quantity": 1},
+         {"type": "junction_box", "id": "JB-1", "quantity": 1},
+         {"type": "cleanout", "id": "CO-1", "quantity": 1}],
+        "C-101", "civil")
+    assert len(rows) == 5, "the probe stopped producing rows for every type"
+    assert {r["unit"] for r in rows} == {"ea"}, (
+        "a civil structure row came out in something other than EA — the "
+        "unconditional stamp assumes every row here is a count"
+    )
+    assert {r["count_corroboration"] for r in rows} == {"none"}
+    assert {r["count_evidence_sheet_kind"] for r in rows} == {"civil"}
+
+
+def test_a_geometry_backed_civil_structure_is_corroborated_and_a_scheduled_one_too():
+    """The same two corroborations, reached through the same helper."""
+    geom = _calculate_from_civil_structures(
+        [{"type": "manhole", "id": "MH-1", "quantity": 3, "provenance": "geometry"}],
+        "C-101", "civil")
+    assert geom[0]["count_corroboration"] == "geometry"
+
+    tabled = _calculate_from_civil_structures(
+        [{"type": "headwall", "id": "HW-1", "quantity": 1, "qty_source": "schedule"}],
+        "C-101", "civil")
+    assert tabled[0]["count_corroboration"] == "schedule"
+
+
+def test_a_civil_structure_on_a_details_sheet_is_uncorroborated_not_a_drawing_count():
+    """The details-sheet verdict is scoped to the shared list, not to the sheet.
+
+    No civil structure type is in ``_DETAIL_SHEET_NOT_AN_INSTALL_COUNT``, so
+    calling a catch basin off a details sheet a count of DRAWINGS would be a
+    claim that list does not make. It is merely uncorroborated, and the sheet
+    kind is recorded so a reader can see where it came from.
+    """
+    rows = _calculate_from_civil_structures(
+        [{"type": "catch_basin", "id": "CB-1", "quantity": 2}], "C-101", "detail")
+    assert rows[0]["item_type"] not in _DETAIL_SHEET_NOT_AN_INSTALL_COUNT
+    assert rows[0]["count_corroboration"] == "none"
+    assert rows[0]["count_evidence_sheet_kind"] == "detail"
+
+
+def test_the_civil_sheet_kind_defaults_rather_than_crashing_when_unstated():
+    """A caller that does not know the sheet kind gets "unknown", not an error.
+
+    The one caller has always had ``sheet_type`` in hand; the default exists so
+    a future one cannot take the whole take-off down mid-run, and so the field
+    is never silently omitted.
+    """
+    rows = _calculate_from_civil_structures(
+        [{"type": "catch_basin", "id": "CB-1", "quantity": 2}], "C-101")
+    assert rows[0]["count_evidence_sheet_kind"] == "unknown"
+    assert rows[0]["count_corroboration"] == "none"
+
+
+def test_the_civil_stamp_moves_no_quantity_and_drops_no_row():
+    """Same rows, same numbers, one field more."""
+    structures = [{"type": "catch_basin", "id": "CB-1", "quantity": 2},
+                  {"type": "manhole", "id": "MH-1", "quantity": 3}]
+    rows = _calculate_from_civil_structures(structures, "C-101", "civil")
+    assert len(rows) == len(structures)
+    for row, s in zip(rows, structures):
+        assert row["quantity"] == float(s["quantity"])
+        assert row["description"] == s["id"]
+
+
+def test_both_newly_stamped_verdicts_survive_into_the_report_layer():
+    """A field ``_normalize_calculated`` drops is a field that was never written.
+
+    The aggregator reads these rows through that whitelist, so a stamp that does
+    not survive it is inert — which is exactly the state 28-03 found and could
+    not fix from its own layer.
+    """
+    from bobbytailor.pipeline.reporter import _normalize_calculated
+
+    rows = _normalize_calculated(
+        [_calculate_from_measurement(_bollard_annotation(), "A-101", "floor_plan")]
+        + _calculate_from_civil_structures(
+            [{"type": "catch_basin", "id": "CB-1", "quantity": 2}], "C-101", "civil")
+    )
+    assert len(rows) == 2
+    assert {r["count_corroboration"] for r in rows} == {"none"}
+    assert {r["count_evidence_sheet_kind"] for r in rows} == {"floor_plan", "civil"}
+
+
+def test_the_publish_decision_now_reaches_both_producers():
+    """The point of the stamp, asserted where it is felt: at the published row.
+
+    Nothing in the aggregator changed for this — 28-03 already refuses to
+    publish an uncorroborated count as MEASURED, and it simply could not see
+    these two rows. This is the accuracy consequence: a civil-structure count a
+    model read off a sheet no longer publishes clean, and a geometry-backed one
+    still does, so the rule costs nothing it was not meant to cost.
+    """
+    from bobbytailor.pipeline.aggregator import aggregate_takeoff
+    from bobbytailor.pipeline.coverage import ITEM_MEASURED
+    from bobbytailor.pipeline.reporter import _normalize_calculated
+
+    loose = _calculate_from_civil_structures(
+        [{"type": "catch_basin", "id": "Catch Basin", "quantity": 2}],
+        "C-101", "civil")
+    backed = _calculate_from_civil_structures(
+        [{"type": "manhole", "id": "Manhole", "quantity": 3,
+          "provenance": "geometry"}], "C-101", "civil")
+
+    rows = aggregate_takeoff(_normalize_calculated(loose + backed))
+    published = {r["item"]: r for r in rows}
+
+    uncorroborated = [r for r in published.values()
+                      if r["item_type"] == "catch_basin"]
+    assert uncorroborated, "the uncorroborated civil count vanished from the report"
+    assert uncorroborated[0]["provenance"] != ITEM_MEASURED, (
+        "a civil-structure count with nothing behind it still published %r"
+        % uncorroborated[0]["provenance"]
+    )
+    assert uncorroborated[0]["needs_review"] is True
+
+    corroborated = [r for r in published.values() if r["item_type"] == "manhole"]
+    assert corroborated, "the geometry-backed civil count vanished from the report"
+    assert corroborated[0]["provenance"] == ITEM_MEASURED, (
+        "a geometry-backed count was flagged — this rule must not cost the rows "
+        "it was never aimed at"
+    )
+    assert corroborated[0]["needs_review"] is False
 
 
 # ─────────────────────────────────────────────────────────────────────────────

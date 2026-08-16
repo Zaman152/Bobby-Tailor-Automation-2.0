@@ -454,28 +454,56 @@ def test_the_rules_boundary_is_a_recorded_verdict_and_this_is_it():
 
 
 #: Calculator producers that can emit an EA row — a COUNT — and stamp no
-#: corroboration verdict on it, so this layer treats it as not-a-count and can
-#: still publish it MEASURED. Measured, not assumed: `_calculate_from_component`
-#: and `_calculate_from_schedule` were given the verdict by 28-01; these two were
-#: not, and the aggregator cannot see what it was never told.
-_COUNT_PRODUCERS_THAT_STAMP_NO_VERDICT = (
-    # a dimension annotation that resolves to a whole EA quantity >= 1
+#: corroboration verdict on it, so this layer would treat it as not-a-count and
+#: could still publish it MEASURED.
+#:
+#: **EMPTY, and that is the point.** It held two entries when 28-03 wrote this
+#: tripwire, and 29-04 shortened it to nothing by stamping both of them:
+#:
+#: * ``_calculate_from_measurement`` — a dimension annotation resolving to a
+#:   whole EA quantity >= 1; now stamped on the ``ea`` branch only, so areas and
+#:   lengths stay unstamped and the "absence is never read as uncorroborated"
+#:   rule below keeps costing nothing.
+#: * ``_calculate_from_civil_structures`` — catch basins / manholes / headwalls,
+#:   always EA; now stamped unconditionally, since it emits nothing else.
+#:
+#: The tuple stays rather than being deleted: a future producer that emits a
+#: count without a verdict belongs here, named, and this list is where the phase
+#: gate looks.
+_COUNT_PRODUCERS_THAT_STAMP_NO_VERDICT = ()
+
+#: The producers 29-04 closed. Asserted POSITIVELY below so the shortening above
+#: cannot be the whole test — an empty list asserts nothing, and a tripwire
+#: retired into vacuity is worse than one left standing.
+_COUNT_PRODUCERS_CLOSED_BY_29_04 = (
     "_calculate_from_measurement",
-    # catch basins / manholes / headwalls, always in EA
     "_calculate_from_civil_structures",
 )
 
 
 def test_the_residual_this_plan_does_not_close_is_named_not_implied():
-    """A tripwire, so the gap is greppable instead of remembered.
+    """The 28-03 tripwire, flipped by 29-04 as its own instructions directed.
 
-    V4-FIX-01 asks that no count publish MEASURED without corroboration. This
-    layer now enforces that for every count carrying a verdict — but a count
-    from a producer that stamps none is invisible to it. Widening the rule to
-    "no verdict means no evidence" would flag every area and length in the
-    take-off, so the fix belongs in the RECORDING layer, not here. If a later
-    plan stamps one of these producers, this test fails and the list must be
-    shortened deliberately.
+    Kept under its original name because the phase-28 acceptance gate invokes
+    this function by name, and because the question it asks has not changed —
+    only the answer. It used to assert that two named producers emitted counts
+    and recorded NO verdict, and it failed the day either was stamped; that day
+    was 29-04, and the list it guards is now empty.
+
+    What it asserts now, in both directions:
+
+    * every producer still named in the residual list emits a count and records
+      no verdict (vacuous today by construction, and the place a future
+      regression would be declared);
+    * every producer 29-04 closed still emits a count AND still records a
+      verdict — which is what makes V4-FIX-01's universal claim true app-wide
+      rather than true only of the rows 28-01 happened to reach.
+
+    The check is on the SOURCE rather than on a return value for the same reason
+    28-03 wrote it that way: it is a coverage question about which producers
+    exist, and a behavioural probe can only speak for the inputs it was handed.
+    The behaviour of each stamp is pinned separately, on returned rows, in
+    ``tests/test_phase28_count_corroboration.py``.
     """
     from bobbytailor.pipeline import calculator
     for fn in _COUNT_PRODUCERS_THAT_STAMP_NO_VERDICT:
@@ -484,6 +512,13 @@ def test_the_residual_this_plan_does_not_close_is_named_not_implied():
         assert "count_corroboration" not in src, (
             "%s now records a verdict — remove it from the residual list and "
             "say so in the phase gate" % fn
+        )
+    for fn in _COUNT_PRODUCERS_CLOSED_BY_29_04:
+        src = inspect.getsource(getattr(calculator, fn))
+        assert '"ea"' in src, "%s no longer emits a count at all" % fn
+        assert "count_corroboration" in src, (
+            "%s stopped recording a verdict — the counts it emits are invisible "
+            "to this layer again and can publish MEASURED unbacked" % fn
         )
 
 

@@ -213,7 +213,9 @@ def _published(rows, name):
 # ═════════════════════════════════════════════════════════════════════════════
 # V4-FIX-01 — NO COUNT PUBLISHES MEASURED WITHOUT CORROBORATION
 #
-# ADVANCED, NOT TICKED. The reason is a check, not a sentence.
+# ADVANCED at phase 28 close; the residual was closed by 29-04. The reason it
+# could be ticked is a check, not a sentence — the same check, read the other
+# way round.
 # ═════════════════════════════════════════════════════════════════════════════
 
 
@@ -232,14 +234,18 @@ def test_v4_fix_01_an_uncorroborated_count_cannot_publish_measured_and_is_not_ti
       still quotes the reading it withheld — a deletion and a zero read
       identically to a client (INV-08).
 
-    **The requirement is not ticked and this check is why.** 28-03 measured two
-    calculator producers that emit EA counts and record no verdict at all, so
-    the aggregator reads them as not-a-count and they can still publish
-    ``MEASURED``. Its tripwire asserts both halves of that residual and FAILS
-    the moment either producer is fixed — which is the signal to shorten the
-    list deliberately, not to delete the test. It is invoked here so this gate
-    cannot tick a requirement whose universal claim the phase measured to be
-    still false.
+    **The boundary that kept this unticked at phase close, and what became of
+    it.** 28-03 measured two calculator producers that emitted EA counts and
+    recorded no verdict at all, so the aggregator read them as not-a-count and
+    they could still publish ``MEASURED``. Its tripwire asserted both halves of
+    that residual and was written to FAIL the moment either producer was fixed.
+    29-04 stamped both — ``_calculate_from_measurement``'s whole-EA branch and
+    ``_calculate_from_civil_structures`` — so the tripwire went red on purpose
+    and was SHORTENED, not deleted: it now asserts the closure from the other
+    side, and its residual list is empty. It is still invoked here, and it is
+    still the thing that decides whether the universal claim holds; what changed
+    is the answer it returns. The function's name is unchanged so this call site
+    keeps landing on the same check.
     """
     from bobbytailor.pipeline import aggregator
     from bobbytailor.pipeline.aggregator import aggregate_takeoff
@@ -285,7 +291,8 @@ def test_v4_fix_01_an_uncorroborated_count_cannot_publish_measured_and_is_not_ti
     assert stairs["needs_review"] is True
     assert stairs["review_reasons"], "a blank that says nothing is a deletion"
 
-    # The boundary, as the phase's own committed tripwire.
+    # The boundary, as the phase's own committed tripwire — flipped by 29-04
+    # and now asserting that both named producers DO stamp a verdict.
     _phase28("uncorroborated_counts").test_the_residual_this_plan_does_not_close_is_named_not_implied()
 
 

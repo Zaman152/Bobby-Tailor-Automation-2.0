@@ -526,7 +526,8 @@ def apply_estimation_tables(extracted_data: dict, project_type: str = "auto",
 
     # 5) Pipe runs, civil structures, and lintel runs (v2.1)
     estimates.extend(_calculate_from_pipe_runs(extracted_data.get("pipe_runs", []), sheet_name))
-    estimates.extend(_calculate_from_civil_structures(extracted_data.get("civil_structures", []), sheet_name))
+    estimates.extend(_calculate_from_civil_structures(
+        extracted_data.get("civil_structures", []), sheet_name, sheet_type))
     estimates.extend(_calculate_from_lintel_runs(extracted_data.get("lintel_runs", []), sheet_name))
 
     estimates = _suppress_profile_duplicates(estimates)
@@ -673,6 +674,27 @@ def _calculate_from_measurement(m: dict, sheet_name: str, sheet_type: str) -> Op
             "auto_verified": auto_verified,
             "review_reason": "approximate dimension (field verify)" if is_approx else "",
         }
+
+        # WHAT BACKED THIS NUMBER, on the rows of this path that are COUNTS
+        # (29-04). A dimension annotation that survives the whole-EA gate above
+        # is an EA row exactly like the ones `_calculate_from_component`
+        # produces, and 28-01 stamped a verdict there and not here — so the
+        # aggregator, which reads an ABSENT verdict as "not a count" on purpose
+        # (28-03: absence must not flag every area and length in the take-off),
+        # could still publish one of these MEASURED with nothing behind it. That
+        # was measured, not feared: it is 28-03's deviation 3, held open by the
+        # tripwire in tests/test_phase28_uncorroborated_counts.py.
+        #
+        # The stamp is confined to `ea` for the same reason: areas and lengths
+        # off this path are not counts, and stamping them would be the widening
+        # 28-03 refused. Nothing else on the row moves — the verdict is
+        # RECORDED here and acted on downstream, never here.
+        if calc_unit == "ea":
+            out["count_corroboration"] = _count_corroboration(
+                m.get("provenance"), sheet_type, item_type, m.get("qty_source")
+            )
+            out["count_evidence_sheet_kind"] = sheet_type
+
         _carry_measured_region(m, out)
         return out
     except Exception as e:
@@ -998,7 +1020,15 @@ def _calculate_from_pipe_runs(pipe_runs: list, sheet_name: str) -> List[dict]:
     return results
 
 
-def _calculate_from_civil_structures(structures: list, sheet_name: str) -> List[dict]:
+def _calculate_from_civil_structures(structures: list, sheet_name: str,
+                                     sheet_type: str = "unknown") -> List[dict]:
+    """Catch basins, manholes and headwalls — every row here is a COUNT.
+
+    ``sheet_type`` is taken so the count can say which sheet kind it was read
+    off, the same fact `_calculate_from_component` records; it defaults rather
+    than being required because the one caller has always had it and a missing
+    value must degrade to "unknown sheet", never to a crash mid-take-off.
+    """
     results = []
     type_map = {
         "catch_basin": "catch_basin",
@@ -1034,6 +1064,20 @@ def _calculate_from_civil_structures(structures: list, sheet_name: str) -> List[
             "unit": calc_unit,
             "waste_factor_applied": table.get("waste_factor", 1.0),
             "formula": formula,
+            # WHAT BACKED THIS COUNT (29-04). Unconditional, because every row
+            # this producer emits is an EA count — `catch_basin`, `manhole` and
+            # `headwall` all carry `unit_out: "ea"`, so there is no measured
+            # row here to keep silent about. Geometry provenance corroborates;
+            # a structure listed in a table printed on the plans arrives with a
+            # `qty_source` and is corroborated by that table. Anything else is
+            # a number a model read off a sheet, and the row now says so
+            # instead of staying silent — silence is read downstream as "not a
+            # count", which let these publish MEASURED unbacked (28-03's
+            # deviation 3).
+            "count_corroboration": _count_corroboration(
+                s.get("provenance"), sheet_type, item_type, s.get("qty_source")
+            ),
+            "count_evidence_sheet_kind": sheet_type,
             "source_sheet": sheet_name,
             "source_location": sid,
             "source_raw": spec,
