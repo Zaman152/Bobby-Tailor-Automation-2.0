@@ -1822,6 +1822,10 @@ class KeynoteCallout:
     ["ladder", "ship ladder", "roof ladder"] returns 2 where the answer is 1.
     Geometry supplies the counts; deciding that keynote 1 is the ladder and
     keynote 2 is a hatch is the head-noun question the semantic pass exists for.
+
+    ``source_candidate_id`` names the bubble symbol group these counts were
+    split out of. A consumer that publishes the per-number counts has to drop
+    that group, or the same drawn bubbles are published twice.
     """
 
     number: str
@@ -1830,6 +1834,7 @@ class KeynoteCallout:
     callout_count: int
     instance_bboxes_pt: List[tuple] = field(default_factory=list)
     legend_bbox_pt: Optional[tuple] = None
+    source_candidate_id: str = ""
 
     def to_dict(self) -> dict:
         return {
@@ -1839,7 +1844,70 @@ class KeynoteCallout:
             "callout_count": self.callout_count,
             "instance_bboxes_pt": [tuple(b) for b in self.instance_bboxes_pt],
             "legend_bbox_pt": self.legend_bbox_pt,
+            "source_candidate_id": self.source_candidate_id,
         }
+
+
+# Anywhere in the note: a quantifier or a requirement, either of which makes
+# the number of bubbles a number of PLACEMENTS OF A RULE, not of objects.
+_SPEC_NOTE_RES = (
+    re.compile(r"\bALL\b"),
+    re.compile(r"\bTYP(?:ICAL)?\b"),
+    re.compile(r"\bPROVIDE[DS]?\b"),
+    re.compile(r"\bREQUIRED\b"),
+    re.compile(r"\bTO BE\b"),
+)
+
+# At the START of the note: an instruction to the contractor. A note that opens
+# with a verb is telling somebody to DO something; it is not the sheet naming a
+# thing. Leading-only, because "MULTI-USE ROOM" and "RAMP GUARDRAIL - SEE
+# DETAILS 4, 12 & 13" are names that happen to contain these words.
+_DIRECTIVE_LEAD_RE = re.compile(
+    r"^(?:PROVIDE|INSTALL|COORDINATE|USE|GANG|VERIFY|REFER|SEE|PAINT|APPLY)\b"
+)
+
+# A note declaring the ABSENCE of something must never publish a count of it:
+# Moxy keynote 5 is "NO TRANSITION STRIP. FLOORING IN GUESTROOM ...".
+_ABSENCE_LEAD_RE = re.compile(r"^NO\b")
+
+
+def is_specification_note(text: str) -> bool:
+    """True when a note states a REQUIREMENT rather than naming an object.
+
+    A keynote's callout count is a count of drawn bubbles, and that equals a
+    quantity only when the note names one thing per bubble. Three shapes break
+    that, and all three were measured on real sheets rather than imagined:
+
+    * The universal quantifier. Crow general note 13 — "ALL BOLLARDS TO BE
+      PAINTED SAFETY YELLOW. (PROVIDE BOLLARDS AT ALL DRIVE-IN OVERHEAD DOOR
+      JAMBS, FIRE PROTECTION RISERS ...)" — placed once would publish Bollards
+      = 1 against a golden 28. That is WORSE than the blank it replaces: a
+      blank is visibly missing, a 1 is silently wrong. Crow keynote 10,
+      "SANITARY LINE - PROVIDE 6" PVC CLEANOUTS AT 80'-0" O.C.", is the same
+      shape inside the keynote legend proper.
+
+    * The instruction. Sweeping all 83 pages of the four plan sets found 180
+      placed keynotes on Moxy's 16 guestroom prototype sheets against 9 on
+      Crow, and Moxy's legend is not a list of objects at all — "PROVIDE
+      BLOCKING AS REQUIRED FOR CEILING MOUNTED", "USE PAINTERS TAPE TO CREATE
+      LINE BETWEEN THE", "COORDINATE LOCATION AND INSTALLATION OF OUTLET AND".
+      Those are jobs, not things, and publishing them as counted candidates
+      would hand the naming pass 180 rows of nothing. The plan for this work
+      anticipated only the quantifier; the sweep is what found the rest.
+
+    * The declared absence — "NO TRANSITION STRIP" is not one transition strip.
+
+    Two things bound this. The word lists are what four drafting offices
+    actually printed, not a lexicon of English, so a fifth office will need
+    them extended; and the test reads only the ONE line the legend reader pairs
+    with the number block (see :func:`keynote_legend_rows`), so a note whose
+    quantifier wraps onto a dropped line passes it. It is a floor, not a
+    ceiling — every count that survives it still publishes flagged.
+    """
+    upper = " ".join(str(text or "").upper().split())
+    if _DIRECTIVE_LEAD_RE.search(upper) or _ABSENCE_LEAD_RE.search(upper):
+        return True
+    return any(rx.search(upper) for rx in _SPEC_NOTE_RES)
 
 
 def _encloses(outer, inner, pad: float = 1.0) -> bool:
@@ -1937,6 +2005,9 @@ def keynote_callout_counts(page, symbol_groups) -> List[KeynoteCallout]:
                         callout_count=len(placed),
                         instance_bboxes_pt=placed,
                         legend_bbox_pt=legend_box,
+                        source_candidate_id=str(
+                            getattr(best_group, "candidate_id", "") or ""
+                        ),
                     )
                 )
         return out

@@ -1074,6 +1074,48 @@ def _lattice_as_symbol_group(lattice, fpp: float) -> SymbolGroup:
     )
 
 
+def _keynote_callout_as_symbol_group(callout, fpp: float) -> SymbolGroup:
+    """Present a placed keynote as a candidate the registry already knows.
+
+    Same adapter move as :func:`_lattice_as_symbol_group`, and for the same
+    reason: the registry, the Set-of-Mark pass and the unnamed-geometry ledger
+    are all written against ``SymbolGroup``, so a count that arrives in that
+    shape needs no changes anywhere downstream.
+
+    Where it deliberately differs from the lattice is ``contained_texts``. A
+    lattice cell id is a coordinate, not a name, so filling it in would be
+    manufacturing an anchor. A keynote's note text is the opposite — it is the
+    sheet's OWN words for the thing the bubble points at, printed by the
+    drafter in the legend. That is the text-anchored regime the whole engine
+    prefers (recognition 0.65-0.92 anchored vs 0.03-0.39 symbol-conveyed), and
+    it is the only reason a keynote count can carry a name at all.
+
+    ``needs_review`` is always True. The count is a count of PLACEMENTS, and a
+    keynote may mark a detail reference rather than an instance; the flag is
+    what makes a miscount a 30-second confirm instead of a wrong bid, and it
+    stays until repeated paid runs earn its removal.
+    """
+    boxes = [tuple(b) for b in callout.instance_bboxes_pt]
+    rep = boxes[0] if boxes else (0.0, 0.0, 0.0, 0.0)
+    return SymbolGroup(
+        candidate_id="KEY-%s" % callout.number,
+        count=int(callout.callout_count),
+        signature_hash=hashlib.sha1(
+            ("keynote-callout|%s|%s" % (callout.header, callout.number))
+            .encode("utf-8")
+        ).hexdigest()[:16],
+        instance_bboxes_pt=boxes,
+        representative_bbox_pt=rep,
+        bbox_size_ft=(
+            round(abs(rep[2] - rep[0]) * fpp, 3),
+            round(abs(rep[3] - rep[1]) * fpp, 3),
+        ),
+        contained_texts=[callout.note_text] if callout.note_text else [],
+        confidence="high",
+        needs_review=True,
+    )
+
+
 def _build_symbol_count_hint(symbols) -> str:
     """User hint listing each marked cluster's deterministic repetition count.
 
@@ -3090,6 +3132,77 @@ class TakeoffPipeline:
                     _lattice_as_symbol_group(g, fpp) for g in lattices
                 ]
 
+        # ── Placed keynotes (additive, same adapter contract as the lattice) ──
+        #
+        # The detector below has been green in tests since 28-06 and had ZERO
+        # callers on the plan path: `keynote_tags` is consumed only by the
+        # elevation facade route, so a floor plan read its keynote legend and
+        # threw the answer away. That is why the first paid run of the post-28
+        # engine (2026-08-16) predicted "Ladder = 1, PASS expected" and
+        # published nothing at all — a wiring gap, not a detection gap.
+        #
+        # A keynote bubble is the sheet's own pointer from a drawn thing to the
+        # sheet's own words for it, so unlike every symbol cluster this count
+        # arrives already anchored. What it is NOT is a count of objects when
+        # the note states a requirement instead of naming a thing
+        # (is_specification_note) — those are dropped, and the honest blank is
+        # kept over a confidently wrong 1.
+        keynote_callouts: list = []
+        if resolved_type in _PLAN_SHEET_TYPES and fpp > 0 and symbols:
+            try:
+                from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
+                    is_specification_note,
+                    keynote_callout_counts,
+                )
+
+                published, refused = [], []
+                for callout in keynote_callout_counts(page, symbols):
+                    if callout.callout_count <= 0:
+                        continue
+                    if is_specification_note(callout.note_text):
+                        refused.append(callout)
+                    else:
+                        published.append(callout)
+                for c in refused:
+                    logger.info(
+                        "sheet %r: keynote %s placed %d time(s) is NOT published "
+                        "as a count — %r states a requirement, not an object",
+                        sheet_name, c.number, c.callout_count, c.note_text,
+                    )
+                if published:
+                    # The per-number counts were split OUT of the bubble group,
+                    # so publishing both counts the same drawn marks twice —
+                    # the lattice_shadowed_symbol_ids contract. And that group
+                    # is annotations either way: nobody buys a keynote bubble.
+                    bubble_ids = {
+                        c.source_candidate_id for c in published
+                        if c.source_candidate_id
+                    }
+                    # `symbols` is rebound ONCE, at the end, so a raise anywhere
+                    # above leaves the sheet exactly as it was measured.
+                    kept = [
+                        g for g in symbols
+                        if getattr(g, "candidate_id", None) not in bubble_ids
+                    ] + [
+                        _keynote_callout_as_symbol_group(c, fpp) for c in published
+                    ]
+                    logger.info(
+                        "sheet %r: published %d placed keynote(s) as flagged "
+                        "counts (%s); dropped bubble group(s) %s",
+                        sheet_name, len(published),
+                        ", ".join(
+                            "KEY-%s×%d" % (c.number, c.callout_count)
+                            for c in published
+                        ),
+                        sorted(bubble_ids) or "none",
+                    )
+                    symbols = kept
+                    keynote_callouts = published
+            except Exception as exc:  # noqa: BLE001 — additive: never break a run
+                logger.debug(
+                    "keynote callout wiring failed on %r: %s", sheet_name, exc
+                )
+
         footprint = None
         if resolved_type in _PLAN_SHEET_TYPES:
             try:
@@ -3232,6 +3345,11 @@ class TakeoffPipeline:
             # carries the COUNT; this carries why anyone should believe it, and
             # what the drawing declines to say.
             "grid_lattices": [g.to_dict() for g in lattices],
+            # The keynotes that became KEY-<n> candidates above, with the
+            # legend bubble and the placed bubbles they were counted from —
+            # the evidence for a number that a reviewer has to be able to
+            # check against the sheet in seconds.
+            "keynote_callouts": [c.to_dict() for c in keynote_callouts],
             "walls": walls,
             "wall_lf_by_class": wall_lf,
             "rooms": rooms,
