@@ -1013,17 +1013,28 @@ class TestRoomFillDropsAreRecorded:
         assert "squared error" in drop.reason
         assert drop.area_sf is None, "a drop reports None, never 0.0"
 
-    def test_a_measured_drawing_leaves_no_drop(self):
+    def test_a_measured_drawing_reports_a_measurement_and_not_a_loss(self):
+        """29-05: the second return value is coverage, not losses.
+
+        It used to be asserted EMPTY here, which is what made
+        `summary()["drawings_measured"]` structurally 0 — the ledger copies
+        this list verbatim, so a drawing that measured left no trace in it. The
+        contract that matters is unchanged and is what is asserted instead:
+        nothing on this sheet reports a LOSS.
+        """
         path = _synthetic_sheet()
         try:
-            fills, drops = self._measure(path)
+            fills, coverage = self._measure(path)
         finally:
             os.unlink(path)
 
         assert len(fills) == 1
         assert fills[0].plan_kind == "RCP"
         assert fills[0].area_sf > 0
-        assert drops == [], "nothing was lost, so nothing is reported lost"
+        assert [c.disposition for c in coverage] == [MEASURED]
+        assert coverage[0].region_id == fills[0].candidate_id
+        assert coverage[0].area_sf == fills[0].area_sf
+        assert coverage[0].reason == "", "a measurement explains nothing away"
 
     def test_a_page_with_no_plan_title_reports_nothing_either_way(self):
         """Silence is correct when there was never a drawing to measure."""

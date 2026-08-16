@@ -31,6 +31,7 @@ from bobbytailor.deterministic.room_fill import (
     wall_area_for_unit,
     wall_perimeter_for_unit,
 )
+from bobbytailor.pipeline.coverage import MEASURED
 
 # 1/4" = 1'-0"  ->  4 ft per inch  ->  4/72 ft per point (Moxy's guestroom scale)
 FPP_QUARTER = 4.0 / 72.0
@@ -235,19 +236,21 @@ def test_the_same_sheet_measures_the_same_whether_it_is_rotated():
     """
     flat_doc, flat = _sheet_reading_upright(0)
     turned_doc, turned = _sheet_reading_upright(90)
-    flat_fills, flat_drops = _fills(flat)
-    turned_fills, turned_drops = _fills(turned)
+    flat_fills, flat_cov = _fills(flat)
+    turned_fills, turned_cov = _fills(turned)
 
     assert len(flat_fills) == 1, "the control fixture must measure"
     assert len(turned_fills) == 1, (
         "the rotated sheet measured NOTHING before this change: %r"
-        % ([d.reason for d in turned_drops],)
+        % ([d.reason for d in turned_cov],)
     )
     assert turned_fills[0].viewport_title == flat_fills[0].viewport_title
     assert turned_fills[0].scale_fpi == flat_fills[0].scale_fpi == pytest.approx(4.0)
     assert turned_fills[0].area_sf == pytest.approx(flat_fills[0].area_sf, rel=0.02)
     assert turned_fills[0].area_sf == pytest.approx(300.0, rel=0.06)
-    assert not turned_drops and not flat_drops
+    # 29-05: the coverage list carries a MEASURED row per fill, so the check
+    # that used to read "empty" reads "reports no loss" — the same claim.
+    assert not [c for c in turned_cov + flat_cov if c.disposition != MEASURED]
     flat_doc.close()
     turned_doc.close()
 
@@ -363,9 +366,10 @@ def test_the_region_bound_is_threaded_and_defaults_to_the_module_constant():
     assert param.default == MAX_REGION_SF
 
     doc, page = _sheet_reading_upright(0)
-    clean_fills, clean_drops = _fills(page)
+    clean_fills, clean_cov = _fills(page)
     assert len(clean_fills) == 1
-    assert not clean_drops
+    # 29-05: one MEASURED row, and nothing reporting a loss.
+    assert [c.disposition for c in clean_cov] == [MEASURED]
     # This fixture draws a room and a scale but NO dimension string, so since
     # 23-11 it is flagged for exactly one reason: the drawing does not say how
     # big it is, and a check that cannot run must say so rather than pass

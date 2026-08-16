@@ -3373,8 +3373,12 @@ class TakeoffPipeline:
             "sheet_name": sheet_name,
             # Additive coverage keys. `excluded_viewports` is the DELIBERATE
             # off-scale exclusion (correct, and previously log-only);
-            # `coverage_drops` is everything this sheet failed to measure, each
-            # with a named reason. No existing key is renamed or removed.
+            # `coverage_drops` is every drawing this sheet SAW — what it failed
+            # to measure, each with a named reason, and since 29-05 what it
+            # measured, so `drawings_measured` can be something other than the
+            # 0 it read on every saved run. The key keeps its name: it is the
+            # ledger's `drawings` list under an older one, and renaming it
+            # moves no number. No existing key is renamed or removed.
             "excluded_viewports": excluded_viewports,
             "coverage_drops": coverage_drops,
             # The schedule-table / title-block / legend rectangles this sheet
@@ -3700,12 +3704,15 @@ class TakeoffPipeline:
                 ``room_fill.MAX_REGION_SF``, so this plan moves no measurement.
 
         Returns:
-            ``(fills, drops)`` — the measurements, and one
-            :class:`DrawingCoverage` per drawing that was NOT measured, each
-            naming the reason. The four bare ``continue``s this method used to
+            ``(fills, coverage)`` — the measurements, and one
+            :class:`DrawingCoverage` per drawing this method SAW, whatever
+            became of it: the reason where it was not measured, and a MEASURED
+            row where it was. The four bare ``continue``s this method used to
             take are exactly INV-08 §2 row S6: a named drawing (e.g.
             ``KING A - FC PLAN``) vanished with no row, no flag and no count in
             any artifact, so its item read as a zero rather than as a blank.
+            The MEASURED row is the mirror of that: a drawing that produced
+            1716.7 SF also left no row, so the ledger counted it as nothing.
         """
         from bobbytailor.deterministic.printed_scale import (  # noqa: PLC0415
             extract_printed_scales,
@@ -3909,6 +3916,32 @@ class TakeoffPipeline:
                         needs_review=bool(result.needs_review),
                     )
                 )
+            else:
+                # A drawing that MEASURED leaves a row too, not only one that
+                # refused. Without this the ledger's `drawings` list held drops
+                # exclusively, so `drawings_measured` — which counts MEASURED
+                # and MEASURED_PARTIAL rows — read 0 on every saved run of all
+                # four plan sets, including runs whose own `fusion_rejected`
+                # records carry `fill:FILL-2` at 1716.7 SF. A counter that is
+                # structurally zero is not a low number, it is a wrong one, and
+                # it reads as "this sheet measured nothing" beside the single
+                # skip row the sheet legitimately produced (Crow A-101: title
+                # #1 is the title BLOCK's own "OVERALL FLOOR PLAN" string with
+                # no callout within 573 pt, title #2 the real drawing title,
+                # which pairs and measures). MEASURED here cannot move a sheet
+                # disposition: _record_sheet_coverage's `dropped` filter
+                # already excludes it.
+                drops.append(
+                    DrawingCoverage(
+                        region_id=result.candidate_id,
+                        title=result.viewport_title,
+                        plan_kind=plan_kind,
+                        disposition=MEASURED,
+                        printed_scale_fpi=fpi,
+                        area_sf=result.area_sf,
+                        needs_review=bool(result.needs_review),
+                    )
+                )
             logger.info(
                 "sheet %r: %s %r enclosed area %.1f SF at %.2f ft/in, "
                 "perimeter %.1f LF, wall height %s (source %s)%s",
@@ -4027,8 +4060,9 @@ class TakeoffPipeline:
     def _measure_elevation_areas(self, page, viewports, sheet_name: str) -> tuple:
         """Measure each titled elevation as a facade silhouette, at its own scale.
 
-        ``(facades, drops)`` — the elevation analogue of
-        :func:`_measure_room_fills`, anchored on the printed-scale callouts
+        ``(facades, coverage)`` — the elevation analogue of
+        :func:`_measure_room_fills`, coverage row per elevation SEEN (measured
+        or refused) exactly as that method does, anchored on the callouts
         (:func:`room_fill.elevation_titles`). Each facade is measured at THAT
         callout's own feet-per-point, cropped to its own datum band, and
         validated by POSITION: the blob width against the independently
@@ -4202,6 +4236,25 @@ class TakeoffPipeline:
                     if facade.review_reason else "; ".join(reasons)
                 )
             facades.append(facade)
+            # Same asymmetry as the room fills, and it has to close with them:
+            # every elevation this method REFUSED already lands in `drops`, so
+            # a ledger that never records the measured ones counts elevation
+            # coverage as pure loss. An excluded facade (demolition, interior)
+            # is still a MEASURED drawing carrying its exclusion as the reason —
+            # "was this drawing measured" and "does its number reach a
+            # quantity" are different questions, and item_coverage answers the
+            # second one.
+            drops.append(
+                DrawingCoverage(
+                    region_id=cid,
+                    title=entry.title,
+                    disposition=MEASURED,
+                    reason=facade.excluded_reason or "",
+                    printed_scale_fpi=fpi,
+                    area_sf=facade.area_sf,
+                    needs_review=bool(facade.needs_review),
+                )
+            )
             logger.info(
                 "sheet %r: %s %r facade %.1f SF at %.2f ft/in (%s)%s%s",
                 sheet_name, cid, entry.title, facade.area_sf, fpi,
