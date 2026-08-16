@@ -1170,6 +1170,9 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
     # take-off, ingested from a human input file, is human-vouched. Absent
     # marker => plan_parsed: HUMAN INPUT must be EARNED, never defaulted into.
     legend_origin = str(sched.get("legend_origin") or "plan_parsed")
+    # Whether this schedule's ITEM column holds canonical estimator names rather
+    # than marks/tags. Declared by the producer, never inferred here (29-01).
+    item_field_is_canonical = bool(sched.get("item_field_is_canonical"))
 
     if not isinstance(rows, list):
         return results
@@ -1184,6 +1187,29 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
             if row.get(k):
                 desc = str(row[k])
                 break
+
+        # The CANONICAL estimator name, when the schedule prints one BESIDE its
+        # prose. `door_schedule_to_legend` emits ITEM="Doors-STL" next to
+        # DESCRIPTION="Doors - Steel (door schedule)" precisely because the
+        # aggregator matches on the former — and the tuple above, being
+        # first-match-wins with DESCRIPTION first, could never reach it. That is
+        # why the saved Crow run published a MEASURED "Doors - Steel (door
+        # schedule)" and a BLANK "Doors-STL" in the same report.
+        #
+        # Carried as its OWN key rather than by reordering the tuple: this
+        # function reads every legend on both entry points, and for most of them
+        # ITEM is a tag ("A-1"), not an estimator name. Reordering would trade
+        # one door defect for a regression across every other schedule.
+        # Read ONLY when the schedule's producer declared that its ITEM column
+        # holds estimator names. Without that gate this reads "A-1" off a
+        # generic schedule and publishes a drawing tag as an item name — which
+        # a hand-built row in this plan's own test proved, before the gate
+        # existed.
+        canonical_item = ""
+        if item_field_is_canonical:
+            raw_item = row.get("ITEM")
+            if raw_item and str(raw_item).strip() != desc.strip():
+                canonical_item = str(raw_item).strip()
 
         # Find a REAL quantity. Reject "Multiple", "Varies", "TBD", etc.
         qty = None
@@ -1247,6 +1273,7 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
                 # A table PRINTED on the plans stating a quantity is itself the
                 # corroboration for that count (28-01).
                 "count_corroboration": "schedule",
+                "canonical_item": canonical_item,
                 "legend_origin": legend_origin,
                 "source_sheet": sheet_name,
                 "source_location": f"{sched_name}{' row ' + mark if mark else ''}",
@@ -1275,6 +1302,7 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
                 "formula": formula_out,
                 "qty_source": "schedule",
                 "count_corroboration": "schedule",
+                "canonical_item": canonical_item,
                 "source_sheet": sheet_name,
                 "source_location": f"{sched_name}{' row ' + mark if mark else ''}",
                 "source_raw": row_text,
@@ -1294,6 +1322,7 @@ def _calculate_from_schedule(sched: dict, sheet_name: str) -> List[dict]:
                 "formula": f"count from schedule (qty column = {qty_source})",
                 "qty_source": "schedule",
                 "count_corroboration": "schedule",
+                "canonical_item": canonical_item,
                 "source_sheet": sheet_name,
                 "source_location": f"{sched_name}{' row ' + mark if mark else ''}",
                 "source_raw": row_text,

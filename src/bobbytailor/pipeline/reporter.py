@@ -984,6 +984,13 @@ def _normalize_calculated(estimates: list) -> List[Dict[str, Any]]:
             # nobody downstream can ever see (28-01).
             "count_corroboration": e.get("count_corroboration"),
             "count_evidence_sheet_kind": e.get("count_evidence_sheet_kind"),
+            # The CANONICAL estimator name a schedule printed beside its prose
+            # description (29-01). Same gate, same reason as the two keys above:
+            # left off this whitelist it is a name nobody downstream can ever
+            # see, which is the defect this plan exists to close — the door
+            # schedule produced "Doors-STL" and the report published a blank
+            # under that name while publishing its quantity under the prose one.
+            "canonical_item": e.get("canonical_item"),
             "waste_factor": e.get("waste_factor_applied", 1.0),
             "formula_applied": e.get("formula", ""),   # NEW: shows the actual math
             "approximate": e.get("approximate", False),

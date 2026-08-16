@@ -1262,10 +1262,21 @@ def aggregate_takeoff(
             # path — as a VERBATIM authority, so this is behaviourally the same
             # assignment it always was, and "exactly one function decides which
             # authority names a row" stays literally true.
+            # A schedule that printed its own CANONICAL estimator name gets to
+            # use it. `door_schedule_to_legend` emits ITEM="Doors-STL" beside
+            # DESCRIPTION="Doors - Steel (door schedule)" precisely so that
+            # reconciliation has a name to match on, and this branch published
+            # the prose one — which is why the saved Crow run carried a MEASURED
+            # "Doors - Steel (door schedule)" and a BLANK "Doors-STL" at once
+            # (29-01). Still ONE authority and ONE arbiter; only the label
+            # offered to it changes, and only for rows that printed a second
+            # name. A schedule that prints one label is untouched.
+            legend_label = (item.get("canonical_item") or "").strip() \
+                or _clean_legend_label(desc)
             canonical_name, canonical_unit, authority = resolve_published_name([
-                (NAME_AUTHORITY_LEGEND, _clean_legend_label(desc),
+                (NAME_AUTHORITY_LEGEND, legend_label,
                  (unit or "").strip().upper()),
-            ]) or (_clean_legend_label(desc), (unit or "").strip().upper(),
+            ]) or (legend_label, (unit or "").strip().upper(),
                    NAME_AUTHORITY_LEGEND)
             bucket_source = _PUBLISHED_SOURCE_BY_AUTHORITY[authority]
             # Absent marker => plan_parsed. HUMAN INPUT is earned, not defaulted.

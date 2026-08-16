@@ -1,0 +1,930 @@
+[
+  {
+    "name": "Acoustical Ceiling",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "acoustic tile",
+      "act",
+      "lay-in ceiling"
+    ]
+  },
+  {
+    "name": "Asphalt Paving",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "ac paving",
+      "asphalt",
+      "paving"
+    ]
+  },
+  {
+    "name": "Blocking",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "fire treated blocking",
+      "wood blocking"
+    ]
+  },
+  {
+    "name": "Bollards",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "bollard",
+      "concrete bollard",
+      "guard post",
+      "pipe bollard"
+    ]
+  },
+  {
+    "name": "Brick Veneer",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "brick",
+      "masonry veneer"
+    ]
+  },
+  {
+    "name": "CMU Wall",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "block wall",
+      "cmu",
+      "concrete masonry",
+      "concrete masonry unit",
+      "masonry wall"
+    ]
+  },
+  {
+    "name": "Columns",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "column",
+      "hss column",
+      "pipe column",
+      "steel column",
+      "structural column"
+    ]
+  },
+  {
+    "name": "Concrete Curb",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "concrete curb",
+      "curb and gutter"
+    ]
+  },
+  {
+    "name": "Concrete Footing",
+    "unit": "CY",
+    "measure": "volume",
+    "aliases": [
+      "continuous footing",
+      "footing",
+      "spread footing"
+    ]
+  },
+  {
+    "name": "Concrete Pad",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "conc pad",
+      "equipment pad",
+      "housekeeping pad"
+    ]
+  },
+  {
+    "name": "Concrete Slab",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "concrete floor",
+      "floor slab",
+      "slab on grade",
+      "sog"
+    ]
+  },
+  {
+    "name": "Concrete Stairs",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "cast in place stair",
+      "concrete stair"
+    ]
+  },
+  {
+    "name": "Conduit",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "conduit",
+      "electrical conduit",
+      "emt"
+    ]
+  },
+  {
+    "name": "Demolition",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "demolish",
+      "demolition",
+      "remove existing"
+    ]
+  },
+  {
+    "name": "Dock Bumper",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "bumper",
+      "dock bumper"
+    ]
+  },
+  {
+    "name": "Dock Leveler",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "dock leveler",
+      "dock lift",
+      "leveler"
+    ]
+  },
+  {
+    "name": "Door Frames-AL",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - Aluminum",
+      "al frame",
+      "aluminum frame",
+      "aluminum frames"
+    ]
+  },
+  {
+    "name": "Door Frames-FRP",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - FRP",
+      "frp frame",
+      "frp frames"
+    ]
+  },
+  {
+    "name": "Door Frames-GALV",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - Galvanized Steel",
+      "galv frame",
+      "galvanized steel frame",
+      "galvanized steel frames"
+    ]
+  },
+  {
+    "name": "Door Frames-GL",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - Glass",
+      "gl frame",
+      "glass frame",
+      "glass frames"
+    ]
+  },
+  {
+    "name": "Door Frames-HC",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - Hollow Core",
+      "hc frame",
+      "hollow core frame",
+      "hollow core frames"
+    ]
+  },
+  {
+    "name": "Door Frames-HM",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - Hollow Metal",
+      "hm frame",
+      "hollow metal frame",
+      "hollow metal frames"
+    ]
+  },
+  {
+    "name": "Door Frames-IM",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - Insulated Metal",
+      "im frame",
+      "insulated metal frame",
+      "insulated metal frames"
+    ]
+  },
+  {
+    "name": "Door Frames-KD",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - Knock-Down",
+      "kd frame",
+      "knock-down frame",
+      "knock-down frames"
+    ]
+  },
+  {
+    "name": "Door Frames-SC",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - Solid Core",
+      "sc frame",
+      "solid core frame",
+      "solid core frames"
+    ]
+  },
+  {
+    "name": "Door Frames-SCW",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - Solid Core Wood",
+      "scw frame",
+      "solid core wood frame",
+      "solid core wood frames"
+    ]
+  },
+  {
+    "name": "Door Frames-STL",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - Steel",
+      "steel frame",
+      "steel frames",
+      "stl frame"
+    ]
+  },
+  {
+    "name": "Door Frames-WD",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Door Frames - Wood",
+      "wd frame",
+      "wood frame",
+      "wood frames"
+    ]
+  },
+  {
+    "name": "Doors-AL",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - Aluminum",
+      "al door",
+      "aluminum door",
+      "aluminum doors"
+    ]
+  },
+  {
+    "name": "Doors-FRP",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - FRP",
+      "frp door",
+      "frp doors"
+    ]
+  },
+  {
+    "name": "Doors-GALV",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - Galvanized Steel",
+      "galv door",
+      "galvanized steel door",
+      "galvanized steel doors"
+    ]
+  },
+  {
+    "name": "Doors-GL",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - Glass",
+      "gl door",
+      "glass door",
+      "glass doors"
+    ]
+  },
+  {
+    "name": "Doors-HC",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - Hollow Core",
+      "hc door",
+      "hollow core door",
+      "hollow core doors"
+    ]
+  },
+  {
+    "name": "Doors-HM",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - Hollow Metal",
+      "hm door",
+      "hollow metal door",
+      "hollow metal doors"
+    ]
+  },
+  {
+    "name": "Doors-IM",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - Insulated Metal",
+      "im door",
+      "insulated metal door",
+      "insulated metal doors"
+    ]
+  },
+  {
+    "name": "Doors-KD",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - Knock-Down",
+      "kd door",
+      "knock-down door",
+      "knock-down doors"
+    ]
+  },
+  {
+    "name": "Doors-SC",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - Solid Core",
+      "sc door",
+      "solid core door",
+      "solid core doors"
+    ]
+  },
+  {
+    "name": "Doors-SCW",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - Solid Core Wood",
+      "scw door",
+      "solid core wood door",
+      "solid core wood doors"
+    ]
+  },
+  {
+    "name": "Doors-STL",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - Steel",
+      "steel door",
+      "steel doors",
+      "stl door"
+    ]
+  },
+  {
+    "name": "Doors-WD",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "Doors - Wood",
+      "wd door",
+      "wood door",
+      "wood doors"
+    ]
+  },
+  {
+    "name": "Downspouts",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "downspout",
+      "leader"
+    ]
+  },
+  {
+    "name": "Ductwork",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "ductwork",
+      "return duct",
+      "supply duct"
+    ]
+  },
+  {
+    "name": "Electrical Panels",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "electric panel",
+      "electrical panel",
+      "panelboard"
+    ]
+  },
+  {
+    "name": "Exposed Structure",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "exposed ceiling",
+      "exposed deck",
+      "exposed roof structure",
+      "open structure"
+    ]
+  },
+  {
+    "name": "Fire Extinguisher",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "extinguisher",
+      "fe cabinet"
+    ]
+  },
+  {
+    "name": "Fire Riser",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "fire protection riser",
+      "fire riser",
+      "riser"
+    ]
+  },
+  {
+    "name": "Flooring",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "carpet",
+      "lvt",
+      "tile floor",
+      "vct"
+    ]
+  },
+  {
+    "name": "Gas Piping",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "gas line",
+      "gas pipe",
+      "natural gas piping"
+    ]
+  },
+  {
+    "name": "Guardrail",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "guard rail",
+      "safety rail"
+    ]
+  },
+  {
+    "name": "Gutter",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "aluminum gutter",
+      "gutter"
+    ]
+  },
+  {
+    "name": "Gypsum Board",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "drywall",
+      "gyp board",
+      "sheetrock"
+    ]
+  },
+  {
+    "name": "Handrail",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "hand rail",
+      "pipe handrail"
+    ]
+  },
+  {
+    "name": "Internal Tilt up walls",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "interior tilt up",
+      "interior tilt-up wall",
+      "internal tilt-up"
+    ]
+  },
+  {
+    "name": "Joint Sealant",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "caulk",
+      "joint sealer",
+      "sealant"
+    ]
+  },
+  {
+    "name": "Ladder",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "access ladder",
+      "fixed ladder",
+      "ladder",
+      "roof ladder",
+      "ship ladder"
+    ]
+  },
+  {
+    "name": "Landscaping",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "landscape",
+      "planting",
+      "sod"
+    ]
+  },
+  {
+    "name": "Lift",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "elevator",
+      "hydraulic lift",
+      "scissor lift",
+      "wheelchair lift"
+    ]
+  },
+  {
+    "name": "Light Fixtures",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "light fixture",
+      "lighting fixture",
+      "luminaire"
+    ]
+  },
+  {
+    "name": "Lintels",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "lintel",
+      "masonry lintel",
+      "steel lintel"
+    ]
+  },
+  {
+    "name": "Metal Deck",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "b-deck",
+      "floor deck",
+      "roof deck"
+    ]
+  },
+  {
+    "name": "Metal Stud Framing",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "metal framed wall",
+      "metal stud"
+    ]
+  },
+  {
+    "name": "Mobilization",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "general conditions",
+      "mobilisation",
+      "mobilize"
+    ]
+  },
+  {
+    "name": "Overhead Doors",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "dock door",
+      "oh door",
+      "overhead door",
+      "roll up door",
+      "sectional door"
+    ]
+  },
+  {
+    "name": "PVC Cleanouts",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "clean out",
+      "cleanout",
+      "pvc cleanout"
+    ]
+  },
+  {
+    "name": "Painting",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "field painting",
+      "painted finish"
+    ]
+  },
+  {
+    "name": "Parapet Coping",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "coping",
+      "metal coping",
+      "parapet cap"
+    ]
+  },
+  {
+    "name": "Parking Stalls",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "parking space",
+      "parking stall"
+    ]
+  },
+  {
+    "name": "Plywood Sheathing",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "frt plywood",
+      "plywood",
+      "sheathing"
+    ]
+  },
+  {
+    "name": "Pre-Engineered Metal Canopy",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "canopy",
+      "entrance canopy",
+      "metal canopy"
+    ]
+  },
+  {
+    "name": "Roof Drains",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "overflow drain",
+      "roof drain"
+    ]
+  },
+  {
+    "name": "Roof Hatch",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "roof hatch",
+      "smoke hatch"
+    ]
+  },
+  {
+    "name": "Roof Insulation",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "rigid insulation",
+      "roof insul"
+    ]
+  },
+  {
+    "name": "Roofing",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "built up roof",
+      "epdm",
+      "membrane roof",
+      "tpo"
+    ]
+  },
+  {
+    "name": "Rooftop Units",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "hvac unit",
+      "rooftop unit",
+      "rtu"
+    ]
+  },
+  {
+    "name": "Sanitary Piping",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "sanitary pipe",
+      "sanitary sewer",
+      "waste line"
+    ]
+  },
+  {
+    "name": "Sawcutting",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "saw cut",
+      "sawcut"
+    ]
+  },
+  {
+    "name": "Sealed Concrete",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "concrete sealer",
+      "polished concrete",
+      "sealed floor",
+      "sealed slab"
+    ]
+  },
+  {
+    "name": "Signage",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "building sign",
+      "wayfinding sign"
+    ]
+  },
+  {
+    "name": "Site Fencing",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "chain link fence",
+      "site fence"
+    ]
+  },
+  {
+    "name": "Skylights",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "skylight",
+      "smoke vent"
+    ]
+  },
+  {
+    "name": "Sprinkler Heads",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "fire sprinkler",
+      "sprinkler head"
+    ]
+  },
+  {
+    "name": "Stairs",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "egress stair",
+      "metal stair",
+      "stair",
+      "stair run"
+    ]
+  },
+  {
+    "name": "Steel Joists",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "bar joist",
+      "joist",
+      "open web joist"
+    ]
+  },
+  {
+    "name": "Storefront",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "alum. storefront",
+      "aluminum storefront",
+      "curtain wall",
+      "storefront"
+    ]
+  },
+  {
+    "name": "Striping",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "pavement marking",
+      "pavement striping",
+      "stripe"
+    ]
+  },
+  {
+    "name": "Structural Steel",
+    "unit": "TON",
+    "measure": "count",
+    "aliases": [
+      "steel frame",
+      "structural framing"
+    ]
+  },
+  {
+    "name": "Temporary Fencing",
+    "unit": "LF",
+    "measure": "length",
+    "aliases": [
+      "construction fence",
+      "temp fence"
+    ]
+  },
+  {
+    "name": "Tilt Up Wall",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "precast panel",
+      "s.c.c.p.",
+      "sccp",
+      "site cast concrete panel",
+      "tilt up panel",
+      "tilt wall",
+      "tilt-up"
+    ]
+  },
+  {
+    "name": "Toilet Partitions",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "toilet compartment",
+      "toilet partition"
+    ]
+  },
+  {
+    "name": "Vapor Barrier",
+    "unit": "SF",
+    "measure": "area",
+    "aliases": [
+      "under slab barrier",
+      "vapor retarder",
+      "vapour barrier"
+    ]
+  },
+  {
+    "name": "Windows",
+    "unit": "EA",
+    "measure": "count",
+    "aliases": [
+      "glazing unit",
+      "window"
+    ]
+  }
+]

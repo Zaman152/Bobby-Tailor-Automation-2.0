@@ -1014,6 +1014,13 @@ def door_schedule_to_legend(ds: "DoorSchedule") -> Optional[dict]:
         "legend_origin": "plan_parsed",
         "schedule_type": "door",
         "use_for_takeoff": True,
+        # This schedule's ITEM column holds the CANONICAL ESTIMATOR NAME
+        # ("Doors-STL"), not a mark or a tag. Stated by the producer because
+        # only the producer knows: a generic schedule's ITEM is routinely "A-1",
+        # and a consumer that guessed from the string shape would publish tags
+        # as item names. Downstream, only a schedule carrying this marker has
+        # its ITEM read as a name (29-01).
+        "item_field_is_canonical": True,
         "description": (
             f"{ds.openings} scheduled door openings parsed deterministically from "
             f"the door schedule on sheet page(s) {ds.pages}. Exact type/material "
