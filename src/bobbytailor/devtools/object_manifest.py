@@ -135,9 +135,28 @@ class ManifestEntry:
             # Exact normalised phrase match.
             if t_norm == " ".join(sorted(p_tokens)):
                 return 1.0
-            # One side fully contains the other (e.g. "cmu" in {"cmu","wall"}).
-            if p_tokens <= t_tokens or t_tokens <= p_tokens:
+            # The whole TEXT appears in the phrase (e.g. text "cmu" against
+            # phrase "cmu wall"): the detection is a fragment of this entry's
+            # own name. Full strength.
+            if t_tokens <= p_tokens:
                 best = max(best, 0.9)
+                continue
+            # The whole PHRASE appears in the text. Full strength ONLY when the
+            # phrase explains most of the text: a multi-token alias, or a text
+            # short enough to be a label. A single-token alias inside long
+            # prose explains almost nothing of it — the paid Crow run of
+            # 2026-08-16 bound the alias "stair" to "Stair plan truck court
+            # clearance from center line of rail to wall" (a DIMENSION note,
+            # 9 significant tokens) at 0.9 and published Stairs = 3 EA as
+            # MEASURED with no flag: a confidently wrong count manufactured
+            # from a clearance callout. Scaling by coverage keeps "bollard" ->
+            # "Bollard concrete dia." (1 of 3 tokens, a label) while rejecting
+            # one word fished out of a sentence.
+            if p_tokens <= t_tokens:
+                if len(p_tokens) >= 2 or len(t_tokens) <= 3:
+                    best = max(best, 0.9)
+                else:
+                    best = max(best, 0.9 * len(p_tokens) / len(t_tokens))
                 continue
             # Otherwise require shared tokens; score by Jaccard overlap only.
             shared = p_tokens & t_tokens
@@ -188,6 +207,25 @@ class Manifest:
             ),
             reverse=True,
         )
+        # A text that ties across DIFFERENT entries does not discriminate, and
+        # an arbitrary tie-break is a guess wearing a sort key. The paid Crow
+        # run of 2026-08-16 measured the cost: a bare "DOOR" detection (136
+        # personnel doors) tied every door-family entry at 0.9, the
+        # longest-name tie-break picked "Door Frames-GALV", and 136 hollow-
+        # metal doors published as galvanized FRAMES. The unit tie-break may
+        # settle a tie, because a unit is evidence; name length may not. If
+        # more than one entry survives at the top score with the same unit
+        # standing, refuse to bind — the row keeps its own detected name and,
+        # where naming matters, gets flagged by the paths that own that.
+        top_score = round(scored[0][0], 3)
+        top_unit = 1 if unit_hint and scored[0][1].unit == unit_hint else 0
+        contenders = {
+            se[1].name for se in scored
+            if round(se[0], 3) == top_score
+            and (1 if unit_hint and se[1].unit == unit_hint else 0) == top_unit
+        }
+        if len(contenders) > 1:
+            return None
         return scored[0][1]
 
     # ── Completeness ────────────────────────────────────────────────────────────

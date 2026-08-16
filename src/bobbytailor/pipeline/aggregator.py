@@ -1224,13 +1224,27 @@ def aggregate_takeoff(
     for item in calculated_items:
         if item.get("qty_source") == "plan_schedule_legend":
             desc = item.get("description", "")
-            bucket_key = _clean_legend_label(desc)
+            # MUST mirror the legend publish branch below: since 29-01 a legend
+            # row that printed a canonical estimator name publishes UNDER that
+            # name. Keying this map on the prose label while the real bucket
+            # lives under the canonical one sent every suppression note to an
+            # orphan defaultdict bucket — which then published as a row with
+            # the defaultdict's 0.0 and no unit ("Doors - Steel (door
+            # schedule)" = 0.0, paid run 2026-08-16), the exact numeric-zero-
+            # for-a-blank defect the comment at the top of this file records.
+            bucket_key = (item.get("canonical_item") or "").strip() \
+                or _clean_legend_label(desc)
+            prose_label = _clean_legend_label(desc)
             name, _ = normalize_item_name(
                 desc, item.get("item_type", ""), item.get("unit", ""), learned=learned,
             )
             legend_names.add(name)
             legend_bucket_by_name.setdefault(name, bucket_key)
             legend_bucket_by_name.setdefault(bucket_key, bucket_key)
+            # The prose label still identifies this bucket for duplicate
+            # suppression — a vision reading will match the prose, not the code.
+            legend_names.add(prose_label)
+            legend_bucket_by_name.setdefault(prose_label, bucket_key)
             # A legend bucket is keyed by its cleaned label, and a vision row binds
             # to its manifest name. Add BOTH so a vision/measured duplicate of a
             # legend item is suppressed regardless of which naming path it took
