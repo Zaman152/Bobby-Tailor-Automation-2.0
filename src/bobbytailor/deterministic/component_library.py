@@ -957,18 +957,56 @@ _WALL_MATERIAL_MAP = [
 ]
 
 
+#: A material word can be NAMED without being the note's subject. Measured over
+#: every material mention on all four plan sets: 18 of 68 sit behind one of
+#: these cues, and every one of the 18 is a reference rather than a subject —
+#: "FINISH TO MATCH STOREFRONT" on a guardrail, a canopy, a coping and a
+#: louver (Moxy, x3 each); "PAINT FLASHING TO MATCH EX. SPLIT FACE CMU"
+#: (Bob's); and "DO NOT INSTALL TO THE STOREFRONT SYSTEM" on Bob's page-4
+#: awning note 07, which is what renames a 6,245 SF facade.
+_MATERIAL_REFERENCE_CUE_RE = re.compile(r"^(?:NOT|MATCH|MATCHING)$", re.IGNORECASE)
+
+#: How far back a cue still governs. MEASURED, not chosen: the cue-to-material
+#: distances on the four sets are 1 (x14), 2 (x1) and 4 (x3), with NOTHING
+#: beyond 4 — "DO NOT INSTALL TO THE STOREFRONT" is the widest at 4
+#: (NOT-INSTALL-TO-THE). A window of 4 therefore captures every measured case
+#: and reaches no mention that is not already cued.
+_MATERIAL_CUE_LOOKBACK_TOKENS = 4
+
+
+def _material_mention_is_a_reference(text: str, start: int) -> bool:
+    """Is the material word at *start* a REFERENCE rather than the subject?"""
+    preceding = text[:start].split()[-_MATERIAL_CUE_LOOKBACK_TOKENS:]
+    for token in reversed(preceding):
+        if _MATERIAL_REFERENCE_CUE_RE.match(token.strip(".,:;/()\"'")):
+            return True
+    return False
+
+
 def wall_material_from_text(text) -> Optional[str]:
     """The canonical wall material a keynote/legend *text* names, or ``None``.
 
     ``None`` means the text anchors NO wall material — and the caller must
     flag rather than guess (a keynote about a light sconce attributes
     nothing). Never raises.
+
+    A mention behind a negation or match-reference does not anchor: an awning
+    note that says "DO NOT INSTALL TO THE STOREFRONT" is not a storefront wall,
+    and a guardrail whose finish is "TO MATCH STOREFRONT" is not one either.
+
+    The test is PER OCCURRENCE, not per note, and that distinction is load
+    bearing. Bob's "INFILL WITH CMU TO MATCH EXISTING. TOOTH IN CMU" names CMU
+    twice — once as the subject and once four tokens behind a MATCH — and it IS
+    a CMU note. One un-cued occurrence anchors the material; a note is only
+    refused when EVERY occurrence of that material is a reference.
     """
     if not text:
         return None
+    body = str(text)
     for pattern, canonical in _WALL_MATERIAL_MAP:
-        if pattern.search(str(text)):
-            return canonical
+        for match in pattern.finditer(body):
+            if not _material_mention_is_a_reference(body, match.start()):
+                return canonical
     return None
 
 
