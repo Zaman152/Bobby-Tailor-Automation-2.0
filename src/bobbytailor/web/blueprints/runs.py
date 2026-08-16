@@ -180,6 +180,42 @@ def run_stackct():
     return jsonify({"job_id": job_id})
 
 
+#: What an unreadable upload is, in the two ways an estimator actually meets
+#: one. Both are ORDINARY: a scan that came off a copier wrong, and a set the
+#: architect password-protected before emailing it.
+UNREADABLE_PDF_ERROR = (
+    "This file could not be opened as a PDF. It is either corrupt or not "
+    "really a PDF. Re-export or re-download the drawing set and try again."
+)
+ENCRYPTED_PDF_ERROR = (
+    "This PDF is password-protected, so its pages cannot be read. Open it in "
+    "a PDF viewer, save an unprotected copy, and upload that."
+)
+
+
+def _unreadable_pdf_error(path: str) -> str:
+    """Which unreadable-PDF message applies to the file at *path*.
+
+    Measured, not assumed: on this PyMuPDF a corrupt file raises
+    ``FileDataError`` from ``fitz.open``, while a password-protected one opens
+    fine and raises ``ValueError: document closed or encrypted`` on the first
+    page access. So the exception alone cannot tell the operator which of the
+    two they have — the document has to be asked.
+
+    Any failure to ask degrades to the generic message. Naming the wrong cause
+    is worse than naming none.
+    """
+    try:
+        import fitz
+
+        with fitz.open(path) as doc:
+            if doc.needs_pass or doc.is_encrypted:
+                return ENCRYPTED_PDF_ERROR
+    except Exception:  # noqa: BLE001 — the file is already known to be bad
+        pass
+    return UNREADABLE_PDF_ERROR
+
+
 @runs_bp.route("/api/pdf/upload", methods=["POST"])
 def upload_pdf():
     """Upload a PDF and return metadata for page selection (no analysis)."""
@@ -194,8 +230,25 @@ def upload_pdf():
     save_path = os.path.join("uploads", f"{upload_id}_{_safe_upload_name(f.filename)}")
     f.save(save_path)
 
+    # A corrupt or password-protected PDF used to escape as a bare
+    # ``Error: Internal server error`` from the app's catch-all 500 handler,
+    # with the unreadable file left orphaned in uploads/ forever. Both are
+    # normal things for an estimator to be holding, neither is a server fault,
+    # and a 500 tells them to call support instead of to re-export the file.
     from bobbytailor.pipeline.pdf_analyzer import get_pdf_metadata
-    meta = get_pdf_metadata(save_path)
+    try:
+        meta = get_pdf_metadata(save_path)
+    except Exception as exc:  # noqa: BLE001 — any read failure is the user's file
+        message = _unreadable_pdf_error(save_path)
+        logger.warning(
+            "Upload %s (%s) is not a readable PDF: %s: %s",
+            upload_id, f.filename, type(exc).__name__, exc,
+        )
+        try:
+            os.remove(save_path)
+        except OSError:
+            pass
+        return jsonify({"error": message, "filename": f.filename}), 400
 
     plans_only_warning = (
         TAKEOFF_UPLOAD_WARNING if looks_like_completed_takeoff(f.filename) else None
