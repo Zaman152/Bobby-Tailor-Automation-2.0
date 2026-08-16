@@ -1,0 +1,122 @@
+====================================================================================
+VISION-ONLY BENCHMARK — Crow_Phase29_Paid
+====================================================================================
+Overall quantity accuracy: 40%   Name/found rate: 100%   Qty acc when found: 40%
+  Counts (EA)   n= 6  found=100%  qty_ok=17%
+  Measured(SF/LF) n= 4  found=100%  qty_ok=75%
+  Provenance split: geometry/text qty acc=60% (n=5)  vision qty share=0% of 30 quantity-bearing rows
+  Provenance classes: deterministic=15, unknown=15
+  Silent misses: 0 (every golden category present or flagged)
+  [manifest] runtime=479s  cost=$0.8178  sheets=4
+
+STATUS    ITEM                                  GOLDEN            AI    ERR%  CAT  PROV
+------------------------------------------------------------------------------------
+FAIL_QTY  Bollards                               28.00             —       —  count  unknown
+FAIL_QTY  CMU Wall                            2,204.33     40,086.00  1718.5  measured  deterministic
+FAIL_QTY  Columns-H-35'≈Columns                 132.00        120.00     9.1  count  deterministic
+PASS      Exposed Structure                 395,673.42    397,600.00     0.5  measured  deterministic
+PASS      Internal Tilt up walls≈Tilt Up Wall    108,442.66    106,992.00     1.3  measured  deterministic
+FAIL_QTY  Ladder-H-20'≈Access Ladder              1.00             —       —  count  unknown
+FAIL_QTY  Lift                                    1.00             —       —  count  unknown
+PASS      Mobilization                            1.00          1.00     0.0  count  unknown
+PASS      Sealed Concrete                   395,673.42    397,600.00     0.5  measured  deterministic
+FAIL_QTY  Stairs                                 10.00          3.00    70.0  count  unknown
+
+EXTRA items AI produced not in golden:
+  + Acoustical Ceiling             397600.0 SF
+  + Asphalt Paving                 None SF
+  + Blocking                       None LF
+  + Brick Veneer                   None SF
+  + Building Perimeter             2972.0 LF
+  + Canopy                         None SF
+  + Cass White                     10.6 SF
+  + Concrete Footing               None CY
+  + Conduit                        None LF
+  + Curb & Gutter                  None LF
+  + Dock Bumper                    1.0 EA
+  + Dock Leveler                   None EA
+  + Door Frames-AL                 None EA
+  + Door Frames-FRP                None EA
+  + Door Frames-GALV               136.0 EA
+  + Door Frames-GL                 None EA
+  + Door Frames-HC                 None EA
+  + Door Frames-HM                 29.0 EA
+  + Door Frames-IM                 None EA
+  + Door Frames-KD                 None EA
+  + Door Frames-SC                 None EA
+  + Door Frames-SCW                None EA
+  + Door Frames-STL                None EA
+  + Door Frames-WD                 None EA
+  + Doors - Steel (door schedule)  0.0 
+  + Doors-AL                       6.0 EA
+  + Doors-FRP                      None EA
+  + Doors-GL                       None EA
+  + Doors-HC                       None EA
+  + Doors-HM                       29.0 EA
+  + Doors-IM                       None EA
+  + Doors-KD                       None EA
+  + Doors-SC                       None EA
+  + Doors-SCW                      None EA
+  + Doors-STL                      70.0 EA
+  + Doors-WD                       None EA
+  + Downspouts                     None LF
+  + Ductwork                       None LF
+  + Electrical Panels              1.0 EA
+  + Fire Extinguisher              None EA
+  + Fire Riser                     None EA
+  + Flooring                       397600.0 SF
+  + Gas Piping                     None LF
+  + Glass / Glazing                None EA
+  + Guard Rail                     None LF
+  + Guardrail                      47.38 LF
+  + Gutter                         None LF
+  + Hand Rail                      None LF
+  + Handrail                       None LF
+  + Joint Sealant                  None LF
+  + LED Wall Pack                  None EA
+  + Landscaping                    None SF
+  + Light Fixtures                 None EA
+  + Lintels                        None LF
+  + Metal Deck                     397600.0 SF
+  + Metal Downspouts               None LF
+  + Metal Stud Framing             None LF
+  + OVERALL EAST ELEVATION         16141.2 SF
+  + OVERALL NORTH ELEVATION        48534.8 SF
+  + OVERALL SOUTH ELEVATION        52625.0 SF
+  + OVERALL WEST ELEVATION         16177.2 SF
+  + Overhead Doors                 4.0 EA
+  + PVC Cleanouts                  None EA
+  + Painting                       None SF
+  + Parapet Coping                 None LF
+  + Parking Stalls                 None EA
+  + Pipe Handrail                  None LF
+  + Plywood Sheathing              None SF
+  + Pre-Engineered Metal Canopy    None EA
+  + Ramp                           None EA
+  + Roof Drains                    None EA
+  + Roof Hatch                     None EA
+  + Roof Insulation                397600.0 SF
+  + Roofing                        397600.0 SF
+  + Rooftop Units                  None EA
+  + Sanitary Piping                None LF
+  + Sawcutting                     None LF
+  + Signage                        None EA
+  + Site Fencing                   None LF
+  + Skylights                      None EA
+  + Slab Control Joints            None LF
+  + Sprinkler Heads                None EA
+  + Steel Joists                   None EA
+  + Storefront                     None SF
+  + Striping                       None LF
+  + Temporary Fencing              None LF
+  + Toilet Partitions              None EA
+  + Vapor Barrier                  397600.0 SF
+  + Windows                        None EA
+------------------------------------------------------------------------------------
+GATE CHECKS
+  FAIL  geometry_text_qty_acc    value=0.6  required >= 0.97
+  FAIL  overall_qty              value=0.4  required >= 0.9
+  PASS  item_found_rate          value=1.0  required >= 0.95
+  PASS  silent_misses            value=[]  required == 0 (every golden category present or flagged)
+  PASS  vision_qty_share         value=0.0  required <= 0.05 (vision-provenance quantities ~0 on vector fixtures)
+  GATE VERDICT: FAILED

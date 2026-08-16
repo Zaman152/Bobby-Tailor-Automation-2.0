@@ -1,0 +1,2918 @@
+[
+  {
+    "item": "Access Ladder",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Access Ladder (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Acoustical Ceiling",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "ceiling_grid",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 397600.0,
+        "description": "Acoustical Ceiling",
+        "formula": "authoritative plan schedule (397600.0 SF)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Asphalt Paving",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Asphalt Paving (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Blocking",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Blocking (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Bollards",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "unit_class_conflict",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "the only reading that resolved to this object was measured in a DIFFERENT measurement class from the unit it would publish in, and there is no conversion between them, so the number is WITHHELD \u2014 this is a BLANK, not a zero ('Bollard concrete fill diameter' read 0.1 CY via formula '8 sf \u00d7 4\" / (12 \u00d7 27) = 0.10 cy' and this row publishes in EA \u2014 volume vs count)"
+    ],
+    "source": "unit_class_conflict_unmeasured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Bollards (reading withheld \u2014 measured in a different unit class from this row's unit)",
+        "formula": "unit_class_conflict_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Brick Veneer",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Brick Veneer (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Building Perimeter",
+    "quantity": 2972.0,
+    "quantity_fmt": "2,972",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [
+      "no printed schedule and no counted geometry backs this count \u2014 nothing in this run confirms how many are installed, so it is published as NEEDS REVIEW rather than as a measurement; confirm it against a plan sheet or a schedule before it is bid",
+      "unclassified item (no estimation table matched); count read from a per-sheet description on output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png with no counted geometry and no printed schedule behind it; confirm it against a plan sheet or a schedule before it is bid"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 2972.0,
+        "description": "Building Perimeter",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "measured_from_drawing",
+    "measured": true
+  },
+  {
+    "item": "CMU Wall",
+    "quantity": 40086.0,
+    "quantity_fmt": "40,086",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "cmu_wall",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count; wall class named by naming library (hint bind) \u2014 verify; a printed-thickness match was refused as contested (this wall class measures 9.6\" (LF-weighted mean) and the naming library object 'Metal Downspouts' prints a thickness within the 1.5\" match tolerance of it AND of TC1, TC11, TC5 \u2014 a number that fits several classes does not say which of them it describes), so 'CMU Wall' names this class on weaker evidence than a deterministic bind \u2014 verify; reinstated: this reading was suppressed in favour of a region-measured 'CMU Wall', and that row was then itself rejected \u2014 a supersession whose superseder dies is not a supersession, so the measurement stands rather than leaving the object with no number at all (the superseding route read 31104.0 SF). Verify which route is right before bidding"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 40086.0,
+        "description": "CMU Wall",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "measured_from_drawing",
+    "measured": true
+  },
+  {
+    "item": "Canopy",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "roof_area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Canopy (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Cass White",
+    "quantity": 10.6,
+    "quantity_fmt": "10.6",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched)"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 10.6,
+        "description": "Cass White",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "measured_from_drawing",
+    "measured": true
+  },
+  {
+    "item": "Columns",
+    "quantity": 120.0,
+    "quantity_fmt": "120",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "columns",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "named by deterministic geometry (regular grid \u2192 Columns); vision label unavailable \u2014 verify"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 120.0,
+        "description": "Columns",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "measured_from_drawing",
+    "measured": true
+  },
+  {
+    "item": "Concrete Curb",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "unit_class_conflict",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "the only reading that resolved to this object was measured in a DIFFERENT measurement class from the unit it would publish in, and there is no conversion between them, so the number is WITHHELD \u2014 this is a BLANK, not a zero ('Concrete curb dimension - enlarged ramp plan' read 0.07 CY via formula '6 sf \u00d7 4\" / (12 \u00d7 27) = 0.07 cy' and this row publishes in LF \u2014 volume vs linear)"
+    ],
+    "source": "unit_class_conflict_unmeasured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Concrete Curb (reading withheld \u2014 measured in a different unit class from this row's unit)",
+        "formula": "unit_class_conflict_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Concrete Footing",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "CY",
+    "source_sheets": [],
+    "item_type": "volume",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Concrete Footing (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Concrete Pad",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "concrete_slab",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [
+      "a separate 'Concrete Pad' reading of this item (manifest) was suppressed as a duplicate of the authoritative legend row 'Concrete Pad' \u2014 it was NOT added to this quantity"
+    ],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 397600.0,
+        "description": "Concrete Pad",
+        "formula": "authoritative plan schedule (397600.0 SF)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Concrete Retaining Wall",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "wall_area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Concrete Retaining Wall (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Concrete Slab",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "concrete_slab",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [
+      "a separate 'Concrete Slab' reading of this item (manifest) was suppressed as a duplicate of the authoritative legend row 'Concrete Slab' \u2014 it was NOT added to this quantity",
+      "a separate 'Sealed Concrete' reading of this item (manifest) was suppressed as a duplicate of the authoritative legend row 'Sealed Concrete' \u2014 it was NOT added to this quantity"
+    ],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 397600.0,
+        "description": "Concrete Slab",
+        "formula": "authoritative plan schedule (397600.0 SF)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Conduit",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Conduit (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Curb & Gutter",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "linear",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Curb & Gutter (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Demolition",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Demolition (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Dock Bumper",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0003.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "no printed schedule and no counted geometry backs this count \u2014 nothing in this run confirms how many are installed, so it is published as NEEDS REVIEW rather than as a measurement; confirm it against a plan sheet or a schedule before it is bid",
+      "unclassified item (no estimation table matched); count read from a per-sheet description on output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0003.png with no counted geometry and no printed schedule behind it; confirm it against a plan sheet or a schedule before it is bid"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0003.png",
+        "qty": 1.0,
+        "description": "Dock Bumper",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "sheet_reading",
+    "measured": true
+  },
+  {
+    "item": "Dock Leveler",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Dock Leveler (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Door Frames-AL",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Door Frames-AL (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Door Frames-FRP",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Door Frames-FRP (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Door Frames-GALV",
+    "quantity": 136.0,
+    "quantity_fmt": "136",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "low-confidence count; named from the drawing's own text (text_anchor); no vision label, library bind or deterministic geometry name \u2014 verify"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 136.0,
+        "description": "DOOR",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "measured_from_drawing",
+    "measured": true
+  },
+  {
+    "item": "Door Frames-GL",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Door Frames-GL (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Door Frames-HC",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Door Frames-HC (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Door Frames-HM",
+    "quantity": 29.0,
+    "quantity_fmt": "29",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 29.0,
+        "description": "Door Frames - Hollow Metal (door schedule)",
+        "formula": "authoritative plan schedule (29 EA)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Door Frames-IM",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Door Frames-IM (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Door Frames-KD",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Door Frames-KD (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Door Frames-SC",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Door Frames-SC (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Door Frames-SCW",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Door Frames-SCW (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Door Frames-STL",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Door Frames-STL (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Door Frames-WD",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Door Frames-WD (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Doors - Steel (door schedule)",
+    "quantity": 0.0,
+    "quantity_fmt": "0",
+    "unit": "",
+    "source_sheets": [],
+    "item_type": "",
+    "line_count": 0,
+    "needs_review": false,
+    "confidence": null,
+    "auto_verified": false,
+    "review_reasons": [
+      "a separate 'Doors' reading of this item (vision) was suppressed as a duplicate of the authoritative legend row 'Doors' \u2014 it was NOT added to this quantity",
+      "a separate 'Doors-AL' reading of this item (manifest) was suppressed as a duplicate of the authoritative legend row 'Doors' \u2014 it was NOT added to this quantity"
+    ],
+    "source": "",
+    "detail": [],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Doors-AL",
+    "quantity": 6.0,
+    "quantity_fmt": "6",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 6.0,
+        "description": "Doors - Aluminum (door schedule)",
+        "formula": "authoritative plan schedule (6 EA)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Doors-FRP",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Doors-FRP (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Doors-GL",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Doors-GL (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Doors-HC",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Doors-HC (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Doors-HM",
+    "quantity": 29.0,
+    "quantity_fmt": "29",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 29.0,
+        "description": "Doors - Hollow Metal (door schedule)",
+        "formula": "authoritative plan schedule (29 EA)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Doors-IM",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Doors-IM (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Doors-KD",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Doors-KD (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Doors-SC",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Doors-SC (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Doors-SCW",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Doors-SCW (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Doors-STL",
+    "quantity": 70.0,
+    "quantity_fmt": "70",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 70.0,
+        "description": "Doors - Steel (door schedule)",
+        "formula": "authoritative plan schedule (70 EA)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Doors-WD",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Doors-WD (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Downspouts",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Downspouts (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Ductwork",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Ductwork (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Electrical Panels",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0003.png"
+    ],
+    "item_type": "electrical_fixture",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "count read from a per-sheet description on output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0003.png with no counted geometry and no printed schedule behind it; confirm it against a plan sheet or a schedule before it is bid",
+      "no printed schedule and no counted geometry backs this count \u2014 nothing in this run confirms how many are installed, so it is published as NEEDS REVIEW rather than as a measurement; confirm it against a plan sheet or a schedule before it is bid"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0003.png",
+        "qty": 1.0,
+        "description": "Electrical Panel / Panelboard",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "sheet_reading",
+    "measured": true
+  },
+  {
+    "item": "Exposed Structure",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "exposed_structure",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [
+      "a separate 'Exposed Structure' reading of this item (manifest) was suppressed as a duplicate of the authoritative legend row 'Exposed Structure' \u2014 it was NOT added to this quantity"
+    ],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 397600.0,
+        "description": "Exposed Structure",
+        "formula": "authoritative plan schedule (397600.0 SF)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Fire Extinguisher",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Fire Extinguisher (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Fire Riser",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Fire Riser (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Flooring",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "schedule_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 397600.0,
+        "description": "Flooring",
+        "formula": "authoritative plan schedule (397600.0 SF)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Gas Piping",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Gas Piping (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Glass / Glazing",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Glass / Glazing (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Guard Rail",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "linear",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Guard Rail (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Guardrail",
+    "quantity": 47.38,
+    "quantity_fmt": "47.4",
+    "unit": "LF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0003.png"
+    ],
+    "item_type": "guard_rail",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0003.png",
+        "qty": 47.38,
+        "description": "1.5\" steel pipe guardrail guard rail",
+        "formula": "46 lf \u00d7 1.03 = 47 lf"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "sheet_reading",
+    "measured": true
+  },
+  {
+    "item": "Gutter",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Gutter (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Gypsum Board",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Gypsum Board (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Hand Rail",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "linear",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Hand Rail (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Handrail",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Handrail (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Joint Sealant",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Joint Sealant (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "LED Wall Pack",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "wall_area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "LED Wall Pack (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Ladder",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Ladder (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Landscaping",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Landscaping (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Lift",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Lift (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Light Fixtures",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Light Fixtures (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Lintels",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Lintels (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Metal Deck",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "schedule_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 397600.0,
+        "description": "Metal Deck",
+        "formula": "authoritative plan schedule (397600.0 SF)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Metal Downspouts",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Metal Downspouts (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Metal Stud Framing",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Metal Stud Framing (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Mobilization",
+    "quantity": 1.0,
+    "quantity_fmt": "1",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "standard_line_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": null,
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": 1.0,
+        "description": "Mobilization (standard estimating line item)",
+        "formula": "standard_line_item"
+      }
+    ],
+    "provenance": "STANDARD ITEM",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "OVERALL EAST ELEVATION",
+    "quantity": 16141.2,
+    "quantity_fmt": "16,141.2",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0002.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0002.png",
+        "qty": 16141.2,
+        "description": "OVERALL EAST ELEVATION",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "measured_from_drawing",
+    "measured": true
+  },
+  {
+    "item": "OVERALL NORTH ELEVATION",
+    "quantity": 48534.8,
+    "quantity_fmt": "48,534.8",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0002.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0002.png",
+        "qty": 48534.8,
+        "description": "OVERALL NORTH ELEVATION",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "measured_from_drawing",
+    "measured": true
+  },
+  {
+    "item": "OVERALL SOUTH ELEVATION",
+    "quantity": 52625.0,
+    "quantity_fmt": "52,625",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0002.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0002.png",
+        "qty": 52625.0,
+        "description": "OVERALL SOUTH ELEVATION",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "measured_from_drawing",
+    "measured": true
+  },
+  {
+    "item": "OVERALL WEST ELEVATION",
+    "quantity": 16177.2,
+    "quantity_fmt": "16,177.2",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0002.png"
+    ],
+    "item_type": "component",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [
+      "unclassified item (no estimation table matched); no text-anchored material attribution \u2014 no keynote tag inside this drawing names a wall material, so the facade is named by its own title and flagged; a guessed material is never applied"
+    ],
+    "source": "vision",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0002.png",
+        "qty": 16177.2,
+        "description": "OVERALL WEST ELEVATION",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "measured_from_drawing",
+    "measured": true
+  },
+  {
+    "item": "Overhead Doors",
+    "quantity": 4.0,
+    "quantity_fmt": "4",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "doors",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 4.0,
+        "description": "DOCK DOOR FRAME",
+        "formula": "count"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "measured_from_drawing",
+    "measured": true
+  },
+  {
+    "item": "PVC Cleanouts",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "PVC Cleanouts (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Painting",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Painting (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Parapet Coping",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Parapet Coping (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Parking Stalls",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Parking Stalls (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Pipe Handrail",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Pipe Handrail (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Plywood Sheathing",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Plywood Sheathing (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Pre-Engineered Metal Canopy",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Pre-Engineered Metal Canopy (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Ramp",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Ramp (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Roof Drains",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Roof Drains (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Roof Hatch",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Roof Hatch (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Roof Insulation",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "insulation",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 397600.0,
+        "description": "Roof Insulation",
+        "formula": "authoritative plan schedule (397600.0 SF)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Roofing",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "schedule_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 397600.0,
+        "description": "Roofing",
+        "formula": "authoritative plan schedule (397600.0 SF)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Rooftop Units",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Rooftop Units (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Sanitary Piping",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Sanitary Piping (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Sawcutting",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Sawcutting (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Sealed Concrete",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "sealed_concrete",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 397600.0,
+        "description": "Sealed Concrete",
+        "formula": "authoritative plan schedule (397600.0 SF)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Signage",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Signage (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Site Fencing",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Site Fencing (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Skylights",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Skylights (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Slab Control Joints",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "linear",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "expected from the library but never measured on the plans \u2014 this is a BLANK, not a zero"
+    ],
+    "source": "expected_not_measured",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Slab Control Joints (expected from the library, not measured on the plans)",
+        "formula": "expected_object_not_measured"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Sprinkler Heads",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Sprinkler Heads (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Stairs",
+    "quantity": 3.0,
+    "quantity_fmt": "3",
+    "unit": "EA",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0003.png"
+    ],
+    "item_type": "wall_framing",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "medium",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0003.png",
+        "qty": 3.0,
+        "description": "Stair plan truck court clearance from center line of rail to wall",
+        "formula": "ceil(1lf \u00d7 12 / 16\" OC) + 1 = 2; \u00d7 1.1 waste = 3"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "sheet_reading",
+    "measured": true
+  },
+  {
+    "item": "Steel Joists",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Steel Joists (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Storefront",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "SF",
+    "source_sheets": [],
+    "item_type": "area",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Storefront (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Striping",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Striping (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Structural Steel",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "TON",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Structural Steel (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Temporary Fencing",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "LF",
+    "source_sheets": [],
+    "item_type": "length",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Temporary Fencing (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Tilt Up Wall",
+    "quantity": 106992.0,
+    "quantity_fmt": "106,992",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "tilt_up_wall",
+    "line_count": 1,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "a reading in a DIFFERENT measurement class was NOT summed into this quantity ('Tilt-up concrete panel (S.C.C.P.)' read 5.0 LF via formula 'count' and this row publishes in SF \u2014 linear vs area)",
+      "low-confidence count; wall class named by naming library (hint bind) \u2014 verify; a printed-thickness match was refused as contested (this wall class measures 8.8\" (LF-weighted mean) and the naming library object 'Metal Downspouts' prints a thickness within the 1.5\" match tolerance of it AND of TC11, TC2, TC5 \u2014 a number that fits several classes does not say which of them it describes), so 'Tilt Up Wall' names this class on weaker evidence than a deterministic bind \u2014 verify; reinstated: this reading was suppressed in favour of a region-measured 'Tilt Up Wall', and that row was then itself rejected \u2014 a supersession whose superseder dies is not a supersession, so the measurement stands rather than leaving the object with no number at all (the superseding route read 31104.0 SF). Verify which route is right before bidding"
+    ],
+    "source": "manifest",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 106992.0,
+        "description": "Tilt Up Wall",
+        "formula": "count"
+      }
+    ],
+    "provenance": "NEEDS REVIEW",
+    "quantity_route": "measured_from_drawing",
+    "measured": true
+  },
+  {
+    "item": "Toilet Partitions",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Toilet Partitions (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  },
+  {
+    "item": "Vapor Barrier",
+    "quantity": 397600.0,
+    "quantity_fmt": "397,600",
+    "unit": "SF",
+    "source_sheets": [
+      "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png"
+    ],
+    "item_type": "schedule_item",
+    "line_count": 1,
+    "needs_review": false,
+    "confidence": "high",
+    "auto_verified": false,
+    "review_reasons": [],
+    "source": "plan_schedule_legend",
+    "detail": [
+      {
+        "sheet": "output/screenshots/VisionOnly_Crow_Phase29_Paid_20260816_191944/page_0001.png",
+        "qty": 397600.0,
+        "description": "Vapor Barrier",
+        "formula": "authoritative plan schedule (397600.0 SF)"
+      }
+    ],
+    "provenance": "MEASURED",
+    "quantity_route": "printed_schedule",
+    "measured": true
+  },
+  {
+    "item": "Windows",
+    "quantity": null,
+    "quantity_fmt": "\u2014",
+    "unit": "EA",
+    "source_sheets": [],
+    "item_type": "count",
+    "line_count": 0,
+    "needs_review": true,
+    "confidence": "low",
+    "auto_verified": false,
+    "review_reasons": [
+      "manifest object not found in plans"
+    ],
+    "source": "manifest_missing",
+    "detail": [
+      {
+        "sheet": null,
+        "qty": null,
+        "description": "Windows (expected from manifest, not located on plans)",
+        "formula": "manifest_object_not_found"
+      }
+    ],
+    "provenance": "NOT MEASURED",
+    "quantity_route": null,
+    "measured": false
+  }
+]

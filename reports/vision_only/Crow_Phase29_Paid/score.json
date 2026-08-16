@@ -1,0 +1,21 @@
+{
+  "overall_qty": 0.4,
+  "name_found_rate": 1.0,
+  "qty_acc_when_found": 0.4,
+  "count_qty": 0.16666666666666666,
+  "count_found": 1.0,
+  "measured_qty": 0.75,
+  "measured_found": 1.0,
+  "n_total": 10,
+  "n_count": 6,
+  "n_measured": 4,
+  "geometry_text_qty_acc": 0.6,
+  "n_geometry_text": 5,
+  "vision_qty_share": 0.0,
+  "n_quantity_bearing": 30,
+  "provenance_counts": {
+    "unknown": 15,
+    "deterministic": 15
+  },
+  "silent_misses": []
+}
