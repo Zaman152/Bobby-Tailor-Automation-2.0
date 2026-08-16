@@ -41,10 +41,19 @@ def _ensure_synthetic_fixtures() -> Path:
 # ── synthetic fixtures ────────────────────────────────────────────────────────
 
 
-def test_gen_synthetic_cli_writes_symbols_pdf_and_truth():
-    out = SYNTHETIC_DIR
+def test_gen_synthetic_cli_writes_symbols_pdf_and_truth(tmp_path):
+    # Writes into tmp_path, not SYNTHETIC_DIR — same reason as the dimensions
+    # CLI test: one `gen_synthetic.py` run rewrites all three tracked fixture
+    # PDFs with a new PyMuPDF /ID and nothing else, which is a dirty working
+    # tree carrying no content change.
+    out = tmp_path
     subprocess.run(
-        [sys.executable, str(out / "gen_synthetic.py"), "--out", str(out)],
+        [
+            sys.executable,
+            str(SYNTHETIC_DIR / "gen_synthetic.py"),
+            "--out",
+            str(out),
+        ],
         check=True,
     )
     assert (out / "symbols_synthetic.pdf").exists()

@@ -72,14 +72,25 @@ def _ensure_synthetic_fixtures() -> Path:
     return pdf_path
 
 
-def test_gen_synthetic_cli_writes_pdf_and_truth():
-    out = SYNTHETIC_DIR
+def test_gen_synthetic_cli_writes_pdf_and_truth(tmp_path):
+    # The CLI writes into tmp_path, NOT into SYNTHETIC_DIR. This test's job is
+    # to prove the generator writes; the checked-in fixtures are not what it
+    # needs to write over. PyMuPDF stamps a fresh random /ID into every saved
+    # document, so pointing --out at the tracked directory left all three
+    # fixture PDFs modified-but-identical in `git status` after any suite run.
+    # `_ensure_synthetic_fixtures` above still regenerates in place, but only
+    # when the file is genuinely absent.
     subprocess.run(
-        [sys.executable, str(out / "gen_synthetic.py"), "--out", str(out)],
+        [
+            sys.executable,
+            str(SYNTHETIC_DIR / "gen_synthetic.py"),
+            "--out",
+            str(tmp_path),
+        ],
         check=True,
     )
-    assert (out / "dimensions_synthetic.pdf").exists()
-    assert (out / "truth.json").exists()
+    assert (tmp_path / "dimensions_synthetic.pdf").exists()
+    assert (tmp_path / "truth.json").exists()
 
 
 def test_synthetic_association_matches_truth():
