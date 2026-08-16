@@ -1074,6 +1074,13 @@ def _lattice_as_symbol_group(lattice, fpp: float) -> SymbolGroup:
     )
 
 
+#: The candidate-id namespace 29-03 mints for a PLACED keynote (``KEY-<n>``).
+#: Named once because two readers depend on it meaning the same thing: the
+#: adapter below that mints it, and the gallery restriction in ``run_sheet``
+#: that withholds the namespace from the paid model.
+_KEYNOTE_CANDIDATE_PREFIX = "KEY-"
+
+
 def _keynote_callout_as_symbol_group(callout, fpp: float) -> SymbolGroup:
     """Present a placed keynote as a candidate the registry already knows.
 
@@ -1098,7 +1105,7 @@ def _keynote_callout_as_symbol_group(callout, fpp: float) -> SymbolGroup:
     boxes = [tuple(b) for b in callout.instance_bboxes_pt]
     rep = boxes[0] if boxes else (0.0, 0.0, 0.0, 0.0)
     return SymbolGroup(
-        candidate_id="KEY-%s" % callout.number,
+        candidate_id="%s%s" % (_KEYNOTE_CANDIDATE_PREFIX, callout.number),
         count=int(callout.callout_count),
         signature_hash=hashlib.sha1(
             ("keynote-callout|%s|%s" % (callout.header, callout.number))
@@ -4602,8 +4609,32 @@ class TakeoffPipeline:
                     # interrogated, and reading that as "nothing names it"
                     # would turn a failed anchor computation into a silently
                     # empty pass (INV-08).
+                    #
+                    # A PLACED KEYNOTE is withheld for the OPPOSITE reason
+                    # (29-08). The exclusion above fires on a candidate with
+                    # NOTHING to read: asking about it is asking the model to
+                    # name a shape, the 0.03-0.39 regime. A KEY-<n> candidate is
+                    # the other end of the same axis — the drafter PRINTED its
+                    # name in the sheet's own keynote legend and 29-03 carries
+                    # that note text on the group. The anchor is definitive, so
+                    # the question has already been answered on the paper: the
+                    # model can only agree (paid tokens for a known answer) or
+                    # disagree (a rename, and run-to-run instability injected
+                    # into a deterministic count). Measured on Crow page 0: 9 of
+                    # 41 candidates are keynotes, 4 of them anchored and being
+                    # marked on the overlay and asked about every run.
+                    #
+                    # Withheld from the REQUEST only. They stay in `symbols`,
+                    # in the bundle, in the registry and in fusion, where the
+                    # naming ladder reads their printed text directly — measured
+                    # `name_source=text_anchor` when 24-01 recorded an anchor,
+                    # `contained_text` when no record exists at all — still
+                    # counted, still needs_review, and still ledgered by 24-04
+                    # when the anchor is a recorded absence and nothing names
+                    # them. Nothing here can publish a candidate id as a name.
                     sym_candidates = {}
                     unanchored: list = []
+                    keynoted: list = []
                     for group in symbols:
                         cid = _sched_field(group, "candidate_id", "")
                         if not cid:
@@ -4613,10 +4644,26 @@ class TakeoffPipeline:
                             rep = _sched_field(group, "bbox_pt", None)
                         if not rep:
                             continue
+                        # Tested first, and deliberately: the legend names a
+                        # keynote whatever the plan-text anchor turned out to
+                        # be, so this is the reason we are not asking — one
+                        # candidate, one recorded reason.
+                        if cid.startswith(_KEYNOTE_CANDIDATE_PREFIX):
+                            keynoted.append(cid)
+                            continue
                         if cid in anchor_absences:
                             unanchored.append(cid)
                             continue
                         sym_candidates[cid] = rep
+                    if keynoted:
+                        logger.info(
+                            "run_sheet: %r — %d keynote group(s) are not "
+                            "presented to the model; the sheet's own legend "
+                            "already names them, so asking costs tokens and "
+                            "risks a rename (%s)",
+                            sheet_name, len(keynoted),
+                            ", ".join(keynoted[:10]),
+                        )
                     if unanchored:
                         logger.info(
                             "run_sheet: %r — %d symbol group(s) carry no text "
