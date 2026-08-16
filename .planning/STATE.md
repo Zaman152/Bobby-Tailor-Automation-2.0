@@ -651,7 +651,37 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-08-07T07:05:31.246Z
+Last session: 2026-08-16T15:30:00Z
+Stopped at: Readiness pass committed (upload 400s, 20 user-path tests, fixture pollution) on a
+2557-green suite. Phase 29 opened and two plans EXECUTED: 29-01 name-carry (the canonical
+estimator name a schedule prints now survives calculator->whitelist->aggregator, gated on the
+producer's own item_field_is_canonical marker — never on string shape, which published "A-1" as an
+item name in the first draft and was caught by this plan's own test) and 29-02 manifest-binding
+safety (single-token-alias containment scaled by text coverage; ambiguous ties REFUSED instead of
+broken on name length; the orphan prose bucket that published qty 0.0 + NOT MEASURED closed by
+mirroring the canonical bucket key in the suppression pre-pass). A 91-entry GENERIC catalog
+manifest exists at tests/fixtures/generic_catalog_manifest.json — 91% of entries are items Crow's
+golden never asks for, no quantities, no assumptions; the old crow_cass_manifest.json is the
+golden's index verbatim (incl. height_ft=35 while the plans print 36 and 48) and must not be used
+as accuracy input. FIRST PAID RUN of the post-28 engine (Crow, $0.8178, saved at
+reports/vision_only/Crow_Phase29_Paid/): overall 40%, found-rate 100%, silent misses 0. It proved
+29-01 on real data (Doors-STL 70 / Doors-HM 29 / Doors-AL 6 / Door Frames-HM 29 all MEASURED under
+canonical names), proved the false Bollards 56 is gone (flagged blank), Columns 120 flagged — and
+MEASURED three manifest-binding defects that 29-02 then closed (Stairs=3 unflagged from a stair
+CLEARANCE dimension note; DOOR->Door Frames-GALV 136 by name-length tie-break; the 0.0 orphan).
+Non-vacuity: 29-02's module goes 6-failed with the fixes stashed. LADDER DID NOT PUBLISH — the
+readiness doc's §6 "PASS expected" is falsified: keynote_callout_counts (room_fill.py:1854) is
+built and green in test_keynote_callouts.py and has ZERO call sites; keynote_tags' only caller is
+the elevation facade path. 29-03-PLAN.md is written and execution-ready: adapter mirroring
+_lattice_as_symbol_group at the ~3091 injection point, spec-note guard (Crow note 13 + one callout
+would publish Bollards=1 — worse than the flagged blank), aggregate-bubble suppression, real-page
+tests, then a paid re-run predicting 40%->50% with Ladder=1 flagged.
+Next: execute 29-03 (keynote wiring), then class 2 (FILL-1 skipped_no_scale — drawings_measured:0)
+as 29-04, then the derived-quantity stage as its own phase. Deploy gate remains zero
+wrong-and-unflagged rows; the 2026-08-16 paid run FAILS it only via defects 29-02 already closed —
+re-run paid after 29-03 before any deploy.
+
+Previous session: 2026-08-07T07:05:31.246Z
 Stopped at: Completed 28-05-PLAN.md (5 of 7 plans, wave 3). ONE MEASURED REGION NOW BACKS ONE
 PUBLISHED ROW PER BUILDING LAYER. The 397,600 SF footprint published three times in both saved paid
 runs — `Exposed Structure` and `Sealed Concrete` from the plan's own authoritative legend, and
