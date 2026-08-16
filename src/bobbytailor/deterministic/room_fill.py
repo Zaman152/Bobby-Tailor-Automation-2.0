@@ -321,6 +321,38 @@ _KEYNOTE_PAIR_GAP_PT = 40.0
 # band — do not nudge it.
 _KEYNOTE_STACK_STEP_PT = 150.0
 
+# A note that WRAPS is one CONTIGUOUS BLOCK of lines in the note column, and
+# the STEP between two successive lines is what tells a continuation apart from
+# the start of the next entry. Both constants below are ratios of the column's
+# own LINE HEIGHT, because that is the only quantity that scales with the
+# legend's point size — Moxy's guestroom notes are set at h=14.96 pt against
+# Crow's 9.58, so a step of 15 pt is a WRAP on one sheet and would be nothing
+# at all on the other.
+#
+# Measured over every legend column of all four plan sets (see the census in
+# tests/test_phase29_wrapped_notes.py, which pins these same columns):
+#
+#   column                      line h   wrap step (ratio)    next entry (ratio)
+#   Crow p0 KEYNOTES              9.58   10.80-10.92 (1.127-1.140)  14.15 (1.477)
+#   Bob's p3 ROOF KEYNOTES        8.25   10.08       (1.221)        18.12 (2.196)
+#   Bob's p4 KEYED NOTES          9.29   11.28-11.52 (1.215-1.241)  13.80 (1.486)
+#   Bob's p4 DEMO KEYED NOTES     9.29   11.40       (1.228)        18.48 (1.990)
+#   Moxy p3/4/5 KEYNOTES          9.55   (no note wraps)            26.16 (2.739)
+#   Moxy p23-38 KEY NOTES        14.96   15.12-15.24 (1.011-1.019)  30.24 (2.021)
+#   Moxy p39 KEY NOTES           14.96   15.12-15.24 (1.011-1.019)  30.36 (2.029)
+#   Chelsea                       — the set carries no keynote legend at all
+#
+# Wraps top out at 1.241x (Bob's p4, 11.52/9.29); the tightest entry boundary in
+# the four sets is 1.477x (Crow p0, 14.15/9.58). 1.35 is the middle of that
+# empty band. It is NOT a safety margin either side of a guess — RE-MEASURE the
+# band before moving it, exactly as for _KEYNOTE_STACK_STEP_PT.
+_KEYNOTE_WRAP_STEP_RATIO = 1.35
+# A note column is left-aligned, so a continuation shares its entry's reading
+# start. The widest spread measured within one column is 1.56 pt (Crow's first
+# entry starts at 1335.72 against 1337.28 for the other eleven); Bob's spreads
+# 0.72 and Moxy's 0.00.
+_KEYNOTE_WRAP_MARGIN_PT = 2.0
+
 # Render resolution for facade silhouettes. Elevations are wide-format —
 # Crow's south facade band is 2,441 x 335 pt — so the room-fill 160 DPI would
 # be a 12-million-pixel clip. 80 DPI resolved every facade on all three
@@ -1664,6 +1696,128 @@ def datum_scale_check(
     return (1.0 - tolerance) <= ratio <= (1.0 + tolerance)
 
 
+def _wrapped_note_texts(lines, kept) -> dict:
+    """``{id(text_line): full_note_text}`` for ONE legend column, or ``{}``.
+
+    A wrapped note is one CONTIGUOUS BLOCK of lines in the note column. This
+    builds those blocks from the drawing's own geometry — the column's left
+    margin (:data:`_KEYNOTE_WRAP_MARGIN_PT`), its line height, and the step
+    that separates one entry from the next
+    (:data:`_KEYNOTE_WRAP_STEP_RATIO`) — and then hands each block to the entry
+    whose paired line sits in it. It does NOT slice the column by number
+    positions.
+
+    That distinction is the whole reason this function exists. Splitting at the
+    midpoint between consecutive number centres reassembled all of Crow and
+    broke Bob's, because the midpoint is only the true boundary when adjacent
+    notes have the same line count AND the number block is centred on its note.
+    Neither holds across four sets: Crow centres the number on its note
+    (keynote 2's digit sits level with line 2 of 4) while Bob's and Moxy set it
+    level with line ONE, so on Bob's page 4 the midpoint fell inside note 07 and
+    moved "...DO NOT INSTALL TO THE STOREFRONT" across the 07/08 boundary.
+    A block is indifferent to where in it the digit sits.
+
+    Everything here works in the READING FRAME (:func:`tag_pairing.project_bbox`)
+    rather than in x/y, because Bob's legend sheets are rotated — their notes
+    read down the page and stack toward decreasing x. "Below" is not a direction
+    on a drawing; "the next line" is.
+
+    Returns ``{}`` — the caller then keeps the single paired line, unchanged —
+    whenever the geometry cannot PROVE the grouping:
+
+    * the column's lines do not share one reading direction or one left margin;
+    * two entries' paired lines land in the same block (adjacent entries merged);
+    * a block does not contain its own entry's number-block centre;
+    * a block contains a DIFFERENT entry's number-block centre.
+
+    Refusing the whole column is deliberate. Less text is a visible gap; text
+    from the neighbouring note is a confident lie, and it already cost a
+    published facade material once.
+    """
+    from bobbytailor.deterministic.tag_pairing import project_bbox  # noqa: PLC0415
+
+    picked = [tl for _n, tl, _nl, _b in kept]
+    if not picked:
+        return {}
+    dirs = {tl.text_dir for tl in picked} | {nl.text_dir for _n, _t, nl, _b in kept}
+    if len(dirs) != 1:
+        return {}
+    direction = picked[0].text_dir
+
+    proj = {}
+    for tl in picked:
+        p = project_bbox(tl.bbox_pt, direction)
+        if p is None:
+            return {}
+        proj[id(tl)] = p
+    starts = [p[0] for p in proj.values()]
+    left = min(starts)
+    if max(starts) - left > _KEYNOTE_WRAP_MARGIN_PT:
+        return {}
+    heights = sorted(p[3] - p[2] for p in proj.values())
+    height = heights[len(heights) // 2]
+    if height <= 0:
+        return {}
+    limit = height * _KEYNOTE_WRAP_STEP_RATIO
+
+    # Every line sharing this column's left margin, in reading order. No
+    # vertical window is imposed: contiguity is what ends a block, and a block
+    # that holds no entry is discarded below, so a bound would only be a second
+    # constant saying the same thing less exactly. (Bob's page 4 carries TWO
+    # legends at the same left margin, 143 pt apart — far beyond `limit`.)
+    column = []
+    for line in lines:
+        if line.text_dir != direction or not line.text.strip():
+            continue
+        p = project_bbox(line.bbox_pt, direction)
+        if p is None or abs(p[0] - left) > _KEYNOTE_WRAP_MARGIN_PT:
+            continue
+        column.append((p[2], p[3], line))
+    column.sort(key=lambda c: c[0])
+
+    blocks: List[list] = []
+    for item in column:
+        if blocks and item[0] - blocks[-1][-1][0] <= limit:
+            blocks[-1].append(item)
+        else:
+            blocks.append([item])
+
+    owner: dict = {}
+    for index, block in enumerate(blocks):
+        members = {id(line) for _lo, _hi, line in block}
+        hits = [tl for tl in picked if id(tl) in members]
+        if len(hits) > 1:
+            return {}
+        if hits:
+            owner[id(hits[0])] = index
+    if len(owner) != len(picked):
+        return {}
+
+    # The drafter sets the digit beside its note, so the number block's centre
+    # falls inside its note's block whether it is set level with line one
+    # (Bob's, Moxy) or centred on the whole note (Crow). Two numbers inside one
+    # block means two entries were merged; a number outside its own block means
+    # the block is not the note it was matched to.
+    centres = {}
+    for _number, tl, nl, _box in kept:
+        p = project_bbox(nl.bbox_pt, direction)
+        if p is None:
+            return {}
+        centres[id(tl)] = (p[2] + p[3]) / 2.0
+
+    out = {}
+    for _number, tl, _nl, _box in kept:
+        block = blocks[owner[id(tl)]]
+        lo = block[0][0]
+        hi = max(b for _lo, b, _line in block)
+        for other in picked:
+            inside = lo - 1.0 <= centres[id(other)] <= hi + 1.0
+            if inside != (other is tl):
+                return {}
+        out[id(tl)] = " ".join(line.text.strip() for _lo, _hi, line in block)
+    return out
+
+
 def keynote_legend_rows(page) -> dict:
     """``{header: [(number, note_text, number_block_box), ...]}`` — the legend
     with each entry's own PAGE-SPACE number-block rectangle kept.
@@ -1727,8 +1881,10 @@ def keynote_legend_rows(page) -> dict:
             continue
         number = _KEYNOTE_NUM_RE.match(num_line.text.strip()).group(1)
         entry = grouped.setdefault(best, {"bottom": best_box.y1, "rows": []})
+        # The tie-break index keeps this sortable: two entries can share a y0,
+        # and a TagLine is not orderable.
         entry["rows"].append(
-            (nbox.y0, number, text_line.text.strip(),
+            (nbox.y0, len(entry["rows"]), number, text_line, num_line,
              (nbox.x0, nbox.y0, nbox.x1, nbox.y1))
         )
 
@@ -1736,7 +1892,10 @@ def keynote_legend_rows(page) -> dict:
     for header_text, entry in grouped.items():
         previous = entry["bottom"]
         highest = 0
-        for y0, number, text, box in sorted(entry["rows"]):
+        kept: List[tuple] = []
+        for y0, _seq, number, text_line, num_line, box in sorted(
+            entry["rows"], key=lambda r: (r[0], r[1])
+        ):
             if y0 - previous > _KEYNOTE_STACK_STEP_PT:
                 # The stack ended here. Anything further down is other content
                 # that merely shares the column — a view title, a detail label.
@@ -1752,33 +1911,25 @@ def keynote_legend_rows(page) -> dict:
             if int(number) <= highest:
                 break
             previous, highest = y0, int(number)
-            out.setdefault(header_text, []).append((number, text, box))
+            kept.append((number, text_line, num_line, box))
+        if not kept:
+            continue
 
-    # NOTE — a wrapped note still yields only the ONE line the pairing chose.
-    #
-    # The number block is drawn vertically CENTRED on its note, so a four-line
-    # note hands back whichever line sits level with the digit: Crow keynote 2
-    # returns "CONCRETE ROOF AT ELECTRICAL ROOF BELOW. G.C. TO", the second
-    # line of "3'-0" X 3'-0" ROOF HATCH WITH ACCESS LADDER FROM CONCRETE ROOF
-    # AT ELECTRICAL ROOF BELOW...".
-    #
-    # A reassembly was built and MEASURED, and it is not here because it failed
-    # the four-plan-set rule. Splitting the note column at the midpoint between
-    # consecutive entry centres gave all four Crow notes their full text (260
-    # entries across the four sets gained text, 130 unchanged, none replaced) —
-    # but the midpoint is only the true boundary when adjacent notes have the
-    # same line count. On Bob's page 4 it moved one wrapped line across the
-    # 07/08 boundary, so note 07 ended "...DO NOT INSTALL TO THE STOREFRONT"
-    # and note 08 began "SYSTEM/GLAZING MULLIONS." — which put the word
-    # STOREFRONT into an awning note, flipped the front facade's dominant
-    # material from CMU to Storefront, and cost a real published quantity.
-    #
-    # Doing this properly means grouping the note lines into CONTIGUOUS BLOCKS
-    # first (line pitch within a note vs the step between notes) and matching
-    # each block to the nearest number centre — not slicing the column by
-    # number positions alone. That is a separate piece of work with its own
-    # four-set measurement. Until then the reader returns less text rather than
-    # wrong text.
+        # A wrapped note is reassembled from its contiguous BLOCK of column
+        # lines, or not at all. This is the only step that can turn one entry's
+        # text into another's, so it is strictly additive and strictly
+        # reversible: `_wrapped_note_texts` returns {} for any column whose
+        # geometry does not prove the grouping, and any failure at all leaves
+        # the single paired line the pairing already chose.
+        try:
+            full = _wrapped_note_texts(lines, kept)
+        except Exception:  # noqa: BLE001 — untrusted PDFs must not crash
+            full = {}
+        out[header_text] = [
+            (number, full.get(id(text_line), text_line.text.strip()), box)
+            for number, text_line, _num_line, box in kept
+        ]
+
     return out
 
 

@@ -156,27 +156,51 @@ def test_a_keynote_that_is_never_placed_counts_zero_and_says_so():
 
 
 @crow_only
-def test_the_note_text_is_the_paired_line_only_and_that_limit_is_known():
-    """A wrapped note yields ONE line — the one level with its number block.
+def test_a_wrapped_note_yields_its_whole_sentence():
+    """A wrapped note yields EVERY line of its block, not the paired line only.
 
-    Crow keynote 2 is "3'-0" X 3'-0" ROOF HATCH WITH ACCESS LADDER FROM
-    CONCRETE ROOF AT ELECTRICAL ROOF BELOW. G.C. TO COORDINATE WITH STRUCTURE
-    ...". The reader returns its SECOND line, because the number block is drawn
-    vertically centred on the note and the pairing takes the nearest line.
+    This test replaces ``test_the_note_text_is_the_paired_line_only_and_that_
+    limit_is_known``, which pinned the truncation and instructed its own
+    replacement: "if someone lands a correct block-contiguity reassembly, this
+    test SHOULD fail and be replaced by one asserting the full sentence."
+    29-07 is that reassembly, so the limit is retired by asserting the
+    capability rather than by deleting the check.
 
-    A midpoint-split reassembly was built and measured; it fixed all of Crow
-    and moved a wrapped line across Bob's 07/08 boundary, putting the word
-    STOREFRONT into an awning note and flipping a published facade material.
-    It was rejected under the four-plan-set rule and the reasoning is recorded
-    at the return of ``keynote_legend_rows``. This test states the CURRENT
-    truth so the limitation is visible rather than assumed away — if someone
-    lands a correct block-contiguity reassembly, this test SHOULD fail and be
-    replaced by one asserting the full sentence.
+    Keynote 2 previously returned "CONCRETE ROOF AT ELECTRICAL ROOF BELOW.
+    G.C. TO" — its SECOND line, because the number block is drawn vertically
+    centred on the note and the pairing took the nearest line. The subject of
+    the sentence, ROOF HATCH, was on line one and simply absent.
+
+    Note what this restores beyond completeness: keynote 2's head noun. Two
+    keynotes on this sheet say "ACCESS LADDER", and only with the full text is
+    it visible that keynote 2's subject is a roof HATCH a ladder reaches,
+    while keynote 1's subject is the ladder itself
+    (:func:`test_the_ladder_alias_is_ambiguous_on_the_drawing_itself`).
     """
     entries = keynote_legend(_crow())["KEYNOTES"]
-    assert entries["2"] == "CONCRETE ROOF AT ELECTRICAL ROOF BELOW. G.C. TO"
-    assert "ROOF HATCH" not in entries["2"], (
-        "the note is truncated to one line — see the note in keynote_legend_rows"
+    assert entries["2"] == (
+        '3\'-0" X 3\'-0" ROOF HATCH WITH ACCESS LADDER FROM CONCRETE ROOF AT '
+        'ELECTRICAL ROOF BELOW. G.C. TO COORDINATE WITH STRUCTURE. PAINTED '
+        'SAFETY YELLOW - SEE ENLARGED PLANS AND ROOF PLAN.'
+    )
+    # The old truncation point is now interior to the string rather than its
+    # start, which is what proves lines were JOINED and not merely reordered.
+    assert entries["2"].startswith('3\'-0"')
+    assert "CONCRETE ROOF AT ELECTRICAL ROOF BELOW. G.C. TO" in entries["2"]
+
+
+@crow_only
+def test_an_unwrapped_note_is_untouched_by_the_reassembly():
+    """Keynote 1 fits on one line and must come back exactly as before.
+
+    The reassembly is additive: a note whose block is a single line has no
+    continuation to join, so it must be byte-identical. Without this, a bug
+    that appended a neighbour's line to every entry would still satisfy the
+    test above.
+    """
+    entries = keynote_legend(_crow())["KEYNOTES"]
+    assert entries["1"] == (
+        "ACCESS LADDER TO CONCRETE ROOF OF ELECTRICAL ROOM - SEE ENLARGED PLANS."
     )
 
 
