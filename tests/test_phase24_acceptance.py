@@ -85,7 +85,14 @@ PAID_RUNS = (
 #: Our own internal handle for a piece of measured geometry. A name of this
 #: shape in a client artifact is the defect 24-04 abolished: the app inventing an
 #: identifier and printing it as the name of a thing to price.
-CANDIDATE_ID_RE = re.compile(r"^(?:SYM-\d+|ROOM-\d+|WALL-[A-Z]+\d+)$")
+#:
+#: EVERY namespace the pipeline mints must be listed here. The pattern is used
+#: twice below — once to catch a leak, once to prove the ledger holds nothing
+#: this pattern cannot see — and the second check exists because a namespace
+#: missing from this list is a namespace the leak check silently waves through.
+#: ``KEY-`` (29-03's placed keynotes) was exactly that: added to the pipeline,
+#: absent from here, and the ledger check caught it on the first full run.
+CANDIDATE_ID_RE = re.compile(r"^(?:SYM-\d+|ROOM-\d+|WALL-[A-Z]+\d+|KEY-\d+)$")
 
 
 def _need_crow():
