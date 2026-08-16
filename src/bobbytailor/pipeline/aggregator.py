@@ -13,6 +13,17 @@ from typing import Dict, List, Optional
 # how the calculator starts stamping a marker this layer no longer recognises.
 # ``calculator`` imports nothing from ``bobbytailor``, so there is no cycle.
 from bobbytailor.pipeline.calculator import _SCHEDULE_QTY_SOURCES
+# The second pass (29-06): pure functions over notes and counts, importing
+# nothing from this module — the bucket-identity function travels the other way,
+# as an argument, so there is one definition of when two names are one item.
+from bobbytailor.pipeline.derived_quantities import (
+    CountedItem,
+    derived_reason,
+    published_name,
+    read_quantity_rules,
+    refusal_reason,
+    resolve_quantity_rule,
+)
 from bobbytailor.pipeline.coverage import (
     ITEM_HUMAN_INPUT,
     ITEM_MEASURED,
@@ -23,6 +34,7 @@ from bobbytailor.pipeline.coverage import (
 from bobbytailor.pipeline.provenance import provenance_of_row
 # ONE definition of what a unit measures, shared with vision.fusion (C3b).
 from bobbytailor.pipeline.units import (
+    COUNT as _COUNT_CLASS,
     classes_conflict as _classes_conflict,
     unit_class as _unit_class,
 )
@@ -64,11 +76,27 @@ DETAIL_SHEET_COUNT_UNMEASURED = "detail_sheet_count_unmeasured"
 #: :func:`_withhold_region_sharing_hypotheses`.
 REGION_SHARED_HYPOTHESIS_UNMEASURED = "region_shared_hypothesis_unmeasured"
 
+#: A name a general note states a quantity RULE for ("PROVIDE X AT ALL Y")
+#: whose rule this run REFUSED to resolve — the clause named more than one
+#: referent, or nothing counted the referent, or more than one row answered to
+#: it. The row exists so the refusal can be read: it quotes the note and names
+#: what is missing, which is the one fact that turns an opaque blank into a
+#: thing an estimator can go count. See :func:`_apply_note_quantity_rules`.
+DERIVED_RULE_UNRESOLVED_UNMEASURED = "derived_rule_unresolved_unmeasured"
+
 _UNMEASURED_SOURCES = frozenset({
     "manifest_missing", "expected_not_measured", LIBRARY_FALLBACK_UNMEASURED,
     UNIT_CLASS_CONFLICT_UNMEASURED, DETAIL_SHEET_COUNT_UNMEASURED,
-    REGION_SHARED_HYPOTHESIS_UNMEASURED,
+    REGION_SHARED_HYPOTHESIS_UNMEASURED, DERIVED_RULE_UNRESOLVED_UNMEASURED,
 })
+
+#: A name whose quantity was DERIVED from a note's rule and another row's count,
+#: rather than measured. Deliberately NOT in :data:`_UNMEASURED_SOURCES`: this
+#: row publishes a number. It is also never MEASURED — see the ``measured`` key
+#: at the end of :func:`aggregate_takeoff` and the permanent ``needs_review``
+#: in :func:`_apply_note_quantity_rules`. A quantity assembled from two sources
+#: is a hypothesis about the drawing's intent, not a measurement of it.
+DERIVED_FROM_NOTE_RULE = "derived_from_note_rule"
 
 #: ``vision.fusion.NAME_SOURCE_VOCABULARY_BASIS`` — the marker on a row whose
 #: name came from a vocabulary object's measure basis with nothing printed on the
@@ -1101,6 +1129,132 @@ def _withhold_region_sharing_hypotheses(buckets: Dict[str, Dict]) -> None:
             })
 
 
+def _counted_rows(buckets: Dict[str, Dict]) -> List[CountedItem]:
+    """The rows a note's rule may be resolved against: COUNTS this run published.
+
+    Three filters, and each one is a guard that already fired somewhere else
+    being re-read rather than re-decided:
+
+    * a bucket with no contributing rows never counted anything;
+    * a bucket carrying an ``_UNMEASURED_SOURCES`` marker had its number
+      WITHHELD, and a second pass that multiplied it would resurrect exactly
+      what the withholding decided (29-02 measured that: a naming route
+      bypassing an upstream guard published Stairs = 3 from a clearance
+      dimension);
+    * a bucket whose unit is not in the COUNT class is not a count of anything.
+      "Provide one at each Y" needs to know how many Y there are, and 397,600 SF
+      of Y is not an answer to that question — there is no factor between "how
+      many" and "how much" (C3b).
+    """
+    counted: List[CountedItem] = []
+    for name in sorted(buckets):
+        bucket = buckets[name]
+        if not bucket.get("has_rows"):
+            continue
+        if bucket.get("source") in _UNMEASURED_SOURCES:
+            continue
+        quantity = bucket.get("quantity")
+        unit = str(bucket.get("unit") or "").strip().upper()
+        if quantity is None or _unit_class(unit) != _COUNT_CLASS:
+            continue
+        counted.append(CountedItem(name=name, quantity=float(quantity), unit=unit))
+    return counted
+
+
+def _apply_note_quantity_rules(buckets: Dict[str, Dict], general_notes) -> None:
+    """The pipeline's SECOND PASS: what the drawing SPECIFIES, not what it draws.
+
+    Everything before this point is extract -> fuse -> aggregate, one-directional
+    and per-sheet, and nothing reasons over the assembled ledger. That is why
+    Crow's Bollards is unreachable: general note 13 states the rule, the door
+    schedule holds a referent, and no stage ever joins them.
+
+    It runs HERE — after every withholding guard, before the completeness blanks
+    — for two reasons in opposite directions. After the guards, so a derived row
+    can never resurrect a number one of them refused. Before the blanks, so a
+    subject this pass publishes or refuses owns its row outright: a "Bollards"
+    row that quotes note 13 and names the riser count nobody took is strictly
+    better than the generic "expected but never measured" blank that would
+    otherwise land on the same name, and two rows for one object is the
+    duplicate defect 24-03 fixed.
+
+    **It never touches a name that already has a row.** A measured row outranks a
+    hypothesis assembled from a note, and a row already carrying a withheld
+    number is the guards' answer, not this pass's to overwrite. Only a subject
+    with no bucket at all — under `_norm_item_key`, so a shouted "BOLLARDS"
+    cannot open a second row beside a measured "Bollard" — is this pass's to
+    create.
+
+    Every row it does create is ``needs_review=True``, whether it publishes a
+    number or a blank.
+    """
+    rules = read_quantity_rules(general_notes)
+    if not rules:
+        # THE no-op path, and the common one: a run whose notes state no rule
+        # (three of the four plan sets) leaves this function having touched
+        # nothing, so its take-off is byte-identical to the pre-29-06 one.
+        return
+
+    counted = _counted_rows(buckets)
+    owned = {_norm_item_key(name): name for name in buckets}
+    for rule in rules:
+        name = published_name(rule.subject)
+        key = _norm_item_key(name)
+        if key in owned:
+            # Includes a second rule for a subject an earlier rule already
+            # claimed: one name is one row, and combining two rules' numbers
+            # would be arithmetic no note stated.
+            continue
+        owned[key] = name
+        resolution = resolve_quantity_rule(rule, counted, _norm_item_key)
+        bucket = buckets[name]
+        bucket["needs_review"] = True
+        bucket["confidence"] = "low"
+        bucket["auto_verified"] = False
+        if rule.sheet:
+            bucket["source_sheets"].add(rule.sheet)
+
+        if resolution.refused:
+            # A withheld number must leave a ROW — the fourth instance of the
+            # contract the three blocks above it enforce, and for the same
+            # reason: a deletion and a zero read identically to a client.
+            bucket["item_type"] = "derived_rule_unresolved"
+            bucket["source"] = DERIVED_RULE_UNRESOLVED_UNMEASURED
+            bucket["review_reasons"].add(refusal_reason(rule, resolution))
+            bucket["source_rows"].append({
+                "sheet": rule.sheet or None,
+                "qty": None,
+                "description": "%s (a general note states a quantity rule for "
+                               "this object; the rule was NOT resolved)" % name,
+                "formula": "derived_rule_not_resolved",
+            })
+            continue
+
+        bucket["quantity"] = resolution.quantity
+        bucket["unit"] = resolution.unit
+        bucket["item_type"] = "derived_quantity"
+        bucket["source"] = DERIVED_FROM_NOTE_RULE
+        bucket["has_rows"] = True
+        # The derived number is a multiplication of the referent's number, so it
+        # is exactly as reproducible as that number and not one step more. No new
+        # route is minted for it: a re-run that answers differently about the
+        # doors answers differently about these.
+        bucket["quantity_route"] = buckets[resolution.referent_name].get(
+            "quantity_route"
+        )
+        bucket["review_reasons"].add(derived_reason(rule, resolution))
+        bucket["source_rows"].append({
+            "sheet": rule.sheet or None,
+            "qty": resolution.quantity,
+            "description": "%s (derived from a general note's rule over %r, "
+                           "which this run counted)" % (name, resolution.referent_name),
+            "formula": "%s x %s" % (
+                _whole_or_decimal(resolution.referent_quantity),
+                _whole_or_decimal(rule.factor),
+            ),
+        })
+
+
 def _row_status(bucket: Dict, is_unknown: bool) -> str:
     """The client status, COMPUTED FROM THE RECORD.
 
@@ -1160,6 +1314,7 @@ def _row_status(bucket: Dict, is_unknown: bool) -> str:
 
 def aggregate_takeoff(
     calculated_items: List[Dict], manifest=None, learned=None, library=None,
+    general_notes=None,
 ) -> List[Dict]:
     """Consolidate per-sheet items into project-level totals.
 
@@ -1179,6 +1334,12 @@ def aggregate_takeoff(
     plan's own printed name via the library's aliases — the manifest-resolve
     replacement under plans-only. Additive: an empty library leaves naming
     unchanged.
+
+    When ``general_notes`` (note records already harvested off the sheets —
+    strings, or mappings with ``text`` and an optional ``sheet``) is supplied,
+    the assembled buckets get a SECOND PASS over the quantity rules those notes
+    state (29-06). Additive and silent by default: no notes, or notes stating no
+    rule, and the take-off is byte-identical.
 
     Naming precedence: companion legend > manifest > learned > library > static.
     Rows whose NAME came from learned vocabulary carry ``source: "learned"``
@@ -1685,6 +1846,14 @@ def aggregate_takeoff(
     # never met in fusion finally sit side by side.
     _withhold_region_sharing_hypotheses(buckets)
 
+    # ── ...and only now, what the drawing SPECIFIES rather than draws ────────
+    #
+    # The one pass that reads the assembled ledger instead of the sheets. Placed
+    # after every guard above so it can resurrect nothing they withheld, and
+    # before the completeness blanks below so a rule's own row is the row that
+    # object gets. See `_apply_note_quantity_rules`.
+    _apply_note_quantity_rules(buckets, general_notes)
+
     # Only enrich with standard line items when a genuine take-off was produced.
     if buckets:
         _inject_standard_line_items(buckets)
@@ -1806,6 +1975,12 @@ def aggregate_takeoff(
         # class: inventing a pedigree for a number that was never published
         # would be the "blank rendered as a value" failure in a new column.
         row["quantity_route"] = None if qty is None else b.get("quantity_route")
-        row["measured"] = bool(qty is not None and b.get("has_rows"))
+        # A DERIVED quantity is excluded by name (29-06). It has a number and it
+        # has rows, so it would otherwise satisfy this flag — but it was
+        # assembled from a note's rule and another row's count, and nothing on
+        # the plans was measured as this object. A second pass that could add to
+        # the measured column would be scoring itself.
+        row["measured"] = bool(qty is not None and b.get("has_rows")
+                               and b.get("source") != DERIVED_FROM_NOTE_RULE)
         result.append(row)
     return result
