@@ -32,6 +32,12 @@ similarity, never "the counts happen to be equal". A loop that guesses is worse
 than no loop: it manufactures citations, and a wrong number wearing evidence is
 harder to catch than a blank.
 
+**Where the loop must refuse, it may still ASK** (29-11). Measured marks nothing
+named stay unresolvable here forever — but the same record can be OFFERED to the
+human against their own manifest. Publishing a name is a claim and only a claim
+can be wrong; an offer is a question, and it is safe precisely because it changes
+nothing. See :func:`offers_for`.
+
 No extraction, no PDF re-read, no API, no I/O — except :func:`publish_input_gaps`,
 which is the one impure function here and does nothing but write what the pure
 ones computed.
@@ -47,9 +53,17 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence, Tu
 # The client status vocabulary is IMPORTED, never restated. A second flag shape
 # for the same fact is how a report ends up with two disagreeing accounts of one
 # gap — the exact defect INV-08 exists to prevent.
-from bobbytailor.pipeline.coverage import ITEM_NEEDS_REVIEW, ITEM_NOT_MEASURED
+from bobbytailor.pipeline.coverage import (
+    ITEM_HUMAN_INPUT,
+    ITEM_NEEDS_REVIEW,
+    ITEM_NOT_MEASURED,
+)
 from bobbytailor.pipeline.cross_references import sheet_ids_in_text
 from bobbytailor.pipeline.derived_quantities import published_name, read_quantity_rules
+# The manifest's OWN unit->measure map, imported rather than restated: an offer
+# that disagreed with the manifest loader about what EA means would be eligible
+# on a basis the entry itself does not have.
+from bobbytailor.devtools.object_manifest import measure_from_unit
 
 logger = logging.getLogger(__name__)
 
@@ -612,6 +626,369 @@ def _sheets_of(items: Sequence[EvidenceItem]) -> List[str]:
 
 
 # ---------------------------------------------------------------------------
+# Naming OFFERS — the question that sits BESIDE the refusal above (29-11)
+#
+# `resolve_need` refuses `unnamed_geometry` outright, and that refusal is not
+# weakened by anything below: a name published from an equal count is a
+# coincidence wearing evidence. What follows never publishes. It builds a
+# QUESTION — "your manifest lists Columns as EA/count; are these 36 marks
+# Columns?" — and hands it to the human with the crop data the record already
+# carries. Publishing a name is a claim and only a claim can be wrong; asking
+# is safe precisely because the take-off is identical either way.
+#
+# Measured on the paid Crow run of 2026-08-17: 39 of 46 open needs are
+# `unnamed_geometry` carrying 209 EA of counted marks, 16 of them with NO text
+# at all and 12 with only drafting noise ('A-101', 'DWG', '1/A-112'). Manifest
+# resolution matches TEXT, so no alias table can ever bind those rows — the
+# only route left is to ask.
+# ---------------------------------------------------------------------------
+
+#: The most eligible entries one cluster may be asked about. Over it the
+#: candidate is SUPPRESSED whole, never truncated: truncating would be a
+#: ranking, and this file has no ranking anywhere. Sized against the real
+#: project manifests in this repo — Crow's has 6 EA/count entries, Bob's has 7,
+#: so a genuine project manifest fits under the bound; the 91-entry generic
+#: catalogue carries 50 EA/count entries and would put 50 equally-grounded
+#: options on every one of 27 clusters (1,350 questions), which is not a
+#: question a human answers but a wall they close.
+MAX_OFFERS_PER_CANDIDATE = 8
+
+#: How the `why` names the measurement, per measure basis. A count of marks and
+#: an area of floor are not the same sentence, and a client reads the sentence.
+_MEASURE_PHRASE = {
+    "count": "%s counted marks",
+    "area": "%s %s of measured area",
+    "length": "%s %s of measured line work",
+    "volume": "%s %s of measured volume",
+}
+
+
+class NamingOffer(NamedTuple):
+    """A QUESTION about one unnamed cluster. Never an answer.
+
+    Deliberately carries no score, no rank and no default flag: every field
+    here is either something the run already measured or the manifest name
+    being asked about. There is nothing in this tuple a UI could sort by
+    "confidence", because no confidence was computed — the grounds are unit and
+    measure basis, which every offer on a cluster shares equally.
+    """
+
+    candidate_id: str
+    sheet: str
+    quantity: Optional[float]
+    unit: str
+    position_pt: Tuple[float, ...]
+    manifest_name: str
+    why: str
+
+
+def _entry_fields(entry: Any) -> Tuple[str, str, str]:
+    """``(name, unit, measure)`` of one manifest entry — dataclass or dict.
+
+    Both shapes are accepted because both exist already: ``load_manifest``
+    returns ``ManifestEntry`` objects and every fixture on disk is a list of
+    plain dicts. Requiring one of them here would only add a conversion step
+    for a caller to get wrong.
+    """
+    if isinstance(entry, dict):
+        name = _text(entry.get("name") or entry.get("item"))
+        unit = _text(entry.get("unit")).upper()
+        measure = _text(entry.get("measure") or entry.get("measure_basis")).lower()
+    else:
+        name = _text(getattr(entry, "name", ""))
+        unit = _text(getattr(entry, "unit", "")).upper()
+        measure = _text(getattr(entry, "measure", "")).lower()
+    if not measure and unit:
+        measure = measure_from_unit(unit)
+    return name, unit, measure
+
+
+def _candidate_fields(record: Dict[str, Any]) -> Tuple[str, str]:
+    """``(unit, measure)`` of one unnamed-geometry record.
+
+    A record with NO unit yields ``("", "")`` and is offered nothing.
+    ``measure_from_unit`` defaults to ``count`` for an unknown unit, so reading
+    a blank unit through it would silently make every unitless cluster eligible
+    for every EA entry in the manifest — the coincidence this whole path exists
+    to avoid.
+    """
+    unit = _text(record.get("unit")).upper()
+    if not unit:
+        return "", ""
+    measure = _text(record.get("measure") or record.get("measure_basis")).lower()
+    return unit, measure or measure_from_unit(unit)
+
+
+def candidate_signature(record: Dict[str, Any]) -> str:
+    """A stable identity for one cluster, for remembering a DECLINE across runs.
+
+    Deliberately NOT ``candidate_id``: ``SYM-6`` is minted by position in this
+    run's detection order, so one extra cluster upstream renumbers everything
+    after it and yesterday's decline would silently attach to a different pile
+    of marks. Sheet + unit + count + where it sits identifies the same marks
+    again; the position is rounded to whole points because a re-run of the same
+    PDF may differ in the third decimal.
+    """
+    unit, _ = _candidate_fields(record)
+    quantity = _number(record.get("quantity"))
+    place: List[str] = []
+    for value in list(record.get("position_pt") or [])[:2]:
+        try:
+            place.append(str(int(round(float(value)))))
+        except (TypeError, ValueError):
+            place.append("?")
+    return "|".join([
+        _text(record.get("sheet")),
+        unit,
+        _plain(quantity) if quantity is not None else "",
+        ",".join(place),
+    ])
+
+
+def decline_key(
+    project_key: str, record: Dict[str, Any], manifest_name: str
+) -> str:
+    """The ``(project, candidate signature, manifest name)`` triple, as one key.
+
+    Scoped to the project on purpose: "these marks are not Bollards" is a fact
+    about ONE drawing set. Letting it travel would be the cross-project naming
+    leak the exact-scope rule already forbids for vocabulary.
+    """
+    return "|".join([_text(project_key), candidate_signature(record),
+                     _text(manifest_name)])
+
+
+def record_decline(
+    declined: Optional[Sequence[str]],
+    project_key: str,
+    record: Dict[str, Any],
+    manifest_name: str,
+) -> Tuple[str, ...]:
+    """The declined set with this answer added — a NEW tuple, nothing mutated.
+
+    Returned to the caller to persist rather than written from here: the
+    learning store is a naming-suggestion store with its own schema, and
+    widening it is not this change's to make. A caller that persists nothing
+    simply re-asks, which is the behaviour before this existed.
+    """
+    key = decline_key(project_key, record, manifest_name)
+    existing = tuple(_text(d) for d in (declined or []) if _text(d))
+    return existing if key in existing else existing + (key,)
+
+
+def _offer_why(
+    record: Dict[str, Any],
+    quantity: Optional[float],
+    unit: str,
+    measure: str,
+    entry_name: str,
+    entry_unit: str,
+    entry_measure: str,
+) -> str:
+    template = _MEASURE_PHRASE.get(measure, "%s %s measured")
+    amount = _plain(quantity) if quantity is not None else "the"
+    measured = (
+        template % amount if template.count("%s") == 1
+        else template % (amount, unit)
+    )
+    return (
+        "%s on %s; your manifest lists %s as %s/%s. Matching unit and measure "
+        "basis is the ONLY thing that produced this question — nothing on the "
+        "sheet names these marks. Confirm only if that is what these are."
+        % (measured, _text(record.get("sheet")) or "an unnamed sheet",
+           entry_name, entry_unit, entry_measure)
+    )
+
+
+def _eligible_entries(
+    record: Dict[str, Any], manifest: Any
+) -> List[Tuple[str, str, str]]:
+    """Manifest entries whose unit AND measure basis match this cluster's.
+
+    That is the WHOLE test, and the omissions are the point. No token overlap
+    (there is no token — 16 of the 39 real records carry no text at all), no
+    fuzzy score, no "marks on a grid are columns". Each of those is a shape
+    guess, and a shape guess behind a surface the human trusts is worse than
+    silence: it converts a machine's hunch into a human's confirmation.
+    """
+    unit, measure = _candidate_fields(record)
+    if not unit or not measure:
+        return []
+    entries = getattr(manifest, "entries", None)
+    if entries is None:
+        entries = manifest
+    out: List[Tuple[str, str, str]] = []
+    for entry in entries or []:
+        name, entry_unit, entry_measure = _entry_fields(entry)
+        if not name or not entry_unit:
+            continue
+        if entry_unit == unit and entry_measure == measure:
+            out.append((name, entry_unit, entry_measure))
+    return out
+
+
+def offers_for(
+    record: Dict[str, Any],
+    manifest: Any,
+    project_key: str = "",
+    declined: Optional[Sequence[str]] = None,
+    max_per_candidate: int = MAX_OFFERS_PER_CANDIDATE,
+) -> Tuple[NamingOffer, ...]:
+    """Every question worth asking about ONE unnamed cluster.
+
+    Three eligible entries produce THREE offers, in the order the human wrote
+    their manifest, with no default and nothing marked best — manifest order
+    implies nothing about fit, which is exactly why it is used. Zero eligible
+    entries produce nothing, and so does an absent manifest: with no manifest
+    there is no vocabulary to ask in, and inventing one would be the app naming
+    geometry again by another route.
+    """
+    if not manifest:
+        return ()
+    eligible = _eligible_entries(record, manifest)
+    if not eligible:
+        return ()
+    blocked = {_text(d) for d in (declined or [])}
+    eligible = [
+        e for e in eligible
+        if decline_key(project_key, record, e[0]) not in blocked
+    ]
+    # The cap is applied AFTER declines, because a decline can only ever shrink
+    # the question — an answer the human already rejected should not keep a
+    # cluster suppressed.
+    if not eligible or len(eligible) > max_per_candidate:
+        return ()
+    unit, measure = _candidate_fields(record)
+    quantity = _number(record.get("quantity"))
+    position = tuple(
+        float(v) for v in (record.get("position_pt") or [])
+        if isinstance(v, (int, float))
+    )
+    return tuple(
+        NamingOffer(
+            candidate_id=_text(record.get("candidate_id")),
+            sheet=_text(record.get("sheet")),
+            quantity=quantity,
+            unit=unit,
+            position_pt=position,
+            manifest_name=name,
+            why=_offer_why(record, quantity, unit, measure,
+                           name, entry_unit, entry_measure),
+        )
+        for name, entry_unit, entry_measure in eligible
+    )
+
+
+def naming_offers(
+    unnamed_geometry: Optional[Sequence[Dict[str, Any]]],
+    manifest: Any,
+    project_key: str = "",
+    declined: Optional[Sequence[str]] = None,
+    max_per_candidate: int = MAX_OFFERS_PER_CANDIDATE,
+) -> Tuple[NamingOffer, ...]:
+    """Every offer across every unnamed cluster of one run."""
+    out: List[NamingOffer] = []
+    for record in unnamed_geometry or []:
+        if not isinstance(record, dict):
+            continue
+        out.extend(offers_for(record, manifest, project_key, declined,
+                              max_per_candidate))
+    return tuple(out)
+
+
+def offers_report(
+    unnamed_geometry: Optional[Sequence[Dict[str, Any]]],
+    manifest: Any,
+    project_key: str = "",
+    declined: Optional[Sequence[str]] = None,
+    max_per_candidate: int = MAX_OFFERS_PER_CANDIDATE,
+) -> Dict[str, Any]:
+    """The offers plus what was NOT asked, and why.
+
+    A suppressed cluster is reported by name and count. A cap that hides its
+    own effect would let a manifest quietly stop producing questions while the
+    report still read as though every cluster had been considered.
+    """
+    records = [r for r in (unnamed_geometry or []) if isinstance(r, dict)]
+    offers: List[NamingOffer] = []
+    suppressed: List[Dict[str, Any]] = []
+    no_entry = 0
+    for record in records:
+        raised = offers_for(record, manifest, project_key, declined,
+                            max_per_candidate)
+        eligible = _eligible_entries(record, manifest) if manifest else []
+        if raised:
+            offers.extend(raised)
+        elif len(eligible) > max_per_candidate:
+            suppressed.append({
+                "candidate_id": _text(record.get("candidate_id")),
+                "sheet": _text(record.get("sheet")),
+                "unit": _candidate_fields(record)[0],
+                "eligible_entries": len(eligible),
+                "reason": "%d manifest entries share this cluster's unit and "
+                          "measure basis, which is more than the %d a human "
+                          "can be asked at once. Nothing is ranked or dropped "
+                          "— the whole question is withheld; narrow the "
+                          "manifest to ask it."
+                          % (len(eligible), max_per_candidate),
+            })
+        else:
+            no_entry += 1
+    return {
+        "max_offers_per_candidate": max_per_candidate,
+        "candidates_seen": len(records),
+        "candidates_offered": len({o.candidate_id for o in offers}),
+        "candidates_with_no_eligible_entry": no_entry,
+        "candidates_suppressed": suppressed,
+        "offers": [
+            {
+                "candidate_id": o.candidate_id,
+                "sheet": o.sheet,
+                "quantity": o.quantity,
+                "unit": o.unit,
+                "position_pt": list(o.position_pt),
+                "manifest_name": o.manifest_name,
+                "why": o.why,
+            }
+            for o in offers
+        ],
+    }
+
+
+def accept_offer(offer: NamingOffer) -> Dict[str, Any]:
+    """What a row looks like once a HUMAN has answered one offer. Pure.
+
+    Returns the row a caller would write; nothing here writes it. The status is
+    HUMAN INPUT and never MEASURED even though the count was measured, because
+    the row's IDENTITY came from the estimator rather than the drawing — and
+    29-02 measured what a manifest-sourced identity published as MEASURED costs
+    (Stairs = 3 EA manufactured from a clearance note, unflagged). The quantity
+    is carried through untouched: accepting a name never restates a count.
+    """
+    return {
+        "item": offer.manifest_name,
+        "quantity": offer.quantity,
+        "unit": offer.unit,
+        "source": "human",
+        "status": ITEM_HUMAN_INPUT,
+        "candidate_id": offer.candidate_id,
+        "source_sheets": [offer.sheet] if offer.sheet else [],
+        "naming_provenance": "named by the estimator from a naming offer; the "
+                             "drawing prints no name for these marks",
+    }
+
+
+def decline_offer(
+    offer: NamingOffer,
+    record: Dict[str, Any],
+    project_key: str = "",
+    declined: Optional[Sequence[str]] = None,
+) -> Tuple[str, ...]:
+    """The declined set with this offer's answer recorded. Nothing mutated."""
+    return record_decline(declined, project_key, record, offer.manifest_name)
+
+
+# ---------------------------------------------------------------------------
 # The fixed-point loop
 # ---------------------------------------------------------------------------
 
@@ -981,6 +1358,9 @@ def run_evidence_pass(
     pages: Optional[Sequence[Dict[str, Any]]],
     all_extracted: Optional[Sequence[Dict[str, Any]]],
     missing_sheets: Optional[Sequence[Dict[str, Any]]] = None,
+    manifest: Any = None,
+    project_key: str = "",
+    declined_offers: Optional[Sequence[str]] = None,
 ) -> Dict[str, Any]:
     """Run the loop over one finished run and publish what it found.
 
@@ -989,6 +1369,13 @@ def run_evidence_pass(
     byte-identical; this adds ``input_gaps.json`` beside them and — only when
     there is something to say — an INPUT GAPS section at the end of
     ``summary.txt``. A run with no open needs writes nothing at all.
+
+    ``manifest`` turns on NAMING OFFERS (29-11) and is the only thing that
+    does: with none supplied the run raises no question, which is why every
+    existing caller behaves exactly as it did. The offers land in the gaps
+    artifact and nowhere else — no quantity, no coverage number and no
+    ``takeoff_summary`` row differs between a run with offers and the same run
+    without.
     """
     from bobbytailor.pipeline.aggregator import (  # local: avoids an import cycle
         _HYPOTHESIS_NAME_SOURCES, _norm_item_key,
@@ -1013,6 +1400,14 @@ def run_evidence_pass(
     evidence = collect_evidence(all_extracted, takeoff_rows)
     loop = run_evidence_loop(needs, evidence, _norm_item_key)
     gaps = input_gaps_report(loop, missing_sheets, needs=needs)
+    if manifest:
+        # Beside the open needs, never instead of them: every cluster offered
+        # here is STILL an open `unnamed_geometry` need in the same report,
+        # still NOT MEASURED, still unnamed. The offer adds a question.
+        gaps["naming_offers"] = offers_report(
+            report.get("unnamed_geometry") or [], manifest,
+            project_key=project_key, declined=declined_offers,
+        )
 
     text = input_gaps_text(gaps)
     if not text:
