@@ -1122,6 +1122,31 @@ def _is_small_marker(group) -> bool:
 _MARKER_2D_MIN_MINOR_FACTOR = 3.0   # minor-axis span ≥ this × the marker size …
 _MARKER_2D_MIN_MINOR_PT = 6.0       # … and at least this many points, absolutely
 
+# The closest a mark may stand to its nearest neighbour and still be a POST,
+# stated as a multiple of the marks' own size.
+#
+# A bollard is a discrete object standing clear in the open — the gap beside it
+# staying open is the entire function of the thing. Marks pitched closer
+# together than their own footprint are not standing clear of one another; they
+# TESSELLATE, which is what a tile field, a hatch or a repeated fill pattern
+# does. The value says adjacent posts are separated by at least one post's width
+# of open ground. That is a fact about what a bollard IS.
+#
+# Measured deterministically across all four plan sets (2026-08-17): of the ten
+# clusters that reach the perimeter hint's shortlist, exactly one falls below 2
+# — Bob's 505-mark finish-plan tile field, whose 1.51 ft marks are pitched
+# 2.06 ft apart, at 1.37. The next cluster up measures 6.9, and Crow's 56-mark
+# lattice measures 62.3. The threshold sits inside a gap a factor of five wide,
+# against neither edge, and no cluster anywhere in the four sets lies between
+# 1.4 and 6.8 for it to have been tuned against.
+#
+# It is a RATIO of a spacing to the marks' own size: it carries no length, no
+# unit and no plan's dimensions, exactly as ``_MASONRY_MAX_LF_SHARE`` carries no
+# footage — derived from no plan's figures, no published quantity and no target.
+# A test asserts an identical verdict when every coordinate on the sheet is
+# multiplied by a constant.
+_MARKER_MIN_NEIGHBOUR_PITCH = 2.0
+
 
 def _minor_axis_span(group) -> Optional[float]:
     """Minor-axis (narrower) span of the instance centres, in points.
@@ -1172,6 +1197,50 @@ def _is_collinear_strip(group) -> bool:
         return False
     minor = _minor_axis_span(group)
     return minor is not None and minor < _min_2d_span_pt(group)
+
+
+def _neighbour_pitch(group) -> Optional[float]:
+    """Median nearest-neighbour centre distance, in units of the marks' own size.
+
+    ``None`` when fewer than two centres are known, or when the instances carry
+    no measurable size — the pitch cannot be computed at all, which callers must
+    treat as unknown rather than as evidence either way.
+
+    The MEDIAN neighbour, not the closest one: two marks that happen to sit near
+    each other say nothing about how the field is laid out, and a rule reading
+    the minimum would refuse a genuine array for one coincidental pair. Both
+    terms are lengths in the same coordinate system, so their ratio carries no
+    unit and no scale.
+    """
+    centroids = _instance_centroids(group)
+    if len(centroids) < 2:
+        return None
+    widths, heights = _instance_dims(group)
+    marker = _median([max(w, h) for w, h in zip(widths, heights)]) if widths else 0.0
+    if marker <= 0:
+        return None
+    nearest: List[float] = []
+    for i, (px, py) in enumerate(centroids):
+        nearest.append(
+            min(
+                math.hypot(px - qx, py - qy)
+                for j, (qx, qy) in enumerate(centroids)
+                if j != i
+            )
+        )
+    return _median(nearest) / marker
+
+
+def _is_discrete_object_array(group) -> bool:
+    """True when the marks stand APART — each clear of its neighbour by at least
+    its own width — rather than tessellating the way a drawn fill pattern does.
+
+    Positive-evidence test: an unmeasurable pitch reads False. It guards a
+    binding that CREATES an object's name out of unlabeled geometry, so absence
+    of evidence must never be what supplies the name (flag-don't-guess §10).
+    """
+    pitch = _neighbour_pitch(group)
+    return pitch is not None and pitch >= _MARKER_MIN_NEIGHBOUR_PITCH
 
 
 def _occupancy_bands(values: List[float], tol: float) -> List[List[int]]:
@@ -1330,7 +1399,8 @@ def _library_symbol_bindings(groups, labels_by_id, binding_map) -> Dict[str, Tup
     real vision label is skipped (vision stays primary). ``structural_grid_symbol``
     considers uniform small-marker clusters (count ≥ ``_GRID_MIN_COUNT``) spread
     in 2-D; ``perimeter_jamb_symbol`` considers uniform small-marker clusters
-    whose centres form a hollow ring. Each hint names the candidate with a
+    whose centres form a hollow ring AND whose marks stand apart as discrete
+    posts rather than tessellating. Each hint names the candidate with a
     STRICTLY largest count, and names nothing when two tie
     (:func:`_unique_top_by_count`). Empty binding map → ``{}``.
 
@@ -1379,6 +1449,12 @@ def _library_symbol_bindings(groups, labels_by_id, binding_map) -> Dict[str, Tup
             if _field(g, "candidate_id", "") not in bindings
             and int(_field(g, "count", 0) or 0) >= _PERIMETER_MIN_COUNT
             and _size_uniform(g) and _is_small_marker(g) and _is_perimeter_ring(g)
+            # The hint has a minimum count and no maximum, and it names the
+            # LARGEST survivor — so on a dense sheet it reaches for the cluster
+            # most likely to be drafting fill. A bollard is a discrete post
+            # standing clear of its neighbours, never a cell of a tile field
+            # (29-13: Bob's finish plan published 505 of them).
+            and _is_discrete_object_array(g)
         ]
         winner = _unique_top_by_count(cands, "perimeter_jamb_symbol")
         if winner is not None:

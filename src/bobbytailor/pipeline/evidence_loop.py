@@ -693,7 +693,7 @@ def _entry_fields(entry: Any) -> Tuple[str, str, str]:
     if isinstance(entry, dict):
         name = _text(entry.get("name") or entry.get("item"))
         unit = _text(entry.get("unit")).upper()
-        measure = _text(entry.get("measure") or entry.get("measure_basis")).lower()
+        measure = _text(entry.get("measure")).lower()
     else:
         name = _text(getattr(entry, "name", ""))
         unit = _text(getattr(entry, "unit", "")).upper()
@@ -715,7 +715,7 @@ def _candidate_fields(record: Dict[str, Any]) -> Tuple[str, str]:
     unit = _text(record.get("unit")).upper()
     if not unit:
         return "", ""
-    measure = _text(record.get("measure") or record.get("measure_basis")).lower()
+    measure = _text(record.get("measure")).lower()
     return unit, measure or measure_from_unit(unit)
 
 
