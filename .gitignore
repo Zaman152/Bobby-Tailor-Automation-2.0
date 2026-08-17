@@ -44,3 +44,14 @@ output/_archive/
 
 # Probe scratch output (scripts/geom_probe.py writes this on every run).
 scratch_*.json
+
+# Benchmark run artifacts (scripts/vision_only_benchmark.py writes one dir per
+# run). Like output/ and uploads/ these are results, not source — leaving them
+# untracked means every run dirties `git status` for whoever looks next.
+reports/
+
+# The decoy manifest the benchmark plants to prove plans-only isolation. Its
+# own cleanup runs in a `finally`, but a killed run (SIGTERM skips finally)
+# leaves it behind — and a leftover decoy SKIPS the tripwire on every later
+# run, so the check goes quiet rather than failing.
+manifests/
