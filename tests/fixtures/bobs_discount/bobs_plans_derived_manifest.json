@@ -1,0 +1,105 @@
+[
+  {"name": "Bollards", "unit": "EA", "measure": "count",
+   "aliases": ["pipe bollard", "pipe bollards", "bollard", "painted bollard"]},
+
+  {"name": "Canopy", "unit": "SF", "measure": "area",
+   "aliases": ["metal canopy", "prefinished metal canopy", "super lumideck",
+               "brow awning", "metal brow awning"]},
+
+  {"name": "Exterior Painting - CMU Wall", "unit": "SF", "measure": "area",
+   "aliases": ["cmu", "existing cmu", "concrete masonry", "block wall",
+               "masonry wall", "cmu wall", "paint cmu"]},
+
+  {"name": "Exterior Painting-EIFS - ALT", "unit": "SF", "measure": "area",
+   "aliases": ["eifs", "eifs scratch coat", "sign band", "dryvit",
+               "exterior insulation finish"]},
+
+  {"name": "Doors-HM", "unit": "EA", "measure": "count",
+   "aliases": ["Doors - Hollow Metal", "hollow metal door", "hollow metal doors",
+               "h.m. door", "hm door"]},
+
+  {"name": "Doors-WD", "unit": "EA", "measure": "count",
+   "aliases": ["Doors-SCW", "Doors - Solid Core Wood", "solid core wood door",
+               "solid core door", "wood door", "wood doors", "birch door"]},
+
+  {"name": "Door Frame - HM", "unit": "EA", "measure": "count",
+   "aliases": ["Door Frames-HM", "Door Frames - Hollow Metal",
+               "hollow metal frame", "hollow metal frames", "h.m. frame",
+               "hm frame"]},
+
+  {"name": "Gas Piping", "unit": "LF", "measure": "length",
+   "aliases": ["gas piping", "gas line", "gas pipe", "natural gas piping"]},
+
+  {"name": "Ladder-H-24'", "unit": "EA", "measure": "count",
+   "aliases": ["ladder", "roof ladder", "access ladder", "roof hatch and ladder",
+               "fixed ladder", "ship ladder"]},
+
+  {"name": "Lift", "unit": "EA", "measure": "count",
+   "aliases": ["lift", "elevator", "scissor lift", "hydraulic lift",
+               "wheelchair lift", "vertical platform lift"]},
+
+  {"name": "Lintels", "unit": "LF", "measure": "length",
+   "aliases": ["lintel", "lintels", "steel lintel", "masonry lintel",
+               "loose lintel"]},
+
+  {"name": "Mobilization", "unit": "EA", "measure": "count",
+   "aliases": ["mobilize", "mobilisation", "general conditions"]},
+
+  {"name": "Overhead Doors", "unit": "EA", "measure": "count",
+   "aliases": ["overhead door", "sectional door", "roll up door", "dock door"]},
+
+  {"name": "Dock Leveler", "unit": "EA", "measure": "count",
+   "aliases": ["dock leveler", "leveler"]},
+
+  {"name": "Dock Bumper", "unit": "EA", "measure": "count",
+   "aliases": ["dock bumper", "bumpers", "seal and bumpers"]},
+
+  {"name": "Storefront", "unit": "SF", "measure": "area",
+   "aliases": ["storefront", "storefront glazing", "sliding door package",
+               "curtain wall", "exterior glass door"]},
+
+  {"name": "Downspouts", "unit": "LF", "measure": "length",
+   "aliases": ["downspout", "downspouts", "leader"]},
+
+  {"name": "Parapet Coping", "unit": "LF", "measure": "length",
+   "aliases": ["coping", "aluminum coping", "drip edge", "parapet coping"]},
+
+  {"name": "Gutter", "unit": "LF", "measure": "length",
+   "aliases": ["gutter", "aluminum gutter", "gutter system"]},
+
+  {"name": "Rooftop Units", "unit": "EA", "measure": "count",
+   "aliases": ["roof top hvac unit", "rooftop unit", "rtu", "hvac unit"]},
+
+  {"name": "Exhaust Fan", "unit": "EA", "measure": "count",
+   "aliases": ["exhaust fan", "exhaust fan and curb"]},
+
+  {"name": "Vent Riser", "unit": "EA", "measure": "count",
+   "aliases": ["vent riser", "riser"]},
+
+  {"name": "Roof Hatch", "unit": "EA", "measure": "count",
+   "aliases": ["roof hatch", "smoke hatch"]},
+
+  {"name": "Signage", "unit": "EA", "measure": "count",
+   "aliases": ["signage", "building sign", "wall sign"]},
+
+  {"name": "Light Fixtures", "unit": "EA", "measure": "count",
+   "aliases": ["light sconce", "exterior light sconce", "wall light",
+               "wall pack"]},
+
+  {"name": "Metal Deck", "unit": "SF", "measure": "area",
+   "aliases": ["metal deck", "roof deck", "infill metal deck"]},
+
+  {"name": "Roofing", "unit": "SF", "measure": "area",
+   "aliases": ["roofing membrane", "roof membrane", "tpo", "epdm"]},
+
+  {"name": "Roof Insulation", "unit": "SF", "measure": "area",
+   "aliases": ["roof insulation", "rigid insulation", "insulation"]},
+
+  {"name": "Doors-AL", "unit": "EA", "measure": "count",
+   "aliases": ["Doors - Aluminum", "aluminum door", "alum door",
+               "aluminum entrance door"]},
+
+  {"name": "Door Frames-AL", "unit": "EA", "measure": "count",
+   "aliases": ["Door Frames-ALUM", "Door Frames - Aluminum", "aluminum frame",
+               "alum frame"]}
+]
