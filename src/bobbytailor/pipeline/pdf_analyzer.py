@@ -567,7 +567,7 @@ def run_pdf_analysis(
 
     cross_refs = resolve_cross_references(all_extracted)
     all_estimates = resolve_spec_lookups(all_extracted, all_estimates)
-    return generate_report(
+    report = generate_report(
         project_name, all_extracted, all_estimates,
         cross_references=cross_refs, manifest=manifest,
         learned=pipeline.learned_context,
@@ -583,3 +583,21 @@ def run_pdf_analysis(
         # unanswerable for the two saved paid runs.
         run_settings=pipeline.settings.to_dict(),
     )
+
+    # ----------------------------------------------------------------
+    # The cross-sheet reasoning pass (29-10). Runs LAST, on assembled
+    # evidence only — zero API, zero re-extraction — and never writes
+    # into the take-off: the report and its CSVs are already on disk and
+    # stay byte-identical. What it adds is `input_gaps.json` beside
+    # coverage.json plus an INPUT GAPS section on summary.txt, and only
+    # when the run actually left a question open. A run with none is
+    # untouched, which is what keeps every existing report valid.
+    # ----------------------------------------------------------------
+    try:
+        from bobbytailor.pipeline.evidence_loop import run_evidence_pass
+        run_evidence_pass(
+            report, pipeline_pages, all_extracted, ledger.missing_sheets,
+        )
+    except Exception as exc:  # noqa: BLE001 — additive; never break a finished run
+        logger.error("evidence loop failed (report is unaffected): %s", exc)
+    return report
