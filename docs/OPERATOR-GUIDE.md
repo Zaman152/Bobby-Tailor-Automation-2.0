@@ -27,6 +27,10 @@ workflow, not a failure of it.
 Prerequisites: Ubuntu box, Python 3.9, **one operator, one instance**. This is single-tenant by
 design (see §8).
 
+> **Sized for small and medium sets — roughly 4 to 15 sheets.** That is the range the accuracy
+> work targets and the range the app is measured on. Larger sets still run, but they exercise
+> paths that carry no accuracy evidence, so treat their output as unvalidated.
+
 ```bash
 git clone <repo> && cd Bobby-Tailor-Automation-2.0
 python3 -m venv .venv && . .venv/bin/activate
@@ -224,6 +228,80 @@ This is the workflow the accuracy target actually depends on.
 
 **Expect roughly half the items to need a touch.** Items that are drawn get measured; items that
 are *specified in a note* or drawn on a sheet you did not upload need you.
+
+---
+
+## 6a. How the app works, in one page
+
+Read this once and the review reasons stop being cryptic.
+
+**1 — Route.** Each sheet is classified. A title sheet runs nothing and costs nothing; unknown
+types fall back to "measure" so no sheet is silently dropped.
+
+**2 — Measure deterministically (free, no API).** For vector sheets this does the real work, in
+order: dimensions → viewports → printed scale → scale solve → walls, rooms, symbols, grid
+lattices, schedules, keynotes. **Everything is measured from the PDF's vector geometry at the
+drawing's own printed scale.** This is why the large areas land within about 1%, and why no
+vision model can match it — every AI provider rasterises a PDF before looking at it.
+
+**3 — Label, never count.** The model is *never* asked "how many". It sees marked-up crops and
+answers "which of these candidates is which named thing". A candidate with no text near it is not
+even shown to it — asking a model to name a bare shape is where accuracy collapses.
+
+**4 — Arbitrate the name.** One ladder decides what a row is called:
+
+```
+the drawing's printed schedule  >  your manifest  >  your past corrections
+      >  the built-in library   >  AI-learned names  >  the vision label
+```
+
+**5 — Calculate**, applying estimating formulas and waste — except printed schedule quantities,
+which pass through verbatim.
+
+**6 — Aggregate, and refuse.** A series of guards each turn a doubtful number into a visible
+blank: a volume reading that would publish as a count, a count read off a *detail* sheet, a name
+that is only a hypothesis, a count nothing corroborates.
+
+**7 — Reason across sheets.** A question raised on one sheet is answered by evidence on another,
+repeating until nothing new resolves. Two possible answers means the app picks **neither** and
+tells you both. Anything it still cannot answer becomes an **INPUT GAPS** entry — including a
+cited sheet you did not upload, listed with the questions it would have answered.
+
+**8 — Report** with a per-row state and a reason for every blank.
+
+---
+
+## 6b. Repeat runs, and the learning store
+
+### Will the same plans give the same answer twice?
+
+**The deterministic half: yes, exactly.** Vector geometry, printed scales, schedule tables and
+keynote text are pure functions of the PDF. Same file in, identical numbers out.
+
+**The vision half: nearly, and it is measured rather than assumed.** Hosted AI APIs are not
+bit-reproducible even at temperature zero — the cause is GPU batching inside the provider, not a
+setting anyone can switch off. The app's answer to that is to *take decisions away from the model*
+rather than to ask it more nicely: names now come from printed schedules and legends wherever one
+exists, and a count nothing corroborates is flagged rather than published.
+
+`summary.txt` names the specific rows a repeat run may answer differently. Those are the rows to
+confirm first.
+
+### The learning store — on by default
+
+`output/learning.db` accumulates across runs and is loaded once at the start of each:
+
+| What it stores | Effect on the next run |
+|---|---|
+| **Vocabulary** | a name you corrected is used automatically; the correction never recurs |
+| **Corrections** | your edits, captured from the worksheet |
+| **Project vocabulary** | a repeat run reuses the object list the first run derived, instead of paying to re-derive it |
+
+It sits **below** the drawing's own printed legend and **above** the built-in guesses: the sheet
+outranks a past correction, and a past correction outranks a guess. An anti-amplification guard
+stops it compounding its own mistakes.
+
+**This is why calibration pays twice** — once for this bid, and again on every future job.
 
 ---
 
