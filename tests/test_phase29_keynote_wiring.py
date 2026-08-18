@@ -318,10 +318,25 @@ def test_four_set_sweep_publishes_only_notes_that_name_things():
     for row in published:
         assert not is_specification_note(row[4]), row
     by_set = {n: [r for r in published if r[0] == n] for n, _, _ in present}
-    for name in ("bobs", "chelsea"):
-        if name in by_set:
-            assert by_set[name] == [], (
-                "a set with no placed keynotes published rows: %r" % (by_set[name],)
+    # Chelsea prints no keynote legend at all, so it must stay empty. Bob's was
+    # empty when this pin was written and is NOT any more: 29-15 gave the
+    # matcher a text-cover fallback for a legend that is plain table text rather
+    # than bubbles, and Bob's roof plan now yields KEY-08 (VENT RISER) x1. The
+    # pin is moved to the new measured truth rather than deleted, so a REGRESSION
+    # to zero still fails here.
+    if "chelsea" in by_set:
+        assert by_set["chelsea"] == [], (
+            "chelsea prints no keynote legend and must publish nothing: %r"
+            % (by_set["chelsea"],)
+        )
+    if "bobs" in by_set:
+        assert by_set["bobs"] == [
+            ("bobs", 3, "08", 1, "VENT RISER, RE: DETAILS THIS SHEET, PLUMBING PLANS.")
+        ], (
+            "bob's placed-keynote census moved: %r. Page 4 carries 22 further "
+            "entries across TWO legends that share the numbers 01-06, so four "
+            "symbol groups tie at six matched numbers and the fallback refuses "
+            "them — a tie is not a discriminator." % (by_set["bobs"],)
             )
     if "crow" in by_set:
         assert [(r[2], r[3]) for r in by_set["crow"] if r[1] == 0] == [

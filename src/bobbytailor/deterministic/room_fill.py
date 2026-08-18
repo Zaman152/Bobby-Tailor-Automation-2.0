@@ -2113,8 +2113,32 @@ def keynote_callout_counts(page, symbol_groups) -> List[KeynoteCallout]:
             ]
             return hits[0] if len(hits) == 1 else ""
 
+        # Identify the bubble group by how much of the legend it accounts for.
+        #
+        # ENCLOSURE first: on a sheet whose legend numbers are themselves drawn
+        # in bubbles (Crow), the group that wraps the legend's own number blocks
+        # is the keynote bubble beyond doubt, and knowing WHICH instance is the
+        # legend's own is what separates a keynote drawn twice from one drawn
+        # once. That is the strongest signal available and it stays primary.
+        #
+        # TEXT COVER second, and this is what the enclosure test cannot see. A
+        # legend is not always bubbled: Bob's page 4 sets its keynotes as a
+        # plain "01: NEW SLIDING DOOR PACKAGE..." table, so NO instance encloses
+        # any legend number and enclosure scores 0 for every group on the sheet
+        # — the route returned nothing at all on 22 legend entries. Measured
+        # there: SYM-6 carries 12 of the 22 legend numbers and the next best
+        # group carries 2, so which group is the bubble is not in doubt; only
+        # the legend's own bubble is, and on such a sheet there is none to
+        # subtract because the legend was never drawn with one.
+        #
+        # The fallback requires a MAJORITY of the winner's matched numbers over
+        # the runner-up (>= 2x) rather than a bare maximum. A tie or near-tie
+        # means the sheet has two plausible bubble groups and no discriminator
+        # to choose between them, which is the one-instance-order guess this
+        # module refuses everywhere else.
         best_group = None
         best_cover = 0
+        legend_is_bubbled = True
         cache: dict = {}
         for grp in symbol_groups:
             boxes = list(getattr(grp, "instance_bboxes_pt", ()) or ())
@@ -2132,8 +2156,30 @@ def keynote_callout_counts(page, symbol_groups) -> List[KeynoteCallout]:
             )
             if cover > best_cover:
                 best_group, best_cover = grp, cover
+
         if best_group is None or best_cover == 0:
-            return []
+            legend_is_bubbled = False
+            wanted = {number for _h, number, _lbox in legend_boxes}
+            scored = []
+            for grp in symbol_groups:
+                texts = cache.get(id(grp))
+                if not texts:
+                    continue
+                scored.append((len(wanted & {t for t in texts if t}), grp))
+            scored.sort(key=lambda pair: -pair[0])
+            if not scored or scored[0][0] == 0:
+                return []
+            runner_up = scored[1][0] if len(scored) > 1 else 0
+            if scored[0][0] < max(2, runner_up * 2):
+                logger.info(
+                    "keynote callouts: no legend bubble, and the best text "
+                    "cover (%d) does not clearly beat the runner-up (%d) — no "
+                    "bubble group chosen, because instance order is not a "
+                    "discriminator",
+                    scored[0][0], runner_up,
+                )
+                return []
+            best_group, best_cover = scored[0][1], scored[0][0]
 
         boxes = list(best_group.instance_bboxes_pt)
         texts = cache[id(best_group)]
@@ -2144,7 +2190,10 @@ def keynote_callout_counts(page, symbol_groups) -> List[KeynoteCallout]:
                 for b, t in zip(boxes, texts):
                     if t != number:
                         continue
-                    if legend_box is None and _encloses(b, lbox):
+                    # Only subtract a legend bubble on a sheet that HAS one.
+                    # Where the legend is plain text every instance is a
+                    # callout, and skipping one would under-count by exactly 1.
+                    if legend_is_bubbled and legend_box is None and _encloses(b, lbox):
                         legend_box = tuple(b)   # the legend's own bubble
                         continue
                     placed.append(tuple(b))

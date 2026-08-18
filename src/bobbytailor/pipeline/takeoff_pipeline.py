@@ -3154,8 +3154,21 @@ class TakeoffPipeline:
         # the note states a requirement instead of naming a thing
         # (is_specification_note) — those are dropped, and the honest blank is
         # kept over a confidently wrong 1.
+        # Sheet types whose keynote bubbles are worth counting. DELIBERATELY
+        # wider than `_PLAN_SHEET_TYPES`: that tuple gates extract_walls /
+        # extract_rooms / cluster_symbols and is about where GEOMETRY is
+        # measured, which is a different question from where a drafter puts a
+        # keynote. 29-03 borrowed it and inherited a fence it did not want.
+        #
+        # Measured on Bob's: 22 of its 31 keynote entries — including the
+        # canopy, the EIFS band and the bollards — sit on page 4, which
+        # classifies `elevation`, so the route skipped the sheet carrying most
+        # of the set's keynoted objects. An elevation is keynoted exactly the
+        # way a plan is.
+        _KEYNOTE_SHEET_TYPES = _PLAN_SHEET_TYPES + ("elevation",)
+
         keynote_callouts: list = []
-        if resolved_type in _PLAN_SHEET_TYPES and fpp > 0 and symbols:
+        if resolved_type in _KEYNOTE_SHEET_TYPES and fpp > 0 and symbols:
             try:
                 from bobbytailor.deterministic.room_fill import (  # noqa: PLC0415
                     is_specification_note,
