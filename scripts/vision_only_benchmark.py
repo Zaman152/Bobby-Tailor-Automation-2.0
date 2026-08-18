@@ -738,7 +738,7 @@ def run_vision(name: str, plans: Path, manifest: Optional[Path], run_tag: str = 
         decoy_manifest = _plant_decoy_manifest()
         if decoy_manifest is not None:
             from bobbytailor.devtools.object_manifest import discover_manifest_path
-            found = discover_manifest_path(f"VisionOnly {name}{run_tag}")
+            found = discover_manifest_path(f"VisionOnly {name}")
             assert found and Path(found).resolve() == decoy_manifest.resolve(), (
                 f"Decoy manifest should be discoverable by the devtools finder, got: {found}"
             )
@@ -750,8 +750,20 @@ def run_vision(name: str, plans: Path, manifest: Optional[Path], run_tag: str = 
             if manifest:
                 kwargs["manifest_path"] = str(manifest)
             t0 = time.time()
+            # The project name deliberately OMITS run_tag. A --repro pair is two
+            # runs of the SAME project, which is the question the gate exists to
+            # answer ("run the same plans twice"). Tagging run 2 gave it a
+            # distinct project key, so 24-05's vocabulary snapshot could not be
+            # reused and the AI naming pass re-derived every object name from
+            # scratch — measured on Bob's 2026-08-17: run 1 stored 29 objects
+            # and run 2 stored 27, under keys 'VisionOnly Bobs_Plans_Manifest'
+            # and 'VisionOnly Bobs_Plans_Manifest run2'. The gate then reported
+            # rows appearing and disappearing when what actually differed was
+            # the LABEL: 'Gypsum Board Ceiling / Soffit' vs 'Gypsum Board
+            # Ceiling', both at 56046.7 SF. The harness was measuring cold-start
+            # naming variance, never the repeat run a customer performs.
             result = run_pdf_analysis(
-                str(isolated), project_name=f"VisionOnly {name}{run_tag}", **kwargs)
+                str(isolated), project_name=f"VisionOnly {name}", **kwargs)
             elapsed = time.time() - t0
         finally:
             _cleanup_decoy_manifest(decoy_manifest)
