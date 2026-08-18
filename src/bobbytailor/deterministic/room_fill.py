@@ -2070,6 +2070,47 @@ def _encloses(outer, inner, pad: float = 1.0) -> bool:
     )
 
 
+#: How a titled elevation's DRAWING extent is recovered from its title.
+#:
+#: A sheet stacks its elevations vertically and sets each title BENEATH its own
+#: drawing, so a drawing occupies the band between the title above it and its
+#: own title. Measured on Bob's page 4, whose four titles sit at y = 498, 1031,
+#: 1513 and 2095: the demolition elevation is everything above 498, the front
+#: elevation the band 498..1031, and so on. Nothing here reads a scale, a
+#: dimension or a quantity — it is the sheet's own layout, and a sheet that
+#: titles nothing yields no regions and no binding.
+def _elevation_regions(page) -> List[tuple]:
+    """``[(is_demo, y_lo, y_hi), ...]`` for each titled elevation, top to bottom."""
+    try:
+        titles = elevation_titles(page)
+    except Exception:  # noqa: BLE001 — a region read never breaks a take-off
+        return []
+    marks = []
+    for t in titles or []:
+        box = getattr(t, "callout_bbox_pt", None)
+        if not box:
+            continue
+        marks.append((float(box[1]), bool(getattr(t, "is_demo", False))))
+    if not marks:
+        return []
+    marks.sort()
+    out, prev = [], 0.0
+    for y, is_demo in marks:
+        out.append((is_demo, prev, y))
+        prev = y
+    return out
+
+
+def _legend_is_demo(header: str) -> bool:
+    """Does this legend head a DEMOLITION drawing?
+
+    Read from the header's own printed words. Bob's page 4 prints
+    'DEMO KEYED NOTES' beside 'KEYED NOTES', and that word is the only thing
+    separating two legends that both number 01-06.
+    """
+    return "DEMO" in str(header or "").upper()
+
+
 def keynote_callout_counts(page, symbol_groups) -> List[KeynoteCallout]:
     """How many times each legend keynote is actually PLACED on the drawing.
 
@@ -2139,6 +2180,7 @@ def keynote_callout_counts(page, symbol_groups) -> List[KeynoteCallout]:
         best_group = None
         best_cover = 0
         legend_is_bubbled = True
+        region_bound = False
         cache: dict = {}
         for grp in symbol_groups:
             boxes = list(getattr(grp, "instance_bboxes_pt", ()) or ())
@@ -2171,15 +2213,29 @@ def keynote_callout_counts(page, symbol_groups) -> List[KeynoteCallout]:
                 return []
             runner_up = scored[1][0] if len(scored) > 1 else 0
             if scored[0][0] < max(2, runner_up * 2):
-                logger.info(
-                    "keynote callouts: no legend bubble, and the best text "
-                    "cover (%d) does not clearly beat the runner-up (%d) — no "
-                    "bubble group chosen, because instance order is not a "
-                    "discriminator",
-                    scored[0][0], runner_up,
-                )
-                return []
-            best_group, best_cover = scored[0][1], scored[0][0]
+                # A TIE, and on a page carrying more than one legend it is a
+                # REAL one rather than noise: Bob's page 4 heads both
+                # 'KEYED NOTES' and 'DEMO KEYED NOTES' over the numbers 01-06,
+                # so four groups match six numbers apiece and no amount of
+                # counting separates them. The drawing separates them by
+                # POSITION — a demolition callout is drawn on the demolition
+                # elevation — so the tie is broken by the sheet's own layout or
+                # not at all (30-01).
+                regions = _elevation_regions(page) if len(rows_by_header) > 1 else []
+                if not regions or not any(r[0] for r in regions):
+                    logger.info(
+                        "keynote callouts: no legend bubble, best text cover "
+                        "(%d) does not beat the runner-up (%d), and the page "
+                        "offers no demolition region to bind by — no bubble "
+                        "group chosen, because instance order is not a "
+                        "discriminator",
+                        scored[0][0], runner_up,
+                    )
+                    return []
+                region_bound = True
+                best_group, best_cover = scored[0][1], scored[0][0]
+            else:
+                best_group, best_cover = scored[0][1], scored[0][0]
 
         boxes = list(best_group.instance_bboxes_pt)
         texts = cache[id(best_group)]
@@ -2187,9 +2243,21 @@ def keynote_callout_counts(page, symbol_groups) -> List[KeynoteCallout]:
         for header, rows in rows_by_header.items():
             for number, text, lbox in rows:
                 placed, legend_box = [], None
+                want_demo = _legend_is_demo(header) if region_bound else None
                 for b, t in zip(boxes, texts):
                     if t != number:
                         continue
+                    if region_bound:
+                        # Count this instance only where it stands in a region
+                        # this legend claims. An instance in no region at all
+                        # is not counted: absence of a region is not evidence
+                        # of a legend.
+                        cy = (float(b[1]) + float(b[3])) / 2.0
+                        band = next(
+                            (r for r in regions if r[1] <= cy < r[2]), None
+                        )
+                        if band is None or band[0] != want_demo:
+                            continue
                     # Only subtract a legend bubble on a sheet that HAS one.
                     # Where the legend is plain text every instance is a
                     # callout, and skipping one would under-count by exactly 1.

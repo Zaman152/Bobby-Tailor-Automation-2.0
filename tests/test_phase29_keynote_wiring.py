@@ -330,14 +330,22 @@ def test_four_set_sweep_publishes_only_notes_that_name_things():
             % (by_set["chelsea"],)
         )
     if "bobs" in by_set:
+        # 30-01 made page 4 readable. Its two legends share the numbers 01-06,
+        # so the sheet is bound by REGION: a demolition callout is drawn on the
+        # demolition elevation. Keynote 04 appearing TWICE with different text
+        # is that disambiguation working, not a duplicate — a light sconce from
+        # KEYED NOTES and a door replacement from DEMO KEYED NOTES are two
+        # different things sharing one number on one sheet.
         assert by_set["bobs"] == [
-            ("bobs", 3, "08", 1, "VENT RISER, RE: DETAILS THIS SHEET, PLUMBING PLANS.")
-        ], (
-            "bob's placed-keynote census moved: %r. Page 4 carries 22 further "
-            "entries across TWO legends that share the numbers 01-06, so four "
-            "symbol groups tie at six matched numbers and the fallback refuses "
-            "them — a tie is not a discriminator." % (by_set["bobs"],)
-            )
+            ("bobs", 3, "08", 1,
+             "VENT RISER, RE: DETAILS THIS SHEET, PLUMBING PLANS."),
+            ("bobs", 4, "01", 11,
+             "NEW SLIDING DOOR PACKAGE AND/OR STOREFRONT GLAZING."),
+            ("bobs", 4, "03", 7, "NEW EIFS SCRATCH COAT AT SIGN BAND."),
+            ("bobs", 4, "04", 1, "NEW EXTERIOR LIGHT SCONCE RE: ELECTRICAL"),
+            ("bobs", 4, "05", 2, "EXISTING COPING TO REMAIN"),
+            ("bobs", 4, "04", 1, "REMOVE AND REPLACE EXISTING EXTERIOR DOOR."),
+        ], ("bob's placed-keynote census moved: %r" % (by_set["bobs"],))
     if "crow" in by_set:
         assert [(r[2], r[3]) for r in by_set["crow"] if r[1] == 0] == [
             ("1", 1), ("2", 1), ("3", 1), ("4", 1), ("5", 2),
