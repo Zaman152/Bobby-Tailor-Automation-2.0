@@ -1441,7 +1441,7 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
 
     if item_type == "flooring":
         wf = table["waste_factor"]
-        return value * wf, "sq_ft", f"{value:.0f} sf × {wf} waste = {value * wf:.0f} sf"
+        return value, "sq_ft", f"{value:.0f} sf measured (order factor {wf}, not applied)"
 
     if item_type == "drywall":
         wf = table["waste_factor"]
@@ -1480,7 +1480,7 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
 
     if item_type == "insulation":
         wf = table["waste_factor"]
-        return value * wf, "sq_ft", f"{value:.0f} sf × {wf} waste"
+        return value, "sq_ft", f"{value:.0f} sf measured (order factor {wf}, not applied)"
 
     if item_type in ("storm_pipe", "trench_drain", "guard_rail", "hand_rail", "striping",
                       "gas_pipe", "lintel", "duct_lf", "conduit_lf"):
@@ -1490,7 +1490,10 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
             # no-formula gate drops it from calculations output.
             return value, unit, "no formula"
         wf = table.get("waste_factor", 1.0)
-        return value * wf, "lf", f"{value:.0f} lf × {wf} = {value * wf:.0f} lf"
+        return value, "lf", (
+            f"{value:.0f} lf measured"
+            + (f" (order factor {wf}, not applied)" if wf != 1.0 else "")
+        )
 
     if item_type in (
         "catch_basin", "manhole", "headwall", "bollard",
@@ -1506,7 +1509,10 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
             # as the length branch above.
             return value, unit, "no formula"
         wf = table.get("waste_factor", 1.0)
-        return value * wf, "sq_ft", f"{value:.0f} sf × {wf} = {value * wf:.0f} sf"
+        return value, "sq_ft", (
+            f"{value:.0f} sf measured"
+            + (f" (order factor {wf}, not applied)" if wf != 1.0 else "")
+        )
 
     # Default: pass-through
     return value, unit, "no formula"

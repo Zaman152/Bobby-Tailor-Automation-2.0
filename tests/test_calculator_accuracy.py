@@ -195,7 +195,11 @@ def test_a_rail_length_in_linear_feet_still_gets_its_formula():
     qty, unit, formula = _apply_formula("guard_rail", 50.0, "lf", "50")
     assert unit == "lf"
     assert formula != "no formula"
-    assert abs(qty - 50.0 * wf) < 0.01
+    # 31-01: the QUANTITY is the measurement. The waste factor is an ORDER
+    # factor and is named in the formula rather than multiplied in — a take-off
+    # states what is on the drawing, not what to buy.
+    assert abs(qty - 50.0) < 0.01
+    assert str(wf) in formula and "not applied" in formula
 
 
 def test_pipe_run_and_lintel_run_calculators_are_unaffected():
@@ -208,14 +212,19 @@ def test_pipe_run_and_lintel_run_calculators_are_unaffected():
     wf = ESTIMATION_TABLES["storm_pipe"]["waste_factor"]
     assert pipe[0]["unit"] == "lf"
     assert pipe[0]["formula"] != "no formula"
-    assert abs(pipe[0]["quantity"] - round(25 * wf, 2)) < 0.01
+    # 31-01: measured length published; order factor recorded, not applied.
+    assert abs(pipe[0]["quantity"] - 25.0) < 0.01
+    assert str(wf) in pipe[0]["formula"]
 
     lintel = _calculate_from_lintel_runs([{"total_lf": 179.24}], "S-1")
     assert len(lintel) == 1
     wf = ESTIMATION_TABLES["lintel"]["waste_factor"]
     assert lintel[0]["unit"] == "lf"
     assert lintel[0]["formula"] != "no formula"
-    assert abs(lintel[0]["quantity"] - round(179.24 * wf, 2)) < 0.01
+    # 31-01: 179.24 is what the drawing carries, and it is what Bob's golden
+    # asks for. Publishing 188.20 could never have matched it.
+    assert abs(lintel[0]["quantity"] - 179.24) < 0.01
+    assert str(wf) in lintel[0]["formula"]
 
 
 def test_no_rail_row_with_an_inch_raw_unit_survives_to_calculations_csv(tmp_path):

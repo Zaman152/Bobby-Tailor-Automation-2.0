@@ -591,7 +591,10 @@ def test_aggregator_lintel_run_canonical():
     names = {row["item"] for row in aggregated}
     assert "Lintels" in names, f"Expected 'Lintels' canonical name, got: {names}"
     qty = next(r["quantity"] for r in aggregated if r["item"] == "Lintels")
-    assert abs(qty - 72.0 * 1.05) < 0.1, f"Expected 75.6 LF (72 × 1.05 waste), got {qty}"
+    # 31-01: the published quantity is the MEASURED run. The 1.05 is an order
+    # factor, recorded on the row and named in its formula rather than
+    # multiplied into the number an estimator bids.
+    assert abs(qty - 72.0) < 0.1, f"Expected the measured 72.0 LF, got {qty}"
 
 
 @pytest.mark.generalization
