@@ -1,0 +1,148 @@
+/* Bobby Tailor v2 — components. Every colour comes from a token, so a theme
+   swap is a token swap and no component knows which theme it is in. */
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 2px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ── type ─────────────────────────────────────────────────────────────── */
+h1, h2, h3, h4 { font-family: var(--font-ui); margin: 0; text-wrap: balance; letter-spacing: -.015em; }
+h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -.025em; }
+h2 { font-size: 1.25rem; font-weight: 650; }
+h3 { font-size: 1rem;    font-weight: 650; }
+p  { margin: 0; max-width: var(--measure); }
+a  { color: var(--accent); text-underline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.ui   { font-family: var(--font-ui); }
+.muted { color: var(--ink-2); }
+.eyebrow {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: 600;
+}
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ── app shell ────────────────────────────────────────────────────────── */
+.app { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 100vh; }
+@media (max-width: 900px) { .app { grid-template-columns: 1fr; } .rail { position: static; height: auto; } }
+
+.rail {
+  background: var(--paper-raised); border-right: 1px solid var(--rule);
+  padding: var(--s5) var(--s4); display: flex; flex-direction: column; gap: var(--s5);
+  position: sticky; top: 0; height: 100vh;
+}
+.brand { display: flex; flex-direction: column; gap: 2px; }
+.brand b { font-family: var(--font-ui); font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.brand span { font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em;
+              text-transform: uppercase; color: var(--ink-3); }
+
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav a {
+  font-family: var(--font-ui); font-size: 14px; color: var(--ink-2);
+  text-decoration: none; padding: 8px 10px; border-radius: var(--radius);
+  display: flex; align-items: center; gap: 10px;
+}
+.nav a:hover { background: var(--paper-sunk); color: var(--ink); }
+.nav a[aria-current="page"] { background: var(--accent-quiet); color: var(--accent); font-weight: 600; }
+.rail-foot { margin-top: auto; }
+
+.main { min-width: 0; padding: var(--s6) var(--s6) var(--s8); }
+.page-head { display: flex; flex-direction: column; gap: var(--s2); margin-bottom: var(--s6); }
+.stack { display: flex; flex-direction: column; gap: var(--s5); }
+.row   { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+
+/* ── surfaces ─────────────────────────────────────────────────────────── */
+.card {
+  background: var(--paper-raised); border: 1px solid var(--rule);
+  border-radius: var(--radius-lg); padding: var(--s5);
+  display: flex; flex-direction: column; gap: var(--s4); box-shadow: var(--shadow-1);
+}
+.card-head { display: flex; flex-direction: column; gap: var(--s1); }
+
+/* ── controls ─────────────────────────────────────────────────────────── */
+.btn {
+  font-family: var(--font-ui); font-size: 14px; font-weight: 600;
+  padding: 9px 16px; border-radius: var(--radius); border: 1px solid transparent;
+  background: var(--accent); color: #fff; cursor: pointer; line-height: 1.2;
+}
+.btn:hover { background: var(--accent-hover); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn-quiet { background: transparent; color: var(--ink); border-color: var(--rule-2); }
+.btn-quiet:hover { background: var(--paper-sunk); }
+.input, select, textarea {
+  font-family: var(--font-ui); font-size: 14px; color: var(--ink);
+  background: var(--paper-raised); border: 1px solid var(--rule-2);
+  border-radius: var(--radius); padding: 9px 11px; width: 100%;
+}
+label { font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.hint { font-size: 13px; color: var(--ink-3); max-width: var(--measure); }
+
+/* ── row-state chips: the report's vocabulary, and the only semantic colour */
+.chip {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 3px; white-space: nowrap;
+  border: 1px solid currentColor; display: inline-flex; align-items: center; gap: 5px;
+}
+.chip-measured { color: var(--measured); background: var(--measured-bg); }
+.chip-review   { color: var(--review);   background: var(--review-bg); }
+.chip-blank    { color: var(--blank);    background: var(--blank-bg); }
+.chip-human    { color: var(--human);    background: var(--human-bg); }
+.chip-quiet    { color: var(--ink-3);    background: var(--paper-sunk); }
+
+/* ── tables — wide content scrolls itself, never the page ─────────────── */
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius-lg); background: var(--paper-raised); }
+table { border-collapse: collapse; width: 100%; font-family: var(--font-ui); font-size: 14px; }
+thead th {
+  position: sticky; top: 0; background: var(--paper-sunk); z-index: 1;
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: 600;
+  text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+tbody td { padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--paper-sunk); }
+td.qty { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.qty[data-editable="1"] { cursor: text; }
+td.qty[data-editable="1"]:hover { box-shadow: inset 0 0 0 1px var(--rule-2); border-radius: 3px; }
+
+/* ── callouts ─────────────────────────────────────────────────────────── */
+.note {
+  border: 1px solid var(--rule); border-left: 3px solid var(--ink-3);
+  background: var(--paper-sunk); padding: var(--s3) var(--s4);
+  border-radius: var(--radius); max-width: var(--measure);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.note-warn { border-left-color: var(--blank); background: var(--blank-bg); }
+.note-key  { border-left-color: var(--measured); background: var(--measured-bg); }
+.note .eyebrow { color: inherit; opacity: .8; }
+
+/* ── dropzone ─────────────────────────────────────────────────────────── */
+.drop {
+  border: 1.5px dashed var(--rule-2); border-radius: var(--radius-lg);
+  background: var(--paper-sunk); padding: var(--s7) var(--s5);
+  display: flex; flex-direction: column; align-items: center; gap: var(--s2);
+  text-align: center; cursor: pointer;
+}
+.drop:hover, .drop[data-over="1"] { border-color: var(--accent); background: var(--accent-quiet); }
+
+/* ── progress ─────────────────────────────────────────────────────────── */
+.bar { height: 6px; background: var(--paper-sunk); border-radius: 999px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+/* ── coverage banner — the first number a client reads ────────────────── */
+.coverage { display: flex; align-items: baseline; gap: var(--s3); flex-wrap: wrap; }
+.coverage .pct { font-family: var(--font-mono); font-size: 2rem; font-weight: 700; color: var(--ink); }
+.counts { display: flex; gap: var(--s4); flex-wrap: wrap; }
+.counts > div { display: flex; flex-direction: column; gap: 2px; }
+.counts b { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; }

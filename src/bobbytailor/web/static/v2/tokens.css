@@ -1,0 +1,89 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Bobby Tailor — design tokens (v2)
+
+   Calm, light, document-like. An estimator reads this beside a plotter and
+   hands its output to a client, so it is built as a DOCUMENT, not a console.
+
+   The neutral is warmed toward the accent rather than a flat grey: paper,
+   not screen. Two semantic hues carry meaning and are never decorative —
+   they map to the report's own row states, which is the only place colour
+   is allowed to mean something in this app.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ground + ink ------------------------------------------------------- */
+  --paper:        #FCFBF8;   /* page */
+  --paper-raised: #FFFFFF;   /* cards, table rows */
+  --paper-sunk:   #F4F2EC;   /* inputs, headers, code */
+  --ink:          #1C1E22;   /* body */
+  --ink-2:        #55595F;   /* secondary */
+  --ink-3:        #868B92;   /* captions, units */
+  --rule:         #E4E0D6;   /* hairlines */
+  --rule-2:       #CFCABC;   /* emphasis rules */
+
+  /* semantic — mapped to row states, never decorative ------------------ */
+  --measured:      #1B6B72;  /* ✓ measured */
+  --measured-bg:   #E6F1F1;
+  --review:        #9A6B12;  /* ! needs review */
+  --review-bg:     #F9F1DE;
+  --blank:         #B5462F;  /* ∅ not measured — a blank, not a zero */
+  --blank-bg:      #FBECE8;
+  --human:         #4C4A8F;  /* ✎ human input */
+  --human-bg:      #ECEBF6;
+
+  /* interactive -------------------------------------------------------- */
+  --accent:        #1B6B72;
+  --accent-hover:  #14545A;
+  --accent-quiet:  #E6F1F1;
+  --focus:         #1B6B72;
+
+  /* type --------------------------------------------------------------- */
+  --font-body: ui-serif, Charter, "Iowan Old Style", Georgia, serif;
+  --font-ui:   ui-sans-serif, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* spacing — a 4pt scale, used through gap and never as ad-hoc margins */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 24px; --s6: 32px; --s7: 48px; --s8: 64px;
+
+  --radius: 4px;
+  --radius-lg: 8px;
+  --shadow-1: 0 1px 2px rgba(28,30,34,.05);
+  --shadow-2: 0 2px 8px rgba(28,30,34,.07);
+  --measure: 68ch;           /* comfortable reading width */
+}
+
+/* The viewer may run dark. Tokens are redefined; components never are. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:        #16181C;
+    --paper-raised: #1E2126;
+    --paper-sunk:   #22262C;
+    --ink:          #E9E5DC;
+    --ink-2:        #AAAFB7;
+    --ink-3:        #7C828B;
+    --rule:         #2C3037;
+    --rule-2:       #3D434B;
+    --measured:     #5EB7BE;  --measured-bg: #142628;
+    --review:       #D6A445;  --review-bg:   #2A2216;
+    --blank:        #E4715A;  --blank-bg:    #2E1D1A;
+    --human:        #9C99DE;  --human-bg:    #1E1D33;
+    --accent:       #5EB7BE;  --accent-hover:#7FCBD1;
+    --accent-quiet: #142628;  --focus:       #5EB7BE;
+    --shadow-1: 0 1px 2px rgba(0,0,0,.35);
+    --shadow-2: 0 2px 8px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"] {
+  --paper:#16181C; --paper-raised:#1E2126; --paper-sunk:#22262C;
+  --ink:#E9E5DC; --ink-2:#AAAFB7; --ink-3:#7C828B;
+  --rule:#2C3037; --rule-2:#3D434B;
+  --measured:#5EB7BE; --measured-bg:#142628;
+  --review:#D6A445;   --review-bg:#2A2216;
+  --blank:#E4715A;    --blank-bg:#2E1D1A;
+  --human:#9C99DE;    --human-bg:#1E1D33;
+  --accent:#5EB7BE;   --accent-hover:#7FCBD1;
+  --accent-quiet:#142628; --focus:#5EB7BE;
+  --shadow-1:0 1px 2px rgba(0,0,0,.35);
+  --shadow-2:0 2px 8px rgba(0,0,0,.45);
+}

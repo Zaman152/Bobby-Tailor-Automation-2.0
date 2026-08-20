@@ -221,23 +221,34 @@ def test_every_asset_the_report_screen_imports_is_served(browser):
         "path this test resolved against /static/js/")
 
 
-def test_the_page_loads_the_workspace_as_an_es_module(browser):
-    """``import`` in a classic <script> is a syntax error, not a warning."""
-    _, _, _, shell, _ = browser
-    tag = [line for line in shell.splitlines() if "reports-workspace.js" in line]
-    assert tag, "index.html no longer loads reports-workspace.js"
-    assert all('type="module"' in line for line in tag), (
-        "reports-workspace.js is loaded without type=\"module\"; it uses "
-        "`import` and would fail to parse: %s" % tag)
+def test_the_page_serves_the_controller_the_shell_depends_on(browser):
+    """The shell is inert without its controller, and a 404 here is silent.
+
+    The v2 UI replaced the ES-module workspace with a single classic script, so
+    the old `type="module"` assertion no longer describes anything. What still
+    matters is unchanged: the page must REFERENCE its controller and the server
+    must SERVE it. A shell that loads with a broken script tag renders a static
+    skeleton — every button dead — and nothing on screen says so.
+    """
+    client, _, _, shell, _ = browser
+    tag = [line for line in shell.splitlines() if "v2/app.js" in line]
+    assert tag, "index.html no longer loads the v2 controller"
+    served = client.get("/static/v2/app.js")
+    assert served.status_code == 200, "the controller 404s; the shell would be inert"
+    body = served.get_data(as_text=True)
+    assert "addEventListener" in body and "/api/pdf/upload" in body
 
 
 def test_the_upload_form_states_the_plans_only_contract(browser):
     """The contract belongs on the screen, not only in the docs."""
     _, _, _, shell, _ = browser
-    # Matched on the sentence rather than on "Upload the PLANS", which the
-    # template splits across a <strong> tag.
-    assert "never reads a completed take-off" in shell
-    assert "plans-only-hint" in shell
+    # Matched on the CLAIM rather than on any one phrasing: the v2 shell states
+    # it in the page head and again on the upload card, and a redesign that
+    # keeps the words but drops the meaning should still fail here.
+    assert "not a completed take-off" in shell, (
+        "the plans-only contract is no longer stated on the upload screen")
+    assert "cannot tell a finished take-off apart" in shell, (
+        "the screen no longer says WHY it matters, only that it does")
 
 
 # ─── 3. uploading ───────────────────────────────────────────────────────────
