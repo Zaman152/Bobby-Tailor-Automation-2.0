@@ -991,6 +991,24 @@ def _normalize_calculated(estimates: list) -> List[Dict[str, Any]]:
             # schedule produced "Doors-STL" and the report published a blank
             # under that name while publishing its quantity under the prose one.
             "canonical_item": e.get("canonical_item"),
+            # WHICH REGION a measured row came from, and WHAT NAMED IT. Both are
+            # set by fusion and carried by the calculator's
+            # `_CARRIED_REGION_FIELDS`, and both died here — this whitelist is
+            # the only gate between the calculator and aggregate_takeoff, and a
+            # field left off it is a field nobody downstream can ever see.
+            #
+            # The cost was not cosmetic. `_withhold_region_sharing_hypotheses`
+            # (28-05) groups rows by `region_ref` and withholds a
+            # hypothesis-named row that claims a region an evidence-named row
+            # already holds — the rule that stops one measured footprint
+            # publishing as three priced line items. With the key dropped,
+            # `region_ref` was permanently "" and the grouping never had two
+            # members, so the rule has never fired in production. Its unit tests
+            # pass `region_ref` in by hand, which is exactly why the seam stayed
+            # invisible. `_name_is_a_hypothesis`'s vocabulary-basis disjunct was
+            # dormant for the same reason.
+            "region_ref": e.get("region_ref"),
+            "name_source": e.get("name_source"),
             "waste_factor": e.get("waste_factor_applied", 1.0),
             "formula_applied": e.get("formula", ""),   # NEW: shows the actual math
             "approximate": e.get("approximate", False),
