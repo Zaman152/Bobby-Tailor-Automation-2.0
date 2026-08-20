@@ -97,29 +97,38 @@ async function uploadManifest(file) {
     $("#mdropTitle").textContent = file.name;
     $("#manifestNote").innerHTML = note("note-key", "Catalog loaded",
       `<b>${d.count}</b> objects. Every one will appear in the take-off — measured, or flagged so nothing is silently missed.`);
+    refreshRunGate();
   } catch (err) {
     $("#mdropTitle").textContent = "Drop a manifest (.json or .csv)";
     $("#manifestNote").innerHTML = note("note-warn", "Could not read that manifest", esc(err.message));
-    state.manifestId = null;
+    state.manifestId = null; refreshRunGate();
   }
 }
 
 function refreshRunGate() {
+  // The catalog is REQUIRED. Without it every row is named from the drawing's
+  // own vocabulary, and the estimator gets a take-off in the drafter's words —
+  // measured correctly and unusable without a second pass to rename it.
   const ack = $("#ackTakeoff");
-  const blocked = !state.uploadId || (ack && !ack.checked);
+  const needsAck = ack && !ack.checked;
+  const blocked = !state.uploadId || !state.manifestId || needsAck;
   $("#runBtn").disabled = blocked;
-  $("#runHint").textContent = !state.uploadId ? "Upload a PDF to begin."
-    : (ack && !ack.checked) ? "Confirm the file is plans before running."
-    : state.manifestId ? "Ready. Your catalog is attached."
-    : "Ready. Running without a catalog is fine — names will come from the drawings.";
+  $("#runHint").textContent =
+      !state.uploadId  ? "Upload a PDF to begin."
+    : needsAck         ? "Confirm the file is plans before running."
+    : !state.manifestId? "Add your item catalog — download a sample above if you have not written one yet."
+    :                    "Ready. Your catalog is attached.";
 }
 
 /* ── step 3: run + progress ─────────────────────────────────────────── */
 async function startRun() {
   $("#runBtn").disabled = true;
   try {
-    const body = { upload_id: state.uploadId, project_name: $("#projName").value || "Untitled" };
-    if (state.manifestId) body.manifest_id = state.manifestId;
+    const body = {
+      upload_id: state.uploadId,
+      project_name: $("#projName").value || "Untitled",
+      manifest_id: state.manifestId,
+    };
     const d = await api("/api/pdf/run", { method: "POST", body });
     state.jobId = d.job_id;
     $("#pgProject").textContent = body.project_name;
@@ -291,6 +300,7 @@ async function editQty(cell) {
 addEventListener("DOMContentLoaded", () => {
   wireDrop($("#drop"),  $("#file"),  uploadPlans);
   wireDrop($("#mdrop"), $("#mfile"), uploadManifest);
+  refreshRunGate();
   $("#runBtn").addEventListener("click", startRun);
   $("#cancelBtn").addEventListener("click", async () => {
     clearInterval(state.poll);

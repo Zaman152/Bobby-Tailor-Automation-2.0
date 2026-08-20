@@ -1,156 +1,123 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Settings — Bobby Tailor</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='ui-polish.css') }}">
-  <style>
-    .label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-    .field-set-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(16, 185, 129, 0.15); color: var(--accent-success); font-weight: 500; }
-    .field-unset-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(239, 68, 68, 0.15); color: var(--accent-danger); font-weight: 500; }
-    .checkbox-row { display: flex; align-items: center; gap: 10px; }
-    .help-text { font-size: 12px; color: var(--text-tertiary); margin-top: 5px; }
-    .cron-examples { margin-top: 6px; font-size: 12px; color: var(--text-tertiary); }
-    .cron-examples code { font-family: var(--font-data); color: var(--text-secondary); background: var(--bg-elevated); padding: 1px 5px; border-radius: 3px; }
-    .actions { max-width: 720px; margin: 24px auto 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-    .msg-success { color: var(--accent-success); padding: 10px 16px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius-sm); }
-    .msg-error { color: var(--accent-danger); padding: 10px 16px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-sm); }
-    .msg-warning { color: var(--accent-warning); padding: 10px 16px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: var(--radius-sm); margin-top: 8px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(96,165,250,0.3); border-top-color: #60a5fa; border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='v2/tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='v2/base.css') }}">
 </head>
-<body class="settings-page">
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><b>Bobby Tailor</b><span>Take-off</span></div>
+    <nav class="nav">
+      <a href="/#/new">New take-off</a>
+      <a href="/#/reports">Reports</a>
+      <a href="/#/history">History</a>
+      <a href="/#/guide">How to use</a>
+      <a href="/settings" aria-current="page">Settings</a>
+    </nav>
+    <div class="rail-foot">
+      <form method="POST" action="/logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-quiet" style="width:100%">Sign out</button>
+      </form>
+    </div>
+  </aside>
 
-<div class="page-header">
-  <h1>Settings</h1>
-  <div style="display:flex;align-items:center;gap:16px;">
-    <a href="/" class="back-link">← Back to App</a>
-    <form action="{{ url_for('auth.logout') }}" method="post" class="logout-form logout-form--header">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-      <button type="submit" class="back-link">Log out</button>
-    </form>
-  </div>
+  <main class="main">
+    <div class="page-head">
+      <h1>Settings</h1>
+      <p class="hint">These write to <span class="mono">.env</span>. A value set in the process
+        environment — systemd, Docker — <b>wins over this page</b> and will read back unchanged.</p>
+    </div>
+
+    <div class="stack">
+      <div id="msgArea"></div>
+
+      <div class="card">
+        <div class="card-head"><h2>Anthropic</h2>
+          <p class="hint">Required for the vision passes. Without a key the deterministic
+            measurement still runs and the vision passes fail mid-run.</p></div>
+        <div class="field">
+          <label for="ANTHROPIC_API_KEY">API key <span id="ANTHROPIC_API_KEY_badge" class="chip chip-quiet">unset</span></label>
+          <input class="input mono" type="password" id="ANTHROPIC_API_KEY" name="ANTHROPIC_API_KEY"
+                 autocomplete="off" placeholder="sk-ant-…">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Models</h2>
+          <p class="hint">Routing is per sheet type. Changing these changes cost and quality
+            together — the dense-table model earns its price on schedule sheets.</p></div>
+        <div class="field">
+          <label for="CLAUDE_MODEL">Default sheet model</label>
+          <select class="input" id="CLAUDE_MODEL" name="CLAUDE_MODEL">
+            {% for slug, label in model_choices %}
+            <option value="{{ slug }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <p class="hint">Used for most drawing sheets.</p>
+        </div>
+        <div class="field">
+          <label for="CLAUDE_MODEL_SCHEDULES">Schedule sheet model</label>
+          <select class="input" id="CLAUDE_MODEL_SCHEDULES" name="CLAUDE_MODEL_SCHEDULES">
+            {% for slug, label in model_choices %}
+            <option value="{{ slug }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <p class="hint">Used for schedules and panel sheets with dense tabular text.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Output</h2></div>
+        <div class="field">
+          <label for="OUTPUT_DIR">Report directory</label>
+          <input class="input mono" type="text" id="OUTPUT_DIR" name="OUTPUT_DIR" placeholder="./output">
+          <p class="hint">Use an absolute path in production.</p>
+        </div>
+        <div class="field">
+          <label for="RUN_SCHEDULE">Scheduled run (cron)</label>
+          <input class="input mono" type="text" id="RUN_SCHEDULE" name="RUN_SCHEDULE" placeholder="0 2 * * *">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>StackCT <span class="chip chip-quiet">not used on a plans-only box</span></h2>
+          <p class="hint">Leave these empty. With no email set the app skips the catalog prefetch
+            and the 24-hour scheduler, and logs that it did. Do not invent credentials.</p></div>
+        <div class="field">
+          <label for="STACKCT_EMAIL">Email <span id="STACKCT_EMAIL_badge" class="chip chip-quiet">unset</span></label>
+          <input class="input" type="email" id="STACKCT_EMAIL" name="STACKCT_EMAIL" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="STACKCT_PASSWORD">Password <span id="STACKCT_PASSWORD_badge" class="chip chip-quiet">unset</span></label>
+          <input class="input" type="password" id="STACKCT_PASSWORD" name="STACKCT_PASSWORD" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="HEADLESS">Headless browser</label>
+          <select class="input" id="HEADLESS" name="HEADLESS">
+            <option value="true">true</option><option value="false">false</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:1"><label for="CANVAS_STABILITY_TIMEOUT">Canvas timeout (s)</label>
+            <input class="input mono" type="number" id="CANVAS_STABILITY_TIMEOUT" name="CANVAS_STABILITY_TIMEOUT"></div>
+          <div class="field" style="flex:1"><label for="CANVAS_STABILITY_CHECKS">Stability checks</label>
+            <input class="input mono" type="number" id="CANVAS_STABILITY_CHECKS" name="CANVAS_STABILITY_CHECKS"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="btn" id="saveBtn">Save settings</button>
+        <span class="hint">Blank a secret to leave it unchanged — saving never clears a stored key.</span>
+      </div>
+    </div>
+  </main>
 </div>
-
-<form class="settings-form" onsubmit="saveSettings(event)">
-
-  <div class="section">
-    <h2>StackCT Credentials</h2>
-    <div class="field">
-      <div class="label-row">
-        <label for="STACKCT_EMAIL">Email</label>
-        <span id="STACKCT_EMAIL_badge"></span>
-      </div>
-      <input type="email" id="STACKCT_EMAIL" name="STACKCT_EMAIL" placeholder="your@email.com" autocomplete="username" />
-      <p class="help-text">Your StackCT login email address.</p>
-    </div>
-    <div class="field">
-      <div class="label-row">
-        <label for="STACKCT_PASSWORD">Password</label>
-        <span id="STACKCT_PASSWORD_badge"></span>
-      </div>
-      <input type="password" id="STACKCT_PASSWORD" name="STACKCT_PASSWORD"
-             data-sensitive="true" data-has-value="false"
-             placeholder="Enter new password to change"
-             autocomplete="current-password" />
-      <p class="help-text">Leave blank to keep existing password. Changing this requires a server restart.</p>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>Anthropic API Configuration</h2>
-    <div class="field">
-      <div class="label-row">
-        <label for="ANTHROPIC_API_KEY">API Key</label>
-        <span id="ANTHROPIC_API_KEY_badge"></span>
-      </div>
-      <input type="password" id="ANTHROPIC_API_KEY" name="ANTHROPIC_API_KEY"
-             data-sensitive="true" data-has-value="false"
-             placeholder="sk-ant-... (leave blank to keep existing)"
-             autocomplete="off" />
-      <p class="help-text">Leave blank to keep existing key. Must start with <code>sk-ant-</code>.</p>
-    </div>
-    <div class="field">
-      <label for="CLAUDE_MODEL">Default Model</label>
-      {# Options come from config.MODEL_CHOICES — a hardcoded list here went
-         stale against .env, and a <select> silently reads back "" when its
-         value has no matching <option>. #}
-      <select id="CLAUDE_MODEL" name="CLAUDE_MODEL">
-        {% for slug, label in model_choices %}
-        <option value="{{ slug }}">{{ label }}</option>
-        {% endfor %}
-      </select>
-      <p class="help-text">Used for most drawing sheets. Haiku recommended for general takeoffs.</p>
-    </div>
-    <div class="field">
-      <label for="CLAUDE_MODEL_SCHEDULES">Schedule Sheet Model</label>
-      <select id="CLAUDE_MODEL_SCHEDULES" name="CLAUDE_MODEL_SCHEDULES">
-        {% for slug, label in model_choices %}
-        <option value="{{ slug }}">{{ label }}</option>
-        {% endfor %}
-      </select>
-      <p class="help-text">Used for schedule and panel sheets with dense tabular text. Sonnet recommended.</p>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>Browser Settings</h2>
-    <div class="field">
-      <div class="checkbox-row">
-        <input type="checkbox" id="HEADLESS" name="HEADLESS" />
-        <label for="HEADLESS" style="margin:0;cursor:pointer;">Run browser in headless mode</label>
-      </div>
-      <p class="help-text">Disable for debugging; enable for server/VPS deployment.</p>
-    </div>
-    <div class="field">
-      <label for="CANVAS_STABILITY_TIMEOUT">Canvas Stability Timeout (seconds)</label>
-      <input type="text" id="CANVAS_STABILITY_TIMEOUT" name="CANVAS_STABILITY_TIMEOUT" placeholder="15" />
-      <p class="help-text">Seconds to wait for canvas to stabilize before screenshot.</p>
-    </div>
-    <div class="field">
-      <label for="CANVAS_STABILITY_CHECKS">Canvas Stability Checks</label>
-      <input type="text" id="CANVAS_STABILITY_CHECKS" name="CANVAS_STABILITY_CHECKS" placeholder="2" />
-      <p class="help-text">Consecutive pixel-hash matches required before screenshot is taken.</p>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>Output Configuration</h2>
-    <div class="field">
-      <label for="OUTPUT_DIR">Output Directory</label>
-      <input type="text" id="OUTPUT_DIR" name="OUTPUT_DIR" placeholder="./output" />
-      <p class="help-text">Where reports and screenshots are saved. Relative to project root.</p>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>Schedule Configuration</h2>
-    <div class="field">
-      <label for="RUN_SCHEDULE">Automated Run Schedule (cron format)</label>
-      <input type="text" id="RUN_SCHEDULE" name="RUN_SCHEDULE" placeholder="0 8 * * *" />
-      <p class="help-text">Format: <code>minute hour day month weekday</code></p>
-      <div class="cron-examples">
-        Examples: <code>0 8 * * *</code> daily at 8am ·
-        <code>0 */6 * * *</code> every 6h ·
-        <code>0 0 * * 1</code> every Monday
-      </div>
-    </div>
-  </div>
-
-</form>
-
-<div class="actions">
-  <div class="msg-area" id="msgArea"></div>
-  <button class="save-btn" id="saveBtn" onclick="saveSettings(event)">Save Settings</button>
-</div>
-
 <script src="{{ url_for('static', filename='settings.js') }}"></script>
 </body>
 </html>
