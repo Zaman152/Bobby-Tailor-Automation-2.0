@@ -62,7 +62,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 STATIC = REPO_ROOT / "src" / "bobbytailor" / "web" / "static"
 PROVENANCE_JS = STATIC / "js" / "report-provenance.js"
 WORKSPACE_JS = STATIC / "js" / "reports-workspace.js"
-APP_JS = STATIC / "app.js"
+APP_JS = STATIC / "v2" / "app.js"
 INDEX_HTML = REPO_ROOT / "src" / "bobbytailor" / "web" / "templates" / "index.html"
 HARNESS = REPO_ROOT / "tests" / "js" / "report_provenance_harness.mjs"
 
@@ -446,8 +446,14 @@ def test_coverage_json_downloads_and_previews(client, run_dir):
 
 def test_the_downloads_panel_links_coverage_json():
     assert "coverage_json" in WORKSPACE_JS.read_text()
-    assert "coverage_json" in APP_JS.read_text()
     assert "coverage: 'coverage.json'" in WORKSPACE_JS.read_text()
+    # The v2 worksheet links the file by name on the downloads row. coverage.json
+    # is the record of what the run did NOT do, and it is what makes a published
+    # number defensible to whoever the estimator is bidding against — so it must
+    # be reachable from the screen, not only from the API.
+    v2 = APP_JS.read_text()
+    assert "coverage.json" in v2, "the v2 worksheet no longer offers coverage.json"
+    assert "wsCoverage" in v2, "the coverage download link is not wired"
 
 
 # ─── 8. unnamed geometry is rendered ────────────────────────────────────────
@@ -559,9 +565,13 @@ def test_both_pdf_entry_points_open_their_job_log_through_the_guard():
 
 def test_the_upload_form_states_the_plans_only_contract_and_asks_for_a_confirm():
     html = INDEX_HTML.read_text()
-    assert "plansOnlyWarning" in html
-    assert "plansOnlyAck" in html
+    # The v2 shell renders the warning from the upload response rather than
+    # shipping an empty container, so the CLAIM is asserted instead of a
+    # container id — a rebuild that keeps the id and drops the sentence would
+    # otherwise pass.
+    assert "not a completed take-off" in html
     js = APP_JS.read_text()
+    assert "ackTakeoff" in js, "the acknowledgement checkbox is no longer rendered"
     assert "plansOnlyBlocksRun" in js
     # The acknowledgement must gate the run itself, not only the button — a
     # disabled attribute is only as good as the last event that set it, and

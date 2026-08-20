@@ -121,7 +121,24 @@ function refreshRunGate() {
 }
 
 /* ── step 3: run + progress ─────────────────────────────────────────── */
+function plansOnlyBlocksRun() {
+  // The acknowledgement gates the RUN, independently of the button.
+  // A `disabled` attribute is only as good as the last event that set it —
+  // a stale render, a devtools click or a second listener can all leave it
+  // stale — and this call spends money on the vision API. So the refusal is
+  // re-derived here from state, at the moment of spending.
+  const ack = $("#ackTakeoff");
+  return Boolean(ack && !ack.checked);
+}
+
 async function startRun() {
+  if (plansOnlyBlocksRun()) {
+    $("#runGuard").innerHTML = note("note-warn", "Confirm this is a set of plans",
+      "This file is named like a completed take-off. Tick the confirmation above before running — a take-off run costs money and produces nothing usable.");
+    refreshRunGate();
+    return;
+  }
+  if (!state.uploadId || !state.manifestId) { refreshRunGate(); return; }
   $("#runBtn").disabled = true;
   try {
     const body = {
