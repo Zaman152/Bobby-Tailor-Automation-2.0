@@ -95,3 +95,50 @@ def test_the_factor_is_still_recorded_on_the_table():
     """Not deleted — pricing still needs it."""
     assert ESTIMATION_TABLES["gas_pipe"]["waste_factor"] == 1.05
     assert ESTIMATION_TABLES["eifs"]["waste_factor"] == 1.05
+
+# ─── the branch 31-01 missed ────────────────────────────────────────────────
+
+def test_the_component_producer_publishes_the_measurement():
+    """31-01 fixed `_apply_formula` and reported Gas Piping as fixed. It was not.
+
+    The paid run of 2026-08-21 returned Gas Piping at 921.48 LF against a golden
+    of 886.77 — raw_value 877.6, `formula: count x 1.05` — byte-identical to the
+    run BEFORE that fix, because this producer publishes the row and
+    `_apply_formula` never sees it. A fix proved on a function is not a fix
+    proved on a row.
+
+    Asserted through the real producer with the shape Bob's gas piping actually
+    arrives as, so the next person to change a waste rule finds out here.
+    """
+    from bobbytailor.pipeline.calculator import _calculate_from_component
+
+    out = _calculate_from_component(
+        {"name": "Gas Piping", "quantity": 877.6, "unit": "LF",
+         "provenance": "geometry", "confidence": "high"},
+        "page_0004.png", "roof_plan",
+    )
+    assert out is not None, "the producer refused a row it publishes in production"
+    assert out["quantity"] == 877.6, (
+        "the measured length was multiplied by a waste factor: %r" % out["quantity"])
+    assert out["waste_factor_applied"] == 1.05, (
+        "the factor must be RECORDED for pricing, not discarded")
+    assert "not applied" in out["formula"], (
+        "the row must say the factor was withheld: %r" % out["formula"])
+
+
+def test_no_producer_multiplies_a_published_quantity_by_waste():
+    """The rule, asserted against the SOURCE so a third branch cannot reappear.
+
+    Two branches carried this defect and the second survived a fix that claimed
+    both. A grep-level guard costs nothing and closes the class.
+    """
+    import re
+    from pathlib import Path as _P
+
+    src = _P("src/bobbytailor/pipeline/calculator.py").read_text()
+    offenders = [ln.strip() for ln in src.splitlines()
+                 if re.search(r"(?<![\w.])(numeric|value)\s*\*\s*wf\b", ln)
+                 and "sheets" not in ln and "studs" not in ln]
+    assert offenders == [], (
+        "a producer multiplies a published quantity by the waste factor: %r\n"
+        "Waste belongs to ordering, not to a take-off quantity." % offenders)

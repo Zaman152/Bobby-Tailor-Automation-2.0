@@ -721,7 +721,19 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
         item_type = _classify_item(name, unit, sheet_type)
         table = ESTIMATION_TABLES.get(item_type, {})
         wf = table.get("waste_factor", 1.0)
-        final = numeric * wf
+        # MEASURED, not ordered — the same rule 31-01 applied to the area and
+        # length branches of `_apply_formula`, and the branch it MISSED.
+        #
+        # 31-01 was verified on `_apply_formula` and reported as fixing Gas
+        # Piping. It did not: this producer is the one that publishes that row,
+        # and the paid run of 2026-08-21 still returned 921.48 LF against a
+        # golden of 886.77 — raw_value 877.6 with `formula: count × 1.05`,
+        # byte-identical to the run before the fix. A fix proved on a function
+        # is not a fix proved on a row.
+        #
+        # The factor is not lost; `waste_factor_applied` below still carries it
+        # for whoever prices the job.
+        final = numeric
 
         # Propagate the count pass's own confidence; flag low-confidence or
         # unclassified ("general") counts for human review rather than presenting
@@ -785,7 +797,10 @@ def _calculate_from_component(c: dict, sheet_name: str, sheet_type: str) -> Opti
             "count_corroboration": corroboration,
             "count_evidence_sheet_kind": sheet_type,
             "waste_factor_applied": wf,
-            "formula": f"count × {wf}" if wf != 1.0 else "count",
+            "formula": (
+                f"count of {numeric:g} (order factor {wf}, not applied)"
+                if wf != 1.0 else "count"
+            ),
             "source_sheet": sheet_name,
             "source_location": location,
             "source_raw": f"{name} — {spec}" if spec else name,
@@ -1476,7 +1491,7 @@ def _apply_formula(item_type: str, value: float, unit: str, raw: str) -> Tuple[f
 
     if item_type == "ceiling_grid":
         wf = table["waste_factor"]
-        return value * wf, "sq_ft", f"{value:.0f} sf × {wf} waste = {value * wf:.0f} sf"
+        return value, "sq_ft", f"{value:.0f} sf measured (order factor {wf}, not applied)"
 
     if item_type == "insulation":
         wf = table["waste_factor"]
