@@ -1,0 +1,65 @@
+name: PR checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  fast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PYTHONPATH: src
+      SECRET_KEY: ci-only-not-a-real-secret
+      ADMIN_EMAIL: ci@example.com
+      # bcrypt hash of a throwaway string; the app refuses to boot without one.
+      ADMIN_PASSWORD_HASH: $2b$12$oFS0rKXSELUhrYG9MKjHoeggIEC36jKJK8vpBybtkQzRHwILZ0Egq
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"        # the runtime this app ships on
+          cache: pip
+
+      - name: Refuse to run with a paid credential present
+        run: |
+          if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::error::ANTHROPIC_API_KEY is set in CI. No job here needs it,"
+            echo "and a stray '-m golden' would then bill a real account."
+            exit 1
+          fi
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest pytest-timeout
+          # Deliberately NOT `playwright install`: browsers are StackCT-only and
+          # this deployment is plans-only. It would add ~400 MB for nothing.
+
+      - name: Imports
+        run: python -c "import bobbytailor, app; print('imports ok')"
+
+      - name: Critical modules
+        # Seven modules, each guarding a defect that reached a paid run.
+        run: |
+          python -m pytest -q --timeout=1200 \
+            tests/test_production_user_path.py \
+            tests/test_report_honesty.py \
+            tests/test_blueprint_parity.py \
+            tests/test_aggregator.py \
+            tests/test_calculator_accuracy.py \
+            tests/test_phase31_waste_is_not_quantity.py \
+            tests/test_phase31_region_fields_reach_the_aggregator.py
+
+      - name: The learning seed must import cleanly
+        # A seed that cannot be imported is a seed nobody finds out about until
+        # a fresh VPS starts with no vocabulary at all.
+        run: |
+          python3 scripts/learning_seed.py import --db /tmp/ci_learning.db
+          python3 scripts/learning_seed.py import --db /tmp/ci_learning.db | tee /tmp/second.txt
+          grep -q "imported 0 row" /tmp/second.txt || {
+            echo "::error::the seed import is not idempotent — a redeploy would duplicate learning"
+            exit 1; }

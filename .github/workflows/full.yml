@@ -1,0 +1,58 @@
+name: Full suite
+
+on:
+  schedule:
+    - cron: "0 2 * * *"      # 02:00 UTC nightly
+  workflow_dispatch:          # and on demand, before a deploy
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      PYTHONPATH: src
+      SECRET_KEY: ci-only-not-a-real-secret
+      ADMIN_EMAIL: ci@example.com
+      ADMIN_PASSWORD_HASH: $2b$12$oFS0rKXSELUhrYG9MKjHoeggIEC36jKJK8vpBybtkQzRHwILZ0Egq
+      # Pin this to the skip count a GREEN run reports. See docs/CI-CD-SETUP.md §3.
+      # It is NOT the local baseline of 1: CI has no uploads/, so four-set
+      # sweeps skip by design.
+      EXPECTED_SKIPS: "0"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.9", cache: pip }
+
+      - name: Refuse to run with a paid credential present
+        run: |
+          if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::error::ANTHROPIC_API_KEY is set in CI."; exit 1; fi
+
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      - name: Full offline suite
+        run: set -o pipefail; python -m pytest -q | tee /tmp/suite.log
+
+      - name: A gate that skips is a gate that did not run
+        # Twice in one week the determinism harness went 19 passed -> 9 passed /
+        # 10 skipped on replay-fixture drift, and the suite still reported green.
+        # It passed for having looked at nothing. The skip count is the tell.
+        run: |
+          SUMMARY=$(grep -E "[0-9]+ passed" /tmp/suite.log | tail -1)
+          echo "$SUMMARY"
+          SKIPPED=$(echo "$SUMMARY" | grep -oE '[0-9]+ skipped' | grep -oE '[0-9]+' || echo 0)
+          if [ "$SKIPPED" -gt "${EXPECTED_SKIPS}" ]; then
+            echo "::error::$SKIPPED skipped, expected ${EXPECTED_SKIPS}."
+            echo "Most likely replay-fixture drift. Fix with (zero API):"
+            echo "    python3 scripts/author_replay_fixtures.py"
+            echo "Do NOT raise EXPECTED_SKIPS to make this pass — that is how a"
+            echo "gate stops testing and nobody notices."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: suite-log, path: /tmp/suite.log }

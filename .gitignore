@@ -35,7 +35,7 @@ Thumbs.db
 *.swp
 *.swo
 *.egg-info/
-data/
+data/*
 MagicMock/
 output/_archive/
 
@@ -55,3 +55,9 @@ reports/
 # leaves it behind — and a leftover decoy SKIPS the tripwire on every later
 # run, so the check goes quiet rather than failing.
 manifests/
+
+# The learning SEED is the one thing under data/ that must travel with a deploy.
+# output/learning.db is gitignored (a live SQLite file has no place in git), so
+# without this a fresh VPS starts knowing nothing — no corrected vocabulary, no
+# project snapshots, and therefore no reproducible repeat runs.
+!data/learning_seed.json

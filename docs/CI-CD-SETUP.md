@@ -215,6 +215,7 @@ Set as GitHub **repository secrets**, never in the repo:
 | `ADMIN_EMAIL` | login |
 | `ADMIN_PASSWORD_HASH` | bcrypt, starts `$2b$` |
 | `ANTHROPIC_API_KEY` | **on the server only** — never exposed to a CI job |
+| `DEPLOY_PORT` | SSH port (22 unless you moved it) |
 
 Leave `STACKCT_EMAIL` / `STACKCT_PASSWORD` **empty**. With them set the app
 starts a 24-hour catalog scheduler against a service a plans-only box never
@@ -345,3 +346,60 @@ Two rules learned the hard way:
   fix passed its unit tests and left the published Gas Piping row byte-identical
   through a whole paid run, because a second producer published it. Assert the
   ROW.
+
+---
+
+## 8. Server `.env` — the complete list
+
+Everything the VPS needs. Set on the server, never in the repo.
+
+| Variable | Required | Notes |
+|---|---|---|
+| `SECRET_KEY` | **yes** | long random string; app refuses to boot without it |
+| `ADMIN_EMAIL` | **yes** | login |
+| `ADMIN_PASSWORD_HASH` | **yes** | bcrypt, starts `$2b$` |
+| `ANTHROPIC_API_KEY` | for paid runs | missing is a WARNING, not a refusal — the deterministic path still runs |
+| `OUTPUT_DIR` | **yes** | use an **absolute** path, e.g. `/var/lib/bobbytailor/output` |
+| `LEARNING_DB_PATH` | **yes** | **put it OUTSIDE the repo** — see below |
+| `SESSION_COOKIE_SECURE` | conditional | leave unset behind TLS; `false` only for an SSH tunnel |
+| `MAX_UPLOAD_MB` | recommended | must match nginx `client_max_body_size` |
+| `JOB_HISTORY_RETENTION_DAYS` | optional | default 90 |
+| `STACKCT_EMAIL` / `STACKCT_PASSWORD` | **leave empty** | setting them starts a 24 h scheduler this box never uses |
+
+### Why `LEARNING_DB_PATH` must live outside the repo
+
+```bash
+LEARNING_DB_PATH=/var/lib/bobbytailor/learning.db
+OUTPUT_DIR=/var/lib/bobbytailor/output
+```
+
+The learning store is what makes a name you corrected once stick forever, and
+what makes a REPEAT run of a project reproducible. Left at its default
+(`output/learning.db`) it sits inside the working tree — gitignored, so
+`git reset --hard` spares it, but one `git clean -fdx` erases every correction
+the estimator has ever made. Outside the repo, no git operation can reach it.
+
+```bash
+sudo mkdir -p /var/lib/bobbytailor && sudo chown bobbytailor: /var/lib/bobbytailor
+```
+
+### Seeding a fresh server with what this machine learned
+
+`output/learning.db` is gitignored, so a fresh VPS starts knowing nothing.
+`data/learning_seed.json` is the committed bridge — currently **1,652
+vocabulary rows, 65 corrections and 7 project snapshots**.
+
+```bash
+# on the dev machine, after teaching it something
+python3 scripts/learning_seed.py export && git commit -am "chore: refresh learning seed"
+
+# on the server (the deploy workflow does this for you)
+PYTHONPATH=src .venv/bin/python scripts/learning_seed.py import \
+  --db /var/lib/bobbytailor/learning.db
+```
+
+**The import is additive and idempotent** — verified by running it three times:
+1,724 rows on the first pass, zero on the second and third. A row already on the
+server is left exactly as it is, because the server's own learning outranks a
+seed. A deploy must never silently undo a correction an estimator made in
+production.

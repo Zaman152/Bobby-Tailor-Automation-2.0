@@ -1,0 +1,81 @@
+name: Deploy to VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm'
+        required: true
+      seed_learning:
+        description: 'Import the committed learning seed (additive, never overwrites)'
+        type: boolean
+        default: true
+
+jobs:
+  deploy:
+    if: github.event.inputs.confirm == 'deploy'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy
+        uses: appleboy/ssh-action@v1
+        env:
+          SEED: ${{ github.event.inputs.seed_learning }}
+        with:
+          host:     ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key:      ${{ secrets.DEPLOY_SSH_KEY }}
+          port:     ${{ secrets.DEPLOY_PORT }}
+          envs: SEED
+          script: |
+            set -euo pipefail
+            APP=/opt/bobbytailor
+            cd "$APP"
+
+            # Remember where we were, so a rollback is one command.
+            git rev-parse HEAD > /tmp/bt_previous
+
+            git fetch --all --quiet
+            git reset --hard origin/main --quiet
+            .venv/bin/pip install -q -r requirements.txt
+
+            # LEARNING: the store lives OUTSIDE the repo (LEARNING_DB_PATH in
+            # .env) so no git operation can reach it. The seed is additive and
+            # never overwrites — the server's own learning always outranks it,
+            # or a deploy would silently undo corrections made in production.
+            if [ "${SEED}" = "true" ]; then
+              PYTHONPATH=src .venv/bin/python scripts/learning_seed.py import \
+                --db "${LEARNING_DB_PATH:-/var/lib/bobbytailor/learning.db}" || \
+                echo "seed import skipped (non-fatal)"
+            fi
+
+            sudo systemctl restart bobbytailor
+            sleep 6
+
+            # ── smoke test: every check can be watched failing ──────────────
+            code() { curl -s -o /dev/null -w '%{http_code}' "$1"; }
+            [ "$(code http://127.0.0.1:5050/login)" = "200" ] \
+              || { echo "::error::/login is not served"; exit 1; }
+            # 401 is the point: a 200 here means report data is PUBLIC.
+            [ "$(code http://127.0.0.1:5050/api/reports)" = "401" ] \
+              || { echo "::error::/api/reports is not protected"; exit 1; }
+            [ "$(code http://127.0.0.1:5050/)" = "302" ] \
+              || { echo "::error::/ does not redirect to login"; exit 1; }
+
+            # Exactly one worker. Job state is in-process dicts; with two, an
+            # upload handled by worker A 404s when the run lands on worker B.
+            WORKERS=$(pgrep -f "gunicorn.*app:app" | wc -l)
+            [ "$WORKERS" -le 2 ] \
+              || { echo "::error::$WORKERS gunicorn processes — -w 1 is mandatory"; exit 1; }
+
+            echo "deployed $(git rev-parse --short HEAD) · workers=$WORKERS"
+
+      - name: Rollback instructions
+        if: failure()
+        run: |
+          echo "Deploy failed. To roll back:"
+          echo "  ssh \$USER@\$HOST 'cd /opt/bobbytailor && \\"
+          echo "    git reset --hard \$(cat /tmp/bt_previous) && \\"
+          echo "    sudo systemctl restart bobbytailor'"
