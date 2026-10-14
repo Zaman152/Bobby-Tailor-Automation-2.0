@@ -1187,8 +1187,12 @@ class StackCTBrowser:
         return False
 
     async def close(self):
-        if self._browser:
-            await self._browser.close()
-        if self._playwright:
-            await self._playwright.stop()
+        try:
+            if self._browser:
+                await self._browser.close()
+        finally:
+            # The driver is a separate node process; it outlives a browser
+            # that failed to launch or crashed unless it is stopped here.
+            if self._playwright:
+                await self._playwright.stop()
         logger.info("Browser closed")
