@@ -24,8 +24,10 @@ async def _fetch_projects_from_browser() -> list[dict]:
     from bobbytailor.scrape.browser import StackCTBrowser
 
     b = StackCTBrowser()
-    await b.start()
+    # start() belongs inside the try: when the Chromium launch fails, the
+    # Playwright driver is already running and only close() stops it.
     try:
+        await b.start()
         await b.login()
         return await b.get_all_projects()
     finally:
@@ -38,8 +40,8 @@ async def _fetch_plan_sets_from_browser(
     from bobbytailor.scrape.browser import StackCTBrowser
 
     b = StackCTBrowser()
-    await b.start()
     try:
+        await b.start()
         await b.login()
         return await b.get_plan_sets(project_id, count_sheets=count_sheets)
     finally:
@@ -52,8 +54,8 @@ async def _fetch_plans_in_folder_from_browser(
     from bobbytailor.scrape.browser import StackCTBrowser
 
     b = StackCTBrowser()
-    await b.start()
     try:
+        await b.start()
         await b.login()
         return await b.get_page_ids_in_folder(project_id, folder_id)
     finally:
